@@ -211,7 +211,11 @@ describe('UNLOCK_PROGRESSION', () => {
   // gate + the final animal), so the Phase-4 dwell + finale play out inside a
   // finished temple. Completion/recruit is ~96-100, capped dwell completes
   // ~104-108, arming waits for 115, the final board is ~116, and
-  // post-revelation ~117-122.
+  // post-revelation ~117-122. This pins the SOLVE FLOORS only: a player whose
+  // weighted progress lags the floors can finish the house before Phase 4
+  // commits, so the house ceremony is HELD in the ceremony queue until
+  // confirmPhaseTransition lands Phase 4 (canQueueHouseCeremony in
+  // amberCurrency) rather than playing a pre-reveal temple.
   test('house completion sits after the reveal floor, before the Phase 5 floor', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)
@@ -674,6 +678,23 @@ describe('skip the wait (pay premium, unlock now)', () => {
     const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
     expect(getUnlockSkipCost(jungle)).toBe(Math.ceil(jungle.cost * (1 + UNLOCK_SKIP_PREMIUM)));
     expect(getUnlockSkipCost(jungle)).toBeGreaterThan(jungle.cost);
+  });
+
+  test('the premium is 1.5 (skip = 2.5x build cost), a real decision rather than loose change', () => {
+    // product-retention-3: at the old 0.5 (1.5x) a casual 2/day player held
+    // 2-5x the premium at every non-trio gate from solve ~13, so the gates
+    // only paced players who never read the button (all six mid-house skips
+    // cost 3,640 amber, earned by day ~17). At 2.5x the same six cost ~6,050.
+    expect(UNLOCK_SKIP_PREMIUM).toBe(1.5);
+    const gated = UNLOCK_PROGRESSION.filter(u => u.type === 'room' && u.minPuzzles !== undefined);
+    expect(gated.length).toBeGreaterThan(0);
+    for (const room of gated) {
+      expect(getUnlockSkipCost(room)).toBe(Math.ceil(room.cost * 2.5));
+    }
+    // Reserve is still the plain build cost: the premium sits on top of it,
+    // never on the non-paying path.
+    const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+    expect(getUnlockSkipCost(jungle) - jungle.cost).toBe(Math.ceil(jungle.cost * 1.5));
   });
 
   test('canSkipUnlockGate: true when gated + premium affordable + prerequisites met', async () => {

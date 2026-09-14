@@ -679,6 +679,104 @@ export function getHintFallback(phase: DialoguePhase): string {
   return HINT_FALLBACK[phase];
 }
 
+// ============================================================================
+// HINT / UNDO REFUSALS AND RECEIPTS. These used to be literal strings inside
+// usePuzzleGame, spoken in the Phase-0 register at every phase, and the
+// no-hints refusal named Challenge Mode to a player who had only armed the
+// Blind Offering (both run under the shared 'challenge' no-hints umbrella).
+// ============================================================================
+
+// The no-hints umbrella refusal. Blind-only players never enabled Challenge,
+// so the copy names the trial they actually chose.
+const HINT_REFUSED_CHALLENGE: Record<DialoguePhase, string> = {
+  0: 'No hints in Challenge Mode!',
+  1: 'No hints in Challenge Mode. This one is all yours.',
+  2: 'Challenge Mode keeps its hints to itself.',
+  3: 'Challenge Mode allows no hints. The arrangement watches you choose.',
+  4: 'There are no hints here. Challenge Mode gives nothing away.',
+  5: 'Challenge Mode offers no hints. The pattern waits on you.',
+};
+
+const HINT_REFUSED_BLIND: Record<DialoguePhase, string> = {
+  0: 'No hints in the Blind Offering! The chain is yours to judge.',
+  1: 'No hints in the Blind Offering. Trust your words.',
+  2: 'The Blind Offering keeps its hints to itself. Judge the chain yourself.',
+  3: 'The Blind Offering allows no hints. The arrangement is judged unseen.',
+  4: 'There are no hints in the dark. The Blind Offering is judged whole.',
+  5: 'The Blind Offering offers no hints. Judge the chain, then give it.',
+};
+
+/**
+ * Refusal when HINT is tapped under the no-hints umbrella. `blind` names the
+ * Blind Offering; otherwise Challenge Mode (Blind + Challenge stacked is
+ * still refused for the Challenge rule the player armed on top).
+ */
+export function getHintRefusedMessage(phase: DialoguePhase, blind: boolean): string {
+  return blind ? HINT_REFUSED_BLIND[phase] : HINT_REFUSED_CHALLENGE[phase];
+}
+
+// A hint search that found no provably-finishable move. Free (nothing is
+// spent), so the copy always says so. `canUndo` is whether a committed move
+// exists to take back: a fresh board must never be told to undo moves the
+// player has not made.
+const HINT_NO_SAFE_ROUTE_UNDO: Record<DialoguePhase, string> = {
+  0: 'Try undoing a move to find another route. No hint was spent.',
+  1: 'This path may not finish. Try undoing a move. No hint was spent.',
+  2: 'The pattern sees no sure way on from here. Undo a move. No hint was spent.',
+  3: 'No sure route remains from here. Take a move back. No hint was spent.',
+  4: 'The arrangement finds no way on from here. Undo. No hint was spent.',
+  5: 'The threads lead nowhere sure from here. Unwind a move. No hint was spent.',
+};
+
+const HINT_NO_SAFE_ROUTE_FRESH: Record<DialoguePhase, string> = {
+  0: 'No sure route jumps out yet. Try a move of your own! No hint was spent.',
+  1: 'No sure route shows itself yet. Make a move and ask again. No hint was spent.',
+  2: 'The pattern has not found a sure way in yet. Begin, then ask. No hint was spent.',
+  3: 'No sure route shows from the start. Begin, then ask again. No hint was spent.',
+  4: 'The arrangement offers no opening yet. Begin. No hint was spent.',
+  5: 'The threads have not settled yet. Begin, then ask again. No hint was spent.',
+};
+
+export function getHintNoSafeRouteMessage(phase: DialoguePhase, canUndo: boolean): string {
+  return canUndo ? HINT_NO_SAFE_ROUTE_UNDO[phase] : HINT_NO_SAFE_ROUTE_FRESH[phase];
+}
+
+// UNDO tapped with the Challenge budget spent (the budget is Challenge's
+// rule even when stacked on Blind, so the name is right in both cases).
+const UNDO_REFUSED_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'No undos remaining in Challenge Mode!',
+  1: 'No undos left in Challenge Mode. Play it through.',
+  2: 'Challenge Mode has no undos left. The pattern keeps what you gave.',
+  3: 'Challenge Mode has no undos left. What is placed stays placed.',
+  4: 'No undos remain. The arrangement keeps every word you gave it.',
+  5: 'Challenge Mode has no undos left. The pattern holds what it was given.',
+};
+
+export function getUndoRefusedMessage(phase: DialoguePhase): string {
+  return UNDO_REFUSED_MESSAGES[phase];
+}
+
+// A committed undo (the letter returns to its row).
+const UNDO_MESSAGES: Record<DialoguePhase, string> = {
+  0: "Let's try again!",
+  1: 'Back a step. Try again.',
+  2: 'The letter returns. Try another way.',
+  3: 'Taken back. The arrangement waits.',
+  4: 'Undone. The arrangement remembers.',
+  5: 'Unwound. The pattern waits.',
+};
+
+export function getUndoMessage(phase: DialoguePhase): string {
+  return UNDO_MESSAGES[phase];
+}
+
+// Structural guard when a drop would leave a row the wrong length (normally
+// unreachable; kept phase-aware so the guard can never break register).
+export function getWordLengthMessage(expectedLength: number, phase: DialoguePhase): string {
+  if (phase >= 3) return `That row needs ${expectedLength} letters.`;
+  return `Need ${expectedLength} letters!`;
+}
+
 // Shown when the player taps HINT with an empty hint balance.
 const OUT_OF_HINTS_MESSAGES: Record<DialoguePhase, string> = {
   0: "You're out of hints! Watch a quick clip or grab more to keep going.",
@@ -1079,6 +1177,14 @@ export function getCeremonyHoldHint(): string {
 interface RulesText {
   title: string;
   steps: { heading: string; desc: string }[];
+  /**
+   * The star rule (ftue-7), rendered under the four steps: three stars for a
+   * solve with no hints and at most one slipped drop; a hint or a couple of
+   * slips costs one; a solve with no hints, slips or undos is Flawless. Kept
+   * out of the step list on purpose: each step has its own diagram
+   * (RULES_STEP_ART) and the step count is pinned at four.
+   */
+  starRule: string;
   dismissLabel: string;
 }
 
@@ -1097,6 +1203,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Make Real Words', desc: 'Both words must be valid English!' },
       { heading: 'Complete All Rows', desc: 'Work through every row to win!' },
     ],
+    starRule: 'Stars: three for a solve with no hints and no more than one slipped drop. A hint, or a couple of slips, costs one. No hints, slips or undos at all is a Flawless solve!',
     dismissLabel: "LET'S PLAY!",
   },
   1: {
@@ -1107,6 +1214,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Form Valid Words', desc: 'Both words must exist in the dictionary.' },
       { heading: 'Solve the Chain', desc: 'Complete each row to progress.' },
     ],
+    starRule: 'Stars: three for a chain solved without hints and at most one slipped drop. A hint or a couple of slips costs one. A solve with no hints, slips or undos is Flawless.',
     dismissLabel: 'UNDERSTOOD',
   },
   2: {
@@ -1117,6 +1225,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Words Must Be Valid', desc: 'The dictionary decides. Not you.' },
       { heading: 'Finish the Chain', desc: 'Row by row. There is no shortcut.' },
     ],
+    starRule: 'Stars: three when you needed no hint and slipped at most once. A hint, or more than one slip, takes one away. Nothing borrowed, nothing undone: Flawless.',
     dismissLabel: 'CONTINUE',
   },
   3: {
@@ -1127,6 +1236,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Valid Words Only', desc: 'Some arrangements are forbidden.' },
       { heading: 'Complete the Sequence', desc: 'Keep a path open through the remaining rows.' },
     ],
+    starRule: 'Stars: three if you asked for nothing and slipped no more than once. Each hint, each second slip, dims one. A sequence with no hint, no slip and no undo is Flawless.',
     dismissLabel: 'PROCEED',
   },
   4: {
@@ -1137,6 +1247,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'The Words Must Be Real', desc: 'As real as anything here.' },
       { heading: 'Complete the Ritual', desc: 'Row by row. Closer and closer.' },
     ],
+    starRule: 'Stars: three when the hands needed no hint and faltered at most once. A hint, or a second falter, costs one. Unaided, unfaltering, undone by nothing: Flawless.',
     dismissLabel: '...',
   },
   5: {
@@ -1147,6 +1258,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'The Words Are Real', desc: 'As real as the silence between them.' },
       { heading: 'Continue the Pattern', desc: 'Row by row. The weave holds.' },
     ],
+    starRule: 'Stars: three for a thread pulled without a hint and no more than one slip. A hint, or a second slip, lets one go. No hint, no slip, no undo: Flawless.',
     dismissLabel: 'Continue',
   },
 };
@@ -2808,6 +2920,112 @@ export function getPreviewGraduationConfirm(phase: number): string {
 }
 
 // ============================================================================
+// FIRST IMPERFECT STARS — a one-line receipt the first time a win lands under
+// three stars, naming the cause (a hint, slipped drops, or both). The star rule
+// itself lives in the How-to-Play star line; this is the moment it first
+// matters. Device-local once flag (a fresh device may deserve it once more).
+// ============================================================================
+
+/** Device-local once flag for the first sub-3-star receipt (see App). */
+export const FIRST_IMPERFECT_STARS_SEEN_KEY = 'wordshift_first_imperfect_stars_seen';
+
+export type ImperfectStarCause = 'hint' | 'slips' | 'both';
+
+/**
+ * Why a win fell short of three stars (starRating: 3 stars = 0 hints and at
+ * most 1 invalid attempt). Null when the win was a full three stars, or when
+ * neither counter explains it.
+ */
+export function resolveImperfectStarCause(
+  stars: number,
+  hintsUsed: number,
+  invalidAttempts: number,
+): ImperfectStarCause | null {
+  if (stars >= 3) return null;
+  const hint = hintsUsed > 0;
+  const slips = invalidAttempts > 1;
+  if (hint && slips) return 'both';
+  if (hint) return 'hint';
+  if (slips) return 'slips';
+  return null;
+}
+
+/** Phase-aware one-line receipt for the first sub-3-star win, naming the cause. */
+export function getFirstImperfectStarsMessage(phase: number, cause: ImperfectStarCause, stars = 2): string {
+  const opener = stars <= 1 ? 'One star.' : 'Two stars!';
+  if (phase >= 5) {
+    if (cause === 'both') return 'A hint and a few slips cost a star. The weave keeps the whole solve anyway.';
+    if (cause === 'hint') return 'The hint cost a star. Three come from solving unaided. The weave holds either way.';
+    return 'A few slipped drops cost a star. One slip is forgiven; more are not. The weave holds either way.';
+  }
+  if (phase >= 4) {
+    if (cause === 'both') return 'Guidance and faltering hands cost a star. The arrangement counts both.';
+    if (cause === 'hint') return 'The guidance cost a star. Three are given only to hands that asked for nothing.';
+    return 'The faltering cost a star. One slip is overlooked. A second is not.';
+  }
+  if (phase >= 3) {
+    if (cause === 'both') return 'A hint and more than one slip: two reasons the third star stayed dark.';
+    if (cause === 'hint') return 'The hint kept the third star dark. Three stars belong to unaided solves.';
+    return 'More than one slipped drop kept the third star dark. One slip is forgiven.';
+  }
+  if (phase >= 2) {
+    if (cause === 'both') return 'A hint and a few slips together cost a star. Three stars ask for neither.';
+    if (cause === 'hint') return 'The hint cost a star. Three stars are for solves with no help at all.';
+    return 'A few slipped drops cost a star. One slip is forgiven; the second is not.';
+  }
+  if (cause === 'both') return `${opener} A hint and more than one slipped drop each cost a star. No help, no slips: three stars.`;
+  if (cause === 'hint') return `${opener} Using a hint costs one. Solve without help for all three.`;
+  return `${opener} More than one slipped drop costs a star. One slip is always forgiven.`;
+}
+
+/**
+ * The once-ever receipt: returns the phase-aware line the FIRST time a win
+ * lands under three stars for a nameable reason, marking the device flag as it
+ * does, and null on every later call (or when the win was three stars).
+ * Broken storage is treated as already seen so it can never repeat.
+ */
+export async function consumeFirstImperfectStarsReceipt(
+  phase: number,
+  win: { stars: number; hintsUsed: number; invalidAttempts: number },
+): Promise<string | null> {
+  const cause = resolveImperfectStarCause(win.stars, win.hintsUsed, win.invalidAttempts);
+  if (!cause) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- guarded lazy require keeps the helpers Node-importable
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    if ((await AsyncStorage.getItem(FIRST_IMPERFECT_STARS_SEEN_KEY)) === 'true') return null;
+    await AsyncStorage.setItem(FIRST_IMPERFECT_STARS_SEEN_KEY, 'true');
+  } catch {
+    return null;
+  }
+  return getFirstImperfectStarsMessage(phase, cause, win.stars);
+}
+
+// ============================================================================
+// DIALOGUE REVEAL SKIP HINT — the bubble is tappable to land the whole page at
+// once, but nothing tells a new player. Shown once, under the first reveal
+// (see useDialogueFlow.revealSkipHint). Phase 0-1 only in practice; later
+// phases keep the wording in register in case the first visit comes late.
+// ============================================================================
+
+export function getDialogueRevealSkipHint(phase: number): string {
+  if (phase >= 4) return 'Tap the words and they will all arrive at once.';
+  if (phase >= 2) return 'Tap the words to let them land all at once.';
+  return 'Tap the words to skip ahead.';
+}
+
+// ============================================================================
+// ARRIVAL RESUME FRAMING — one-time, per resident: when a resident resumes
+// their pre-arrival conversation after the Arrival, a single lead-in frames the
+// older material as recollection. Presentation only; it never touches the
+// conversation ledger (see useDialogueFlow).
+// ============================================================================
+
+export function getArrivalResumeFramingLine(animalName: string): string {
+  return `${animalName} settles in. "There is more I meant to tell you before that night. Let me say it the way I had it then."`;
+}
+
+// ============================================================================
 // SWIFT VICTORY POINTER — one-time hint that a quicker victory style exists in
 // Settings. In-world voice (the house offers), never a tutorial voice.
 // ============================================================================
@@ -2816,6 +3034,28 @@ export function getSwiftVictoryHintMessage(phase: number): string {
   if (phase >= 4) return 'The fanfare can be set aside, if you wish. Settings keeps that quiet for you.';
   if (phase >= 2) return 'The house can celebrate more softly, if you prefer. That choice waits in Settings.';
   return 'If the celebrations ever feel long, the house can keep them short and sweet. You will find that choice in Settings.';
+}
+
+// The same setting, offered where the player is actually waiting on the
+// fanfare: a quiet one-line affordance in the VictoryModal footer once past
+// SWIFT_VICTORY_MIN_PUZZLES (product-retention-9). `enabled` is the CURRENT
+// state, so the label reads as the change the tap makes.
+export function getSwiftVictoriesToggleLabel(phase: number, enabled: boolean): string {
+  if (phase >= 4) return enabled ? 'Let the fanfare return' : 'Set the fanfare aside';
+  if (phase >= 2) return enabled ? 'Celebrate in full again' : 'Celebrate more softly';
+  return enabled ? 'Full celebrations again' : 'Quicker celebrations';
+}
+
+// One-line receipt after the tap, so the change is acknowledged on the win it
+// was made on (the strip itself only changes from the NEXT routine win).
+export function getSwiftVictoriesToggledMessage(phase: number, enabled: boolean): string {
+  if (phase >= 4) {
+    return enabled ? 'The house will keep the next ones brief.' : 'The house will mark the next ones in full.';
+  }
+  if (phase >= 2) {
+    return enabled ? 'The house will celebrate the next ones softly.' : 'The house will celebrate the next ones in full.';
+  }
+  return enabled ? 'The next ones will be short and sweet.' : 'The next ones get the full celebration.';
 }
 
 // ============================================================================
@@ -3481,30 +3721,51 @@ export function getGoalSuggestion(
 // HOME SCREEN NUDGE — pull puzzle-focused players toward animal dialogue
 // ============================================================================
 
+// Five lines per phase (ftue-5): the nudge is shown at most once per app
+// session (see useVictoryOrchestration), so a chaining player meets one line
+// per session and the pool has to stay fresh across many sessions.
 const HOME_NUDGE_MESSAGES: Record<number, string[]> = {
   0: [
     '{name} has been waiting to talk to you. Visit the house!',
     'Your friends miss you! Head home and say hi.',
+    '{name} saved you a seat by the window. Drop in whenever you like.',
+    'The kettle is on at home. {name} keeps glancing at the door.',
+    'A little news is waiting at the house. {name} is bursting to share it.',
   ],
   1: [
     '{name} has something on their mind. You should visit.',
     'The house feels quiet without you. {name} noticed.',
+    '{name} has been turning a thought over. It might be one for you.',
+    'The lamps are lit at home. {name} is up late, thinking.',
+    'Something small changed at the house. {name} would like to tell you what.',
   ],
   2: [
     '{name} has been staring at the walls. You should check on them.',
     'Something is different at home. {name} wants to talk.',
+    '{name} left a question by the door. It is still there.',
+    'The house has gone quiet in a new way. {name} noticed first.',
+    '{name} has started counting things. Ask them what.',
   ],
   3: [
     '{name} needs you to hear something. It cannot wait much longer.',
     'The house is restless. {name} has been pacing.',
+    '{name} stopped mid-sentence this morning. They want to finish it with you.',
+    'The rooms are colder than they were. {name} has been keeping a lamp lit for you.',
+    '{name} has been listening at the floor. They would rather tell you than write it down.',
   ],
   4: [
     'The keepers are calling for you. {name} says it is time.',
     '{name} says: "We have waited long enough."',
+    '{name} keeps your place at the pattern. Nobody else will sit there.',
+    'The house holds its breath between your visits. {name} counts them.',
+    '{name} has one more thing to tell you before the hour. Come home.',
   ],
   5: [
     '{name} is humming softly. The house hums with them.',
     'The weave holds. {name} wants you to know that.',
+    '{name} mended a cup this morning. They would like to show you.',
+    'The house rests. {name} is on the porch, saving the good chair.',
+    '{name} has a story from the quiet days. No hurry. It keeps.',
   ],
 };
 
@@ -3878,7 +4139,7 @@ export function getFoxPitNudgeLines(targetPhase: DialoguePhase): string[] {
  * Hammock, by default) blocks the player. Explains, in-world, WHY the house
  * can't simply be bought forward here, and points at the two amber options:
  * Reserve (set the amber aside now, it rises on its own when the gate opens)
- * and Skip (press it to completion now, for a little more amber). Fires around
+ * and Skip (press it to completion now, though the house asks a good deal more amber for that). Fires around
  * the first gate (~level 28), so mostly the bright-days voice, with a quieter
  * later variant. `roomName` is the gated room's display name ("Jungle Hammock").
  */
@@ -3887,13 +4148,13 @@ export function getGatedRoomIntroLines(phase: number, roomName: string): string[
     return [
       `The house has grown quickly with you, friend. But the ${roomName} is not ready to rise yet.`,
       "Some rooms ask for more than amber. They ask for time, and for words. More of your words must be offered to the pit before the ground will hold the walls.",
-      "If you have the amber, you do not have to wait. There are two ways. Set the amber aside now, and the room will rise on its own when the time comes. Or spend a little more and bring the room to completion now.",
+      "If you have the amber, you do not have to wait. There are two ways. Set the amber aside now, and the room will rise on its own when the time comes. Or pay a good deal more and bring the room to completion now.",
     ];
   }
   return [
     `The house has grown so quickly with you, friend. But the ${roomName} isn't ready to be built yet.`,
     "Some rooms need more than amber. They need a little time, and a few more of your words offered to the pit, before the ground will hold them.",
-    "If you'd rather not wait and you have the amber to spare, there are two ways. Set it aside now, and the room will build itself when the time comes. Or press it to completion now, for a little more.",
+    "If you'd rather not wait and you have the amber to spare, there are two ways. Set it aside now, and the room will build itself when the time comes. Or press it to completion now, though the house asks a good deal more for that.",
   ];
 }
 
@@ -4180,6 +4441,15 @@ export function getShopTitle(phase: number): string {
   if (phase >= 4) return 'Vestments';
   if (phase >= 2) return 'Adornments';
   return 'Tile Shop';
+}
+
+// Pointer row from the house's unlock cards to the Shop's House Upgrades
+// section (Phase 2+, when the room decorations open). Names the recurring
+// amber sink where a player holding idle amber is standing.
+export function getHouseUpgradesPointerLabel(phase: number): string {
+  if (phase >= 4) return 'Deepen the rooms: in the Shop';
+  if (phase >= 3) return 'Room Upgrades: in the Shop';
+  return 'House Upgrades: in the Shop';
 }
 
 export function getShopSubtitle(phase: number): string {
@@ -4505,19 +4775,22 @@ const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string, string, 
     'Two weeks. The stillness has settled into something almost like waiting.',
     'A month. The house does not forget. It simply waits, and the waiting deepens.',
   ],
+  // A notification is read out of context, by anyone who sees the phone. The
+  // dark rungs stay unsettling in the house's own register but never carry a
+  // second-person threat: the phase-2 and phase-5 pools are the model.
   3: [
     'The house is quieter without you. The animals have noticed.',
-    'Something pauses while you are away. It does not like pausing.',
+    'Three days. Your chair is still turned toward the fire. Nobody has moved it.',
     'Seven days. The house has held its breath the whole time.',
-    'Two weeks. What was building does not unbuild. It only leans closer to the door.',
+    'Two weeks. The rooms have gone still, the way a room does when someone stops mid-sentence.',
     'A month of your absence. The pattern has not moved. It is very good at not moving.',
   ],
   4: [
     'The arrangement is incomplete without you.',
-    'The keepers hold your place at the pattern. They are patient. It is less so.',
-    'Seven days of silence. What comes through still waits for your hand.',
+    'The keepers hold your place at the pattern. Nobody else will sit there.',
+    'Seven days of silence. The keepers keep the lamps lit, and keep your place.',
     'Two weeks. The keepers have not moved from their places. Neither has it.',
-    'A month at the threshold. It has waited longer than this. It can wait for you.',
+    'A month at the threshold. It has waited longer than this. The keepers still keep your place.',
   ],
   5: [
     'The house rests. It will be here when you return.',
@@ -4598,6 +4871,42 @@ export function getShopStoreBridgeText(phase: number): { title: string; subtitle
   if (phase >= 4) return { title: 'The pattern asks more than you hold?', subtitle: 'The Store provides.' };
   if (phase >= 2) return { title: 'Short on amber?', subtitle: 'The Store carries more.' };
   return { title: 'Need more amber?', subtitle: 'Amber packs are available in the Store.' };
+}
+
+/**
+ * Calm notice when the STORE itself could not take an order: billing not
+ * connected or still waking up, the product not visible to this account, or
+ * another checkout still open. Nothing was attempted, so this never sends the
+ * player to a purchase history looking for a purchase that never happened.
+ */
+export function getStoreUnavailableMessage(phase: number): string {
+  if (phase >= 5) return 'The store is resting for a moment. Try again shortly.';
+  if (phase >= 4) return 'The store cannot take your offering just now. Try again in a moment.';
+  if (phase >= 2) return 'The store is not answering right now. Try again in a moment.';
+  return 'The store is not available right now. Try again in a moment.';
+}
+
+/** Price pill label while the store's own localized prices are still arriving. */
+export const STORE_PRICE_PLACEHOLDER = '...';
+
+/** Screen-reader note for a price pill that has no localized price yet. */
+export function getStorePriceLoadingLabel(phase: number): string {
+  if (phase >= 4) return 'Prices are still arriving';
+  return 'Loading prices';
+}
+
+/**
+ * The Supporter row's renewal disclosure. Deliberately the same at every
+ * phase: it states what the subscription does and where it is cancelled.
+ */
+export function getSupporterRenewalNote(storeName: string): string {
+  return `Renews monthly at the price shown until cancelled in ${storeName}.`;
+}
+
+/** Link label an active Supporter taps to manage or cancel the subscription. */
+export function getManageSubscriptionLabel(phase: number): string {
+  if (phase >= 4) return 'Manage your subscription';
+  return 'Manage subscription';
 }
 
 /** Title/subtitle for the very first daily-login reward claim. */
@@ -4983,4 +5292,38 @@ export function getShopSeeItInRoomLabel(
     return { label: 'Go and look', accessibilityLabel: `Go and look at what stands in ${where}` };
   }
   return { label: `See it in ${where}`, accessibilityLabel: `See it in ${where}` };
+}
+
+// ============================================================================
+// BOOT HOLD — the branded card that opens the app. It renders BEFORE any save
+// is readable, so it has no phase and keys on the failed boot stage instead:
+// a failure while checking the cloud backup can be routed around (the local
+// save is untouched), while a local recovery that throws stays closed.
+// ============================================================================
+
+export type BootFailureKind = 'cloud' | 'local';
+
+export function getBootFailureCopy(kind: BootFailureKind): {
+  message: string;
+  retry: string;
+  continueWithoutCloud: string;
+  contactSupport: string;
+} {
+  const retry = 'Try again';
+  const continueWithoutCloud = 'Continue without the cloud backup';
+  const contactSupport = 'Contact support';
+  if (kind === 'cloud') {
+    return {
+      message: 'Your cloud backup could not be checked. Try again, or continue without it for now. The progress saved on this device is safe.',
+      retry,
+      continueWithoutCloud,
+      contactSupport,
+    };
+  }
+  return {
+    message: 'Your save could not be opened safely. Free some device storage if it is full, then try again. If it keeps failing, contact support and your support ID will be attached.',
+    retry,
+    continueWithoutCloud,
+    contactSupport,
+  };
 }

@@ -78,6 +78,24 @@ jest.mock(
 );
 
 const DASH_RE = /[–—]/;
+/**
+ * Typographic quotes/apostrophes (U+2018/2019/201C/201D). The corpus writes
+ * straight quotes (2,000+ strings); a handful of ceremony and chrome literals
+ * drifted to curly glyphs, which render as a different apostrophe in the same
+ * typeface as the very next dialogue bubble. Straight is the convention.
+ */
+const CURLY_RE = /[\u2018\u2019\u201C\u201D]/;
+/**
+ * Curly-quote sites that pre-date the sweep and live in files other packages
+ * own (App.tsx, ShareCard, HouseUpgradeGiftModal, cosmetics). Each entry is the
+ * MAXIMUM number of offending literals still tolerated in that file; a new
+ * curly quote anywhere fails, and an owner who normalises a file can lower or
+ * delete its entry. Never raise a number here.
+ */
+const CURLY_BASELINE: Record<string, number> = {
+  'src/components/home/HouseUpgradeGiftModal.tsx': 1,
+  'src/services/cosmetics.ts': 1,
+};
 
 const ANIMAL_TYPES: AnimalType[] = [
   'fox',
@@ -289,9 +307,11 @@ describe('no em/en dashes in player-facing text', () => {
     expect(files.length).toBeGreaterThan(100); // sanity: the walk found the app
 
     const offenders: string[] = [];
+    const curlyOffenders: string[] = [];
+    const curlyCounts = new Map<string, number>();
     for (const file of files) {
       const text = fs.readFileSync(file, 'utf8');
-      if (!DASH_RE.test(text)) continue; // fast path: dash only possible in comments
+      if (!DASH_RE.test(text) && !CURLY_RE.test(text)) continue; // fast path: only comments could carry one
       const sf = ts.createSourceFile(
         file,
         text,
@@ -317,10 +337,26 @@ describe('no em/en dashes in player-facing text', () => {
             `${path.relative(root, file)}:${line + 1}: ${literal.trim().slice(0, 120)}`
           );
         }
+        if (literal !== null && CURLY_RE.test(literal)) {
+          const rel = path.relative(root, file);
+          const seen = (curlyCounts.get(rel) ?? 0) + 1;
+          curlyCounts.set(rel, seen);
+          if (seen > (CURLY_BASELINE[rel] ?? 0)) {
+            const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+            curlyOffenders.push(`${rel}:${line + 1}: ${literal.trim().slice(0, 120)}`);
+          }
+        }
         ts.forEachChild(node, visit);
       };
       visit(sf);
     }
     expect(offenders).toEqual([]);
+    // Curly quotes: straight is the convention (see CURLY_RE / CURLY_BASELINE).
+    expect(curlyOffenders).toEqual([]);
+    // Shrink-only for real: a baseline entry higher than the live count would
+    // let fresh curly quotes back in, so every entry must match exactly.
+    for (const [rel, allowed] of Object.entries(CURLY_BASELINE)) {
+      expect({ file: rel, curly: curlyCounts.get(rel) ?? 0 }).toEqual({ file: rel, curly: allowed });
+    }
   });
 });

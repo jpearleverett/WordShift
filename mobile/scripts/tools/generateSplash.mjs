@@ -6,6 +6,15 @@
 // the wordmark, on the warm cream field the in-app boot screen also uses so the
 // native splash -> JS boot handoff is a seamless hold.
 //
+// Android 12+ does NOT show that composition: the system splash renders the
+// configured image as a small icon (expo-splash-screen's `imageWidth`, 200dp
+// here) inside a 192dp circular container on the background colour, so the
+// wordmark would be an unreadable strip. app.json therefore points Android at
+// `splash-icon-android.png`, the fox card ALONE (same rounded mask, transparent
+// surround) at 0.72 of a 1024 canvas: at imageWidth 200 the card is 144dp and
+// its farthest corner point (0.6326 * side) is ~91dp, inside the 96dp circle.
+// iOS keeps the full composition.
+//
 // Run: node scripts/tools/generateSplash.mjs   (pure Node + pngjs, no build step)
 import { PNG } from 'pngjs';
 import fs from 'fs';
@@ -132,6 +141,35 @@ function main() {
   canvas.copy(out.data);
   fs.writeFileSync(ASSET('splash.png'), PNG.sync.write(out, { colorType: 6 }));
   console.log(`wrote ${ASSET('splash.png')} (${SIZE}x${SIZE})`);
+  writeAndroidSplashIcon(icon);
+}
+
+// The Android 12+ splash icon: the fox card alone on a transparent surround.
+const ANDROID_ICON_SIZE = 1024;
+const ANDROID_CARD_FRACTION = 0.72;
+function writeAndroidSplashIcon(icon) {
+  const SIZE_A = ANDROID_ICON_SIZE;
+  const CARD = Math.round(SIZE_A * ANDROID_CARD_FRACTION); // 737
+  const CARD_R = Math.round((185 / 1024) * CARD);
+  const cardX = Math.round((SIZE_A - CARD) / 2), cardY = cardX;
+  const cx = cardX + CARD / 2, cy = cardY + CARD / 2, half = CARD / 2;
+  const out = new PNG({ width: SIZE_A, height: SIZE_A }); // zero-filled = transparent
+  for (let y = cardY; y < cardY + CARD; y++) {
+    for (let x = cardX; x < cardX + CARD; x++) {
+      const cover = Math.max(0, Math.min(1, 0.5 - rrectSDF(x + 0.5, y + 0.5, cx, cy, half, half, CARD_R)));
+      if (cover <= 0) continue;
+      const u = ((x - cardX) / CARD) * (icon.width - 1);
+      const v = ((y - cardY) / CARD) * (icon.height - 1);
+      const px = sample(icon, u, v);
+      const i = (y * SIZE_A + x) * 4;
+      out.data[i] = Math.round(px[0]);
+      out.data[i + 1] = Math.round(px[1]);
+      out.data[i + 2] = Math.round(px[2]);
+      out.data[i + 3] = Math.round((px[3] / 255) * cover * 255);
+    }
+  }
+  fs.writeFileSync(ASSET('splash-icon-android.png'), PNG.sync.write(out, { colorType: 6 }));
+  console.log(`wrote ${ASSET('splash-icon-android.png')} (${SIZE_A}x${SIZE_A}, ${CARD}px card)`);
 }
 
 main();

@@ -68,6 +68,9 @@ jest.mock('react', () => {
       if (!refStore.has(idx)) refStore.set(idx, { current: initial });
       return refStore.get(idx)!;
     },
+    // The button subscribes to ad readiness; outside a real renderer the
+    // snapshot is simply read (no dispatcher to schedule a re-render).
+    useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
     useCallback: (fn: unknown) => fn,
     useMemo: (fn: () => unknown) => fn(),
   };
@@ -130,7 +133,11 @@ jest.mock('../services/iap', () => ({
   purchaseProduct: (...args: unknown[]) => mockPurchaseProduct(...args),
   restorePurchases: (...args: unknown[]) => mockRestorePurchases(...args),
   subscribeBillingChanges: () => () => {},
+  isBillingReady: () => mockBillingReady,
+  isStoreUnavailableError: (error?: string) =>
+    error === 'billing_unavailable' || error === 'product_not_found' || error === 'purchase_in_progress',
 }));
+let mockBillingReady = false;
 
 let mockIsPatron = false;
 let mockIsAdFree = false;
@@ -149,6 +156,8 @@ jest.mock('../services/ads', () => ({
   isRewardedCapReached: (...args: unknown[]) => mockIsRewardedCapReached(...args),
   getAdProviderName: () => mockAdProviderName,
   isAdsReady: () => mockAdsReady,
+  subscribeAdsReady: () => () => {},
+  retryAdConsentIfUnready: async () => undefined,
 }));
 
 // ---------------------------------------------------------------------------
@@ -219,6 +228,7 @@ async function renderC(Comp: (props: any) => unknown, props: Record<string, unkn
 
 beforeEach(() => {
   resetHookState();
+  mockBillingReady = false;
   mockIsPatron = false;
   mockIsAdFree = false;
   mockAdProviderName = 'Not Connected';
@@ -295,11 +305,50 @@ describe('PatronModal', () => {
     // Must not throw on the unavailable path.
     await expect((buyBtn!.props as any).onPress()).resolves.toBeUndefined();
 
-    // Re-render → calm copy, still a non-Patron, no crash.
+    // Re-render → calm copy, still a non-Patron, no crash. Nothing was
+    // attempted at the store, so the player is NOT sent to a purchase history.
     tree = await renderC(PatronModal as any, { visible: true, phase: 0, onClose: jest.fn() });
-    expect(textOf(tree)).toContain('Check your store purchase history');
+    expect(textOf(tree)).toContain('The store is not available right now');
+    expect(textOf(tree)).not.toContain('Check your store purchase history');
     expect(textOf(tree)).not.toContain('Nothing was charged');
     expect(mockIsPatron).toBe(false);
+  });
+
+  it('a failure after the sheet keeps the unconfirmed-purchase copy', async () => {
+    mockPurchaseProduct.mockResolvedValue({ success: false, error: 'purchase_failed' });
+    let tree = await renderC(PatronModal as any, { visible: true, phase: 0, onClose: jest.fn() });
+    await (findByA11yLabel(tree, 'Become a Patron')!.props as any).onPress();
+    tree = await renderC(PatronModal as any, { visible: true, phase: 0, onClose: jest.fn() });
+    expect(textOf(tree)).toContain('Check your store purchase history');
+  });
+
+  it('CTAs wait for a store price: placeholder + disabled until it arrives, USD literal only when never connected', async () => {
+    // Fetch settled with nothing on the never-connected (NoOp / Expo Go) path.
+    let tree = await renderC(PatronModal as any, { visible: true, phase: 0, onClose: jest.fn() });
+    tree = await renderC(PatronModal as any, { visible: true, phase: 0, onClose: jest.fn() });
+    let buy = findByA11yLabel(tree, 'Become a Patron')!;
+    expect((buy.props as any).label).toBe('Become a Patron · $8.99');
+    expect((buy.props as any).disabled).toBe(true);
+    expect(textOf(tree)).toContain('The store is not available right now');
+
+    // A connected store whose localized price has arrived: live and tappable,
+    // never the dollar literal.
+    resetHookState();
+    mockBillingReady = true;
+    mockGetProducts.mockResolvedValue([
+      { productId: 'com.wordshift.patron_key', title: 'Patron', description: '', priceString: '8,99 €' },
+      { productId: 'com.wordshift.remove_ads', title: 'Remove Ads', description: '', priceString: '5,99 €' },
+    ]);
+    tree = await renderC(PatronModal as any, { visible: true, phase: 0, onClose: jest.fn() });
+    tree = await renderC(PatronModal as any, { visible: true, phase: 0, onClose: jest.fn() });
+    buy = findByA11yLabel(tree, 'Become a Patron')!;
+    expect((buy.props as any).label).toBe('Become a Patron · 8,99 €');
+    expect((buy.props as any).disabled).toBe(false);
+    const ads = findByA11yLabel(tree, 'Remove ads')!;
+    expect((ads.props as any).label).toBe('Remove Ads · 5,99 €');
+    expect((ads.props as any).disabled).toBe(false);
+    expect(textOf(tree)).not.toContain('$8.99');
+    mockBillingReady = false;
   });
 
   it('restore that finds nothing leaves the player a non-Patron without error', async () => {

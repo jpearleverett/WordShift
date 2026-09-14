@@ -91,6 +91,7 @@ import {
   getPhaseTransitionEvent,
   getEventDuration,
   HOUSE_COMPLETION_EVENT,
+  buildHouseCompletionEvent,
   FINAL_PUZZLE_EVENT,
   buildFinalPuzzleEvent,
   buildPostRevelationEvent,
@@ -518,6 +519,42 @@ describe('HOUSE_COMPLETION_EVENT — the temple ceremony', () => {
     for (const scene of HOUSE_COMPLETION_EVENT.scenes) {
       expect(scene.effect).not.toBe('descend');
     }
+  });
+
+  // The finale arms on a real-solve floor independent of the build, so the
+  // house can be finished AFTER the Arrival (buy Sky Garden and Moss in Phase
+  // 5). The static ceremony anticipates a waiting presence; the built variant
+  // must not, once it has descended and settled.
+  describe('buildHouseCompletionEvent (narrative-1)', () => {
+    test('without context, or before the Arrival, returns the authored constant untouched', () => {
+      expect(buildHouseCompletionEvent()).toBe(HOUSE_COMPLETION_EVENT);
+      expect(buildHouseCompletionEvent({ arrived: false })).toBe(HOUSE_COMPLETION_EVENT);
+      expect(buildHouseCompletionEvent({ houseComplete: true, boundary: 'remember' })).toBe(HOUSE_COMPLETION_EVENT);
+    });
+
+    test('after the Arrival, Ember stops promising the reveal and the shadow stops waiting', () => {
+      const event = buildHouseCompletionEvent({ arrived: true });
+      const texts = event.scenes.map(scene => scene.text).join('\n');
+      expect(texts).not.toContain('I owe you the rest of what I knew');
+      expect(texts).not.toContain('ready to receive');
+      expect(texts).not.toContain('remains unanswered');
+      expect(event.scenes[3].text).toContain('after you learned what I knew');
+      expect(event.scenes[4].text).toContain('already here to see it finished');
+      // The settled presence at After's opacity: present, never a descent.
+      const last = event.scenes[event.scenes.length - 1];
+      expect(last.image).toBe('shadow_figure');
+      expect(last.imageOpacity).toBe(POST_REVELATION_EVENT.backdrop!.opacity);
+      for (const scene of event.scenes) expect(scene.effect).not.toBe('descend');
+      // Same length and choreography: only the two contradicting scenes change.
+      expect(event.scenes).toHaveLength(HOUSE_COMPLETION_EVENT.scenes.length);
+      expect(event.scenes.slice(0, 3)).toEqual(HOUSE_COMPLETION_EVENT.scenes.slice(0, 3));
+    });
+
+    test('never mutates the shared HOUSE_COMPLETION_EVENT constant', () => {
+      const before = HOUSE_COMPLETION_EVENT.scenes.map(scene => ({ ...scene }));
+      buildHouseCompletionEvent({ arrived: true });
+      expect(HOUSE_COMPLETION_EVENT.scenes).toEqual(before);
+    });
   });
 });
 

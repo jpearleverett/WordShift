@@ -108,7 +108,9 @@ These are the human/store steps the code is waiting on:
 3. **Done (Android):** the AdMob banner unit is created and
    `admobBannerIdAndroid` is filled in `app.json → extra`. The iOS banner unit
    rides item 1.
-4. **Flip `adsUseTestIds` to `false` at the production cut — and only then.**
+4. **Live ads follow the release channel, never a hand flip** (since 2026-09-14,
+   `app.config.js` resolves `adsUseTestIds` to `false` only for the `production`
+   channel; the original wording below is kept as history).
    It is deliberately `true` in `app.json` today and stays `true` through dev
    and internal/closed testing (a revenue-pass flip to `false` was reverted
    2026-07-16 to protect the live closed test — tapping your own live ads on a

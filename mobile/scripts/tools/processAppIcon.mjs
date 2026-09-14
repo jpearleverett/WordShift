@@ -17,9 +17,15 @@
 // this only rebuilds the four corners, giving iOS a full-bleed square to mask
 // cleanly. (Making it transparent would break the iOS opaque requirement.)
 //
-// The Android ADAPTIVE foreground keeps the safe-zone treatment (the art at 66%,
-// centered on a transparent surround, the app.json backgroundColor behind it), so
-// the launcher mask only ever crops the decorative margin, never the identity.
+// The Android ADAPTIVE foreground is the SAME un-baked art, masked to its own
+// rounded-card shape and scaled so the whole card sits inside the adaptive-icon
+// safe zone (a 66/108 circle, radius 0.3056 of the canvas) on a transparent
+// surround, with the app.json adaptiveIcon.backgroundColor behind it. The
+// launch audit measured the previous 66%-square placement leaving 32.7% of the
+// card outside that circle: circle launchers cut the card's rounded corners,
+// and square launchers showed the source's baked black corners. Masking the
+// card (instead of using the raw art) is what keeps those corners off the
+// pink field at every mask shape.
 //
 // Run: node scripts/tools/processAppIcon.mjs   (from mobile/)
 // After this, generateSplash.mjs recomposes splash.png from the fixed icon.
@@ -194,25 +200,35 @@ function downscale(source, flatten, target = OUT) {
 const fullBleed = fillCorners(src);
 fs.writeFileSync(path.join(ASSETS, 'icon.png'), PNG.sync.write(downscale(fullBleed, true)));
 
-// Android ADAPTIVE foreground: the whole composition placed inside the
-// guaranteed-visible safe zone (66% of the 1024 canvas, centered) on a fully
-// transparent surround; the app.json adaptiveIcon.backgroundColor (#FFF0F5)
-// fills behind it, so the launcher mask crops only the decorative margin, never
-// the identity (fox ears / W/S tiles / amber gem). Uses the ORIGINAL art (its
-// own rounded corners float as a card on the pink field).
-const SAFE = Math.round(OUT * 0.66); // 676
-const fg = downscale(src, false, SAFE);   // transparent-surround art at 66% size
+// Android ADAPTIVE foreground: the un-baked card, masked to its rounded-rect
+// silhouette, scaled to fit the 66/108 safe circle and centered on a fully
+// transparent surround. Farthest card point from the centre is
+// (half - r) * sqrt(2) + r = 0.6326 * side for the art's r = 185/1024 corner
+// radius, so a side of 0.475 * 1024 (max radius ~307px) clears the 312.9px safe
+// radius; the launcher mask then crops only pink field, never the identity.
+const ADAPTIVE_CARD_FRACTION = 0.475;
+const CARD = Math.round(OUT * ADAPTIVE_CARD_FRACTION); // 486
+const CARD_R = (185 / 1024) * CARD;                     // the icon's own corner radius
+const rrectSDF = (px, py, c, half, r) => {
+  const qx = Math.abs(px - c) - (half - r);
+  const qy = Math.abs(py - c) - (half - r);
+  const ax = Math.max(qx, 0), ay = Math.max(qy, 0);
+  return Math.hypot(ax, ay) + Math.min(Math.max(qx, qy), 0) - r;
+};
+const fg = downscale(fullBleed, false, CARD);   // opaque full-bleed art at card size
 const canvas = new PNG({ width: OUT, height: OUT }); // zero-filled = transparent
-const offset = Math.round((OUT - SAFE) / 2);
-for (let y = 0; y < SAFE; y++) {
-  for (let x = 0; x < SAFE; x++) {
-    const s = (y * SAFE + x) * 4;
+const offset = Math.round((OUT - CARD) / 2);
+for (let y = 0; y < CARD; y++) {
+  for (let x = 0; x < CARD; x++) {
+    const cover = Math.max(0, Math.min(1, 0.5 - rrectSDF(x + 0.5, y + 0.5, CARD / 2, CARD / 2, CARD_R)));
+    if (cover <= 0) continue;
+    const s = (y * CARD + x) * 4;
     const dd = ((y + offset) * OUT + (x + offset)) * 4;
     canvas.data[dd] = fg.data[s];
     canvas.data[dd + 1] = fg.data[s + 1];
     canvas.data[dd + 2] = fg.data[s + 2];
-    canvas.data[dd + 3] = fg.data[s + 3];
+    canvas.data[dd + 3] = Math.round(fg.data[s + 3] * cover);
   }
 }
 fs.writeFileSync(path.join(ASSETS, 'adaptive-icon.png'), PNG.sync.write(canvas));
-console.log(`wrote icon.png (${OUT}, full-bleed) + adaptive-icon.png (${SAFE} art centered in ${OUT}, safe-zone) from ${path.basename(SRC)}`);
+console.log(`wrote icon.png (${OUT}, full-bleed) + adaptive-icon.png (${CARD} masked card centered in ${OUT}, inside the 66/108 safe circle) from ${path.basename(SRC)}`);

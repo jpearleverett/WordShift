@@ -271,7 +271,14 @@ describe('verb-depth preview gate threading', () => {
     // the beat unfired; no teaching card may cover the last arrangement), and
     // the finale return must come BEFORE the session latch so the beat still
     // fires on the next ordinary neutral board.
-    expect(APP_TSX).toMatch(/if \(puzzle\.isFinalBoard\) return;[\s\S]{0,200}graduationCheckedRef\.current = true;/);
+    expect(APP_TSX).toMatch(/if \(puzzle\.isFinalBoard\) return;[\s\S]{0,400}graduationCheckedRef\.current = true;/);
+    // ftue-2: the board right after an acknowledged phase ceremony is a quiet
+    // one; the deferral is consumed BETWEEN the finale return and the session
+    // latch, so skipping that board never spends the beat.
+    expect(APP_TSX).toMatch(
+      /if \(puzzle\.isFinalBoard\) return;[\s\S]{0,300}if \(consumePreviewGraduationDeferral\(\)\) return;\s*\n\s*if \(graduationCheckedRef\.current\) return;\s*\n\s*graduationCheckedRef\.current = true;/
+    );
+    expect(APP_TSX).toMatch(/import \{ createCeremonyPlayback, consumePreviewGraduationDeferral \} from '\.\/src\/services\/ceremonyPlayback';/);
   });
 
   test('Reset All re-arms the graduation beat and both files agree on the key', () => {
@@ -882,6 +889,14 @@ describe('a timed-out speed run is finished, not resumable', () => {
       /if \(!puzzle\.speedMode \|\| puzzle\.gameState !== GameState\.PLAYING \|\| victoryFlow\.isProcessingVictory\)/
     );
   });
+
+  test('the clock holds while the setup menu or the Rules sheet covers the board (gameplay-2)', () => {
+    // Modifier toggles keep the setup menu open and re-serve the board under
+    // it; the hook's paused input banks the seconds until the surface closes.
+    expect(APP_TSX).toMatch(
+      /useSpeedTimer\(\s*onSpeedTimeUp,\s*puzzle\.showDifficultyMenu \|\| puzzle\.showRules,\s*\)/
+    );
+  });
 });
 
 describe('the private pace record stays untimed', () => {
@@ -951,3 +966,109 @@ describe('a daily solve belongs to the board it was played on', () => {
   });
 });
 
+
+describe('launch-readiness app-integration wiring', () => {
+  test('a completed hint_recovery clip retries its grant until saved (monetization-7)', () => {
+    const claim = APP_TSX.slice(
+      APP_TSX.indexOf('const handleClaimRewardedHint = useCallback'),
+      APP_TSX.indexOf('const handleOutOfHints = useCallback')
+    );
+    expect(claim).toMatch(
+      /if \(res\.completed\) \{[\s\S]{0,600}await saveWithPlayerRetry\(\(\) => addHints\(REWARDED_HINT_GRANT, 'rewarded_hint'\)/
+    );
+    // The bare grant (a lost reward on a storage failure) must not come back.
+    expect(claim).not.toMatch(/await addHints\(REWARDED_HINT_GRANT/);
+    // The retry copy carries no dashes (it is player-facing).
+    expect(claim).not.toMatch(/[\u2014\u2013]/);
+  });
+
+  test('the phase ceremony is the share prompt\'s second peak, under the exit-nudge guards (product-retention-7)', () => {
+    // The ceremony path fires only once the phase scene is acknowledged.
+    expect(APP_TSX).toMatch(
+      /if \(completed\?\.kind === 'phase' && completed\.phase <= 2\) \{\s*maybeShowCeremonySharePrompt\(\)\.catch\(\(\) => \{\}\);\s*\}/
+    );
+    // The pit exit (Collect Now) is the route to the ward ceremony, so it
+    // snapshots the win exactly like the Next/Home exits; otherwise the
+    // ceremony prompt would open a board from several wins ago.
+    const pitExit = APP_TSX.slice(
+      APP_TSX.indexOf('const handleGoToPit = useCallback'),
+      APP_TSX.indexOf('// Android hardware back button')
+    );
+    expect(pitExit).toMatch(/pendingShareSnapshotRef\.current = buildShareDataRef\.current\(\);\s*startVictoryExitFlow/);
+    const ceremony = APP_TSX.slice(
+      APP_TSX.indexOf('const maybeShowCeremonySharePrompt = useCallback'),
+      APP_TSX.indexOf('const runVictoryExitNudges = useCallback')
+    );
+    // Same one-time flag, same exit-nudge gate and spacing record as the
+    // flawless path (it can never stack on the board-13 exit nudge either).
+    expect(ceremony).toMatch(/if \(!\(await canShowExitNudge\(solved\)\)\) return;/);
+    expect(ceremony).toMatch(/if \(await maybeShowSharePrompt\('phase_transition'\)\) \{\s*await recordExitNudgeShown\(solved\);/);
+    // The shared decision passes the real trigger through, never a hardcoded false.
+    expect(APP_TSX).toMatch(/consumeSharePrompt\(\{\s*isFlawlessWin: !isPhaseTransition && vd\?\.flawless === true,\s*isPhaseTransition,\s*isOnboarding: false,/);
+    expect(APP_TSX).not.toMatch(/isPhaseTransition: false/);
+    // Never over a still-pending ward ignition, never during onboarding, and
+    // never stacked on a queued Fox intro (guards shared by both triggers).
+    const shared = APP_TSX.slice(
+      APP_TSX.indexOf('const maybeShowSharePrompt = useCallback'),
+      APP_TSX.indexOf('const maybeShowCeremonySharePrompt = useCallback')
+    );
+    expect(shared).toMatch(/if \(onboardingFlow\.isOnboarding\) return false;/);
+    expect(shared).toMatch(/if \(persistence\.pendingPhaseTransition != null\) return false;/);
+    expect(shared).toMatch(/if \(postVictoryIntro \|\| queuedPostVictoryIntrosRef\.current\.length > 0\) return false;/);
+  });
+
+  test('the daily standing re-check asks for the recorded cohort and date (backend-ops-7)', () => {
+    const recheck = APP_TSX.slice(
+      APP_TSX.indexOf('const handleRecheckDailyStanding = useCallback'),
+      APP_TSX.indexOf('const resolveDailyBoardDate = useCallback')
+    );
+    expect(recheck).toMatch(/const cohort = await getLastDailyCompletionCohort\(\);/);
+    expect(recheck).toMatch(/const date = cohort\?\.date \?\? getLocalDateString\(\);/);
+    // A board this session served is exact from the ref (a legacy_v1 restore
+    // is recorded under the compiled constant); a relaunch reads the record.
+    expect(recheck).toMatch(
+      /const boardVersion = cohort\?\.boardVersion \?\? dailyBoardVersionRef\.current;/
+    );
+    expect(recheck).toMatch(/await getDailyRank\(date, boardVersion\);/);
+    expect(recheck).toMatch(/await refreshDailyLadderRank\(date, rank\);/);
+    // The wall-clock/compiled-default query must not return.
+    expect(recheck).not.toMatch(/getDailyRank\(getLocalDateString\(\)\)/);
+  });
+
+  test('the first sub-3-star win gets its receipt on the victory toast queue (ftue-7)', () => {
+    expect(APP_TSX).toMatch(
+      /if \(!wasFinalBoard && !\(result\.blind \?\? false\) && !onboardingFlow\.isOnboarding\) \{\s*consumeFirstImperfectStarsReceipt\(persistence\.currentPhase, \{\s*stars: victory\.earnedStars,\s*hintsUsed: result\.hintsUsed,\s*invalidAttempts: result\.invalidAttempts,\s*\}\)\.then\(line => \{\s*if \(line\) enqueueVictoryToast\(line, 'receipt'\);/
+    );
+  });
+
+  test('a launch route that cannot open is reported before it fails (boot-persistence-2)', () => {
+    const route = APP_TSX.slice(
+      APP_TSX.indexOf('const initialRoute = useInitialGameRoute('),
+      APP_TSX.indexOf('const bootRouting = initialRoute.status')
+    );
+    expect(route).toMatch(/reportError\(error instanceof Error \? error : String\(error\), \{\s*source: 'initial_route',\s*metadata: \{ step \},\s*\}\);\s*throw error;/);
+  });
+
+  test('the boot card has a support escape and the cloud-only continue (boot-persistence-1)', () => {
+    const hold = APP_TSX.slice(
+      APP_TSX.indexOf('function BootHold('),
+      APP_TSX.indexOf('function resetAfterRootRenderError')
+    );
+    expect(hold).toMatch(/getSupportMailto\(BOOT_APP_VERSION, supportIdentifier \?\? undefined\)/);
+    expect(hold).toMatch(/getSupportIdentifier\(\)/);
+    expect(hold).toMatch(/onPress=\{openSupportMail\} accessibilityRole="link"/);
+    expect(hold).toMatch(/\{onContinueWithoutCloud \? \(/);
+    expect(hold).toMatch(/getBootFailureCopy\(onContinueWithoutCloud \? 'cloud' : failureKind\)/);
+    // The continue option is offered ONLY when the hook judged the failure a
+    // cloud-restore one; the hydration hold (initial route) never offers it.
+    expect(APP_TSX).toMatch(/onContinueWithoutCloud=\{boot\.canContinueWithoutCloud \? boot\.continueWithoutCloud : undefined\}/);
+    expect(APP_TSX).toMatch(/<BootHold failed=\{initialRoute\.status === 'failed'\} onRetry=\{initialRoute\.retry\} failureKind="local" \/>/);
+    const USE_APP_BOOT = fs.readFileSync(path.resolve(__dirname, '../hooks/useAppBoot.ts'), 'utf8');
+    expect(USE_APP_BOOT).toMatch(/source: 'app_boot'/);
+    // The escape is offered only for a NON-storage failure inside the cloud
+    // stage: a StorageRecoveryRequiredError there is a local journal/write
+    // failure that skipping the stage would replay through migrations anyway.
+    expect(USE_APP_BOOT).toMatch(/stage === 'restoreCloud' && !\(error instanceof StorageRecoveryRequiredError\)/);
+    expect(USE_APP_BOOT).toMatch(/status === 'failed' && cloudEscape/);
+  });
+});

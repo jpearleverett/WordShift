@@ -19,7 +19,9 @@ import {
   DAILY_CHALLENGE_UNLOCK_PUZZLES,
   getDailyHost,
   getDailyHostName,
+  getLastDailyCompletionCohort,
 } from '../services/dailyChallenge';
+import { DAILY_BOARD_VERSION } from '../services/dailyBoardVersion';
 import { getHintBalance, clearHints } from '../services/hints';
 import { selectDailyBankPuzzle } from '../services/puzzleBank';
 import { FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
@@ -245,6 +247,32 @@ describe('dailyChallenge', () => {
     await recordDailyCompletion(3, 0, 0);
     await recordDailyCompletion(3, 0, 0, getLocalDateStringDaysAgo(1));
     expect(await getDailyStatus()).toMatchObject({ totalCompleted: 1, streak: 1 });
+  });
+
+  test('a completion records the cohort it was played under, for the standing re-check', async () => {
+    // Ranks are partitioned by (date, board_version). The victory path
+    // submits with the SERVED board's version, so the completed card's
+    // re-check must ask the same partition, not whatever the compiled
+    // constant is at re-check time.
+    expect(await getLastDailyCompletionCohort()).toBeNull();
+    const yesterday = getLocalDateStringDaysAgo(1);
+    await recordDailyCompletion(3, 0, 0, yesterday, undefined, 'legacy_v1');
+    expect(await getLastDailyCompletionCohort()).toEqual({ date: yesterday, boardVersion: 'legacy_v1' });
+    const status = await getDailyStatus();
+    expect(status.isCompleted).toBe(false);
+
+    // A fresh board defaults to the compiled cohort; the newest record wins.
+    await recordDailyCompletion(3, 0, 0);
+    expect(await getLastDailyCompletionCohort()).toEqual({ date: getTodayString(), boardVersion: DAILY_BOARD_VERSION });
+    expect((await getDailyStatus()).todayResult?.boardVersion).toBe(DAILY_BOARD_VERSION);
+  });
+
+  test('a record written before the cohort was stored reads as the compiled cohort', async () => {
+    const progress = await loadDailyProgress();
+    progress.completedChallenges.push({
+      date: getTodayString(), stars: 3, hintsUsed: 0, invalidAttempts: 0, completedAt: Date.now(),
+    });
+    expect(await getLastDailyCompletionCohort()).toEqual({ date: getTodayString(), boardVersion: DAILY_BOARD_VERSION });
   });
 
   test('getDailyStatus returns correct structure', async () => {

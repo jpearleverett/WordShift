@@ -52,7 +52,9 @@ function readExtra(): Record<string, any> {
  * internal-testing (release) build can opt into test ads too. Serving LIVE ads
  * to yourself on a test build and clicking them is an AdMob policy violation
  * that can get the whole account limited; this gate is the guard against it.
- * Flip `adsUseTestIds` to false in app.json ONLY for the production build.
+ * The flag is derived in app.config.js from WORDSHIFT_RELEASE_CHANNEL
+ * (production -> false / live units; every other channel keeps the app.json
+ * literal `true`). Never hand-flip the literal.
  */
 function shouldUseTestAds(): boolean {
   if (typeof __DEV__ !== 'undefined' && __DEV__) return true;
@@ -244,28 +246,44 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
     void preload('rewarded');
   }
 
-  /** UMP's explicit signal is authoritative, including after a consent-form error. */
-  async function refreshConsentPermission(generation: number): Promise<void> {
-    let permitted = false;
+  /**
+   * UMP's explicit signal is authoritative, including after a consent-form
+   * error. Returns the permission it read: true/false for an explicit answer,
+   * null when the consent info itself could not be read (never a permission).
+   */
+  async function refreshConsentPermission(generation: number): Promise<boolean | null> {
+    let permitted: boolean | null = false;
     try {
       const info = await mod?.AdsConsent?.getConsentInfo?.();
       permitted = info?.canRequestAds === true;
     } catch {
       // Unknown consent is not permission to initialize the SDK or request ads.
+      permitted = null;
     }
-    if (generation !== consentGeneration) return;
-    consentAllowsAds = permitted;
-    if (permitted) void startAds(generation);
+    if (generation !== consentGeneration) return permitted;
+    consentAllowsAds = permitted === true;
+    if (consentAllowsAds) void startAds(generation);
     else setReady(false);
+    return permitted;
   }
 
-  /** Single-flight UMP update; never infer non-personalized permission from an error. */
+  /**
+   * Single-flight UMP update; never infer non-personalized permission from an
+   * error. A completed update (permitted OR refused) is final for the session.
+   * An update that FAILED and left no permission behind (an offline cold start
+   * on a fresh install, before UMP has any stored answer) is forgotten again, so
+   * the next `requestConsentIfNeeded` (ads.ts ensureAdConsent, at each ad
+   * exposure while ads stay disabled) retries it instead of leaving every ad
+   * format dark until the next launch.
+   */
   function resolveConsent(): Promise<void> {
     if (!consentPromise) {
-      consentPromise = (async () => {
+      let attempt: Promise<void> | null = null;
+      attempt = (async () => {
         const AdsConsent = mod?.AdsConsent;
         const generation = consentGeneration;
         if (!AdsConsent) return;
+        let updateFailed = false;
         try {
           if (typeof AdsConsent.gatherConsent === 'function') {
             await AdsConsent.gatherConsent();
@@ -278,9 +296,14 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
         } catch {
           // UMP may still permit requests using a previous session's consent.
           // Read that permission explicitly; an error alone never authorizes ads.
+          updateFailed = true;
         }
-        await refreshConsentPermission(generation);
+        const permitted = await refreshConsentPermission(generation);
+        if (permitted !== true && (updateFailed || permitted === null) && consentPromise === attempt) {
+          consentPromise = null;
+        }
       })();
+      consentPromise = attempt;
     }
     return consentPromise;
   }

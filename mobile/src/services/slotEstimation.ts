@@ -11,7 +11,7 @@ import { Dimensions } from 'react-native';
 import {
   ROW_HORIZONTAL_MARGIN,
   ROW_PADDING,
-  ARC_SLOT_CELL_W,
+  arcSlotCellWidth,
   ARC_LETTER_MARGIN_H,
   STANDARD_TILE_W,
   STANDARD_TILE_MARGIN_H,
@@ -46,7 +46,7 @@ function naturalContentWidth(letterCount: number): number {
   const tileW = compact ? COMPACT_TILE_W : STANDARD_TILE_W;
   const tileMarginH = compact ? COMPACT_TILE_MARGIN_H : STANDARD_TILE_MARGIN_H;
   const letterCellW = tileW + tileMarginH * 2 + ARC_LETTER_MARGIN_H * 2;
-  const slotEffectiveW = ARC_SLOT_CELL_W;
+  const slotEffectiveW = arcSlotCellWidth(compact);
   const slotCount = letterCount + 1;
   return slotCount * slotEffectiveW + letterCount * letterCellW;
 }
@@ -107,7 +107,7 @@ export function estimateSlotIndex(
   // content stays centered at screenWidth/2, so scaling both cell widths here
   // makes every slot center track the rendered (scaled) layout exactly.
   const letterCellW = (tileW + tileMarginH * 2) * scale;
-  const slotEffectiveW = ARC_SLOT_CELL_W * scale;
+  const slotEffectiveW = arcSlotCellWidth(compact) * scale;
   // The inter-letter wrapper margin scales with the board too, or the walk would
   // drift a few px per letter at scale != 1.
   const letterMarginH = ARC_LETTER_MARGIN_H * scale;

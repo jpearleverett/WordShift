@@ -45,6 +45,10 @@ export type EventType =
   | 'hint_requested'
   | 'puzzle_abandoned'
   | 'ad_availability'
+  // The one-time store-review ask fired; data.elapsedMs is how long the
+  // native call took (a near-instant resolve on Android means the Play quota
+  // suppressed the dialog and the ask was spent silently).
+  | 'review_prompt_shown'
   | 'story_started' | 'story_deferred' | 'story_completed' | 'story_choice'
   | 'story_resumed' | 'cinematic_skipped' | 'story_world_inspected';
 

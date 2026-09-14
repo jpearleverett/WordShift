@@ -11,10 +11,11 @@ verify the latest binary, backend deployment or public release.
 - [x] **Production access granted.** The owner completed the 12-tester/14-day
   closed test and confirmed access on 2026-08-31.
 - [ ] **Identify the exact release artifact.** Source currently configures app
-  **1.3.4**, Android **98**, with local version management and no automatic
-  increment. Compare the next code with Play Console before uploading; increase
-  it if already used. Record commit, EAS build ID, version/code, runtime, track
-  and device. `package.json`'s 1.3.1 is package metadata, not the native app version.
+  **1.3.5**, Android **99**, with local version management and no automatic
+  increment. Compare the next code with Play Console before uploading: an
+  internal-track upload may already have consumed 99, in which case bump to 100
+  for the production candidate. Record commit, EAS build ID, version/code,
+  runtime, track and device. `package.json`'s 1.3.1 is package metadata, not the native app version.
 - [ ] **Run the release checks on that commit.** From `mobile/`: `npm ci`,
   `npm run typecheck`, `npm run lint -- --max-warnings 0`,
   `npm test -- --no-coverage`, `npm run test:e2e`, `npx expo install --check`
@@ -50,32 +51,69 @@ verify the latest binary, backend deployment or public release.
   a longer session on low/mid/high-end Android where available; record device,
   thermal/frame/memory observations rather than extrapolating from a July build.
 - [ ] **Ad and consent matrix.** Keep `adsUseTestIds: true` through internal and
-  closed testing. Verify UMP required/not-required/error paths and Settings →
+  closed testing: with the channel-derived flag that means running this matrix
+  on an `internal-testing`-profile build (its channel keeps Google test units,
+  so tapping ads is safe); the `production`-profile candidate serves live units,
+  so on that build only confirm ads become available and never tap one, or
+  register the test phones as AdMob test devices first. Verify UMP required/not-required/error paths and Settings →
   Privacy Options; an error alone never permits ad requests. Test interstitial,
   rewarded and Stats banner placements using a tester without restored ad-free
   entitlements, as well as paid-player suppression. Collect Now is ad-exempt.
-- [ ] **Backend release evidence.** Apply/rehearse the current SQL upgrades,
-  verify hosted v2 save/event/daily/support RPCs, actual event arrival, two-device
-  conflict handling, verified support recovery/deletion and a successful retention
-  run. Confirm project availability/backup policy and Sentry alerting plus a
-  symbolicated event from the exact signed release. Follow [backend setup](BACKEND_SETUP.md).
+- [x] **Hosted v2 migrations verified (2026-09-14).** A read-only probe with the
+  shipped publishable key found `get_save_v2`, `upsert_save_v2`,
+  `get_legacy_save_for_upgrade`, `ingest_events_v2`, `submit_daily_score_v2`,
+  `daily_rank_v2`, `bump_words_offered` and `aggregate_proof` deployed, the
+  operator RPCs (`support_preview`, `support_delete_verified`,
+  `prune_expired_events`) denied to `anon`, the legacy save RPCs revoked and
+  every table denied to `anon`. Commands and the result table are in
+  [backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14). Do not
+  re-run `security_setup.sql` alone: it would re-grant the legacy names.
+- [ ] **Apply `docs/supabase/rate_limits_v1.sql`** (request budgets, Daily
+  plausibility floor and activity requirement, legacy daily RPC revocation,
+  `purge_daily_cohort`). Rehearsed offline (`rehearse.mjs`, 78 checks) on
+  2026-09-14; not yet applied. Re-run the probe afterwards: `submit_daily_score`
+  and `daily_rank` must answer `42501`, `bump_words_offered` must still accept
+  the two-argument body, and a signed build must still post a Daily rank.
+- [ ] **Remaining backend evidence.** From an operator connection: actual event
+  rows from the signed build, the `wordshift-event-retention` cron job and a
+  successful run (the job is NOT created by `apply_upgrade.sql`: enable Supabase
+  Cron on the project, then run `docs/supabase/schedule_event_retention.sql` as
+  postgres and keep its job/run/oldest-row query output), two-device conflict handling, verified support
+  recovery/deletion, the project plan tier plus disk/usage alerts (the events
+  table shares the disk with saves), Sentry alert rules and a symbolicated
+  event from the exact signed release. Follow [backend setup](BACKEND_SETUP.md).
 - [ ] **Review the current store package.** Use the reviewed launch package in
   `mobile/assets/Play_store/launch-2026-09/`, its claims ledger and
   [store listing](STORE_LISTING.md). Confirm the files actually uploaded are the
   current captures and show the shipped +25% Challenge reward, current counts
   and spoiler-safe UI. Earlier uploaded July/August images were stale; the
   presence of replacements in Git does not update Play Console.
-- [ ] **Production configuration cut.** Change `expo.extra.adsUseTestIds` to
-  `false` only for the reviewed public-release configuration, keep `creatorCode`
-  empty, and target the `production` runtime/channel. Run
-  `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage --testPathPattern=productionConfig`.
-  Update the corresponding CI test environment in the same production-cut change
-  so it enforces the intended ad mode. This documentation update leaves test ads
-  enabled. Follow [OTA instructions](OTA_UPDATES.md) for compatible updates.
-- [ ] **Publish the documentation clarification with release notes.** The September 13
-  privacy/terms revision clarifies existing purchase delivery, restore and reset
-  behavior. Include that clarification in the app release notes as the terms
-  require, and verify the deployed policy links.
+- [ ] **Production configuration cut.** Do NOT edit `expo.extra.adsUseTestIds`
+  or `ci.yml`: `app.config.js` derives the shipped flag from
+  `WORDSHIFT_RELEASE_CHANNEL`, so `eas build --profile production` resolves live
+  ad units by itself and every other channel keeps the `true` literal (a literal
+  `false` would put live ads into the testing channels and fails
+  `productionConfig.test.ts`). Bump `android.versionCode` above the last Play
+  upload, keep `creatorCode` empty, run
+  `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage --testPathPattern=productionConfig`,
+  and confirm `WORDSHIFT_RELEASE_CHANNEL=production npx expo config --type public`
+  shows `adsUseTestIds: false` and runtime `1.3.5-production`. Follow
+  [OTA instructions](OTA_UPDATES.md) for compatible updates.
+  The Play release notes for this build must carry the legal line: "Privacy
+  Policy and Terms updated (effective September 14, 2026): clarified purchase
+  restore and Reset All behavior (September 13 revision) and added data
+  retention periods." Append "and a governing-law clause" only once the clause
+  below is actually published.
+- [ ] **Publish the documentation clarification with release notes.** The
+  September 13 privacy/terms revision clarifies existing purchase delivery,
+  restore and reset behavior; the September 14 revision adds retention periods
+  to the privacy policy. A governing-law clause for the terms is DRAFTED inside
+  an HTML comment in `docs/terms.md` (so the live page never shows bracketed
+  placeholders; the Pages workflow refuses a placeholder outside its comment):
+  fill in the jurisdiction and venue, move the section out of the comment,
+  renumber "Changes", then mention the clause in the revision note and the
+  release notes. Both documents promise a release-notes mention, so the line
+  above is not optional. Verify the deployed policy links.
 - [ ] **Submit and promote deliberately.** Both configured Android submit
   profiles target Play's **internal** track. Validate the production-configured
   artifact there, then promote it in Play Console with a staged rollout while
@@ -112,6 +150,10 @@ history, and repeat changed flows in the current release matrix above.
 - [x] **2026-09-05:** Expo SDK 57 / RN 0.86.3 dependency update, Doctor 21/21 and
   zero known npm vulnerabilities recorded at that time. Re-run current checks;
   these dated results are not current measurements.
+- [x] **2026-09-14:** hosted Supabase v2 migrations verified by read-only probe
+  (see the backend gates above); `rate_limits_v1.sql` written and rehearsed
+  offline, not applied. Launch readiness review recorded in
+  [`LAUNCH_READINESS_REVIEW_2026-09-14.md`](LAUNCH_READINESS_REVIEW_2026-09-14.md).
 
 ## iOS: separate release track
 

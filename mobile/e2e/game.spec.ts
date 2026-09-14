@@ -593,7 +593,7 @@ for (const [letter, finalWord, boundary] of [['D', 'CLOSED', 'remember'], ['R', 
   test(`playing the final ${finalWord} choice persists its boundary through relaunch`, async ({ page }) => {
     test.setTimeout(180_000);
     await openReturningBoard(page);
-    await page.evaluate(() => {
+    const applyFinaleState = () => page.evaluate(() => {
       const progress = JSON.parse(localStorage.getItem('wordshift_home_progress')!);
       Object.assign(progress, { currentPhase: 4, phaseProgress: 160, puzzlesSolved: 160,
         finaleArmed: true, finalPuzzleCompleted: false, postRevelation: false });
@@ -605,6 +605,20 @@ for (const [letter, finalWord, boundary] of [['D', 'CLOSED', 'remember'], ['R', 
       localStorage.removeItem('wordshift_in_progress_puzzle');
       localStorage.removeItem('wordshift_story_spine');
     });
+    // The live board keeps a 120 ms debounced autosave that re-arms on any
+    // late board message (a board-start line, a toast), so a single removal
+    // can be written back before the reload and Play would then RESUME that
+    // board instead of serving the finale. Re-apply until the edits hold
+    // still for a beat.
+    await expect.poll(async () => {
+      await applyFinaleState();
+      await page.waitForTimeout(600);
+      return page.evaluate(() =>
+        localStorage.getItem('wordshift_in_progress_puzzle') === null &&
+        localStorage.getItem('wordshift_story_spine') === null &&
+        JSON.parse(localStorage.getItem('wordshift_home_progress')!).finaleArmed === true,
+      );
+    }, { timeout: 20_000 }).toBe(true);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Play puzzle', exact: true }).click();
     const later = page.getByText('Come back to this', { exact: true });

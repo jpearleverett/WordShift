@@ -222,9 +222,14 @@ export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3 base (×2 → every 10)
  * preview-graduation toast (PREVIEW_GRADING_FULL_LIMIT = 12), so the marks
  * stepped back and the first ad hit in one breath. 16 puts the first ad at
  * the exit of win 17, clear of graduation (board 13) and the challenge-toggle
- * intro (15). Deliberately no longer equal to EXIT_NUDGE_MIN_PUZZLES (12):
- * the nudge and the interstitial never stack on one exit anyway
- * (runVictoryExitNudges skips when an interstitial showed).
+ * intro (15). EXIT_NUDGE_MIN_PUZZLES (16) may equal this: the
+ * nudge and the interstitial never stack on one exit anyway
+ * (runVictoryExitNudges skips when an interstitial showed). The early
+ * one-time-beat timeline: daily unlock 8 / mandatory first harvest 9 /
+ * reverse variant 10 / phase-1 pit ceremony 12 (engaged players; 13-16 at
+ * lower 3-star rates) / preview graduation 13 (deferred one board when a
+ * ceremony was just acknowledged, see ceremonyPlayback) / first exit nudge
+ * 14 / challenge intro 15 / first ad on the exit of win 17.
  */
 export const INTERSTITIAL_MIN_PUZZLES = 16;
 
@@ -339,8 +344,21 @@ export const SEASON_PASS_PREMIUM_AMBER_COST = 2500;
 // Gentle, frequency-capped nudges (never modal spam). All are suppressed for
 // players who already own the relevant entitlement.
 
-/** Earliest puzzle count at which the shared victory-exit nudge chain may run. */
-export const EXIT_NUDGE_MIN_PUZZLES = 12;
+/**
+ * Earliest puzzle count at which the shared victory-exit nudge chain may run.
+ * 14 (not 12): at 12 the first share/patron alert could fire on the exit of
+ * win 13, the SAME board whose start carries the blocking preview-graduation
+ * card (PREVIEW_GRADING_FULL_LIMIT = 12) and which follows the phase-1 pit
+ * ceremony (MIN_PUZZLES_FOR_PHASE[1] = 12) by one board. The graduation card
+ * itself defers one board after an acknowledged phase ceremony (so an
+ * engaged player meets it on board 14), and the challenge intro is a home
+ * landing beat at 15, so 16 is the first exit that cannot abut either: the
+ * first exit nudge lands on the exit of win 16 at the earliest. Equal to
+ * INTERSTITIAL_MIN_PUZZLES is harmless (runVictoryExitNudges skips an exit
+ * that showed an interstitial). The notification prompt runs before this
+ * gate and is unaffected.
+ */
+export const EXIT_NUDGE_MIN_PUZZLES = 16;
 
 /** Minimum completed puzzles between proactive victory-exit nudges. */
 export const EXIT_NUDGE_SPACING_PUZZLES = 5;
@@ -358,12 +376,15 @@ export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
 
 /**
  * Earliest puzzle count for Fox's one-time "Keeper's Welcome" starter-pack intro.
- * Pushed to puzzle 35 so the store pitch never lands inside the first-session
- * cluster of new-thing introductions (journal, daily, variants, challenge,
- * mandatory harvest all fire before this) — the newcomer meets the game before
- * the game asks for anything. Suppressed if the starter pack is already owned.
+ * Pushed past the first-session cluster of new-thing introductions (journal,
+ * daily, variants, challenge, mandatory harvest all fire before this) — the
+ * newcomer meets the game before the game asks for anything. It sits at 38,
+ * three wins past the EXPERT difficulty unlock (35), so the store pitch and a
+ * new difficulty row never land on the same win, and it is no longer the only
+ * event in the Desert (29) to Office (41) room-gate gap. Suppressed if the
+ * starter pack is already owned.
  */
-export const STARTER_INTRO_MIN_PUZZLES = 35;
+export const STARTER_INTRO_MIN_PUZZLES = 38;
 
 /**
  * Puzzle count where the Journal Hub (ledger, gallery, quests) and the header
@@ -438,15 +459,19 @@ export const HARVEST_NUDGE_MIN_AMBER = 150;
 /**
  * Amber premium for skipping a level-gated room's puzzle requirement and
  * unlocking it immediately (vs Reserve, which pays the plain cost and waits for
- * the gate). skip cost = ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)). This is
- * convenience pricing: a meaningful premium over Reserve so the gate keeps its
- * shape, sized so a player who can afford the room can usually also afford the
- * skip with a session or two of earnings. At 0.5 the gated rooms (build
- * 200-550) skip for 300-825. Reserve (base cost, auto-build at the gate) stays
- * the non-paying path, so the premium is a convenience, never a wall. Tune
- * post-launch on real data.
+ * the gate). skip cost = ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)).
+ *
+ * 1.5 (skip = 2.5x build cost; was 0.5 = 1.5x). The launch-readiness economy
+ * simulation (product-retention-3) found a casual MEDIUM 2/day player holding
+ * 2-5x the old premium at EVERY non-trio gate from solve ~13, so the gates
+ * only paced players who never read the button: skipping all six mid-house
+ * gates cost 3,640 amber, earned by day ~17. At 2.5x the gated rooms (build
+ * 200-550) skip for 500-1,375 (all six: ~6,050), a real decision against the
+ * Phase-2 house upgrades rather than loose change. Reserve (base cost,
+ * auto-build at the gate) stays the non-paying path, so the premium is a
+ * convenience, never a wall. Tune post-launch on unlock_purchased.skippedGate.
  */
-export const UNLOCK_SKIP_PREMIUM = 0.5;
+export const UNLOCK_SKIP_PREMIUM = 1.5;
 
 // ============================================================================
 // STREAK
@@ -685,9 +710,13 @@ export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 8;
  * that the player has mastered HARD and the core verb, so six-letter boards
  * (more tiles to track, longer chains, a rarer-but-fair vocabulary band) read
  * as an earned step up, not an early wall. Tunable; between HARD-comfort and
- * the Blind Offering apex (80).
+ * the Blind Offering apex (80). Keyed to 35 (was 50) so a 2/day player finds
+ * something new inside the Desert (29) to Office (41) room-gate gap, which
+ * used to hold nothing but the starter-pack pitch across the Phase-2 turn: a
+ * difficulty row is a discoverable beat, not a story beat, so it can move
+ * without touching the arc geography.
  */
-export const EXPERT_DIFFICULTY_UNLOCK_PUZZLES = 50;
+export const EXPERT_DIFFICULTY_UNLOCK_PUZZLES = 35;
 
 /**
  * Lexicon mode gate: the rare-word mode is a late-unlock mastery pursuit. It is

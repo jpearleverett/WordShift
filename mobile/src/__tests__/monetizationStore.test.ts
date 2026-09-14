@@ -12,7 +12,10 @@ import {
   setBillingProvider,
   BillingProvider,
   PurchaseResult,
+  isStoreUnavailableError,
+  PLAY_SUBSCRIPTIONS_URL,
 } from '../services/iap';
+import { getSupporterRenewalNote } from '../services/phaseNarrative';
 import {
   ENTITLEMENTS,
   loadEntitlements,
@@ -267,31 +270,77 @@ const readComponent = (name: string): string =>
     'utf8',
   );
 
-describe('purchase CTAs are never price-less (fallbackPrice contract)', () => {
-  it('PatronModal defines dollar fallback prices for Patron and Remove Ads', () => {
+describe('price pills wait for the store price (no live USD literals on a connected store)', () => {
+  // Google Play shows the localized price on its sheet; the in-app pill must
+  // not lead with a "$0.99" literal a French or Indian player will see
+  // contradicted, and must not be tappable before billing can sell. The USD
+  // catalog literals survive ONLY for the never-connected path (NoOp / Expo
+  // Go), where they orient and the pill stays disabled.
+  it('PatronModal keeps dollar fallback constants for the never-connected path only', () => {
     const src = readComponent('PatronModal.tsx');
     expect(src).toMatch(/export const PATRON_FALLBACK_PRICE = '\$\d+\.\d{2}'/);
     expect(src).toMatch(/export const REMOVE_ADS_FALLBACK_PRICE = '\$\d+\.\d{2}'/);
-  });
-
-  it('PatronModal CTA labels fall back to the constants instead of dropping the price', () => {
-    const src = readComponent('PatronModal.tsx');
-    expect(src).toContain('priceString ?? PATRON_FALLBACK_PRICE');
-    expect(src).toContain('adsPriceString ?? REMOVE_ADS_FALLBACK_PRICE');
+    expect(src).toContain('const showFallbackPrices = pricesSettled && !isBillingReady()');
+    expect(src).toContain('priceString ?? (showFallbackPrices ? PATRON_FALLBACK_PRICE : STORE_PRICE_PLACEHOLDER)');
+    expect(src).toContain('adsPriceString ?? (showFallbackPrices ? REMOVE_ADS_FALLBACK_PRICE : STORE_PRICE_PLACEHOLDER)');
     // The old price-less branches must not come back.
     expect(src).not.toMatch(/priceString\s*\?\s*`Become a Patron/);
     expect(src).not.toMatch(/adsPriceString\s*\?\s*`Remove Ads/);
   });
 
-  it('every StoreModal purchase row falls back to a price label on fetch failure', () => {
+  it('PatronModal CTAs stay disabled until their store price has arrived', () => {
+    const src = readComponent('PatronModal.tsx');
+    expect(src).toContain('disabled={purchaseDisabled || !priceString}');
+    expect(src).toContain('disabled={purchaseDisabled || !adsPriceString}');
+  });
+
+  it('every StoreModal purchase row routes its price through priceFor', () => {
     const src = readComponent('StoreModal.tsx');
     // Consumable amber/hint rows (fallbackPrice from the iap.ts catalog).
-    expect(src).toContain('?? info.fallbackPrice');
+    expect(src).toContain('priceFor(info.productId, info.fallbackPrice)');
     // Starter-pack hero.
-    expect(src).toContain('?? STARTER_PACK_INFO.fallbackPrice');
-    // Cosmetic bundle (named constant, not an inline magic string).
+    expect(src).toContain('priceFor(STARTER_PACK_INFO.productId, STARTER_PACK_INFO.fallbackPrice)');
+    // Cosmetic bundle + Supporter (named constants, not inline magic strings).
     expect(src).toMatch(/export const COSMETIC_BUNDLE_FALLBACK_PRICE = '\$\d+\.\d{2}'/);
-    expect(src).toContain('?? COSMETIC_BUNDLE_FALLBACK_PRICE');
+    expect(src).toContain('priceFor(PRODUCT_IDS.COSMETIC_BUNDLE, COSMETIC_BUNDLE_FALLBACK_PRICE)');
+    expect(src).toContain('priceFor(PRODUCT_IDS.SUPPORTER_SUB, SUPPORTER_SUB_FALLBACK_PRICE)');
+    // No row reaches for a literal directly any more.
+    expect(src).not.toContain('?? info.fallbackPrice');
+    expect(src).not.toContain('?? STARTER_PACK_INFO.fallbackPrice');
+    expect(src).not.toContain('?? COSMETIC_BUNDLE_FALLBACK_PRICE');
+    expect(src).not.toContain('?? SUPPORTER_SUB_FALLBACK_PRICE');
+    // priceFor: placeholder while loading, literal only when billing never connected, disabled without a live price.
+    expect(src).toContain("if (live) return { label: live, available: true, note: '' };");
+    expect(src).toContain('label: isBillingReady() ? STORE_PRICE_PLACEHOLDER : fallbackPrice');
+    expect(src).toContain('disabled={disabled || !price.available}');
+    expect(src).toContain('disabled={purchaseDisabled || !heroPrice.available}');
+    expect(src).toContain('disabled={purchaseDisabled || !supporterPrice.available}');
+    expect(src).toContain('disabled={purchaseDisabled || !bundlePrice.available}');
+  });
+
+  it('store-unavailable failures never show the unconfirmed-purchase copy', () => {
+    for (const name of ['StoreModal.tsx', 'PatronModal.tsx']) {
+      const src = readComponent(name);
+      expect(src).toContain('isStoreUnavailableError(');
+      expect(src).toContain('getStoreUnavailableMessage(phase)');
+    }
+    // The three provider errors that mean nothing was attempted.
+    expect(isStoreUnavailableError('billing_unavailable')).toBe(true);
+    expect(isStoreUnavailableError('product_not_found')).toBe(true);
+    expect(isStoreUnavailableError('purchase_in_progress')).toBe(true);
+    // A post-sheet failure keeps the "check your purchase history" path.
+    expect(isStoreUnavailableError('purchase_failed')).toBe(false);
+    expect(isStoreUnavailableError(undefined)).toBe(false);
+  });
+
+  it('the Supporter row states auto-renewal and the cancel location, with a manage link for subscribers', () => {
+    const src = readComponent('StoreModal.tsx');
+    expect(src).toContain('getSupporterRenewalNote(subscriptionStoreName)');
+    expect(src).not.toContain('Cancel anytime.');
+    expect(src).toContain('getManageSubscriptionLabel(phase)');
+    expect(src).toContain('getSubscriptionManagementUrl(fallback)');
+    expect(getSupporterRenewalNote('Google Play')).toBe('Renews monthly at the price shown until cancelled in Google Play.');
+    expect(PLAY_SUBSCRIPTIONS_URL).toBe('https://play.google.com/store/account/subscriptions');
   });
 });
 

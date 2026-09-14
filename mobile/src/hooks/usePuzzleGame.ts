@@ -16,6 +16,7 @@ import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, getRandomFal
 import { DICTIONARY_WORDS } from '../dictionary';
 import { CURATED_FINAL_PUZZLE } from '../constants/wordLists';
 import { isBlockedWord } from '../constants/blockedWords';
+import { isStandardChainSolvable } from '../services/puzzleSolvability';
 import { isFairPuzzleWord } from '../services/puzzleVocabulary';
 // Imported from gameBalance directly (not the constants barrel) so the hook's
 // test harness — which mocks '../constants' wholesale — still gets real values.
@@ -25,7 +26,7 @@ import {
   RESONANT_BOARD_CAP_AMBER,
 } from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getFinalBoardMoveMessage, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage, getUnbrokenWeaveUnavailableTitle } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getFinalBoardMoveMessage, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage, getUnbrokenWeaveUnavailableTitle, getHintRefusedMessage, getHintNoSafeRouteMessage, getUndoRefusedMessage, getUndoMessage, getWordLengthMessage } from '../services/phaseNarrative';
 import { showGameAlert } from '../services/gameAlert';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
@@ -266,7 +267,14 @@ export function isBoardSolvableFromState(
   moveDirection: 'down' | 'up',
   kind: 'standard' | 'reverse' | 'double_shift',
   isWordValid: (word: string) => boolean,
-  nodeCap: number = 150000
+  nodeCap: number = 150000,
+  /**
+   * Unbroken Weave (standard kind only): characters already given across the
+   * chain. A continuation that re-crosses one is not a continuation the
+   * player can play, so a hint must not steer them into it. Undefined means
+   * the ordinary rules (letters may cross any number of times).
+   */
+  spentLetters?: ReadonlySet<string>,
 ): boolean {
   const n = rows.length;
   if (n === 0 || activeRowIndex < 0 || activeRowIndex >= n) return false;
@@ -275,7 +283,7 @@ export function isBoardSolvableFromState(
   type Cell = { char: string; isLocked: boolean };
   const wordOf = (cells: Cell[]): string => cells.map(c => c.char).join('');
 
-  const goForward = (board: Cell[][], active: number, dbl: boolean): boolean => {
+  const goForward = (board: Cell[][], active: number, dbl: boolean, spent?: ReadonlySet<string>): boolean => {
     if (active >= n - 1) return true; // nothing left to shift
     if (++nodes > nodeCap) return false;
     const src = board[active];
@@ -284,6 +292,7 @@ export function isBoardSolvableFromState(
     if (!dbl) {
       for (let i = 0; i < src.length; i++) {
         if (src[i].isLocked) continue;
+        if (spent && isLetterSpent(spent, src[i].char)) continue;
         const remaining = src.filter((_, k) => k !== i);
         if (!isWordValid(wordOf(remaining))) continue;
         for (let j = 0; j <= tgt.length; j++) {
@@ -298,7 +307,7 @@ export function isBoardSolvableFromState(
           const nextBoard = board.slice();
           nextBoard[active] = remaining;
           nextBoard[active + 1] = nextTgt;
-          if (goForward(nextBoard, active + 1, false)) return true;
+          if (goForward(nextBoard, active + 1, false, spent ? addSpentLetter(spent, src[i].char) : undefined)) return true;
         }
       }
       return false;
@@ -376,7 +385,7 @@ export function isBoardSolvableFromState(
 
   const board = rows.map(r => r.map(c => ({ char: c.char, isLocked: c.isLocked })));
   if (kind === 'reverse') return goReverse(board, activeRowIndex, moveDirection);
-  return goForward(board, activeRowIndex, kind === 'double_shift');
+  return goForward(board, activeRowIndex, kind === 'double_shift', kind === 'standard' ? spentLetters : undefined);
 }
 
 /**
@@ -1522,7 +1531,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
                 recencyMap,
                 variant,
                 puzzlesSolved,
-                { lexicon: requestedLexicon },
+                // The bank skips the late-game +1 row ONLY when told the clock
+                // is armed (see PuzzleBankSelectionOptions.speed); a speed
+                // board arrives here as a plain 'standard' variant.
+                { lexicon: requestedLexicon, speed: speedModeRef.current },
               );
           if (isStale()) return;
           if (bankPuzzle) {
@@ -1728,6 +1740,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (wordLength < 3 || wordLength > 7) return false;
     if (normalized.some(w => w.length !== wordLength)) return false;
     if (normalized.some(w => !validWordsCache.current.has(w))) return false;
+    // A hand-edited link can name valid words that no legal sequence of
+    // shifts connects; such a board loads, refuses every move and every hint,
+    // and only Home exits it. Require a real route under the shipped standard
+    // rules (the same solver the bank CI guard uses) so App shows its
+    // invalid-link notice instead.
+    if (isStandardChainSolvable(normalized, w => validWordsCache.current.has(w)) !== 'solvable') {
+      return false;
+    }
 
     // Invalidate any in-flight startNewGame generation so a slow async commit
     // can't clobber the shared board after it starts.
@@ -1828,9 +1848,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
-    // Challenge mode: no hints allowed
+    // The no-hints umbrella: Challenge, Blind, or both. Name the trial the
+    // player actually armed (a Blind-only player never enabled Challenge).
     if (gameMode === 'challenge') {
-      shakeError("No hints in Challenge Mode!");
+      shakeError(getHintRefusedMessage(currentPhase, blindMode));
       return;
     }
 
@@ -2049,7 +2070,47 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       let continuationChecks = 0;
       const source = rows[activeRowIndex].words;
       const target = rows[hintTargetRowIndex].words;
-      pairs: for (let a = 0; a < source.length; a++) {
+      const pairContinues = (remaining: Letter[], completed: Letter[]): boolean => {
+        if (activeRowIndex === rows.length - 2) return true;
+        const next = rows.map(row => row.words.map(letter => ({ char: letter.char, isLocked: letter.isLocked })));
+        next[activeRowIndex] = remaining;
+        next[hintTargetRowIndex] = completed;
+        return isBoardSolvableFromState(next, activeRowIndex + 1, 'down', 'double_shift', checkValidation, 3000);
+      };
+      // The stored solution pair comes first, proved live against the board
+      // exactly like the single-shift path proves its stored step: both
+      // letters present and unlocked, the remainder a word, some two-slot
+      // placement a word, and the rest of the board still finishable. The bounded search below is the fallback
+      // for a stale pair, not the first resort, so a fresh 7-row board can no
+      // longer exhaust the search budget and tell the player to undo moves
+      // they never made.
+      const storedPair = (): PairHint | null => {
+        const letters = relevantStep?.lettersToMove;
+        if (!letters || letters.length < 2) return null;
+        const a = source.findIndex(letter => !letter.isLocked && letter.char === letters[0]);
+        if (a < 0) return null;
+        const afterFirst = source.filter((_, index) => index !== a);
+        const b = afterFirst.findIndex(letter => !letter.isLocked && letter.char === letters[1]);
+        if (b < 0) return null;
+        const remaining = afterFirst.filter((_, index) => index !== b);
+        const remainder = remaining.map(letter => letter.char).join('');
+        if (!checkValidation(remainder)) return null;
+        for (let firstSlot = 0; firstSlot <= target.length; firstSlot++) {
+          const intermediate = [...target.slice(0, firstSlot), { ...source[a], isLocked: true }, ...target.slice(firstSlot)];
+          for (let secondSlot = 0; secondSlot <= intermediate.length; secondSlot++) {
+            const completed = [...intermediate.slice(0, secondSlot), { ...afterFirst[b], isLocked: true }, ...intermediate.slice(secondSlot)];
+            const formed = completed.map(letter => letter.char).join('');
+            if (!checkValidation(formed)) continue;
+            if (!pairContinues(remaining, completed)) continue;
+            const fair = isFairPuzzleWord(remainder, lexiconMode || difficulty === 'EXPERT') &&
+              isFairPuzzleWord(formed, lexiconMode || difficulty === 'EXPERT');
+            return { first: letters[0], second: letters[1], letterIndex: a, slot: firstSlot, fair };
+          }
+        }
+        return null;
+      };
+      pair = storedPair();
+      pairs: for (let a = 0; pair === null && a < source.length; a++) {
         if (source[a].isLocked) continue;
         const afterFirst = source.filter((_, index) => index !== a);
         for (let b = 0; b < afterFirst.length; b++) {
@@ -2085,7 +2146,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           targetRowIndex: hintTargetRowIndex, targetSlotIndex: pair.slot,
         });
       } else {
-        setMessage('Try undoing a move to find another route. No hint was spent.');
+        setMessage(getHintNoSafeRouteMessage(currentPhase, history.length > 0));
         setHintHighlight(null);
       }
       return;
@@ -2170,7 +2231,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           return isBoardSolvableFromState(nextBoard, activeRowIndex + 1, 'down', 'reverse', wordValid);
         }
         if (activeRowIndex === rows.length - 2) return true; // completing move/step
-        return isBoardSolvableFromState(nextBoard, activeRowIndex + 1, 'down', solverKind, wordValid);
+        // Unbroken Weave: the hinted letter joins the spent set, so the proof
+        // only counts continuations the one-crossing rule still allows.
+        const nextSpent = unbrokenWeaveMode && solverKind === 'standard'
+          ? addSpentLetter(spentLetterSet, movedChar)
+          : undefined;
+        return isBoardSolvableFromState(nextBoard, activeRowIndex + 1, 'down', solverKind, wordValid, undefined, nextSpent);
       };
 
       type FoundMove = { letter: string; resultWord: string; letterIndex: number; slotIndex: number; fair?: boolean };
@@ -2208,7 +2274,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         // A legal next word is not useful paid guidance when its continuation
         // could not be established. Recovery remains free, including when the
         // bounded solver could not finish its search.
-        setMessage('Try undoing a move to find another route. No hint was spent.');
+        setMessage(getHintNoSafeRouteMessage(currentPhase, history.length > 0));
         setHintHighlight(null);
         return;
       }
@@ -2223,7 +2289,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMessage(getHintFallback(currentPhase));
       }
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, checkValidation, unbrokenWeaveMode, spentLetterSet, lexiconMode, difficulty, shakeError]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, blindMode, history, checkValidation, unbrokenWeaveMode, spentLetterSet, lexiconMode, difficulty, shakeError]);
 
   const handleSlotPress = useCallback(async (
     targetIndex: number,
@@ -2281,9 +2347,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // repeat the hidden term.
       if (isBlockedWord(sourceWordStr) || isBlockedWord(targetWordStr)) {
         shakeError(getBlockedWordMessage(currentPhase));
-        setInvalidAttempts(prev => prev + 1);
-        pendingMistakeRef.current = true;
-        cleanMoveStreakRef.current = 0;
+        // Blind judges the chain once at the end: a refused string costs no
+        // attempt there, matching the completed-step guard below.
+        if (!blindMode) {
+          setInvalidAttempts(prev => prev + 1);
+          pendingMistakeRef.current = true;
+          cleanMoveStreakRef.current = 0;
+        }
         return null;
       }
 
@@ -2357,13 +2427,34 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     }
 
     if (sourceWordStr.length !== expectedSourceLength) {
-      shakeError(`Need ${expectedSourceLength} letters!`);
+      shakeError(getWordLengthMessage(expectedSourceLength, currentPhase));
       setIsProcessing(false);
       return null;
     }
 
     if (targetWordStr.length !== expectedTargetLength) {
-      shakeError(`Need ${expectedTargetLength} letters!`);
+      shakeError(getWordLengthMessage(expectedTargetLength, currentPhase));
+      setIsProcessing(false);
+      return null;
+    }
+
+    // Blocked vocabulary must never become visible on either row, on ANY
+    // commit path. The dictionary already excludes these strings, so outside
+    // Blind this only swaps the message for copy that does not repeat the
+    // hidden term; in Blind (where the free-move bypass below skips every
+    // dictionary check) it is the only guard. Blind never counts the refusal
+    // as an invalid attempt: mid-board mistakes are not judged there.
+    if (isBlockedWord(sourceWordStr) || isBlockedWord(targetWordStr)) {
+      shakeError(getBlockedWordMessage(currentPhase));
+      if (!blindMode) {
+        setInvalidAttempts(prev => prev + 1);
+        pendingMistakeRef.current = true;
+        cleanMoveStreakRef.current = 0;
+      }
+      if (isDoubleShift && doubleShiftPhase === 'drop2') {
+        setDoubleShiftPhase('pick2');
+        setSelectedLetter(null);
+      }
       setIsProcessing(false);
       return null;
     }
@@ -2596,8 +2687,44 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // sends them back through undo — which never charges in blind (see
     // handleUndo), so the repair is always possible. Counts one invalid
     // attempt for stars.
+    //
+    // The judgment covers every word the chain PASSED THROUGH, not only each
+    // row's final word: standard rules validate the target the moment a
+    // letter lands, and that received word changes again when the row gives
+    // a letter on. Judging finals alone accepted chains standard rules refuse
+    // (SEAT/MEAT/ARCH via the non-word SMEAT), at Blind's 2x amber and 2x
+    // phase progress. The committed history (plus the move being judged) is
+    // replayed from each row's original word to recover every intermediate.
+    const replayCommittedWords = (deltas: MoveDelta[]): string[] => {
+      const board = rows.map(r => r.originalWord.split(''));
+      const words: string[] = [];
+      // Double shift judges a step at its second drop; every other variant
+      // judges each committed move.
+      const dropsPerStep = isDoubleShift ? 2 : 1;
+      for (let k = 0; k < deltas.length; k++) {
+        const d = deltas[k];
+        const src = board[d.sourceRowIndex];
+        const tgt = board[d.targetRowIndex];
+        if (
+          !src || !tgt ||
+          d.sourceLetterIndex < 0 || d.sourceLetterIndex >= src.length ||
+          d.targetInsertIndex < 0 || d.targetInsertIndex > tgt.length
+        ) {
+          // A malformed delta (corrupted restore) cannot be replayed; judge
+          // what could be reconstructed rather than fail the player for it.
+          return words;
+        }
+        const [ch] = src.splice(d.sourceLetterIndex, 1);
+        tgt.splice(d.targetInsertIndex, 0, ch);
+        if ((k + 1) % dropsPerStep === 0) words.push(src.join(''), tgt.join(''));
+      }
+      return words;
+    };
+
     const judgeBlindCompletion = (completedWords: string[]) => {
-      const holds = completedWords.every(w => checkValidation(w));
+      const holds =
+        completedWords.every(w => checkValidation(w)) &&
+        replayCommittedWords([...history, delta]).every(w => checkValidation(w));
       if (holds) return null;
       setInvalidAttempts(prev => prev + 1);
       pendingMistakeRef.current = true;
@@ -2726,6 +2853,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     unbrokenWeaveMode,
     spentLetterSet,
     doubleShiftPhase,
+    // Blind's end-of-chain judgment replays the committed history; a stale
+    // closure would judge the wrong chain. (rows already changes every move,
+    // so this adds no extra recreation.)
+    history,
   ]);
 
   // Grant one extra undo (e.g. an amber-spend refill in Challenge mode). No-op
@@ -2802,7 +2933,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // nothing happened while the next valid move dropped from the tier-3
       // combo line and chime back to the base one, with no visible cause. A
       // refused action must change nothing.
-      shakeError("No undos remaining in Challenge Mode!");
+      shakeError(getUndoRefusedMessage(currentPhase));
       return;
     }
 
@@ -2868,7 +2999,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           setResonantChoiceCount(resonantChoiceCountRef.current);
         }
       }
-      setMessage("Let's try again!");
+      setMessage(getUndoMessage(currentPhase));
       if (!freeUndos) setUndosRemaining(prev => prev - 1);
       return;
     }
@@ -2933,7 +3064,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setResonantChoiceCount(resonantChoiceCountRef.current);
       }
     }
-    setMessage("Let's try again!");
+    setMessage(getUndoMessage(currentPhase));
 
     // After undoing one delta of a double shift completed step, we're now mid-step
     // (the first drop is still in place). Set to pick2 so player can pick the second letter again.

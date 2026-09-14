@@ -12,6 +12,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
+  Linking,
+  Platform,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
@@ -35,8 +37,19 @@ import {
   purchaseProduct,
   settleConsumableGrant,
   subscribeBillingChanges,
+  getSubscriptionManagementUrl,
+  isStoreUnavailableError,
+  APP_STORE_SUBSCRIPTIONS_URL,
+  PLAY_SUBSCRIPTIONS_URL,
   IapProduct,
 } from '../../services/iap';
+import {
+  getManageSubscriptionLabel,
+  getStorePriceLoadingLabel,
+  getStoreUnavailableMessage,
+  getSupporterRenewalNote,
+  STORE_PRICE_PLACEHOLDER,
+} from '../../services/phaseNarrative';
 import {
   hasEntitlementSync,
   hasMadeAmberPurchaseSync,
@@ -51,7 +64,7 @@ import { logEvent } from '../../services/eventLogger';
 import { RewardedAdButton } from './RewardedAdButton';
 import { RewardReveal } from '../ui/RewardReveal';
 import { GiftOverlay, GiftItem } from './GiftOverlay';
-import { isAdsReady, isRewardedCapReached } from '../../services/ads';
+import { isAdsReady, isRewardedCapReached, retryAdConsentIfUnready } from '../../services/ads';
 import { getStoreArt, STORE_ART_KEYS } from './storeArt';
 import {
   getDailyAmberStatus,
@@ -98,10 +111,25 @@ const StorePricePill: React.FC<{
   <CandyButton {...props} variant="amber" style={styles.pricePill} />
 );
 
+/**
+ * What a price pill shows for one SKU. `available` is true only once the
+ * store's own localized priceString has arrived: until then the pill is
+ * disabled, showing a neutral placeholder while the fetch is in flight and the
+ * USD catalog literal only on the never-connected path (NoOp / Expo Go), so a
+ * player abroad never reads a dollar figure the sheet will contradict and a
+ * tap can never land before the store can sell.
+ */
+interface PriceState {
+  label: string;
+  available: boolean;
+  /** Screen-reader note explaining why the pill is not tappable yet. */
+  note: string;
+}
+
 const StorePackRow: React.FC<{
   info: ConsumableProductInfo;
   phase: number;
-  price: string;
+  price: PriceState;
   firstAmberDouble: boolean;
   disabled: boolean;
   onPurchase: (info: ConsumableProductInfo) => Promise<void>;
@@ -137,8 +165,11 @@ const StorePackRow: React.FC<{
                 </Text>
               )}
             </View>
-            <StorePricePill label={price} onPress={() => onPurchase(info)} phase={phase} disabled={disabled}
-              accessibilityLabel={`Buy ${info.name}, ${info.reward.amount} ${info.reward.kind}, for ${price}`} />
+            <StorePricePill label={price.label} onPress={() => onPurchase(info)} phase={phase}
+              disabled={disabled || !price.available}
+              accessibilityLabel={price.available
+                ? `Buy ${info.name}, ${info.reward.amount} ${info.reward.kind}, for ${price.label}`
+                : `${info.name}. ${price.note}`} />
           </View>
         </View>
       </View>
@@ -227,6 +258,18 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   const rewardedAdBusy = useRef(false);
   const dailyClaimId = useRef<string | null>(null);
   const [prices, setPrices] = useState<Record<string, string>>({});
+  // True once a price fetch has settled (with or without prices). Until then
+  // every pill shows the neutral placeholder; afterwards a SKU with no price
+  // shows its catalog literal only when billing never connected at all.
+  const [pricesSettled, setPricesSettled] = useState(false);
+  const pricesRef = useRef<Record<string, string>>({});
+  // Bumped when billing reports a change while no prices are loaded, so a
+  // store opened during the cold-start window refetches once RevenueCat is up.
+  const [priceFetchNonce, setPriceFetchNonce] = useState(0);
+  // The calm store-unavailable line or the unconfirmed-purchase line, chosen
+  // per failure: a store that never took the order must not send the player
+  // to a purchase history for a purchase that was never attempted.
+  const [failureMessage, setFailureMessage] = useState<string | null>(null);
   const [ownsBundle, setOwnsBundle] = useState<boolean>(
     hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE),
   );
@@ -273,6 +316,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       setOwnsStarter(hasEntitlementSync(ENTITLEMENTS.STARTER_PACK));
       setIsSupporterActive(hasEntitlementSync(ENTITLEMENTS.SUPPORTER));
       setFirstAmberDouble(!hasMadeAmberPurchaseSync());
+      // Every open refetches prices (the effect below); until it settles the
+      // pills show the neutral placeholder rather than a stale or USD label.
+      setPricesSettled(false);
       // The global save overlay can hide this still-mounted modal and reopen it
       // after the grant has completed. Clear reveals only on explicit dismissal.
     }
@@ -280,6 +326,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   // Storage overlays can temporarily hide this modal, so keep the subscription
   // until unmount. Notifications arrive only after grants are durably saved.
   useEffect(() => subscribeBillingChanges(change => {
+    if (Object.keys(pricesRef.current).length === 0) {
+      setPricesSettled(false);
+      setPriceFetchNonce(n => n + 1);
+    }
     setOwnsBundle(hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE));
     setOwnsStarter(hasEntitlementSync(ENTITLEMENTS.STARTER_PACK));
     setIsSupporterActive(hasEntitlementSync(ENTITLEMENTS.SUPPORTER));
@@ -305,6 +355,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     isRewardedCapReached().then(value => { if (!cancelled) setRewardedCapReached(value); }).catch(() => {});
     logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     return () => { cancelled = true; };
+  }, [visible]);
+
+  // Opening the Store is an ad exposure for the Free Amber card: if consent
+  // failed at boot (offline cold start), re-ask now so the card can appear.
+  useEffect(() => {
+    if (!visible) return;
+    retryAdConsentIfUnready(true).catch(() => {});
   }, [visible]);
 
   // Fetch localized price strings from the store; NoOp returns [] → fallbacks used.
@@ -338,16 +395,22 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         if (!cancelled) {
           const map: Record<string, string> = {};
           for (const p of products) if (p.priceString) map[p.productId] = p.priceString;
+          pricesRef.current = map;
           setPrices(map);
+          setPricesSettled(true);
         }
       } catch {
-        if (!cancelled) setPrices({});
+        if (!cancelled) {
+          pricesRef.current = {};
+          setPrices({});
+          setPricesSettled(true);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [visible]);
+  }, [visible, priceFetchNonce]);
 
   useEffect(() => {
     if (!visible) return;
@@ -408,16 +471,50 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   }, [faucetReveal]);
   useEffect(() => {
     if (flow === 'unavailable') {
-      announceForA11y(PURCHASE_UNCONFIRMED);
+      announceForA11y(failureMessage ?? PURCHASE_UNCONFIRMED);
     } else if (flow === 'pending') {
       announceForA11y(PURCHASE_PENDING);
     }
-  }, [flow]);
+  }, [flow, failureMessage]);
 
-  const priceLabel = useCallback(
-    (info: ConsumableProductInfo) => prices[info.productId] ?? info.fallbackPrice,
-    [prices],
+  const priceFor = useCallback(
+    (productId: string, fallbackPrice: string): PriceState => {
+      const live = prices[productId];
+      if (live) return { label: live, available: true, note: '' };
+      if (!pricesSettled) {
+        return { label: STORE_PRICE_PLACEHOLDER, available: false, note: getStorePriceLoadingLabel(phase) };
+      }
+      // Settled with nothing for this SKU: the never-connected path (NoOp /
+      // Expo Go) keeps the catalog literal for orientation; a connected store
+      // that returned nothing keeps the placeholder (nothing to sell yet).
+      return {
+        label: isBillingReady() ? STORE_PRICE_PLACEHOLDER : fallbackPrice,
+        available: false,
+        note: getStoreUnavailableMessage(phase),
+      };
+    },
+    [prices, pricesSettled, phase],
   );
+  const priceLabel = useCallback(
+    (info: ConsumableProductInfo) => priceFor(info.productId, info.fallbackPrice),
+    [priceFor],
+  );
+  const failWith = useCallback((error: string | undefined) => {
+    setFailureMessage(isStoreUnavailableError(error) ? getStoreUnavailableMessage(phase) : PURCHASE_UNCONFIRMED);
+    setFlow('unavailable');
+  }, [phase]);
+
+  const handleManageSubscription = useCallback(async () => {
+    if (operationBusy.current) return;
+    hapticLight();
+    const fallback = Platform.OS === 'ios' ? APP_STORE_SUBSCRIPTIONS_URL : PLAY_SUBSCRIPTIONS_URL;
+    const url = await getSubscriptionManagementUrl(fallback);
+    try {
+      await Linking.openURL(url);
+    } catch {
+      try { await Linking.openURL(fallback); } catch { /* the store app is not reachable */ }
+    }
+  }, []);
 
   // Keep the earned view and claim ID until the counter and amber are durable.
   // Retrying a failed save must not ask for another ad or claim another reward.
@@ -509,15 +606,15 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           return;
         }
         logEvent({ type: 'purchase_failed', data: { productId: info.productId, kind: info.reward.kind, reason: result.error ?? 'unknown' } });
-        setFlow('unavailable');
+        failWith(result.error);
       } catch {
         logEvent({ type: 'purchase_failed', data: { productId: info.productId, kind: info.reward.kind, reason: 'exception' } });
-        setFlow('unavailable');
+        failWith(undefined);
       } finally {
         operationBusy.current = false;
       }
     },
-    [onAmberChange, onHintsChange],
+    [onAmberChange, onHintsChange, failWith],
   );
 
   const handleBuyStarter = useCallback(async () => {
@@ -567,14 +664,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         return;
       }
       logEvent({ type: 'purchase_failed', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter', reason: result.error ?? 'unknown' } });
-      setFlow('unavailable');
+      failWith(result.error);
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter', reason: 'exception' } });
-      setFlow('unavailable');
+      failWith(undefined);
     } finally {
       operationBusy.current = false;
     }
-  }, [onAmberChange, onHintsChange]);
+  }, [onAmberChange, onHintsChange, failWith]);
 
   const handleBuyBundle = useCallback(async () => {
     if (operationBusy.current || pendingPurchase.current || hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE)) return;
@@ -604,14 +701,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         return;
       }
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic', reason: result.error ?? 'unknown' } });
-      setFlow('unavailable');
+      failWith(result.error);
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic', reason: 'exception' } });
-      setFlow('unavailable');
+      failWith(undefined);
     } finally {
       operationBusy.current = false;
     }
-  }, []);
+  }, [failWith]);
 
   const handleBuySupporter = useCallback(async () => {
     if (operationBusy.current || pendingPurchase.current || hasEntitlementSync(ENTITLEMENTS.SUPPORTER)) return;
@@ -642,19 +739,20 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         return;
       }
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter', reason: result.error ?? 'unknown' } });
-      setFlow('unavailable');
+      failWith(result.error);
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.SUPPORTER_SUB, kind: 'supporter', reason: 'exception' } });
-      setFlow('unavailable');
+      failWith(undefined);
     } finally {
       operationBusy.current = false;
     }
-  }, []);
+  }, [failWith]);
 
   const handleClose = useCallback(() => {
     if (operationBusy.current) return;
     pendingPurchase.current = null;
     setFlow('idle');
+    setFailureMessage(null);
     setSuccessMsg(null);
     setFaucetReveal(null);
     setGift(null);
@@ -680,7 +778,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     </View>
   );
 
-  const heroPrice = prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice;
+  const heroPrice = priceFor(STARTER_PACK_INFO.productId, STARTER_PACK_INFO.fallbackPrice);
+  const supporterPrice = priceFor(PRODUCT_IDS.SUPPORTER_SUB, SUPPORTER_SUB_FALLBACK_PRICE);
+  const bundlePrice = priceFor(PRODUCT_IDS.COSMETIC_BUNDLE, COSMETIC_BUNDLE_FALLBACK_PRICE);
+  const subscriptionStoreName = Platform.OS === 'ios' ? 'the App Store' : 'Google Play';
 
   return (
     <Modal
@@ -747,13 +848,15 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                   </View>
                 </View>
                 <CandyButton
-                  label={heroPrice}
+                  label={heroPrice.label}
                   onPress={handleBuyStarter}
                   phase={phase}
                   variant="primary"
                   size="lg"
-                  disabled={purchaseDisabled}
-                  accessibilityLabel={`Buy ${STARTER_PACK_INFO.name} for ${heroPrice}`}
+                  disabled={purchaseDisabled || !heroPrice.available}
+                  accessibilityLabel={heroPrice.available
+                    ? `Buy ${STARTER_PACK_INFO.name} for ${heroPrice.label}`
+                    : `${STARTER_PACK_INFO.name}. ${heroPrice.note}`}
                   style={styles.heroCta}
                 />
               </PanelCard>
@@ -855,7 +958,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 <View style={styles.rowInfo}>
                   <Text style={[styles.rowTitle, { color: t.title }]}>Supporter</Text>
                   <Text style={[styles.rowDesc, { color: t.body }]}>
-                    Ad-free, {SUPPORTER_MONTHLY_AMBER} amber every month, the season pass premium track, and an exclusive confetti. Cancel anytime.
+                    Ad-free, {SUPPORTER_MONTHLY_AMBER} amber every month, the season pass premium track, and an exclusive confetti. {getSupporterRenewalNote(subscriptionStoreName)}
                   </Text>
                   {renderRowFooter(
                     // Cadence rather than a count: the left slot always answers
@@ -864,10 +967,27 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                     isSupporterActive ? (
                       <Text style={[styles.ownedText, { color: t.amberText }]}>Active <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
                     ) : (
-                      <StorePricePill label={prices[PRODUCT_IDS.SUPPORTER_SUB] ?? SUPPORTER_SUB_FALLBACK_PRICE}
-                        onPress={handleBuySupporter} phase={phase} disabled={purchaseDisabled}
-                        accessibilityLabel="Subscribe as a Supporter" />
+                      <StorePricePill label={supporterPrice.label}
+                        onPress={handleBuySupporter} phase={phase} disabled={purchaseDisabled || !supporterPrice.available}
+                        accessibilityLabel={supporterPrice.available
+                          ? `Subscribe as a Supporter for ${supporterPrice.label} a month`
+                          : `Supporter. ${supporterPrice.note}`} />
                     ),
+                  )}
+                  {isSupporterActive && (
+                    // "Cancel anytime" has to be actionable in-app: the store's
+                    // own management page (customerInfo.managementURL) or the
+                    // platform's subscriptions page.
+                    <TouchableOpacity
+                      onPress={handleManageSubscription}
+                      accessibilityRole="link"
+                      accessibilityLabel={getManageSubscriptionLabel(phase)}
+                      style={styles.manageLink}
+                    >
+                      <Text style={[styles.manageLinkText, { color: t.title }]}>
+                        {getManageSubscriptionLabel(phase)} <Image source={CHROME_ICONS.chevron} style={styles.inlineMark} />
+                      </Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               </View>
@@ -889,9 +1009,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                     ownsBundle ? (
                       <Text style={[styles.ownedText, { color: t.amberText }]}>Owned <Image source={CHROME_ICONS.starBullet} style={styles.inlineMark} /></Text>
                     ) : (
-                      <StorePricePill label={prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? COSMETIC_BUNDLE_FALLBACK_PRICE}
-                        onPress={handleBuyBundle} phase={phase} disabled={purchaseDisabled}
-                        accessibilityLabel="Buy The Keeper's Collection" />
+                      <StorePricePill label={bundlePrice.label}
+                        onPress={handleBuyBundle} phase={phase} disabled={purchaseDisabled || !bundlePrice.available}
+                        accessibilityLabel={bundlePrice.available
+                          ? `Buy The Keeper's Collection for ${bundlePrice.label}`
+                          : `The Keeper's Collection. ${bundlePrice.note}`} />
                     ),
                   )}
                 </View>
@@ -949,7 +1071,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           {(flow === 'unavailable' || flow === 'pending') && (
             <View accessibilityLiveRegion="polite" style={[styles.unavailableBox, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
               <Text style={[styles.unavailableText, { color: t.body }]}>
-                {flow === 'pending' ? PURCHASE_PENDING : PURCHASE_UNCONFIRMED}
+                {flow === 'pending' ? PURCHASE_PENDING : failureMessage ?? PURCHASE_UNCONFIRMED}
               </Text>
             </View>
           )}
@@ -1153,6 +1275,8 @@ const styles = StyleSheet.create({
     fontFamily: PIXEL_FONT_BOLD,
   },
 
+  manageLink: { minHeight: 44, justifyContent: 'center', paddingVertical: 8, alignSelf: 'flex-start' },
+  manageLinkText: { fontSize: FONT_SIZE.body, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD, textDecorationLine: 'underline' },
   patronLink: {
     marginTop: 16,
     paddingVertical: SURFACE.cardPadY,

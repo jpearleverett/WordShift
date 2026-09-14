@@ -151,7 +151,21 @@ export function setAdProvider(newProvider: AdProvider): void {
  * first ad on whichever path fires first.
  */
 export async function ensureAdConsent(): Promise<void> {
-  if (consentAndAttRequested) return;
+  if (consentAndAttRequested) {
+    // Consent can fail to resolve at boot (an offline cold start). While the
+    // provider still is not ready, let each ad exposure ask again: a provider
+    // whose consent already settled treats this as a cheap no-op, and one whose
+    // update failed without a stored answer retries it (googleAdMobAds.ts).
+    // ATT stays once per session; the OS never re-prompts anyway.
+    if (!provider.isReady()) {
+      try {
+        await provider.requestConsentIfNeeded();
+      } catch {
+        /* non-fatal */
+      }
+    }
+    return;
+  }
   consentAndAttRequested = true;
   // Consent (UMP) first, then iOS ATT. Errors must not block gameplay; the
   // provider independently keeps ads disabled until UMP permits requests.
@@ -193,6 +207,23 @@ export function getAdProviderName(): string {
 }
 
 /** Whether the registered ad provider is actually initialized and ready. */
+/**
+ * Re-ask for UMP consent while the provider is still not ready (an earlier
+ * update failed with no stored answer, typically an offline cold start).
+ * Called from the foreground resume, from a rewarded surface that renders
+ * unready and from opening the Store, so a player who comes back online can
+ * reach the rewarded faucets without an interstitial exit having to fire
+ * first. A provider whose consent already settled treats it as a no-op.
+ * `allowFirstAsk` lets a rewarded surface count as the first exposure (the
+ * full consent-then-ATT path); the resume handler leaves it false so a mere
+ * foreground never becomes the first ask.
+ */
+export async function retryAdConsentIfUnready(allowFirstAsk = false): Promise<void> {
+  if (provider.isReady()) return;
+  if (!consentAndAttRequested && !allowFirstAsk) return;
+  await ensureAdConsent();
+}
+
 export function isAdsReady(): boolean {
   return provider.isReady();
 }

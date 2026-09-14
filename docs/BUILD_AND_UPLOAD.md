@@ -78,7 +78,7 @@ Check that raw sources, Play listing materials, Git objects, downloaded app bina
 
 ## Current Android build settings and remaining checks
 
-The checked-in Android identity is `com.wordshift.app`, app version **1.3.4**, version code **98**. `eas.json` uses local version management. Increase the Android version code before uploading a replacement bundle if that code has already been used in Play. The npm package version is separately still `1.3.1`; it is not the Android display version or version code.
+The checked-in Android identity is `com.wordshift.app`, app version **1.3.5**, version code **99** (set 2026-09-13; check Play Console for an internal upload that already used 99 and bump to 100 if so). `eas.json` uses local version management. Increase the Android version code before uploading a replacement bundle if that code has already been used in Play. The npm package version is separately still `1.3.1`; it is not the Android display version or version code.
 
 The `internal-testing` profile creates a signed store AAB on the `internal-testing` update channel. The `production` submit profile also currently targets Play's **internal** track; its name does not automatically publish to production. The `preview` profile creates an internally distributed APK. See [the launch checklist](LAUNCH_CHECKLIST.md) for release steps.
 

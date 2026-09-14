@@ -885,11 +885,16 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
       ]}
     >
       {/* Room background image (falls back to backgroundColor on load failure) */}
+      {/* The room art is 1456x720 drawn into a ~250x123dp box: 2-3x
+          oversampled on every density. resizeMethod="resize" (Android) has
+          Fresco decode near the view size instead of holding a 4 MB bitmap
+          per room, so a full house is not 52 MB of room backgrounds. */}
       {ROOM_BACKGROUNDS[room.theme] && (
         <Image
           source={ROOM_BACKGROUNDS[room.theme]}
           style={styles.backgroundImage}
           resizeMode="cover"
+          resizeMethod="resize"
           onError={() => {/* Falls back to themeColors.bg */}}
         />
       )}
@@ -906,6 +911,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
             source={mask}
             style={[styles.backgroundImage, { tintColor: tint.color, opacity: tint.opacity }]}
             resizeMode="cover"
+            resizeMethod="resize"
           />
         );
       })()}

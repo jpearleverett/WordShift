@@ -5,9 +5,12 @@ title: WordShift Terms of Service
 
 # WordShift Terms of Service
 
-**Effective date:** September 13, 2026
+**Effective date:** September 14, 2026
 
-This revision clarifies existing purchase delivery and restoration behavior.
+Change log: the September 13, 2026 revision clarified existing purchase delivery
+and restoration behavior. The September 14, 2026 revision adds this change log;
+a governing-law section will be added once the developer's jurisdiction is
+confirmed.
 
 These terms apply to your use of the WordShift mobile app ("the app"), developed by Jonathan Pearl Everett.
 
@@ -54,6 +57,20 @@ You may stop using the app at any time by deleting it. These terms terminate aut
 ## 9. Contact
 
 Questions about these terms: jpearleverett@gmail.com
+
+<!-- OWNER TO COMPLETE BEFORE PUBLISHING A GOVERNING-LAW CLAUSE: the section
+     below is held inside this comment so the live page never shows bracketed
+     placeholders (docs/ deploys to GitHub Pages on every push to main). To
+     publish it, fill in the developer's home jurisdiction (a country and, where
+     relevant, a state or province) and the courts of that jurisdiction, move
+     the section out of this comment as "## 10. Governing law", renumber
+     "Changes" to 11, and mention the addition in the revision note above and
+     in the app's release notes.
+
+## 10. Governing law
+
+These terms are governed by the laws of [GOVERNING JURISDICTION], without regard to its conflict-of-law rules. Any dispute arising from these terms or your use of the app that cannot be resolved informally will be brought in the courts of [VENUE], except where the consumer-protection law of the country in which you live gives you the right to bring a claim in your local courts or grants you protections that cannot be waived, in which case those rights and protections apply.
+-->
 
 ## 10. Changes
 

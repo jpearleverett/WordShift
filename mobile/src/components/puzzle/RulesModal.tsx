@@ -142,10 +142,17 @@ export const RulesModal: React.FC<RulesModalProps> = ({
             { backgroundColor: t.overlay, opacity: backdropOpacity },
           ]}
         />
+        {/* Tap-outside-to-close backdrop. accessible={false}: a TouchableOpacity
+            is a focusable "button" by default, so TalkBack landed on an
+            unlabeled node wrapping the whole card that CLOSED the rules when
+            activated. The labelled Close button and the dismiss bevel are the
+            announced ways out; the backdrop is a sighted convenience only. */}
         <TouchableOpacity
           style={[styles.overlayTouch, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12 }]}
           activeOpacity={1}
           onPress={handleClose}
+          accessible={false}
+          importantForAccessibility="no"
         >
           <Animated.View
             style={[
@@ -210,6 +217,13 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                   </View>
                 );
               })}
+
+              {/* The star rule (ftue-7): the one rule no other surface taught.
+                  A framed note under the four diagrammed steps rather than a
+                  fifth step, which would need its own diagram. */}
+              <View style={[styles.starRule, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
+                <AppText style={[styles.starRuleText, { color: t.body }]}>{rules.starRule}</AppText>
+              </View>
 
               <AppText style={{ color: t.body, fontSize: 15, lineHeight: 21, marginBottom: 12 }}>
                 Words use standard English spellings. Common regional spellings count. Rare valid discoveries can count too; new ordinary puzzles use a more familiar vocabulary.
@@ -326,6 +340,16 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   ruleDesc: {
+    ...TEXT_ROLE.body,
+  },
+  starRule: {
+    borderWidth: 1,
+    borderRadius: SURFACE.cardRadius,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  starRuleText: {
     ...TEXT_ROLE.body,
   },
   gotItButton: {

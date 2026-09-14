@@ -102,8 +102,9 @@ Backend features are LIVE (Supabase + Sentry + AdMob + Google Play Billing), so 
 - **App interactions / analytics** — anonymous events (install id, platform, app version, event type + non-identifying event details) → Supabase. Purpose: analytics. Not linked to identity, not shared for ads.
 - **Crash logs & Diagnostics** — device model, OS, app version, stack traces → Sentry. Purpose: app functionality / diagnostics.
 - **Device or other IDs — Advertising ID** — collected by Google AdMob. Purpose: advertising/marketing. May be shared with Google.
+- **Device or other IDs — SDK installation identifiers** (re-declare before the public release; the July form listed only the advertising ID) — WordShift's own random install id (cloud backup linkage, telemetry, daily leaderboard), the Sentry SDK's persisted installation id (`user.id` on every crash report) and the RevenueCat anonymous app-user id (tied to store purchases). Purpose: app functionality + analytics/diagnostics. Shared with Supabase, Sentry and RevenueCat respectively. See the matching note in `MONETIZATION_SETUP.md`.
 - **Approximate location** — coarse, IP-derived, collected by Google AdMob for ad serving. Purpose: advertising/marketing.
-- **Purchase history** — entitlement/purchase records via Google Play Billing / RevenueCat. Purpose: app functionality.
+- **Purchase history** — entitlement/purchase records via Google Play Billing / RevenueCat, including the Supporter subscription (added 2026-08-31). Purpose: app functionality.
 - **Cloud save and leaderboard data** — the backup uses a separate random save credential, with support/install references privately linked after successful backups. Eligible daily leaderboard results use the install identifier. The newcomer's easier first daily does not submit to the shared leaderboard. Use the current backend inventory and store questionnaire when selecting categories.
 
 Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from branch, `/docs`). Use these URLs in the store consoles and in-app Settings (all three are also wired into `mobile/src/constants/links.ts`):

@@ -114,6 +114,7 @@ jest.mock('react-native', () => ({
 // ---------------------------------------------------------------------------
 
 let mockSwiftVictories = false;
+const mockUpdateSetting = jest.fn(async () => ({}));
 jest.mock('../services/settings', () => ({
   getSettingsSync: () => ({
     reducedMotion: true,
@@ -121,6 +122,7 @@ jest.mock('../services/settings', () => ({
     hapticsEnabled: false,
     swiftVictories: mockSwiftVictories,
   }),
+  updateSetting: (...args: unknown[]) => mockUpdateSetting(...(args as [])),
 }));
 
 jest.mock('../services/haptics', () => ({
@@ -174,6 +176,8 @@ import {
   getFlawlessHonorific,
   getUnbrokenWeaveRankUpLine,
   getResonanceBonusLabel,
+  getSwiftVictoriesToggleLabel,
+  getSwiftVictoriesToggledMessage,
 } from '../services/phaseNarrative';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../services/shareResults';
 import { getPhaseTheme } from '../theme/colors';
@@ -309,6 +313,7 @@ function baseProps(overrides: Record<string, unknown> = {}): Record<string, unkn
 beforeEach(() => {
   resetHookState();
   mockSwiftVictories = false;
+  mockUpdateSetting.mockClear();
 });
 
 // ===========================================================================
@@ -998,5 +1003,67 @@ describe('daily standing card wiring', () => {
       dailyHistoryLine: '3 dailies completed',
     })));
     expect(props!.beatText).toBeNull();
+  });
+});
+
+// ===========================================================================
+// Quicker celebrations affordance (product-retention-9)
+// ===========================================================================
+
+describe('the quicker-celebrations affordance in the footer', () => {
+  const affordance = (tree: unknown) =>
+    findAll(tree, el => (el.props as Record<string, unknown>)?.testID === 'swift-victories-affordance')
+      .map(el => ({ ...el, props: (el.props ?? {}) as Record<string, unknown> }));
+
+  it('is absent until the compact strip is actually available (SWIFT_VICTORY_MIN_PUZZLES)', () => {
+    const tree = render(baseProps({ victoryData: baseVictoryData({ puzzlesSolved: 19 }) }));
+    expect(affordance(tree)).toHaveLength(0);
+  });
+
+  it('renders once past the gate, labelled through phaseNarrative with the change the tap makes', () => {
+    const tree = render(baseProps({ victoryData: baseVictoryData({ puzzlesSolved: 20 }) }));
+    const [node] = affordance(tree);
+    expect(node).toBeDefined();
+    expect(node.props.accessibilityLabel).toBe(getSwiftVictoriesToggleLabel(0, false));
+    expect(node.props.accessibilityLabel).toBe('Quicker celebrations');
+    expect(node.props.accessibilityState).toEqual({ checked: false });
+  });
+
+  it('never shows on the hushed beats (finale board / silent victory) or the completion coda', () => {
+    expect(affordance(render(baseProps({ victoryData: baseVictoryData({ puzzlesSolved: 40, finalBoard: true }) })))).toHaveLength(0);
+    expect(affordance(render(baseProps({ victoryData: baseVictoryData({ puzzlesSolved: 104 }) })))).toHaveLength(0);
+    expect(affordance(render(baseProps({
+      victoryData: baseVictoryData({ puzzlesSolved: 40 }),
+      completionCoda: { title: 'The house is whole', text: 'It waits.' },
+    })))).toHaveLength(0);
+  });
+
+  it('a tap flips the existing swiftVictories setting and leaves a phase-aware receipt', () => {
+    const props = baseProps({ victoryData: baseVictoryData({ puzzlesSolved: 40 }), phase: 2 });
+    const [node] = affordance(render(props));
+    expect(node.props.accessibilityLabel).toBe(getSwiftVictoriesToggleLabel(2, false));
+    (node.props.onPress as () => void)();
+    expect(mockUpdateSetting).toHaveBeenCalledWith('swiftVictories', true);
+    const [after] = affordance(render(props));
+    expect(after.props.accessibilityLabel).toBe(getSwiftVictoriesToggledMessage(2, true));
+    expect(after.props.accessibilityState).toEqual({ checked: true });
+  });
+
+  it('reads the current setting so the label offers the way back when swift is already on', () => {
+    // A win that is NOT routine (a milestone) still shows the full modal with
+    // swift on, which is where the way back must be offered.
+    mockSwiftVictories = true;
+    const tree = render(baseProps({ victoryData: baseVictoryData({ puzzlesSolved: 40, milestoneBonus: 50 }) }));
+    const [node] = affordance(tree);
+    expect(node.props.accessibilityLabel).toBe(getSwiftVictoriesToggleLabel(0, true));
+  });
+
+  it('its copy carries no em dashes across phases', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5]) {
+      for (const enabled of [true, false]) {
+        expect(getSwiftVictoriesToggleLabel(phase, enabled)).not.toMatch(/[\u2014\u2013]/);
+        expect(getSwiftVictoriesToggledMessage(phase, enabled)).not.toMatch(/[\u2014\u2013]/);
+      }
+    }
   });
 });

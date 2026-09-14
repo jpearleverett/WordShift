@@ -69,13 +69,50 @@ The footer now says `Talk to <name>` and opens the same gift/introduction/conver
 
 Local validation passed **4,789 tests in 197 suites**, the **11 reverse-composition script tests**, TypeScript, zero-warning lint, story integrity, vocabulary/branching and bank-route audits, and the daily cohort check. The **three shortcut browser journeys** passed. CI uses Node-24-based v6 checkout/setup/upload actions while retaining Node 22 for the application; browser evidence uploads only after the browser step runs. ESLint excludes generated browser reports and traces. App version 1.3.5 / Android version code 99 are unchanged.
 
+## Launch readiness review (2026-09-14)
+
+[`LAUNCH_READINESS_REVIEW_2026-09-14.md`](LAUNCH_READINESS_REVIEW_2026-09-14.md)
+answers "is the game ready to publish" with a twelve-dimension review of `main`
+at `8233184` (app 1.3.5 / code 99). Its verdict is **conditionally ready: publish
+the next artifact, not the current one**, on three blockers:
+
+1. **Consumable purchases credit twice** (fixed on 2026-09-14): checkout
+   recorded the Google Play order id as the grant id while receipt recovery
+   keyed the same purchase on RevenueCat's transaction id, so every amber pack,
+   hint pack and starter pack was granted again by recovery (the first amber
+   pack three times). The checkout now links the RevenueCat receipt id to the
+   grant in the same durable write, recovery resolves a receipt to its owning
+   grant by either id, late receipts are covered by a 60 s same-product window
+   and a durable receipt alias, and the reproduction that credited 0 -> 1200
+   -> 1800 now credits once (`billingAdapterSdk` / `billingPurchaseSafety`).
+2. **The shipping toolchain has never run on a device.** SDK 57 / RN 0.86, R8
+   minification, resource shrinking and the optimizing ProGuard default all
+   landed after the closed test that earned production access (1.2.2 / code 88).
+   The production-cut AAB must pass the internal track on physical phones first.
+3. **The production cut was a manual, unenforced edit** (resolved on 2026-09-14):
+   `app.config.js` now derives `adsUseTestIds` from `WORDSHIFT_RELEASE_CHANNEL`,
+   so the `production` EAS profile serves live units by itself and CI validates
+   both channels on every run. Only the version-code bump remains a hand step;
+   follow the checklist's command sequence.
+
+The review's medium and low findings that live in the repository were fixed
+the same day on the review branch (resolution table in the review document);
+the backend items are tracked in [backend setup](BACKEND_SETUP.md) (hosted v2
+migrations verified 2026-09-14; `rate_limits_v1.sql` still to apply). Native
+dependency change: **`expo-device` ~57.0.2** (installed-RAM device-tier signal,
+Android only) was added on 2026-09-14, so the next Play artifact must be a new
+native build; an OTA onto the current binary stays safe because the guarded
+require falls back to the pixel heuristic. The expo-audio plugin options,
+blocked permissions, launcher name and Android 12 splash icon changes from the
+same review also need that native build.
+
 ## Remaining release evidence
 
 Use the [launch checklist](LAUNCH_CHECKLIST.md) to record results against the actual candidate AAB/version code. In particular:
 
-- Exercise cold start, fonts/art/audio, background/resume and ceremony interruption on the signed **minified** Android build.
+- Exercise cold start, fonts/art/audio, background/resume and ceremony interruption on the signed **minified** Android build, including a manifest permission check on the AAB (`bundletool dump manifest --bundle=<file>.aab | grep uses-permission`: no RECORD_AUDIO, SYSTEM_ALERT_WINDOW or external-storage entries), a TalkBack pass over a board (one stop per source letter, double-tap selects) and a three-button-navigation pass over the dialogue sheet and utility menu on Android 15.
 - Exercise a free-player account, test ads, paid checkout, pending/cancelled checkout, retry, restore, reset and reward interruption. Mocked SDK tests and browser journeys do not establish store-side behavior.
-- Verify hosted Supabase migrations and retention jobs, RevenueCat products/entitlements, Sentry delivery and Play listing/consent configuration. Source configuration alone does not prove deployment.
+- The hosted Supabase v2 migrations were verified deployed by a read-only probe on 2026-09-14 ([backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14)); still verify the retention cron run, event arrival, `rate_limits_v1.sql` once applied, RevenueCat products/entitlements, Sentry delivery and Play listing/consent configuration. Source configuration alone does not prove deployment.
 - Compare Play's per-device download/install estimates and DEX metrics after the new build. The reported **497 MB EAS source upload** is a separate measurement; its exact contents have not been inspected here.
 
 Android test ad IDs remain deliberately enabled in the checked-in configuration. The production ad cutover and public Play rollout are separate release actions. iOS monetization configuration remains incomplete.

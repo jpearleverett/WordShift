@@ -170,7 +170,7 @@ export interface PersistenceActions {
     undoLimited?: boolean,
     speed?: boolean,
     completionId?: string,
-    finale?: { finalBoard?: boolean; ritualWord?: string; phaseBefore?: DialoguePhase; dailyDate?: string; unbrokenWeave?: boolean }
+    finale?: { finalBoard?: boolean; ritualWord?: string; phaseBefore?: DialoguePhase; dailyDate?: string; dailyBoardVersion?: string; unbrokenWeave?: boolean }
   ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
@@ -277,7 +277,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     // the lifetime speed-win counter behind the Speed achievements.
     speed: boolean = false,
     completionId?: string,
-    finale?: { finalBoard?: boolean; ritualWord?: string; phaseBefore?: DialoguePhase; dailyDate?: string; unbrokenWeave?: boolean }
+    finale?: { finalBoard?: boolean; ritualWord?: string; phaseBefore?: DialoguePhase; dailyDate?: string; dailyBoardVersion?: string; unbrokenWeave?: boolean }
   ): Promise<VictoryData> => {
     if (recordInProgress.current) throw new Error('This puzzle is already being saved');
     recordInProgress.current = true;

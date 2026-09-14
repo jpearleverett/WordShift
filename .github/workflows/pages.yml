@@ -33,6 +33,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The legal pages carry owner-to-complete placeholders inside HTML
+      # comments until they are filled in; a placeholder that escapes its
+      # comment must never reach the live site.
+      - name: Refuse unfilled legal placeholders
+        run: |
+          status=0
+          for f in $(find docs -name '*.md'); do
+            if ! perl -0777 -ne 's/<!--.*?-->//gs; exit 1 if /\[(GOVERNING JURISDICTION|VENUE)/' "$f"; then
+              echo "Unfilled legal placeholder outside an HTML comment in $f; fill it in before publishing." >&2
+              status=1
+            fi
+          done
+          exit $status
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

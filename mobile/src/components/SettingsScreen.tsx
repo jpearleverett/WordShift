@@ -740,7 +740,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   const handleResetData = () => {
     showGameAlert(
       'Reset All Progress',
-      'This erases everything on this device. Your house and every room, all your animal friends, and all your amber are lost, along with achievements, statistics, streaks, and daily challenge history. The game starts over from the very beginning. This cannot be undone.',
+      'This erases everything on this device, and it replaces the cloud backup linked to your recovery code with the empty start, so another device using that code will be offered the reset save too. Your house and every room, all your animal friends, and all your amber are lost, along with achievements, statistics, streaks, and daily challenge history. The game starts over from the very beginning. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {

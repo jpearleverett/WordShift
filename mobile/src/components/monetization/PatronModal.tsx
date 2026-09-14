@@ -21,11 +21,14 @@ import { AmberInline } from '../AmberInline';
 import {
   PRODUCT_IDS,
   getProducts,
+  isBillingReady,
+  isStoreUnavailableError,
   purchaseProduct,
   restorePurchases,
   subscribeBillingChanges,
   IapProduct,
 } from '../../services/iap';
+import { getStoreUnavailableMessage, getStorePriceLoadingLabel, STORE_PRICE_PLACEHOLDER } from '../../services/phaseNarrative';
 import { isPatronSync, isAdFreeSync, ENTITLEMENTS } from '../../services/entitlements';
 import { PATRON_AMBER_BONUS } from '../../constants/gameBalance';
 import { getSettingsSync } from '../../services/settings';
@@ -124,6 +127,10 @@ export const PatronModal: React.FC<PatronModalProps> = ({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [priceString, setPriceString] = useState<string | null>(null);
   const [adsPriceString, setAdsPriceString] = useState<string | null>(null);
+  // True once the price fetch settled. A CTA stays disabled with a neutral
+  // placeholder until its store price arrives; the USD fallback literal shows
+  // only on the never-connected path (NoOp / Expo Go), see StoreModal.
+  const [pricesSettled, setPricesSettled] = useState(false);
 
   const [cardScale] = useState(() => new Animated.Value(reducedMotion ? 1 : 0.92));
   const [cardOpacity] = useState(() => new Animated.Value(reducedMotion ? 1 : 0));
@@ -134,6 +141,8 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     if (visible) {
       setIsPatron(isPatronSync());
       setAdFree(isAdFreeSync());
+      // The price effect refetches on every open; hold the placeholder until it settles.
+      setPricesSettled(false);
     }
   }
 
@@ -167,11 +176,13 @@ export const PatronModal: React.FC<PatronModalProps> = ({
         if (!cancelled) {
           setPriceString(patron?.priceString ?? null);
           setAdsPriceString(ads?.priceString ?? null);
+          setPricesSettled(true);
         }
       } catch {
         if (!cancelled) {
           setPriceString(null);
           setAdsPriceString(null);
+          setPricesSettled(true);
         }
       }
     })();
@@ -243,7 +254,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
       }
       // billing_unavailable (NoOp) or any other failure → calm unavailable state.
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron', reason: result.error ?? 'unknown' } });
-      setStatusMessage(PURCHASE_UNCONFIRMED);
+      setStatusMessage(isStoreUnavailableError(result.error) ? getStoreUnavailableMessage(phase) : PURCHASE_UNCONFIRMED);
       setFlow('unavailable');
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron', reason: 'exception' } });
@@ -252,7 +263,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     } finally {
       operationBusy.current = false;
     }
-  }, [onPatronChange]);
+  }, [onPatronChange, phase]);
 
   const handlePurchaseRemoveAds = useCallback(async () => {
     if (operationBusy.current || pendingPurchase.current || isAdFreeSync()) return;
@@ -286,7 +297,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
         return;
       }
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree', reason: result.error ?? 'unknown' } });
-      setStatusMessage(PURCHASE_UNCONFIRMED);
+      setStatusMessage(isStoreUnavailableError(result.error) ? getStoreUnavailableMessage(phase) : PURCHASE_UNCONFIRMED);
       setFlow('unavailable');
     } catch {
       logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree', reason: 'exception' } });
@@ -295,7 +306,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     } finally {
       operationBusy.current = false;
     }
-  }, [onPatronChange]);
+  }, [onPatronChange, phase]);
 
   const handleRestore = useCallback(async () => {
     if (operationBusy.current) return;
@@ -339,6 +350,12 @@ export const PatronModal: React.FC<PatronModalProps> = ({
   const skin = getPixelSkin(phase);
   const working = flow === 'working';
   const purchaseDisabled = working || flow === 'pending';
+  // Never-connected path only: the catalog literal orients, the CTA stays off.
+  const showFallbackPrices = pricesSettled && !isBillingReady();
+  const patronPriceLabel = priceString ?? (showFallbackPrices ? PATRON_FALLBACK_PRICE : STORE_PRICE_PLACEHOLDER);
+  const adsPriceLabel = adsPriceString ?? (showFallbackPrices ? REMOVE_ADS_FALLBACK_PRICE : STORE_PRICE_PLACEHOLDER);
+  // Announced beside the dimmed CTA so a screen-reader user knows why it waits.
+  const priceNote = pricesSettled ? getStoreUnavailableMessage(phase) : getStorePriceLoadingLabel(phase);
 
   const benefits: { key: string; render: React.ReactNode }[] = [
     {
@@ -435,12 +452,12 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           {/* Actions */}
           {!isPatron && (
             <CandyButton
-              label={`Become a Patron · ${priceString ?? PATRON_FALLBACK_PRICE}`}
+              label={`Become a Patron · ${patronPriceLabel}`}
               onPress={handlePurchase}
               phase={phase}
               variant="primary"
               size="lg"
-              disabled={purchaseDisabled}
+              disabled={purchaseDisabled || !priceString}
               accessibilityLabel="Become a Patron"
               style={styles.primaryBtn}
             />
@@ -455,14 +472,20 @@ export const PatronModal: React.FC<PatronModalProps> = ({
                 doubles with a single tap. Daily and story limits still apply.
               </Text>
               <CandyButton
-                label={`Remove Ads · ${adsPriceString ?? REMOVE_ADS_FALLBACK_PRICE}`}
+                label={`Remove Ads · ${adsPriceLabel}`}
                 onPress={handlePurchaseRemoveAds}
                 phase={phase}
                 variant="secondary"
-                disabled={purchaseDisabled}
+                disabled={purchaseDisabled || !adsPriceString}
                 accessibilityLabel="Remove ads"
               />
             </View>
+          )}
+
+          {!isPatron && (!priceString || (!adFree && !adsPriceString)) && (
+            <Text style={[styles.adFreeNote, { color: t.muted }]} accessibilityLiveRegion="polite">
+              {priceNote}
+            </Text>
           )}
 
           {!isPatron && adFree && (

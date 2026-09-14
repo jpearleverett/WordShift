@@ -27,6 +27,8 @@ jest.mock('react-native', () => ({
   Modal: 'Modal', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
   Animated: { View: 'AnimatedView', Value: class { setValue() {} } },
   StyleSheet: { create: (styles: unknown) => styles },
+  Platform: { OS: 'android', select: (spec: Record<string, unknown>) => spec.android ?? spec.default },
+  Linking: { openURL: jest.fn(async () => undefined) },
 }));
 jest.mock('../components/ui/NineSlice', () => ({ NineSliceFrame: 'NineSliceFrame' }));
 jest.mock('../components/ui/CandyButton', () => ({ CandyButton: 'CandyButton' }));
@@ -43,7 +45,7 @@ jest.mock('../services/settings', () => ({ getSettingsSync: () => ({ reducedMoti
 jest.mock('../services/a11yAnnounce', () => ({ announceForA11y: jest.fn() }));
 jest.mock('../services/haptics', () => ({ hapticLight: jest.fn(), hapticMedium: jest.fn() }));
 jest.mock('../services/eventLogger', () => ({ logEvent: jest.fn() }));
-jest.mock('../services/ads', () => ({ isAdsReady: () => true, isRewardedCapReached: jest.fn(async () => false) }));
+jest.mock('../services/ads', () => ({ isAdsReady: () => true, isRewardedCapReached: jest.fn(async () => false), retryAdConsentIfUnready: jest.fn(async () => undefined), subscribeAdsReady: () => () => {} }));
 jest.mock('../services/dailyAmberReward', () => ({
   claimDailyAmberReward: jest.fn(), createDailyAmberClaimId: jest.fn(() => 'claim-one'),
   getDailyAmberStatus: jest.fn(),
@@ -64,6 +66,8 @@ jest.mock('../services/iap', () => ({
   ],
   STARTER_PACK_INFO: { productId: 'starter', name: 'Welcome', description: 'Starter pack', fallbackPrice: '$2' },
   getProducts: jest.fn(async () => []), isBillingReady: () => true,
+  isStoreUnavailableError: (error: string | undefined) => ['billing_unavailable', 'product_not_found', 'purchase_in_progress'].includes(error ?? ''),
+  getSubscriptionManagementUrl: jest.fn(async (fallback: string) => fallback),
   purchaseConsumable: jest.fn(), purchaseStarterPack: jest.fn(), purchaseProduct: jest.fn(),
   settleConsumableGrant: jest.fn(), restorePurchases: jest.fn(),
   subscribeBillingChanges: jest.fn(() => () => {}),
@@ -116,6 +120,13 @@ function mountEffects(): () => void {
   const cleanups = jest.mocked(React.useEffect).mock.calls.map(([effect]) => effect());
   return () => { cleanups.forEach(cleanup => cleanup?.()); };
 }
+const flush = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setImmediate(resolve)); };
+/** Open the store the way a device does: first paint, effects, then the price
+ * fetch settles. Buy controls exist only once the store's own price for that
+ * SKU has arrived; before that they are disabled placeholders. */
+async function openStore(ui: ReturnType<typeof store>): Promise<Element[]> {
+  ui.render(); mountEffects(); await flush(); return ui.render();
+}
 function billingChange() {
   const calls = jest.mocked(subscribeBillingChanges).mock.calls;
   return calls[calls.length - 1][0];
@@ -135,7 +146,11 @@ beforeEach(() => {
   jest.mocked(isAdFreeSync).mockReturnValue(false);
   jest.mocked(hasEntitlementSync).mockReturnValue(false);
   jest.mocked(getDailyAmberStatus).mockResolvedValue({ available: true, remaining: 2, claimedToday: 0, dateKey: 'today' } as any);
-  jest.mocked(getProducts).mockResolvedValue([{ productId: 'amber', priceString: '$1' }] as any);
+  jest.mocked(getProducts).mockResolvedValue([
+    { productId: 'amber', priceString: '$1' }, { productId: 'hints', priceString: '$1' },
+    { productId: 'starter', priceString: '$2' }, { productId: 'bundle', priceString: '$3' },
+    { productId: 'supporter', priceString: '$4' },
+  ] as any);
   jest.mocked(purchaseConsumable).mockResolvedValue({ success: false, productId: 'amber', cancelled: true });
   jest.mocked(purchaseStarterPack).mockResolvedValue({ success: false, productId: 'starter', cancelled: true });
   jest.mocked(purchaseProduct).mockResolvedValue({ success: false, productId: 'patron', cancelled: true });
@@ -148,13 +163,13 @@ describe('store purchase controls', () => {
     const payment = deferred(); const credit = deferred();
     jest.mocked(purchaseConsumable).mockReturnValue(payment.promise);
     jest.mocked(settleConsumableGrant).mockReturnValue(credit.promise);
-    const ui = store(); const initial = ui.render();
+    const ui = store(); const initial = await openStore(ui);
     const buy = control(initial, 'Buy Amber, 100 amber, for $1');
     const completed = buy.onPress();
     buy.onPress();
     control(initial, 'Buy Hints, 5 hints, for $1').onPress();
     control(initial, 'Buy Welcome for $2').onPress();
-    control(initial, "Buy The Keeper's Collection").onPress();
+    control(initial, "Buy The Keeper's Collection for $3").onPress();
     control(initial, 'Close store').onPress();
     modal(initial).onRequestClose();
     control(initial, 'Learn about Patron').onPress();
@@ -186,7 +201,7 @@ describe('store purchase controls', () => {
   it('keeps the confirmed reward visible when the save overlay closes after checkout settles', async () => {
     const payment = deferred();
     jest.mocked(purchaseConsumable).mockReturnValue(payment.promise);
-    const ui = store();
+    const ui = store(); await openStore(ui);
     const buying = control(ui.render(), 'Buy Amber, 100 amber, for $1').onPress();
     ui.render({ visible: false });
     payment.resolve({ success: true, productId: 'amber', reward: { kind: 'amber', amount: 100 }, grantId: 'paid-one' });
@@ -203,12 +218,12 @@ describe('store purchase controls', () => {
   it('refreshes durable ownership without releasing an ongoing purchase', async () => {
     const payment = deferred();
     jest.mocked(purchaseConsumable).mockReturnValue(payment.promise);
-    const ui = store(); const initial = ui.render(); const cleanup = mountEffects();
+    const ui = store(); const initial = await openStore(ui); const cleanup = mountEffects();
     const buying = control(initial, 'Buy Amber, 100 amber, for $1').onPress();
     jest.mocked(hasEntitlementSync).mockImplementation(key => key === 'bundle');
     billingChange()({ entitlements: ['bundle'] });
     const updated = ui.render();
-    expect(updated.some(node => node.props.accessibilityLabel === "Buy The Keeper's Collection")).toBe(false);
+    expect(updated.some(node => node.props.accessibilityLabel === "Buy The Keeper's Collection for $3")).toBe(false);
     expect(control(updated, 'Close store').disabled).toBe(true);
     control(updated, 'Close store').onPress();
     expect(ui.props.onClose).not.toHaveBeenCalled();
@@ -219,7 +234,7 @@ describe('store purchase controls', () => {
 
   it('resolves a pending purchase only when its own saved purchase notification arrives', async () => {
     jest.mocked(purchaseConsumable).mockResolvedValue({ success: false, productId: 'amber', pending: true });
-    const ui = store(); const initial = ui.render(); const cleanup = mountEffects();
+    const ui = store(); const initial = await openStore(ui); const cleanup = mountEffects();
     await control(initial, 'Buy Amber, 100 amber, for $1').onPress();
     billingChange()({ productId: 'hints' });
     expect(control(ui.render(), 'Buy Amber, 100 amber, for $1').disabled).toBe(true);
@@ -235,7 +250,7 @@ describe('store purchase controls', () => {
     const hints = deferred();
     jest.mocked(purchaseStarterPack).mockResolvedValue({ success: true, productId: 'starter', reward: { amber: 200, hints: 10 }, grantIds: { amber: 'starter-amber', hints: 'starter-hints' } });
     jest.mocked(settleConsumableGrant).mockResolvedValueOnce({ amberBalance: 400, hintBalance: 2, applied: true }).mockReturnValueOnce(hints.promise);
-    const ui = store(); const initial = ui.render();
+    const ui = store(); const initial = await openStore(ui);
     const buying = control(initial, 'Buy Welcome for $2').onPress();
     await settle();
     control(initial, 'Close store').onPress();
@@ -248,7 +263,7 @@ describe('store purchase controls', () => {
   });
 
   it('allows dismissal after cancellation without presenting a failure', async () => {
-    const ui = store(); const initial = ui.render();
+    const ui = store(); const initial = await openStore(ui);
     await control(initial, 'Buy Amber, 100 amber, for $1').onPress();
     expect(text(ui.render())).not.toContain("couldn't confirm");
     modal(ui.render()).onRequestClose();
@@ -257,7 +272,7 @@ describe('store purchase controls', () => {
 
   it('explains pending confirmation, blocks stale repurchase callbacks, and permits dismissal', async () => {
     jest.mocked(purchaseConsumable).mockResolvedValue({ success: false, productId: 'amber', pending: true });
-    const ui = store(); const initial = ui.render();
+    const ui = store(); const initial = await openStore(ui);
     const buy = control(initial, 'Buy Amber, 100 amber, for $1');
     await buy.onPress();
     await buy.onPress();
@@ -273,7 +288,7 @@ describe('store purchase controls', () => {
 
   it('never promises there was no charge after an ambiguous purchase error', async () => {
     jest.mocked(purchaseConsumable).mockRejectedValue(new Error('connection lost after checkout'));
-    const ui = store();
+    const ui = store(); await openStore(ui);
     await control(ui.render(), 'Buy Amber, 100 amber, for $1').onPress();
     const updated = ui.render();
     expect(text(updated)).toContain('Check your store purchase history');
@@ -285,7 +300,7 @@ describe('store purchase controls', () => {
     jest.mocked(isPatronSync).mockReturnValue(true);
     const saved = deferred();
     jest.mocked(claimDailyAmberReward).mockReturnValue(saved.promise);
-    const ui = store(); ui.render(); seedDailyStatus(); const initial = ui.render();
+    const ui = store(); await openStore(ui); seedDailyStatus(); const initial = ui.render();
     const claim = initial.find(node => node.props.accessibilityLabel?.startsWith('Claim ') && node.props.onPress)!.props;
     const earning = claim.onPress();
     claim.onPress();
@@ -304,7 +319,7 @@ describe('store purchase controls', () => {
   it('reserves navigation and paid actions for the whole earned-ad callback, including after hiding', async () => {
     const saved = deferred();
     jest.mocked(claimDailyAmberReward).mockReturnValue(saved.promise);
-    const ui = store(); ui.render(); seedDailyStatus(); const initial = ui.render();
+    const ui = store(); await openStore(ui); seedDailyStatus(); const initial = ui.render();
     const ad = initial.find(node => node.type === 'RewardedAdButton')!.props;
     expect(ad.completeAfterUnmount).toBe(true);
     expect(ad.canStart()).toBe(true);

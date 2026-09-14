@@ -31,6 +31,34 @@ import {
 } from '../constants/timing';
 
 // ---------------------------------------------------------------------------
+// Home nudge session throttle (ftue-5). puzzlesSinceHomeVisit only resets on a
+// Home/pit exit, so once a player chained three wins the "come home" nudge
+// used to replace the (30%-gated) interjection on EVERY later win: the single
+// most repeated line of session one. Module-scope, like HomeScreen's
+// heavyHarvestNudgeShownThisSession: at most one home nudge per app session.
+// ---------------------------------------------------------------------------
+let homeNudgeShownThisSession = false;
+
+/** Minimum chained wins away from home before the nudge may speak. */
+export const HOME_NUDGE_MIN_PUZZLES_AWAY = 3;
+
+/**
+ * Pure decision: offer the home nudge on this win? Requires 3+ wins since the
+ * last home visit AND no nudge yet this session.
+ */
+export function shouldOfferHomeNudge(
+  puzzlesSinceHomeVisit: number,
+  shownThisSession: boolean = homeNudgeShownThisSession,
+): boolean {
+  return puzzlesSinceHomeVisit >= HOME_NUDGE_MIN_PUZZLES_AWAY && !shownThisSession;
+}
+
+/** Test/reset hook: forget that a home nudge was shown this session. */
+export function resetHomeNudgeSession(): void {
+  homeNudgeShownThisSession = false;
+}
+
+// ---------------------------------------------------------------------------
 // Overlay fade kit (F38) — micro-beat (ambient_whisper/silent_victory only;
 // glitch_title keeps its hard cut) and the interjection fade in on reveal and
 // fade out on dismissal instead of hard-cutting. Native driver; reduced
@@ -567,14 +595,16 @@ export function useVictoryOrchestration(): [
           const fullProgress = await getFullProgress();
           if (gen !== generationRef.current) return;
 
-          // Home nudge takes priority after 3+ puzzles without visiting home
+          // Home nudge takes priority after 3+ puzzles without visiting home,
+          // at most once per app session (see shouldOfferHomeNudge).
           let payload: InterjectionData | null = null;
-          if (puzzlesSinceHomeVisit >= 3) {
+          if (shouldOfferHomeNudge(puzzlesSinceHomeVisit)) {
             payload = getHomescreenNudge(
               phase,
               fullProgress.unlockedAnimals || [],
               puzzlesSinceHomeVisit,
             );
+            if (payload) homeNudgeShownThisSession = true;
           }
           // Standard random interjection (30% chance internally)
           if (!payload) {
