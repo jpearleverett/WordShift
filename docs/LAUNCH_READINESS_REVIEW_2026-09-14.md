@@ -2,8 +2,6 @@
 
 Reviewed against `main` at `8233184` (identical to `claude/wordshift-launch-readiness-wnuzh1`), app version **1.3.5**, Android version code **99**, Expo SDK 57 / React Native 0.86.3. The owner has Google Play production access after the 12-tester closed test and asked whether the game is ready to publish to the public Play Store. This document answers that question. It changes no application code, no configuration and no bank; the one repository edit it carries is adding itself and two internal build documents to the GitHub Pages exclude list (see finding `store-policy-legal-1`).
 
-> Revision note: the adversarial verification pass was still running when this revision was committed; Appendix A marks the findings whose independent check had not yet finished as "verification pending". The verdict, the three blockers and the re-verified findings are final.
-
 ## Verdict
 
 **Conditionally ready. Do not press Publish on the current artifact; publish the next one.** The game itself is in very good shape: the code passes every automated gate on this commit, the save layer is unusually robust, the store policy and legal work is done, and the backend is deployed. What stands between the repository and a public rollout is short and concrete:
@@ -18,7 +16,7 @@ Everything else in this document is either a "fix it in the same native build si
 
 ## How this was assessed
 
-The framework is a **twelve-dimension go/no-go review**. Each dimension was audited by an independent reviewer with the whole repository and the installed toolchain available, under three rules: the code is the truth and the docs describe intent; every finding cites a file and line that was actually read; and at most ten findings per dimension, most important first. Every finding rated medium or above then went through an **adversarial verification pass**: one reviewer tried to refute it by re-tracing the code path and looking for guards or tests the auditor missed, and, for the survivors rated high, a second reviewer judged the real impact for a free Android word game in a staged rollout (how many players, how soon, whether an OTA can fix it, whether it risks store action). A completeness critic then named areas nobody had covered and follow-up reviewers took those. The five most consequential findings were also re-read independently by the author of this document; those are marked "re-verified" in the appendix.
+The framework is a **twelve-dimension go/no-go review**. Each dimension was audited by an independent reviewer with the whole repository and the installed toolchain available, under three rules: the code is the truth and the docs describe intent; every finding cites a file and line that was actually read; and at most ten findings per dimension, most important first. Findings rated medium or above then went through an **adversarial verification pass**: one reviewer tried to refute each by re-tracing the code path and looking for guards or tests the auditor missed, and, for the survivors rated high, a second reviewer judged the real impact for a free Android word game in a staged rollout (how many players, how soon, whether an OTA can fix it, whether it risks store action). Of the 41 findings scheduled for that pass, 26 were re-checked (five of them under both lenses) before the review's agent budget ran out; the 15 that were not reached are marked "not independently verified" in the appendix, and a planned completeness-critic pass did not run, so Appendix B is the author's own list of what this review covered thinly. Nothing that was re-checked was refuted; four findings were re-rated (two down to low, two from high to medium). The seven most consequential findings were also re-read independently by the author of this document; those are marked "re-verified" in the narrative.
 
 Scores are 1 to 5: **5** ship it, **4** ship with minor follow-ups, **3** ship with known caveats, **2** fix first, **1** do not ship. A finding is *blocking* only if publishing should wait for it.
 
@@ -82,6 +80,7 @@ Smoke matrix for the signed internal-track build, on at least two physical Andro
 8. Background and foreground during a ceremony and during a purchase; force-close mid-puzzle and relaunch.
 9. Use the creator kit (on a separate press build with `creatorCode` set) or a long session to reach a 13-room house: record `dumpsys meminfo` and a house pan with `gfxinfo framestats`. The repo already ships `npm run profile:android`.
 10. Send one deliberate error to Sentry and confirm it arrives symbolicated for build 99 or later.
+11. On one device that still has the closed-test build (1.2.2, code 88) installed, update in place from the internal track and confirm progress, house, amber, hints and entitlements survive the v4 to v6 migrations; the twelve testers will take exactly this path.
 
 ### B3. The production cut
 
@@ -124,7 +123,7 @@ Ordered by player impact. None blocks publishing; the first four are cheap.
 | `gameplay-1` (re-verified) | The only bank-selection call in `usePuzzleGame.ts` passes `lexicon` but never `speed`, so every Speed board after 70 solves is served with the extra row against a clock calibrated for the base chain. | XS: pass `speed: speedModeRef.current` and pin it with a hook test. |
 | `gameplay-2` | The speed clock starts while the setup menu still covers the board and restarts on every modifier toggle; nothing pauses it for How to Play. | S |
 | `monetization-3` | The Store renders hard-coded USD prices for one to four seconds before the store fetch lands, and for the whole session if it fails; price pills are live before products load and a tap then reports an unconfirmed purchase. | S: neutral placeholder, disabled pills until a price string arrives, calmer error copy. |
-| `ftue-3` / `ftue-2` | Win 10 stacks two milestone toasts, the one lifetime store-review sheet and the three-card Reverse tutorial; wins 12 to 13 stack the first ceremony, the blocking graduation card and the share invitation. | XS to S: skip the review ask when an intro is queued; move the graduation limit to 14. |
+| `ftue-2` / `ftue-3` | Wins 12 to 13 stack the first ceremony, the blocking graduation card and the share invitation (confirmed, medium); win 10 stacks two milestone toasts, the lifetime store-review sheet and the Reverse tutorial (re-rated low). | XS to S: move the graduation limit to 14; skip the review ask when an intro is queued. |
 | `gameplay-3` | Blind Offering judges only each row's final word, so chains illegal under the standard rule are accepted at 2x amber and 2x phase progress. | S |
 | `product-retention-4` | A lapsed new install receives one notification a day for its first week; an evening player receives a 9:00 "puzzle ready" ping every day. | S: thin the ladder for installs under 14 days; suppress the morning ping on a win-back day and while a streak is live. |
 | `monetization-7` | The out-of-hints rewarded path can lose a fully watched reward if the hint write throws; every other placement retries. | XS: route through `saveWithPlayerRetry`. |
@@ -182,46 +181,44 @@ Status legend: **confirmed** means an independent reviewer re-traced the code an
 | ID | Dimension | Finding | Severity after review | Status | Where |
 |---|---|---|---|---|---|
 | engineering-hygiene-1 | engineering-hygiene | Production toolchain (SDK 57 + R8 optimize + resource shrinking) has never run on a signed device build | high (blocking) | confirmed | `mobile/plugins/withAndroidOptimization.js:21` |
-| gameplay-1 | gameplay | Speed boards past 70 solves silently gain the +1 row because the hook never passes the `speed` option to bank selection | high | confirmed | `mobile/src/hooks/usePuzzleGame.ts:1519` |
 | monetization-1 | monetization | Every consumable and starter-pack purchase is credited twice: checkout is keyed on the Play orderId, receipt recovery on RevenueCat's transaction id | high (blocking) | confirmed | `mobile/src/services/providers/revenueCatBilling.ts:139` |
-| product-retention-1 | product-retention | Closed test validated only Phases 0-2; the reveal, finale, ads, IAP and notification ladder have zero external player evidence | high | verification pending | `docs/STORY_PLAYTEST_PROTOCOL.md:121` |
 | release-config-1 | release-config | First R8-minified, resource-shrunk AAB has never been installed on a device; it must pass the internal track before promotion | high (blocking) | confirmed | `mobile/app.json:234` |
-| accessibility-devices-1 | accessibility-devices | 6-letter boards shrink below touch-target minimums on common 360dp phones (Sunday daily, EXPERT) | medium | verification pending | `mobile/src/services/slotEstimation.ts:65` |
-| accessibility-devices-2 | accessibility-devices | Bottom sheets sit 14-16dp under the three-button navigation bar on Android 15/16 (edge-to-edge forced on Modals) | medium | verification pending | `mobile/src/components/home/HomeScreen.tsx:2727` |
-| accessibility-devices-3 | accessibility-devices | DraggableTile wrapper adds a second, likely inert TalkBack node for every source-row tile | medium | verification pending | `mobile/src/components/DraggableTile.tsx:276` |
+| accessibility-devices-1 | accessibility-devices | 6-letter boards shrink below touch-target minimums on common 360dp phones (Sunday daily, EXPERT) | medium | confirmed | `mobile/src/services/slotEstimation.ts:65` |
+| accessibility-devices-2 | accessibility-devices | Bottom sheets sit 14-16dp under the three-button navigation bar on Android 15/16 (edge-to-edge forced on Modals) | medium | not independently verified | `mobile/src/components/home/HomeScreen.tsx:2727` |
+| accessibility-devices-3 | accessibility-devices | DraggableTile wrapper adds a second, likely inert TalkBack node for every source-row tile | medium | not independently verified | `mobile/src/components/DraggableTile.tsx:276` |
 | accessibility-devices-4 | accessibility-devices | On-device TalkBack / enlarged-text / small-screen validation is still an open checklist item | medium | confirmed | `docs/COMPLETION_CHECKLIST.md:28` |
-| backend-ops-1 | backend-ops | No rate limiting on anonymous write RPCs; a junk flood shares the database and quota with cloud saves | medium | verification pending | `docs/supabase/events_integrity_v2.sql:11` |
+| backend-ops-1 | backend-ops | No rate limiting on anonymous write RPCs; a junk flood shares the database and quota with cloud saves | medium | confirmed | `docs/supabase/events_integrity_v2.sql:11` |
 | backend-ops-2 | backend-ops | Daily leaderboard accepts impossible times and fabricated entrants from any anonymous caller | medium | confirmed | `docs/supabase/daily_board_versions.sql:53` |
-| backend-ops-3 | backend-ops | Google Play RTDN to RevenueCat is owner-deferred, so subscription refunds/revocations propagate late | medium | verification pending | `docs/LAUNCH_CHECKLIST.md:109` |
-| boot-persistence-1 | boot-persistence | Deterministic boot failures dead-end on a Retry-only card with no in-app escape | medium | verification pending | `mobile/App.tsx:6209` |
+| backend-ops-3 | backend-ops | Google Play RTDN to RevenueCat is owner-deferred, so subscription refunds/revocations propagate late | medium | not independently verified | `docs/LAUNCH_CHECKLIST.md:109` |
+| boot-persistence-1 | boot-persistence | Deterministic boot failures dead-end on a Retry-only card with no in-app escape | medium | confirmed | `mobile/App.tsx:6209` |
 | boot-persistence-2 | boot-persistence | Boot and initial-route failures are only console.warn'd, never reported to Sentry or the event log | medium | confirmed | `mobile/src/hooks/useAppBoot.ts:15` |
 | boot-persistence-3 | boot-persistence | Thirteen root-level overlays (VictoryModal, phase cinematic, Store/Patron/GameAlert...) sit outside every ErrorBoundary | medium | confirmed | `mobile/App.tsx:6004` |
 | ftue-1 | ftue | No automated end-to-end coverage of the cold-open onboarding path | medium | confirmed | `mobile/e2e/game.spec.ts:68` |
-| ftue-2 | ftue | Wins 12-13 stack the phase-1 pit ceremony, the blocking preview-graduation card and the first share prompt | medium | verification pending | `mobile/App.tsx:3612` |
-| ftue-3 | ftue | Win 10 stacks the milestone toasts, the OS store-review sheet and the reverse-variant Fox card on one victory | medium | verification pending | `mobile/App.tsx:3105` |
-| ftue-4 | ftue | First home landing after a chained session queues up to three Fox intros with two auto-opened modals | medium | verification pending | `mobile/src/components/home/HomeScreen.tsx:1357` |
-| gameplay-2 | gameplay | The speed clock keeps running under the still-open setup menu and the Rules modal | medium | verification pending | `mobile/App.tsx:1136` |
-| gameplay-3 | gameplay | Blind Offering's single judgment checks only each row's final word, so chains illegal under standard rules are accepted at 2x amber and 2x phase progress | medium | verification pending | `mobile/src/hooks/usePuzzleGame.ts:2599` |
-| gameplay-4 | gameplay | Late-game standard content is thin: 31 HARD / 39 EXPERT extendable boards, and daily HARD/EXPERT pools of 100 repeat within 4-7 weeks | medium | verification pending | `mobile/src/services/puzzleBank.ts:686` |
-| monetization-2 | monetization | Production ad-mode flip is a manual app.json edit that no build profile or CI step enforces, and the committed value cannot coexist with green CI | medium | verification pending | `mobile/app.json:271` |
-| monetization-3 | monetization | Hardcoded USD fallback prices render on real devices before/without the store fetch, buy buttons are live before products load, and every billing failure is reported as an unconfirmed purchase | medium | verification pending | `mobile/src/components/monetization/StoreModal.tsx:417` |
+| ftue-2 | ftue | Wins 12-13 stack the phase-1 pit ceremony, the blocking preview-graduation card and the first share prompt | medium | confirmed | `mobile/App.tsx:3612` |
+| ftue-4 | ftue | First home landing after a chained session queues up to three Fox intros with two auto-opened modals | medium | not independently verified | `mobile/src/components/home/HomeScreen.tsx:1357` |
+| gameplay-1 | gameplay | Speed boards past 70 solves silently gain the +1 row because the hook never passes the `speed` option to bank selection | medium | confirmed | `mobile/src/hooks/usePuzzleGame.ts:1519` |
+| gameplay-2 | gameplay | The speed clock keeps running under the still-open setup menu and the Rules modal | medium | confirmed | `mobile/App.tsx:1136` |
+| gameplay-3 | gameplay | Blind Offering's single judgment checks only each row's final word, so chains illegal under standard rules are accepted at 2x amber and 2x phase progress | medium | not independently verified | `mobile/src/hooks/usePuzzleGame.ts:2599` |
+| gameplay-4 | gameplay | Late-game standard content is thin: 31 HARD / 39 EXPERT extendable boards, and daily HARD/EXPERT pools of 100 repeat within 4-7 weeks | medium | not independently verified | `mobile/src/services/puzzleBank.ts:686` |
+| monetization-2 | monetization | Production ad-mode flip is a manual app.json edit that no build profile or CI step enforces, and the committed value cannot coexist with green CI | medium | confirmed | `mobile/app.json:271` |
+| monetization-3 | monetization | Hardcoded USD fallback prices render on real devices before/without the store fetch, buy buttons are live before products load, and every billing failure is reported as an unconfirmed purchase | medium | not independently verified | `mobile/src/components/monetization/StoreModal.tsx:417` |
 | narrative-1 | narrative | House-completion ceremony has no post-Arrival variant on the solve-floor endgame path | medium | confirmed | `mobile/src/services/phaseEvents.ts:357` |
-| narrative-2 | narrative | Unread Phase 3-4 backlog is delivered after the Arrival mostly verbatim (91% of Phase-4 lines have no post-arrival variant) | medium | verification pending | `mobile/src/services/conversationProgress.ts:52` |
-| narrative-3 | narrative | The 'reveal < house completion' invariant is pinned only against the 90-solve floor; for below-ramp players the house completes before the reveal | medium | verification pending | `mobile/src/__tests__/homeWorldData.test.ts:215` |
-| performance-size-1 | performance-size | Full-house home screen holds 58-114 MB of decoded bitmaps: every room mounted at 1456x720, three pre-mounted sprite layers per animal, no windowing or explicit downsampling | medium | verification pending | `mobile/src/components/home/HouseWorld.tsx:2614` |
-| performance-size-2 | performance-size | Every fresh install's first launch waits on a cloud RPC that cannot return a save (up to 8 s on a slow or captive network) | medium | verification pending | `mobile/src/services/cloudSave.ts:396` |
-| performance-size-3 | performance-size | The low-end device gate (shouldSimplifyAnimations) is keyed on pixel density and never fires on the 720x1600 xhdpi phones that actually have 2-3 GB of RAM | medium | verification pending | `mobile/src/services/deviceTier.ts:22` |
-| performance-size-4 | performance-size | SFX cache is unbounded and never released: each of up to 60 sound names becomes a permanent ExoPlayer + Media3 MediaSession (15 created on the first frame) | medium | verification pending | `mobile/src/services/audio.ts:278` |
+| narrative-3 | narrative | The 'reveal < house completion' invariant is pinned only against the 90-solve floor; for below-ramp players the house completes before the reveal | medium | confirmed | `mobile/src/__tests__/homeWorldData.test.ts:215` |
+| performance-size-1 | performance-size | Full-house home screen holds 58-114 MB of decoded bitmaps: every room mounted at 1456x720, three pre-mounted sprite layers per animal, no windowing or explicit downsampling | medium | not independently verified | `mobile/src/components/home/HouseWorld.tsx:2614` |
+| performance-size-2 | performance-size | Every fresh install's first launch waits on a cloud RPC that cannot return a save (up to 8 s on a slow or captive network) | medium | confirmed | `mobile/src/services/cloudSave.ts:396` |
+| performance-size-3 | performance-size | The low-end device gate (shouldSimplifyAnimations) is keyed on pixel density and never fires on the 720x1600 xhdpi phones that actually have 2-3 GB of RAM | medium | not independently verified | `mobile/src/services/deviceTier.ts:22` |
+| performance-size-4 | performance-size | SFX cache is unbounded and never released: each of up to 60 sound names becomes a permanent ExoPlayer + Media3 MediaSession (15 created on the first frame) | medium | not independently verified | `mobile/src/services/audio.ts:278` |
 | performance-size-5 | performance-size | No on-device performance evidence exists: cold start, memory and frame numbers for a low-end Android were never recorded, and the launch checklist item is still unchecked | medium | confirmed | `docs/LAUNCH_CHECKLIST.md:47` |
-| product-retention-2 | product-retention | Six-day content dead zone for a 2/day player at solves 29-41, landing exactly on the Phase-2 turn (days 15-21) | medium | verification pending | `mobile/src/services/homeWorldData.ts:682` |
-| product-retention-3 | product-retention | Amber floods from solve ~13: casual player is gate-bound, holds 2-5x the Skip premium at every gate, and the only recurring sink is one-shot | medium | verification pending | `mobile/src/services/homeWorldData.ts:1133` |
-| product-retention-4 | product-retention | Notification cadence: 7 pings in the first 7 lapsed days, and a 9:00 'puzzle ready' ping every day for active evening players | medium | verification pending | `mobile/src/services/notifications.ts:515` |
-| release-config-2 | release-config | expo-audio plugin defaults declare RECORD_AUDIO and a mediaPlayback foreground service in a game that never records or plays in background | medium | verification pending | `mobile/app.json:80` |
-| release-config-3 | release-config | R8 obfuscation is on but the Sentry Android Gradle Plugin is not enabled, so Java-side crash traces in Sentry will be obfuscated | medium | verification pending | `mobile/app.json:74` |
-| release-config-5 | release-config | OTA path has no rollback runbook and depends on an easily-forgotten env var to hit the production runtime | medium | verification pending | `docs/OTA_UPDATES.md:30` |
+| product-retention-1 | product-retention | Closed test validated only Phases 0-2; the reveal, finale, ads, IAP and notification ladder have zero external player evidence | medium | confirmed | `docs/STORY_PLAYTEST_PROTOCOL.md:121` |
+| product-retention-2 | product-retention | Six-day content dead zone for a 2/day player at solves 29-41, landing exactly on the Phase-2 turn (days 15-21) | medium | not independently verified | `mobile/src/services/homeWorldData.ts:682` |
+| product-retention-3 | product-retention | Amber floods from solve ~13: casual player is gate-bound, holds 2-5x the Skip premium at every gate, and the only recurring sink is one-shot | medium | not independently verified | `mobile/src/services/homeWorldData.ts:1133` |
+| product-retention-4 | product-retention | Notification cadence: 7 pings in the first 7 lapsed days, and a 9:00 'puzzle ready' ping every day for active evening players | medium | not independently verified | `mobile/src/services/notifications.ts:515` |
+| release-config-2 | release-config | expo-audio plugin defaults declare RECORD_AUDIO and a mediaPlayback foreground service in a game that never records or plays in background | medium | confirmed | `mobile/app.json:80` |
+| release-config-3 | release-config | R8 obfuscation is on but the Sentry Android Gradle Plugin is not enabled, so Java-side crash traces in Sentry will be obfuscated | medium | not independently verified | `mobile/app.json:74` |
+| release-config-5 | release-config | OTA path has no rollback runbook and depends on an easily-forgotten env var to hit the production runtime | medium | not independently verified | `docs/OTA_UPDATES.md:30` |
 | store-policy-legal-1 | store-policy-legal | Internal release docs with story spoilers are publicly served next to the legal pages | medium | confirmed | `docs/_config.yml:18` |
-| store-policy-legal-2 | store-policy-legal | Play Console screenshots are the stale July set; the replacement pack is web-rendered and predates the Sept 13 UI changes | medium | verification pending | `docs/STORE_LISTING.md:161` |
-| store-policy-legal-3 | store-policy-legal | Target-audience and IARC declarations need a deliberate answer: cute store presence vs. a 13+ horror game | medium | verification pending | `mobile/docs/store-launch/listing-en-US.json:3` |
+| store-policy-legal-2 | store-policy-legal | Play Console screenshots are the stale July set; the replacement pack is web-rendered and predates the Sept 13 UI changes | medium | confirmed | `docs/STORE_LISTING.md:161` |
+| store-policy-legal-3 | store-policy-legal | Target-audience and IARC declarations need a deliberate answer: cute store presence vs. a 13+ horror game | medium | confirmed | `mobile/docs/store-launch/listing-en-US.json:3` |
 | accessibility-devices-5 | accessibility-devices | How-to-Play backdrop is an unlabeled focusable button that dismisses the rules | low | low, not verified | `mobile/src/components/puzzle/RulesModal.tsx:145` |
 | accessibility-devices-6 | accessibility-devices | Home header amber balance truncates to an ellipsis at 320dp when a streak badge is present | low | low, not verified | `mobile/src/components/home/HomeScreen.tsx:4264` |
 | accessibility-devices-7 | accessibility-devices | Portrait-only with a fixed 250dp house column: acceptable for a word game, but no large-screen badge and a letterboxed tablet experience | low | low, not verified | `mobile/app.json:7` |
@@ -235,6 +232,7 @@ Status legend: **confirmed** means an independent reviewer re-traced the code an
 | boot-persistence-7 | boot-persistence | persistenceStorage has no re-entrancy guard: a nested transaction would freeze the app with input blocked | low | low, not verified | `mobile/src/services/persistenceStorage.ts:77` |
 | engineering-hygiene-2 | engineering-hygiene | Unhandled-rejection capture in errorReporting.ts is dead code on Hermes; only Sentry sees rejections | low | low, not verified | `mobile/src/services/errorReporting.ts:116` |
 | engineering-hygiene-3 | engineering-hygiene | Stray one-off scratch script mobile/crop_ad_tmp.cjs is tracked in the repo | low | low, not verified | `mobile/crop_ad_tmp.cjs:3` |
+| ftue-3 | ftue | Win 10 stacks the milestone toasts, the OS store-review sheet and the reverse-variant Fox card on one victory | low | confirmed | `mobile/App.tsx:3105` |
 | ftue-5 | ftue | The 'come home' interjection fires on every win once three are chained, with only two copy lines | low | low, not verified | `mobile/src/hooks/useVictoryOrchestration.ts:572` |
 | ftue-6 | ftue | Dialogue typewriter and ceremony pacing are the objectively slow animations; skip affordances are undiscoverable | low | low, not verified | `mobile/src/hooks/useDialogueFlow.ts:109` |
 | ftue-7 | ftue | Star rating and the hint-costs-a-star rule are never explained anywhere in-app | low | low, not verified | `mobile/src/services/phaseNarrative.ts:1085` |
@@ -246,6 +244,7 @@ Status legend: **confirmed** means an independent reviewer re-traced the code an
 | monetization-5 | monetization | A refunded or revoked Patron/Remove-Ads purchase is never revoked locally unless the player taps Restore | low | low, not verified | `mobile/src/services/providers/revenueCatBilling.ts:166` |
 | monetization-6 | monetization | Consent resolution is single-flight per session and never retried, so an offline cold start disables all ad formats until the next launch | low | low, not verified | `mobile/src/services/providers/googleAdMobAds.ts:263` |
 | monetization-7 | monetization | hint_recovery reward can be lost after a fully watched ad because it bypasses RewardedAdButton's earned-reward retry | low | low, not verified | `mobile/App.tsx:3906` |
+| narrative-2 | narrative | Unread Phase 3-4 backlog is delivered after the Arrival mostly verbatim (91% of Phase-4 lines have no post-arrival variant) | low | confirmed | `mobile/src/services/conversationProgress.ts:52` |
 | narrative-4 | narrative | Animal accessibility label reads the raw enum ('Fennick the fennec_fox') and the exact cooldown count | low | low, not verified | `mobile/src/components/home/AnimalSprite.tsx:1368` |
 | narrative-5 | narrative | Typography: curly quotes/apostrophes in 13 strings while the rest of the corpus uses straight quotes | low | low, not verified | `mobile/src/services/phaseEvents.ts:349` |
 | performance-size-6 | performance-size | Install footprint (~110 MB) is heavy for a word game because 40% is music and the 19.5 MB of PNG room/character art is 2-3x larger than it can be displayed | low | low, not verified | `mobile/assets/rooms:1` |
@@ -266,10 +265,17 @@ Status legend: **confirmed** means an independent reviewer re-traced the code an
 | store-policy-legal-8 | store-policy-legal | Template-default permissions (SYSTEM_ALERT_WINDOW, legacy external storage) are not blocked and will appear on the Play permissions list | low | low, not verified | `mobile/app.json:52` |
 
 
-## Appendix B. Follow-up areas named by the completeness critic
+## Appendix B. What this review covered thinly
 
-The completeness pass had not finished when this revision was written; it will be added in the next revision.
+The planned completeness pass did not run, so this list is the author's. None of these is known to hide a defect; they are the places where a second look would most likely find one.
 
+- **The upgrade path for existing installs.** Migrations v4 to v6 are reviewed and tested in isolation, but no reviewer walked a real 1.2.2 save through the current bootstrap. Smoke-matrix step 11 covers it.
+- **Notification scheduling correctness** beyond cadence: DST transitions, the 7-day ladder after a timezone change, and cold-start tap routing were read but not exercised.
+- **Cloud save conflict UI** in Settings (Backup and Restore, "use the newer save", recovery-code entry) was read for correctness of the data path, not driven end to end.
+- **Deep links and friend challenges** got one finding (`gameplay-7`, unsolvable hand-edited links) and no journey.
+- **Live events (the full-moon window), the season pass premium track, the New Cycle reset and the creator kit** were touched by single findings or not at all.
+- **Locale.** The game is English-only by design; prices come from the store in local currency (once loaded, see `monetization-3`), dates use local calendar days, and no right-to-left layout exists. A non-English device was not simulated.
+- **Tablets and foldables** were assessed from layout constants (`accessibility-devices-7`), not on a device.
 
 ## Appendix C. Documentation drift found along the way
 
