@@ -116,6 +116,11 @@ jest.mock('../services/phaseNarrative', () => ({
   getFinalBoardMoveMessage: jest.fn((_p: number) => 'Placed. Kept.'),
   getUnbrokenWeaveSpentLetterMessage: jest.fn((l: string) => `${l} spent.`),
   getUnbrokenWeaveUnavailableMessage: jest.fn(() => 'Weave unavailable.'),
+  getHintRefusedMessage: jest.fn(() => 'No hints here.'),
+  getHintNoSafeRouteMessage: jest.fn(() => 'No safe route. No hint was spent.'),
+  getUndoRefusedMessage: jest.fn(() => 'No undos left.'),
+  getUndoMessage: jest.fn(() => 'Undone.'),
+  getWordLengthMessage: jest.fn((n: number) => `Need ${n} letters!`),
 }));
 
 jest.mock('../services/hints', () => ({

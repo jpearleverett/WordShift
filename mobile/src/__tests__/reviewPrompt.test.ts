@@ -8,6 +8,7 @@ jest.mock('expo-store-review', () => ({
   isAvailableAsync: jest.fn(),
   requestReview: jest.fn(),
 }));
+jest.mock('../services/eventLogger', () => ({ logEvent: jest.fn() }));
 
 import {
   shouldPromptReview,
@@ -20,11 +21,13 @@ import {
 
 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
 const StoreReview = require('expo-store-review');
+const { logEvent } = require('../services/eventLogger');
 
 beforeEach(async () => {
   AsyncStorage.clear();
   await clearReviewPrompt();
   _clearReviewPromptCache();
+  logEvent.mockClear();
   // Default: native sheet available and the prompt resolves cleanly.
   StoreReview.isAvailableAsync = jest.fn().mockResolvedValue(true);
   StoreReview.requestReview = jest.fn().mockResolvedValue(undefined);
@@ -56,6 +59,15 @@ describe('shouldPromptReview', () => {
 
   test('not before the settle-in threshold', () => {
     expect(shouldPromptReview({ ...base, puzzlesSolved: REVIEW_MIN_PUZZLES - 1 })).toBe(false);
+    expect(shouldPromptReview({ ...base, puzzlesSolved: REVIEW_MIN_PUZZLES })).toBe(true);
+  });
+
+  test('the settle-in threshold sits past the early one-time-beat cluster (daily 8 / harvest 9 / reverse 10)', () => {
+    // The ask used to land on win 10, the same board as the reverse intro
+    // and before the daily/streak habit existed; the Play quota can spend the
+    // one lifetime ask silently, so it must land where a rating is likeliest.
+    expect(REVIEW_MIN_PUZZLES).toBe(20);
+    expect(shouldPromptReview({ ...base, puzzlesSolved: 10 })).toBe(false);
   });
 
   test('never twice', () => {
@@ -72,6 +84,14 @@ describe('maybePromptReview', () => {
   test('fires once (native prompt actually called), then never again', async () => {
     expect(await maybePromptReview({ phase: 0, stars: 3, puzzlesSolved: 20 })).toBe(true);
     expect(StoreReview.requestReview).toHaveBeenCalledTimes(1);
+    // The owner's only window into quota-suppressed asks: the elapsed time of
+    // the native call rides the event (an instant resolve = no dialog shown).
+    expect(logEvent).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith({
+      type: 'review_prompt_shown',
+      data: { elapsedMs: expect.any(Number), phase: 0, puzzlesSolved: 20 },
+    });
+    expect(logEvent.mock.calls[0][0].data.elapsedMs).toBeGreaterThanOrEqual(0);
     // Second eligible call is suppressed by the persisted one-time flag.
     expect(await maybePromptReview({ phase: 0, stars: 3, puzzlesSolved: 25 })).toBe(false);
     expect(StoreReview.requestReview).toHaveBeenCalledTimes(1);
@@ -84,10 +104,33 @@ describe('maybePromptReview', () => {
     expect(await maybePromptReview({ phase: 1, stars: 3, puzzlesSolved: 20 })).toBe(true);
   });
 
+  test('measures how long the native call held (the quota-suppressed signature is an instant resolve)', async () => {
+    StoreReview.requestReview = jest.fn(() => new Promise<void>(resolve => setTimeout(resolve, 1500)));
+    jest.useFakeTimers();
+    try {
+      const pending = maybePromptReview({ phase: 1, stars: 3, puzzlesSolved: 30 });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      jest.advanceTimersByTime(1500);
+      expect(await pending).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+    expect(logEvent.mock.calls[0][0].data.elapsedMs).toBeGreaterThanOrEqual(1500);
+  });
+
+  test('a failed native call logs nothing and keeps the flag', async () => {
+    StoreReview.requestReview = jest.fn().mockRejectedValue(new Error('no play services'));
+    expect(await maybePromptReview({ phase: 0, stars: 3, puzzlesSolved: 20 })).toBe(false);
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
   test('does not consume the one-time flag when the OS review sheet is unavailable', async () => {
     StoreReview.isAvailableAsync = jest.fn().mockResolvedValue(false);
     expect(await maybePromptReview({ phase: 0, stars: 3, puzzlesSolved: 20 })).toBe(false);
     expect(StoreReview.requestReview).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalled();
     // Flag survived: once the sheet is available, a later peak still prompts.
     StoreReview.isAvailableAsync = jest.fn().mockResolvedValue(true);
     expect(await maybePromptReview({ phase: 1, stars: 3, puzzlesSolved: 21 })).toBe(true);

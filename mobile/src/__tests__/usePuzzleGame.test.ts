@@ -98,6 +98,14 @@ jest.mock('../services/phaseNarrative', () => ({
   getUnbrokenWeaveSpentLetterMessage: jest.fn((letter: string, _p: number) => `${letter} has already crossed the chain.`),
   getUnbrokenWeaveUnavailableMessage: jest.fn((_p: number) => 'The thread breaks before it can begin. A plain offering remains.'),
   getUnbrokenWeaveUnavailableTitle: jest.fn((_p: number) => 'The Thread Rests'),
+  getHintRefusedMessage: jest.fn((_p: number, blind: boolean) =>
+    blind ? 'No hints in the Blind Offering!' : 'No hints in Challenge Mode!'),
+  getHintNoSafeRouteMessage: jest.fn((_p: number, canUndo: boolean) =>
+    canUndo ? 'Try undoing a move to find another route. No hint was spent.'
+      : 'No sure route jumps out yet. No hint was spent.'),
+  getUndoRefusedMessage: jest.fn((_p: number) => 'No undos remaining in Challenge Mode!'),
+  getUndoMessage: jest.fn((_p: number) => "Let's try again!"),
+  getWordLengthMessage: jest.fn((n: number, _p: number) => `Need ${n} letters!`),
 }));
 
 jest.mock('../services/gameAlert', () => ({
@@ -201,6 +209,22 @@ jest.mock('../constants', () => ({
     // MJQXZ, which is a dead end (no onward word exists) — the hint must
     // still fall back to it rather than refusing.
     'MJQXZ',
+    // Blind judgment replays the whole chain: SEAT → MEAT → ARCH. S into
+    // MEAT at 0 forms SMEAT (NOT a word) yet every FINAL word (EAT / SEAT /
+    // MARCH) holds; the legal route goes through MEATS instead.
+    'SEAT', 'MEAT', 'ARCH', 'EAT', 'MARCH', 'EATS', 'MEATS',
+    // Second valid Double Shift pair on ABCDE → FGHIJ (B then C), so a stored
+    // pair can be told apart from the search's first find (A then B).
+    'ADE', 'BCFGHIJ',
+    // Unbroken Weave hint: ABCD → AMNO → QRST. A first (BCD + AAMNO) can only
+    // continue by re-crossing A (weave-illegal); B first (ACD + ABMNO) then
+    // A (BMNO + AQRST) finishes under the one-crossing rule.
+    'ACD', 'ABMNO', 'BMNO',
+    // Shared-link solvability: the solvable ABCD → EFGH → IJKL chain's start
+    // words (a link's words must all be in the dictionary), and three real
+    // words no shift connects.
+    'ABCD', 'EFGH', 'IJKL',
+    'CAT', 'DOG', 'PIG',
   ]),
   CURATED_EARLY_PUZZLES: [
     { words: ['GLOW', 'ABLE', 'EACH'], solution: [
@@ -822,6 +846,81 @@ describe('usePuzzleGame', () => {
       expect(state.rows[2].words.map(le => le.char).join('')).toBe('TTIED');
     });
 
+    test('refuses a chain whose intermediate received word was never a word (finals all valid)', async () => {
+      await initBlindBoard(['SEAT', 'MEAT', 'ARCH']);
+
+      // S out of SEAT (EAT) into MEAT at 0 forms SMEAT: not a word, but blind
+      // commits it. Then M out of SMEAT (S locked; leaves SEAT) into ARCH at 0
+      // forms MARCH. Every FINAL word (EAT / SEAT / MARCH) is valid, yet the
+      // chain passed through SMEAT, which standard rules refuse on the spot.
+      let [state, actions] = callHook();
+      const s = state.rows[0].words.find(le => le.char === 'S')!;
+      actions.handleLetterPress(s, 0);
+      [, actions] = callHook();
+      await actions.handleSlotPress(0);
+
+      [state, actions] = callHook();
+      expect(state.rows[1].words.map(le => le.char).join('')).toBe('SMEAT');
+      const m = state.rows[1].words.find(le => le.char === 'M' && !le.isLocked)!;
+      actions.handleLetterPress(m, 1);
+      [, actions] = callHook();
+      const result = await actions.handleSlotPress(0);
+
+      expect(result?.completed).toBe(false);
+      expect(result?.blindFailed).toBe(true);
+      [state] = callHook();
+      expect(state.rows.map(r => r.words.map(le => le.char).join(''))).toEqual(['EAT', 'SEAT', 'MARCH']);
+      expect(state.invalidAttempts).toBe(1);
+      expect(state.gameState).toBe(GameState.PLAYING);
+    });
+
+    test('accepts the same board along a route whose every intermediate word holds', async () => {
+      await initBlindBoard(['SEAT', 'MEAT', 'ARCH']);
+
+      // S into MEAT at 4 forms MEATS (a word); M out of MEATS (EATS) into ARCH
+      // at 0 forms MARCH. Finals EAT / EATS / MARCH and the received MEATS all
+      // hold, so the judgment passes.
+      let [state, actions] = callHook();
+      const s = state.rows[0].words.find(le => le.char === 'S')!;
+      actions.handleLetterPress(s, 0);
+      [, actions] = callHook();
+      await actions.handleSlotPress(4);
+
+      [state, actions] = callHook();
+      const m = state.rows[1].words.find(le => le.char === 'M' && !le.isLocked)!;
+      actions.handleLetterPress(m, 1);
+      [, actions] = callHook();
+      const result = await actions.handleSlotPress(0);
+
+      expect(result?.completed).toBe(true);
+      expect(result?.blindFailed).toBeUndefined();
+      expect(result?.completedWords).toEqual(['EAT', 'EATS', 'MARCH']);
+      [state] = callHook();
+      expect(state.invalidAttempts).toBe(0);
+    });
+
+    test('never lets a blocked word onto the board, with no invalid-attempt penalty', async () => {
+      await initBlindBoard(['WXYZ', 'TATS']);
+
+      // W into TATS at 1 spells a BLOCKED_WORDS entry. The free-move bypass
+      // must not commit it: generic copy, board and history untouched, and
+      // no mid-board mistake counted (blind judges nothing until the end).
+      let [state, actions] = callHook();
+      const w = state.rows[0].words.find(le => le.char === 'W')!;
+      actions.handleLetterPress(w, 0);
+      [, actions] = callHook();
+      const result = await actions.handleSlotPress(1);
+
+      expect(result).toBeNull();
+      [state] = callHook();
+      expect(state.error).toBe('That word cannot be used.');
+      expect(state.rows.map(r => r.words.map(le => le.char).join(''))).toEqual(['WXYZ', 'TATS']);
+      expect(state.history).toHaveLength(0);
+      expect(state.invalidAttempts).toBe(0);
+      expect(state.activeRowIndex).toBe(0);
+      expect(state.lastFormedWord).toBeNull();
+    });
+
     test('a fully valid finished chain completes normally', async () => {
       await initBlindBoard(['TIME', 'TIED']);
 
@@ -1143,6 +1242,36 @@ describe('usePuzzleGame', () => {
       expect(state.hintHighlight?.targetSlotIndex).toBe(0);
     });
 
+    test('prefers the stored Double Shift pair (proved live) over the search\'s first find', () => {
+      let [, actions] = callHook();
+      // Both A-then-B (CDE / ABFGHIJ) and B-then-C (ADE / BCFGHIJ) complete.
+      // The bounded search would return A-then-B first; the stored solution
+      // names B-then-C, so the hint must follow the solution.
+      actions.initGame(['ABCDE', 'FGHIJ'], undefined, [{
+        stepIndex: 0, sourceWord: 'ABCDE', targetWord: 'FGHIJ', letterToMove: 'B',
+        lettersToMove: ['B', 'C'], explanation: 'stored pair',
+      }], 5, 'double_shift');
+      [, actions] = callHook();
+      actions.handleHint();
+      const [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(state.hintHighlight?.letterIndex).toBe(1); // B
+      expect(state.hintHighlight?.targetSlotIndex).toBe(0);
+      const { getHintMessage } = require('../services/phaseNarrative');
+      expect(getHintMessage).toHaveBeenLastCalledWith("B' and 'C", 'FGHIJ', 0);
+    });
+
+    test('a hint refused on a fresh board never tells the player to undo', () => {
+      let [, actions] = callHook();
+      actions.initGame(['ABCDE', 'FGHIJ', 'KLMNO'], undefined, undefined, 5, 'double_shift');
+      [, actions] = callHook();
+      actions.handleHint();
+      const [state] = callHook();
+      const { getHintNoSafeRouteMessage } = require('../services/phaseNarrative');
+      expect(getHintNoSafeRouteMessage).toHaveBeenLastCalledWith(0, false);
+      expect(state.message).toContain('No hint was spent');
+    });
+
     test('does not sell a Double Shift pair whose next row cannot finish', () => {
       let [, actions] = callHook();
       actions.initGame(['ABCDE', 'FGHIJ', 'KLMNO'], undefined, undefined, 5, 'double_shift');
@@ -1247,6 +1376,25 @@ describe('usePuzzleGame', () => {
       // hintsUsed should remain 0 since challenge mode blocks hints
       expect(state.hintsUsed).toBe(0);
       expect(state.error).toBe("No hints in Challenge Mode!");
+      const { getHintRefusedMessage } = require('../services/phaseNarrative');
+      expect(getHintRefusedMessage).toHaveBeenLastCalledWith(0, false);
+    });
+
+    test('a Blind-only player is refused in the Blind Offering\'s name, not Challenge Mode\'s', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      // Blind alone: gameMode is the shared 'challenge' umbrella, but the
+      // player never armed Challenge.
+      await actions.startNewGame('MEDIUM', 'challenge', 'standard', true, false, false, false, false);
+      [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']);
+      [, actions] = callHook();
+      actions.handleHint();
+      const [state] = callHook();
+      expect(state.hintsUsed).toBe(0);
+      expect(state.error).toBe('No hints in the Blind Offering!');
+      const { getHintRefusedMessage } = require('../services/phaseNarrative');
+      expect(getHintRefusedMessage).toHaveBeenLastCalledWith(0, true);
     });
 
     test('does not increment when game is not PLAYING', () => {
@@ -1545,8 +1693,42 @@ describe('usePuzzleGame', () => {
         expect.any(Map),
         'standard',
         100,
-        { lexicon: false },
+        { lexicon: false, speed: false },
       );
+    });
+
+    test('a speed board tells the bank the clock is armed, so the +1 row is skipped', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      const { PUZZLE_EXTENSION_UNLOCK_PUZZLES } = require('../services/puzzleExtension');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({
+        puzzlesSolved: PUZZLE_EXTENSION_UNLOCK_PUZZLES + 10,
+      });
+      // Mirror the real bank's gate: the base 4-row board only when told the
+      // clock is armed; the extended 5-row board otherwise.
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockImplementationOnce(
+        async (_d: string, _p: number, _r: Map<string, number>, _v: string, _n: number, options: { speed?: boolean }) =>
+          options.speed === true
+            ? { words: ['LIME', 'TIME', 'TIED', 'TEND'], hint: 'base', solution: [], wordLength: 4 }
+            : { words: ['LIME', 'TIME', 'TIED', 'TEND', 'DENT'], hint: 'extended', solution: [], wordLength: 4 },
+      );
+
+      resetHookState();
+      let [, actions] = callHook();
+      // startNewGame(difficulty, mode, variant, blind, weave, lexicon, undoLimited, speed)
+      await actions.startNewGame('MEDIUM', 'standard', 'standard', false, false, false, false, true);
+
+      const [state] = callHook();
+      expect(state.speedMode).toBe(true);
+      expect(bank.selectPreGeneratedPuzzle).toHaveBeenLastCalledWith(
+        'MEDIUM',
+        0,
+        expect.any(Map),
+        'standard',
+        PUZZLE_EXTENSION_UNLOCK_PUZZLES + 10,
+        { lexicon: false, speed: true },
+      );
+      expect(state.rows).toHaveLength(4);
     });
 
     test('uses fallback on generation failure', async () => {
@@ -2707,7 +2889,7 @@ describe('usePuzzleGame', () => {
       await actions.startNewGame('EASY');
 
       [, actions] = callHook();
-      const ok = actions.startSharedChallengeGame(['SUIT', 'SITE', 'WHAT']);
+      const ok = actions.startSharedChallengeGame(['ABCD', 'EFGH', 'IJKL']);
       expect(ok).toBe(true);
       const [state] = callHook();
       expect(state.previewValidityVisible).toBe(false);
@@ -2826,7 +3008,7 @@ describe('usePuzzleGame', () => {
       await actions.startNewGame('MEDIUM');
 
       [, actions] = callHook();
-      const ok = actions.startSharedChallengeGame(['SUIT', 'SITE', 'WHAT']);
+      const ok = actions.startSharedChallengeGame(['ABCD', 'EFGH', 'IJKL']);
       expect(ok).toBe(true);
       const [state] = callHook();
       expect(state.previewValidityVisible).toBe(true);
@@ -2952,11 +3134,11 @@ describe('usePuzzleGame', () => {
       // Lowercase input exercises normalization; player was in challenge mode.
       actions.setGameMode('challenge');
       [, actions] = callHook();
-      const ok = actions.startSharedChallengeGame(['lime', 'time', 'tied']);
+      const ok = actions.startSharedChallengeGame(['abcd', 'efgh', 'ijkl']);
       expect(ok).toBe(true);
 
       const [state] = callHook();
-      expect(state.rows.map(r => r.originalWord)).toEqual(['LIME', 'TIME', 'TIED']);
+      expect(state.rows.map(r => r.originalWord)).toEqual(['ABCD', 'EFGH', 'IJKL']);
       expect(state.gameState).toBe(GameState.PLAYING);
       expect(state.currentVariant).toBe('standard');
       expect(state.gameMode).toBe('standard');
@@ -3007,6 +3189,19 @@ describe('usePuzzleGame', () => {
 
       const [state] = callHook();
       expect(state.gameState).toBe(GameState.IDLE);
+    });
+
+    test('rejects a chain of real words that no legal shift connects (a hand-edited link)', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      // CAT / DOG / PIG are all dictionary words, but removing any letter from
+      // CAT leaves a non-word, so no move is ever legal: the board would load
+      // and refuse every move and hint with only Home as the exit.
+      expect(actions.startSharedChallengeGame(['CAT', 'DOG', 'PIG'])).toBe(false);
+      const [state] = callHook();
+      expect(state.rows).toHaveLength(0);
+      expect(state.gameState).toBe(GameState.IDLE);
+      expect(state.isSharedChallenge).toBe(false);
     });
   });
 
@@ -3294,7 +3489,7 @@ describe('usePuzzleGame', () => {
     test('set by startSharedChallengeGame, cleared by every other start path', () => {
       resetHookState();
       let [, actions] = callHook();
-      expect(actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED'])).toBe(true);
+      expect(actions.startSharedChallengeGame(['ABCD', 'EFGH', 'IJKL'])).toBe(true);
       let [state] = callHook();
       expect(state.isSharedChallenge).toBe(true);
 
@@ -3307,7 +3502,7 @@ describe('usePuzzleGame', () => {
       // Back to shared, then initGame (the startNewGame / Next Level commit
       // path) clears it again.
       [, actions] = callHook();
-      actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED']);
+      actions.startSharedChallengeGame(['ABCD', 'EFGH', 'IJKL']);
       [, actions] = callHook();
       actions.initGame(['ABCD', 'EFGH', 'IJKL']);
       [state] = callHook();
@@ -3325,7 +3520,7 @@ describe('usePuzzleGame', () => {
     test('survives resetCurrentPuzzle (a retry is the same board) but not clearBoard', () => {
       resetHookState();
       let [, actions] = callHook();
-      actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED']);
+      actions.startSharedChallengeGame(['ABCD', 'EFGH', 'IJKL']);
       [, actions] = callHook();
       actions.resetCurrentPuzzle();
       let [state] = callHook();
@@ -3340,7 +3535,7 @@ describe('usePuzzleGame', () => {
     test('reset to false on autosave restore (provenance is not persisted)', () => {
       resetHookState();
       let [, actions] = callHook();
-      actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED']);
+      actions.startSharedChallengeGame(['ABCD', 'EFGH', 'IJKL']);
       let [state, actions2] = callHook();
       expect(state.isSharedChallenge).toBe(true);
 
@@ -3598,6 +3793,37 @@ describe('usePuzzleGame', () => {
       actions.handleHint();
 
       expect(narrative.getHintMessage).toHaveBeenLastCalledWith('E', 'EIJKL', 5);
+    });
+
+    test('a hint never steers into a continuation that re-crosses a spent letter', async () => {
+      // No stored solution: the off-solution search must prove each candidate.
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 180, postRevelation: true });
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce({
+        words: ['ABCD', 'AMNO', 'QRST'], hint: 'weave', solution: [], wordLength: 4,
+      });
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setCurrentPhase(5);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'challenge', 'standard', true, true);
+      [, actions] = callHook();
+      actions.handleHint();
+      let [state] = callHook();
+      expect(state.unbrokenWeaveMode).toBe(true);
+      expect(state.hintsUsed).toBe(1);
+      // A first (BCD + AAMNO) is the search's first legal candidate, but its
+      // only continuation moves A again; B first (ACD + ABMNO) then A finishes.
+      expect(state.hintHighlight?.letterIndex).toBe(1);
+      expect(narrative.getHintMessage).toHaveBeenLastCalledWith('B', 'ABMNO', 5);
+
+      // Under ordinary rules the same board hints A (re-crossing is legal).
+      resetHookState();
+      [, actions] = callHook();
+      actions.initGame(['ABCD', 'AMNO', 'QRST']);
+      [, actions] = callHook();
+      actions.handleHint();
+      [state] = callHook();
+      expect(state.hintHighlight?.letterIndex).toBe(0);
     });
 
     test('restart clears spent letters but keeps the mode active', async () => {

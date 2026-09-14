@@ -22,6 +22,16 @@ export interface DailyChallengeResult {
   hintsUsed: number;
   invalidAttempts: number;
   completedAt: number;
+  /**
+   * The leaderboard partition the board was played (and its result
+   * submitted) under. Ranks live in (date, board_version) partitions, so a
+   * later standing re-check must ask the partition this record names, not
+   * whatever DAILY_BOARD_VERSION compiles to at re-check time (a cohort bump
+   * shipped mid-day, or a legacy board resumed from autosave, would otherwise
+   * read as "still gathering"). Absent on records written before this field
+   * existed; readers fall back to the compiled constant for those.
+   */
+  boardVersion?: string;
 }
 
 export interface DailyChallengeProgress {
@@ -500,6 +510,7 @@ export async function recordDailyCompletion(
   invalidAttempts: number,
   boardDate: string = getTodayString(),
   completionDate: string = getTodayString(),
+  boardVersion: string = DAILY_BOARD_VERSION,
 ): Promise<DailyChallengeProgress> {
   const progress = await loadDailyProgress();
   const today = boardDate;
@@ -577,6 +588,7 @@ export async function recordDailyCompletion(
     hintsUsed,
     invalidAttempts,
     completedAt: Date.now(),
+    boardVersion,
   };
 
   progress.completedChallenges.push(result);
@@ -598,6 +610,27 @@ export async function recordDailyCompletion(
   }
 
   return progress;
+}
+
+/**
+ * The (board date, leaderboard partition) the most recent daily completion
+ * was recorded under, for the standing re-check on the completed daily card.
+ * The victory path submits and ranks with the SERVED board's date and
+ * version; this hands the re-check the same pair. Null when no daily has
+ * ever been completed. Records predating the stored version fall back to the
+ * compiled DAILY_BOARD_VERSION (the value they were submitted under at the
+ * time, in every case but a mid-day cohort bump).
+ */
+export async function getLastDailyCompletionCohort(): Promise<{
+  date: string;
+  boardVersion: string;
+} | null> {
+  const progress = await loadDailyProgress();
+  // Completions append in board-date order (a result older than the newest
+  // recorded day is refused above), so the last entry is the newest.
+  const latest = progress.completedChallenges[progress.completedChallenges.length - 1];
+  if (!latest) return null;
+  return { date: latest.date, boardVersion: latest.boardVersion ?? DAILY_BOARD_VERSION };
 }
 
 /**

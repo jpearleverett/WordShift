@@ -14,13 +14,21 @@
  * at most once, ever. Device-local UX pacing → intentionally NOT cloud-synced.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logEvent } from './eventLogger';
 
 const STORAGE_KEY = 'wordshift_review_prompt';
 
 /** Phase at/above which review prompts are HARD-suppressed (the reveal onward). */
 export const REVIEW_MAX_PHASE = 2;
-/** Don't ask until the player has clearly settled into the delight. */
-export const REVIEW_MIN_PUZZLES = 10;
+/**
+ * Don't ask until the player has clearly settled into the delight. 20, not
+ * 10: at 10 the ask landed on the same win as the daily unlock (8), the
+ * mandatory first harvest (9) and the reverse intro (10), before the
+ * daily/streak habit exists, and the Play in-app review quota can consume the
+ * one lifetime ask silently (see maybePromptReview), so it should land where
+ * a rating is most likely to be given.
+ */
+export const REVIEW_MIN_PUZZLES = 20;
 
 interface ReviewState {
   prompted: boolean;
@@ -108,6 +116,14 @@ function getStoreReview(): { requestReview?: () => Promise<void>; isAvailableAsy
  * 0-1 perfect win. Otherwise we would silently spend the one ask on a no-op and
  * never reach the player at all. Returns whether a prompt actually fired. Safe
  * no-op when the native module is absent.
+ *
+ * Known limit (accepted for launch): on Android `requestReview` resolving does
+ * NOT mean a dialog was shown. The Play In-App Review API applies a per-user
+ * quota and completes the flow without UI when it is exhausted, and nothing on
+ * its surface distinguishes the two, so the one-time flag still burns. The
+ * `review_prompt_shown` event carries the elapsed time of the native call:
+ * a near-instant resolve is the quota-suppressed signature, so the owner can
+ * see from telemetry how often the single ask was spent silently.
  */
 export async function maybePromptReview(
   ctx: Omit<ReviewPromptContext, 'alreadyPrompted'>
@@ -124,7 +140,12 @@ export async function maybePromptReview(
     // OS review sheet not currently available (rate-limited, simulator, etc.):
     // also keep the flag so a genuine prompt can still land later.
     if (sr.isAvailableAsync && !(await sr.isAvailableAsync())) return false;
+    const startedAt = Date.now();
     await sr.requestReview();
+    logEvent({
+      type: 'review_prompt_shown',
+      data: { elapsedMs: Math.max(0, Date.now() - startedAt), phase: ctx.phase, puzzlesSolved: ctx.puzzlesSolved },
+    });
   } catch {
     // Best-effort — a failed attempt never consumes the one-time flag.
     return false;
