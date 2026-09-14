@@ -202,14 +202,16 @@ probe bump_words_offered '{"p_date":"2026-09-14","p_count":0}'
 probe support_preview '{"p_support_id":"probe"}'      # expect 42501
 probe prune_expired_events '{"p_batch_size":1}'       # expect 42501
 probe get_save '{"p_owner":"probe"}'                  # expect 42501
-probe submit_daily_score '{"p_owner":"probe-only","p_date":"2026-09-14","p_time_ms":0,"p_stars":0,"p_hints":0}'  # 42501 after rate_limits_v1
+probe submit_daily_score '{"p_owner":"probe","p_date":"2026-09-14","p_time_ms":0,"p_stars":0,"p_hints":0}'  # [] before rate_limits_v1 (owner under the 8-char floor, nothing inserted), 42501 after
 for t in saves events daily_scores_v2 daily_counters support_install_links rate_limits; do
   curl -sS -m 20 -o /dev/stdout -w " HTTP %{http_code}\n" "$URL/$t?select=*&limit=1" -H "apikey: $KEY"   # expect 42501
 done
 ```
 
 The probe writes nothing: the RPC bodies fail their own validation (`p_count`
-0, an empty event array, an unknown owner) before any insert. Operator-side
+0, an empty event array, an unknown owner, and a 5-character `p_owner` under the
+legacy `submit_daily_score` 8-character floor, so even the pre-migration schema
+inserts no 0 ms entrant) before any insert. Operator-side
 checks (as `postgres`/service role) belong in the
 [support runbook](SUPPORT_AND_RETENTION_RUNBOOK.md#retention-verification-gate).
 

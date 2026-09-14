@@ -198,6 +198,10 @@ jest.mock('../constants', () => ({
     // (third move: I out of EIJKL leaves EJKL, forms IWXYZ — keeps the board
     // solvable so stuck detection never resets the streak mid-test)
     'EJKL', 'IWXYZ',
+    // Blind + Double Shift judgment: SHARE -> ARE (S, H out), OWING -> SOWING
+    // (first drop) -> SHOWING (second drop at 1) / SOWINGH (second drop at 6,
+    // not a word).
+    'SHARE', 'OWING', 'HARE', 'ARE', 'SOWING', 'SHOWING',
     // Synthetic double-shift step: ABCDE → FGHIJ (move A then B → ABFGHIJ)
     'CDE', 'ABFGHIJ',
     // Hint dead-end awareness: MNOP → QRST → UVWX. First valid candidate is
@@ -934,6 +938,123 @@ describe('usePuzzleGame', () => {
       expect(result?.completed).toBe(true);
       expect(result?.blindFailed).toBeUndefined();
       expect(result?.completedWords).toEqual(['TIE', 'TIMED']);
+      [state] = callHook();
+      expect(state.invalidAttempts).toBe(0);
+    });
+
+    // Blind composes with every style. Reverse judges the whole down-and-back
+    // chain at the return to row 0; Double Shift judges each step at its
+    // second drop. Both replay the committed history exactly once, at the end.
+    async function initBlindVariantBoard(words: string[], variant: 'reverse' | 'double_shift', wordLength: number) {
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', variant, true);
+      [, actions] = callHook();
+      actions.initGame(words, undefined, undefined, wordLength, variant);
+      const [state] = callHook();
+      expect(state.blindMode).toBe(true);
+      expect(state.currentVariant).toBe(variant);
+    }
+
+    test('Blind + Reverse: a flawed descent commits, turns the board around, and fails only at the return', async () => {
+      await initBlindVariantBoard(['TIME', 'TIED'], 'reverse', 4);
+
+      // Descent: M from TIME (TIE) into TIED at 0 spells MTIED. Standard
+      // reverse refuses it on the spot; blind commits it and reaches the
+      // midpoint with no mistake counted.
+      let [state, actions] = callHook();
+      const m = state.rows[0].words.find(le => le.char === 'M')!;
+      actions.handleLetterPress(m, 0);
+      [, actions] = callHook();
+      const down = await actions.handleSlotPress(0);
+      expect(down?.completed).toBe(false);
+      expect(down?.reverseMidpoint).toBe(true);
+      [state] = callHook();
+      expect(state.moveDirection).toBe('up');
+      expect(state.invalidAttempts).toBe(0);
+
+      // Return: the unlocked D from MTIED back into TIE at 3 forms TIED and
+      // leaves MTIE. The finished chain [TIED, MTIE] fails the one judgment:
+      // no victory, one invalid attempt, the flawed move stays committed.
+      const d = state.rows[1].words.find(le => le.char === 'D' && !le.isLocked)!;
+      [, actions] = callHook();
+      actions.handleLetterPress(d, 1);
+      [, actions] = callHook();
+      const up = await actions.handleSlotPress(3);
+      expect(up?.completed).toBe(false);
+      expect(up?.blindFailed).toBe(true);
+      [state] = callHook();
+      expect(state.invalidAttempts).toBe(1);
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.rows.map(r => r.words.map(le => le.char).join(''))).toEqual(['TIED', 'MTIE']);
+    });
+
+    test('Blind + Reverse: a chain whose descent and return both hold completes as a reverse win', async () => {
+      await initBlindVariantBoard(['TIME', 'TIED'], 'reverse', 4);
+
+      let [state, actions] = callHook();
+      const m = state.rows[0].words.find(le => le.char === 'M')!;
+      actions.handleLetterPress(m, 0);
+      [, actions] = callHook();
+      await actions.handleSlotPress(2); // TIE / TIMED
+
+      [state, actions] = callHook();
+      const d = state.rows[1].words.find(le => le.char === 'D' && !le.isLocked)!;
+      actions.handleLetterPress(d, 1);
+      [, actions] = callHook();
+      const up = await actions.handleSlotPress(3); // TIED / TIME
+      expect(up?.completed).toBe(true);
+      expect(up?.blindFailed).toBeUndefined();
+      expect(up?.variant).toBe('reverse');
+      expect(up?.completedWords).toEqual(['TIED', 'TIME']);
+      [state] = callHook();
+      expect(state.invalidAttempts).toBe(0);
+    });
+
+    test('Blind + Double Shift: the first drop is never judged and a flawed second drop fails at the end', async () => {
+      await initBlindVariantBoard(['SHARE', 'OWING'], 'double_shift', 5);
+
+      // S into OWING at 0 (SOWING), then H from HARE into SOWING at its tail
+      // (SOWINGH). ARE holds; SOWINGH does not, so the pair fails the
+      // end-of-chain judgment with the step still committed.
+      let [state, actions] = callHook();
+      const s = state.rows[0].words.find(le => le.char === 'S')!;
+      actions.handleLetterPress(s, 0);
+      [, actions] = callHook();
+      const drop1 = await actions.handleSlotPress(0);
+      expect(drop1).not.toBeNull();
+      expect(drop1?.formedWord).toBeUndefined();
+      [state, actions] = callHook();
+      expect(state.invalidAttempts).toBe(0);
+
+      const h = state.rows[0].words.find(le => le.char === 'H')!;
+      actions.handleLetterPress(h, 0);
+      [, actions] = callHook();
+      const drop2 = await actions.handleSlotPress(6);
+      expect(drop2?.completed).toBe(false);
+      expect(drop2?.blindFailed).toBe(true);
+      [state] = callHook();
+      expect(state.invalidAttempts).toBe(1);
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.rows.map(r => r.words.map(le => le.char).join(''))).toEqual(['ARE', 'SOWINGH']);
+    });
+
+    test('Blind + Double Shift: a pair that lands on real words completes', async () => {
+      await initBlindVariantBoard(['SHARE', 'OWING'], 'double_shift', 5);
+
+      let [state, actions] = callHook();
+      const s = state.rows[0].words.find(le => le.char === 'S')!;
+      actions.handleLetterPress(s, 0);
+      [, actions] = callHook();
+      await actions.handleSlotPress(0); // SOWING
+      [state, actions] = callHook();
+      const h = state.rows[0].words.find(le => le.char === 'H')!;
+      actions.handleLetterPress(h, 0);
+      [, actions] = callHook();
+      const drop2 = await actions.handleSlotPress(1); // SHOWING
+      expect(drop2?.completed).toBe(true);
+      expect(drop2?.blindFailed).toBeUndefined();
+      expect(drop2?.completedWords).toEqual(['ARE', 'SHOWING']);
       [state] = callHook();
       expect(state.invalidAttempts).toBe(0);
     });

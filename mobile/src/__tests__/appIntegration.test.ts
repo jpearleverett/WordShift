@@ -985,8 +985,16 @@ describe('launch-readiness app-integration wiring', () => {
   test('the phase ceremony is the share prompt\'s second peak, under the exit-nudge guards (product-retention-7)', () => {
     // The ceremony path fires only once the phase scene is acknowledged.
     expect(APP_TSX).toMatch(
-      /if \(completed\?\.kind === 'phase'\) \{\s*maybeShowCeremonySharePrompt\(\)\.catch\(\(\) => \{\}\);\s*\}/
+      /if \(completed\?\.kind === 'phase' && completed\.phase <= 2\) \{\s*maybeShowCeremonySharePrompt\(\)\.catch\(\(\) => \{\}\);\s*\}/
     );
+    // The pit exit (Collect Now) is the route to the ward ceremony, so it
+    // snapshots the win exactly like the Next/Home exits; otherwise the
+    // ceremony prompt would open a board from several wins ago.
+    const pitExit = APP_TSX.slice(
+      APP_TSX.indexOf('const handleGoToPit = useCallback'),
+      APP_TSX.indexOf('// Android hardware back button')
+    );
+    expect(pitExit).toMatch(/pendingShareSnapshotRef\.current = buildShareDataRef\.current\(\);\s*startVictoryExitFlow/);
     const ceremony = APP_TSX.slice(
       APP_TSX.indexOf('const maybeShowCeremonySharePrompt = useCallback'),
       APP_TSX.indexOf('const runVictoryExitNudges = useCallback')
@@ -1057,6 +1065,10 @@ describe('launch-readiness app-integration wiring', () => {
     expect(APP_TSX).toMatch(/<BootHold failed=\{initialRoute\.status === 'failed'\} onRetry=\{initialRoute\.retry\} failureKind="local" \/>/);
     const USE_APP_BOOT = fs.readFileSync(path.resolve(__dirname, '../hooks/useAppBoot.ts'), 'utf8');
     expect(USE_APP_BOOT).toMatch(/source: 'app_boot'/);
-    expect(USE_APP_BOOT).toMatch(/failedStage === 'restoreCloud'/);
+    // The escape is offered only for a NON-storage failure inside the cloud
+    // stage: a StorageRecoveryRequiredError there is a local journal/write
+    // failure that skipping the stage would replay through migrations anyway.
+    expect(USE_APP_BOOT).toMatch(/stage === 'restoreCloud' && !\(error instanceof StorageRecoveryRequiredError\)/);
+    expect(USE_APP_BOOT).toMatch(/status === 'failed' && cloudEscape/);
   });
 });

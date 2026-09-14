@@ -107,6 +107,17 @@ function getFlashColor(phase: number): string {
   return '#FFFFFF'; // bright
 }
 
+/** Authored scene timings (duration, gaps, effects) stretch by this factor so
+ *  a ceremony page breathes rather than snapping past. */
+const CEREMONY_TIME_SCALE = 1.25;
+/** The Phase 1-2 ceremonies are the first long pauses a new player meets and
+ *  the ones testers called slightly slow, so they stretch less. The Phase 3+
+ *  ceremonies and the essential (read-at-own-pace) ones keep the full breath. */
+const EARLY_CEREMONY_TIME_SCALE = 1.1;
+function ceremonyTimeScale(event: PhaseTransitionEvent): number {
+  return event.phase <= 2 ? EARLY_CEREMONY_TIME_SCALE : CEREMONY_TIME_SCALE;
+}
+
 interface PhaseTransitionOverlayProps {
   event: PhaseTransitionEvent | null;
   onComplete: () => void;
@@ -732,7 +743,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     }
     deliveredSceneRef.current = { event, index: activeSceneIndex };
     const reducedMotion = getSettingsSync().reducedMotion;
-    const timeScale = 1.25;
+    const timeScale = ceremonyTimeScale(event);
     stopEffectAnims();
     shakeX.setValue(0);
     shakeY.setValue(0);
@@ -808,7 +819,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         activeSceneRef.current = activeSceneIndex + 1;
         setActiveSceneIndex(activeSceneIndex + 1);
       }
-    }, (scene.duration + authoredGap) * 1.25);
+    }, (scene.duration + authoredGap) * ceremonyTimeScale(event));
     timersRef.current.push(timer);
     return () => clearTimeout(timer);
   }, [event, activeSceneIndex, manualPlayback, playbackPaused]);

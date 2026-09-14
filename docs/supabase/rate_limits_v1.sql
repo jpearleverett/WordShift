@@ -11,7 +11,7 @@
 --                       SYNC_THROTTLE_MS) carrying at most the 500 events the
 --                       local queue retains (eventLogger.ts MAX_EVENTS).
 --                       Budget: 240 calls and 6,000 event rows per install per
---                       hour, plus 3,000 calls per client address when the API
+--                       hour, plus 30,000 calls per client address when the API
 --                       gateway supplies one. The row budget is enforced by a
 --                       BEFORE INSERT trigger, so the column-scoped legacy
 --                       INSERT grant that older clients still use is bounded by
@@ -25,10 +25,15 @@
 --                       two-argument call keeps working unchanged.
 --   submit_daily_score  client: once per Daily Challenge victory (replays are
 --                       refused client-side). Budget: 30 submissions per owner
---                       per hour and 240 per client address per hour.
+--                       per hour and 2,400 per client address per hour.
 -- The client address comes from the PostgREST request headers; when no
 -- address header is present (local rehearsal, an unexpected gateway change)
 -- the address-scoped budgets are skipped rather than pooling everyone.
+-- Address budgets are deliberately an order of magnitude above the per-install
+-- ones: mobile carriers put thousands of subscribers behind one carrier-grade
+-- NAT address, so an address cap only exists to stop id-minting floods and
+-- must never be low enough to refuse a busy launch day's legitimate players.
+-- Do not lower these without that arithmetic.
 --
 -- Plausibility for submit_daily_score_v2 (and the legacy submit_daily_score it
 -- still dispatches to for the legacy_v1 cohort):
@@ -143,7 +148,7 @@ begin
      or jsonb_array_length(p_events)>500 or octet_length(p_events::text)>1048576 then return false; end if;
   if not public.rate_limit_take('ingest_calls', p_install_id, 240) then return false; end if;
   client_key := public.request_client_key();
-  if client_key is not null and not public.rate_limit_take('ingest_addr', client_key, 3000) then return false; end if;
+  if client_key is not null and not public.rate_limit_take('ingest_addr', client_key, 30000) then return false; end if;
   for event in select value from jsonb_array_elements(p_events) loop
     if event->>'id' is null or length(event->>'id') not between 1 and 128
        or event->>'type' is null or event->>'type' !~ '^[a-z_]{1,64}$'
@@ -213,6 +218,11 @@ end;
 $$;
 revoke all on function public.daily_time_floor_ms(text) from public, anon, authenticated;
 
+-- daily_owner_has_activity probes support_install_links by install_id; the
+-- table's primary key leads with owner, so give the probe its own index.
+create index if not exists support_install_links_install_idx
+  on public.support_install_links (install_id);
+
 create or replace function public.daily_owner_has_activity(p_owner text) returns boolean
 language sql stable security definer set search_path = public, pg_temp
 as $$
@@ -242,7 +252,7 @@ begin
   if not public.daily_owner_has_activity(p_owner) then return false; end if;
   if not public.rate_limit_take('daily_owner', p_owner, 30) then return false; end if;
   client_key := public.request_client_key();
-  if client_key is not null and not public.rate_limit_take('daily_addr', client_key, 240) then return false; end if;
+  if client_key is not null and not public.rate_limit_take('daily_addr', client_key, 2400) then return false; end if;
   return true;
 end;
 $$;

@@ -76,16 +76,16 @@ test('a fresh install is walked from the cold-open board to a complete onboardin
   await expect(page.getByText(/Hello up there/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toHaveCount(0);
 
-  // Invite Fox. The den's free invite chip opens the prompt when tapped; the
-  // home screen also raises the same prompt on its own after a short reveal
-  // delay (which hides the chip), so tap the chip only while it is still
-  // there and require the prompt either way.
+  // Invite Fox. The den's free invite chip is on screen during home_empty, and
+  // the home screen raises the invite prompt on its own after the reveal
+  // delay (INVITE_PROMPT_REVEAL_DELAY_MS), hiding the chip once the prompt is
+  // up. Pin the EFFECT deterministically: never tap the chip here, so a
+  // regression in the automatic invite cannot hide behind the tap route.
   const denChip = page.getByRole('button', { name: 'Invite animal to Cozy Den for free', exact: true });
+  await expect(denChip).toBeVisible();
   const welcome = page.getByRole('button', { name: 'Welcome friend', exact: true });
-  await expect.poll(async () => {
-    if (await denChip.count()) await denChip.click({ timeout: 1_000 }).catch(() => {});
-    return welcome.count();
-  }).toBeGreaterThan(0);
+  await expect(welcome).toBeVisible({ timeout: 10_000 });
+  await expect(denChip).toHaveCount(0);
   // The nameplate upper-cases its label.
   await expect(page.getByText('A VISITOR APPROACHES!', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Maybe later', exact: true })).toHaveCount(0);

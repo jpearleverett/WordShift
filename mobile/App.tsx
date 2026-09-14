@@ -4427,6 +4427,11 @@ function MainApp() {
       return;
     } finally { storyExitPreparing.current = false; }
     hapticLight();
+    // The pit exit is how a win that lit the ward reaches its ceremony, so it
+    // snapshots the board for the ceremony share prompt exactly like the
+    // Next/Home exits (buildShareData reads victoryData + rows, still intact
+    // until the exit callback clears the board; null when there is no win).
+    pendingShareSnapshotRef.current = buildShareDataRef.current();
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
@@ -6194,7 +6199,11 @@ function MainApp() {
             pendingCycleRebuildRef.current = false;
             await rebuildSessionFromStorage({ restartOnboarding: false });
           }
-          if (completed?.kind === 'phase') {
+          // The share peak is the FIRST sky change (phases 1-2). By phase 3
+          // the flawless path has had ~60 boards, and the phase-4 entry can
+          // queue the held house ceremony right behind it, where a share
+          // card would stack over the Temple scene.
+          if (completed?.kind === 'phase' && completed.phase <= 2) {
             maybeShowCeremonySharePrompt().catch(() => {});
           }
         }}

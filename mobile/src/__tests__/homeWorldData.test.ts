@@ -211,7 +211,11 @@ describe('UNLOCK_PROGRESSION', () => {
   // gate + the final animal), so the Phase-4 dwell + finale play out inside a
   // finished temple. Completion/recruit is ~96-100, capped dwell completes
   // ~104-108, arming waits for 115, the final board is ~116, and
-  // post-revelation ~117-122.
+  // post-revelation ~117-122. This pins the SOLVE FLOORS only: a player whose
+  // weighted progress lags the floors can finish the house before Phase 4
+  // commits, so the house ceremony is HELD in the ceremony queue until
+  // confirmPhaseTransition lands Phase 4 (canQueueHouseCeremony in
+  // amberCurrency) rather than playing a pre-reveal temple.
   test('house completion sits after the reveal floor, before the Phase 5 floor', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)

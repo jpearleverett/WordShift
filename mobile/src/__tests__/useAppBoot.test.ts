@@ -132,6 +132,23 @@ test('a cloud-restore failure is reported with its stage and offers the cloud-on
   expect(recoverStorage).toHaveBeenCalledTimes(2);
 });
 
+test('a storage failure inside the cloud-restore transaction never offers the cloud-only continue', async () => {
+  // The cloud restore swallows provider/network errors itself; the only
+  // StorageRecoveryRequiredError it can throw is a LOCAL journal/write
+  // failure, and skipping the stage would replay that commit through the
+  // migrations stage anyway. Fail closed with the local copy.
+  const { StorageRecoveryRequiredError } = require('../services/persistenceStorage');
+  restoreCloud.mockRejectedValueOnce(new StorageRecoveryRequiredError(new Error('journal write failed')));
+  render();
+  await settle();
+  const hook = render();
+  expect(hook.status).toBe('failed');
+  expect(hook.failedStage).toBe('restoreCloud');
+  expect(hook.canContinueWithoutCloud).toBe(false);
+  expect(reportError).toHaveBeenCalledTimes(1);
+  expect(reportError.mock.calls[0][1]).toEqual({ source: 'app_boot', metadata: { attempt: 0, stage: 'restoreCloud', skipCloudRestore: false } });
+});
+
 test('a local recovery failure is reported but never offers to skip the cloud stage; retry re-runs everything', async () => {
   recoverStorage.mockRejectedValueOnce(new Error('{bad'));
   render();

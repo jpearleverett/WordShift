@@ -260,7 +260,7 @@ test('Continue at an autoplay deadline cannot skip the next unread passage befor
   const harness = mount(event);
   try {
     const tree = harness.render();
-    jest.advanceTimersByTime(1249);
+    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
     press(byId(tree, 'phase-transition-next'));
     // Let the old autoplay callback run before the next render can commit its
     // passive-effect cleanup. A state-only guard used to advance twice here.
@@ -318,6 +318,12 @@ test('a personalized environmental backdrop remains behind the foreground scene'
 });
 
 
+// A 1000 ms scene auto-advances after the ceremony stretch: 1.1x for the
+// phase 1-2 events these fixtures use (the first long pauses a new player
+// meets), 1.25x from phase 3 on.
+const EARLY_AUTOPLAY_MS = 1100;
+const FULL_AUTOPLAY_MS = 1250;
+
 function shortEvent(readAtOwnPace = false): PhaseTransitionEvent {
   return {
     ...getPhaseTransitionEvent(1)!, readAtOwnPace,
@@ -335,7 +341,7 @@ test('Skip requires a separate confirmation and cancelling keeps the same page a
   const harness = mount(shortEvent());
   try {
     const original = harness.render();
-    jest.advanceTimersByTime(1249);
+    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
     // Two callbacks from the original button cannot confirm the second action.
     press(skipButton(original));
     press(skipButton(original));
@@ -380,7 +386,7 @@ test('backgrounding at an autoplay deadline preserves the unread page until the 
   const harness = mount(shortEvent());
   try {
     const original = harness.render();
-    jest.advanceTimersByTime(1249);
+    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
     mockAppStateListener?.('background');
     // Native AppState can change before React commits the pause and its cleanup.
     jest.advanceTimersByTime(60_000);
@@ -390,7 +396,7 @@ test('backgrounding at an autoplay deadline preserves the unread page until the 
     expect(harness.onComplete).not.toHaveBeenCalled();
     mockAppStateListener?.('active');
     expect(text(harness.render())).toContain('First passage.');
-    jest.advanceTimersByTime(1249);
+    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
     expect(text(harness.render())).toContain('First passage.');
     jest.advanceTimersByTime(1);
     expect(text(harness.render())).toContain('Second passage.');
@@ -398,11 +404,31 @@ test('backgrounding at an autoplay deadline preserves the unread page until the 
   expect(mockAppStateListener).toBeUndefined();
 });
 
+test('phase 1-2 ceremonies auto-advance on the shorter early stretch; phase 3 keeps the full breath', () => {
+  const early = mount(shortEvent());
+  try {
+    early.render();
+    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
+    expect(text(early.render())).toContain('First passage.');
+    jest.advanceTimersByTime(1);
+    expect(text(early.render())).toContain('Second passage.');
+  } finally { early.dispose(); }
+
+  const late = mount({ ...shortEvent(), ...getPhaseTransitionEvent(3)!, readAtOwnPace: false, scenes: shortEvent().scenes });
+  try {
+    late.render();
+    jest.advanceTimersByTime(FULL_AUTOPLAY_MS - 1);
+    expect(text(late.render())).toContain('First passage.');
+    jest.advanceTimersByTime(1);
+    expect(text(late.render())).toContain('Second passage.');
+  } finally { late.dispose(); }
+});
+
 test('scrolling a long passage takes over playback before the pending timer can advance', () => {
   const harness = mount(shortEvent());
   try {
     const tree = harness.render();
-    jest.advanceTimersByTime(1249);
+    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
     (byId(tree, 'phase-transition-reading')!.props!.onScrollBeginDrag as () => void)();
     jest.advanceTimersByTime(60_000);
     expect(text(harness.render())).toContain('First passage.');

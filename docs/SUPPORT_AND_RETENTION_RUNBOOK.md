@@ -121,9 +121,10 @@ entrants, impossible times), remove that cohort with bound parameters from the
 operator connection:
 
 ```sql
-select public.purge_daily_cohort($1, $2); -- 'YYYY-MM-DD', board version
--- Use the cohort id the client reports (mobile/src/services/dailyBoardVersion.ts);
--- 'legacy_v1' targets the pre-cohort daily_scores table for that date.
+-- Substitute the date and the cohort id the client reports
+-- (mobile/src/services/dailyBoardVersion.ts); 'legacy_v1' targets the
+-- pre-cohort daily_scores table for that date.
+select public.purge_daily_cohort('2026-09-14', 'daily_v2_f55533098748eba5');
 ```
 
 The function returns the number of rows removed and refuses malformed input.

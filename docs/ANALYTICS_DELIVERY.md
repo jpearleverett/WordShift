@@ -19,8 +19,11 @@ Apply `supabase/events_integrity_v2.sql` before enabling the updated transport.
 The bounded `ingest_events_v2` RPC inserts each `(install_id,event_id)` once;
 an acknowledged-lost response can safely retry. `supabase/rate_limits_v1.sql`
 adds hourly budgets per install (240 calls, 6,000 rows) far above the client's
-one-upload-per-minute, 500-event ceiling; a refused batch returns `false` and
-stays queued locally like any other failed upload. Anonymous table SELECT remains
+one-upload-per-minute, 500-event ceiling; a call refused by the 240-call budget
+returns `false` and stays queued locally like any other failed upload. Rows over
+the 6,000-row hourly budget are dropped server-side by the insert trigger while
+the call still succeeds, so that batch is acknowledged and lost (best-effort by
+design). Anonymous table SELECT remains
 denied. The optional custom collector receives the same IDs and must deduplicate
 that pair before returning a successful acknowledgement. It must return success
 only after persisting the whole batch. A missing RPC retains the local queue and

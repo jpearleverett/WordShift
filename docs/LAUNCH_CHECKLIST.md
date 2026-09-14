@@ -96,13 +96,17 @@ verify the latest binary, backend deployment or public release.
   The Play release notes for this build must carry the legal line: "Privacy
   Policy and Terms updated (effective September 14, 2026): clarified purchase
   restore and Reset All behavior (September 13 revision) and added data
-  retention periods and a governing-law clause."
+  retention periods." Append "and a governing-law clause" only once the clause
+  below is actually published.
 - [ ] **Publish the documentation clarification with release notes.** The
   September 13 privacy/terms revision clarifies existing purchase delivery,
   restore and reset behavior; the September 14 revision adds retention periods
-  to the privacy policy and a governing-law clause to the terms (the owner must
-  fill in the jurisdiction placeholder in `docs/terms.md` before the pages are
-  republished). Both documents promise a release-notes mention, so the line
+  to the privacy policy. A governing-law clause for the terms is DRAFTED inside
+  an HTML comment in `docs/terms.md` (so the live page never shows bracketed
+  placeholders; the Pages workflow refuses a placeholder outside its comment):
+  fill in the jurisdiction and venue, move the section out of the comment,
+  renumber "Changes", then mention the clause in the revision note and the
+  release notes. Both documents promise a release-notes mention, so the line
   above is not optional. Verify the deployed policy links.
 - [ ] **Submit and promote deliberately.** Both configured Android submit
   profiles target Play's **internal** track. Validate the production-configured
