@@ -120,7 +120,7 @@ Smoke matrix for the signed internal-track build, on at least two physical Andro
 Run from `mobile/`, in this order:
 
 ```bash
-# 1. app.json: extra.adsUseTestIds -> false; keep extra.creatorCode ""; bump android.versionCode above the last Play upload
+# 1. app.json: bump android.versionCode above the last Play upload; keep extra.creatorCode "" (adsUseTestIds is derived from the channel since 2026-09-14: never hand-flip it)
 WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage --testPathPattern=productionConfig
 npm ci && npm run typecheck && npm run lint -- --max-warnings 0 && npm test -- --no-coverage
 WORDSHIFT_RELEASE_CHANNEL=production npx expo config --type public   # confirm runtimeVersion 1.3.5-production and adsUseTestIds false
@@ -132,7 +132,7 @@ WORDSHIFT_RELEASE_CHANNEL=production npx eas-cli@latest update --channel product
 npx eas-cli@latest update:roll-back-to-embedded --channel production   # rollback
 ```
 
-Two things to know before doing it. First, committing `adsUseTestIds: false` to `main` turns CI red, because the non-production branch of `productionConfig.test.ts` asserts the testing value; either update `.github/workflows/ci.yml` in the same change or derive the flag from `WORDSHIFT_RELEASE_CHANNEL` in `app.config.js` so both states can be green. Second, `docs/OTA_UPDATES.md` has no rollback step; the last command above is it.
+Both caveats the original review raised here are resolved on the branch: `app.config.js` derives `adsUseTestIds` from `WORDSHIFT_RELEASE_CHANNEL`, so the checked-in value stays `true` for every non-production channel and CI is green in both states (`productionConfig.test.ts` validates both; `WORDSHIFT_PRODUCTION_CUT=1` asserts the current shell resolves to production), and `docs/OTA_UPDATES.md` now carries the rollback runbook.
 
 ## Fix in the same native build
 
