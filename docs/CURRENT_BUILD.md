@@ -94,6 +94,16 @@ validation in CI's mode (`npm test -- --no-coverage --ci --runInBand`):
 **209 suites / 4,997 tests, exit 0, zero teardown imports**, plus TypeScript and
 zero-warning lint. App version 1.3.5 / code 99 unchanged; nothing native moved.
 
+The follow-up merge (PR 440, `c23dfb4`) then failed CI one step later, at
+"Puzzle delivery policy and daily cohort": `updateDailyBoardVersion.mjs --check`
+reported the daily cohort stamp stale because two hashed inputs had changed on
+the launch-readiness branch (`constants/gameBalance.ts` for the economy tuning
+and `services/dailyChallenge.ts` for the completion-cohort recording), while the
+banks, dictionary and board selection were untouched. The stamp was regenerated
+to `daily_v2_c2dbbd283e5cd45b`; the served daily board is identical, only the
+leaderboard partition name moves, and no build carrying the previous v2 stamp
+has shipped (the closed test ran 1.2.2 / code 88, before v2 cohorts existed).
+
 ## Launch readiness review (2026-09-14)
 
 [`LAUNCH_READINESS_REVIEW_2026-09-14.md`](LAUNCH_READINESS_REVIEW_2026-09-14.md)
