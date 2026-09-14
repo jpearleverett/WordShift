@@ -86,7 +86,9 @@ describe('ftue-2: graduation card spacing after a phase ceremony', () => {
   test('the first exit nudge cannot land on the graduation board exit', () => {
     // Graduation opens on board FULL_LIMIT + 1; the nudge gate must sit past
     // that board's own exit (win FULL_LIMIT + 1).
-    expect(EXIT_NUDGE_MIN_PUZZLES).toBeGreaterThan(PREVIEW_GRADING_FULL_LIMIT + 1);
+    // The graduation card can defer to board 14 and the challenge intro lands
+    // at 15, so the first exit nudge must clear both.
+    expect(EXIT_NUDGE_MIN_PUZZLES).toBeGreaterThan(PREVIEW_GRADING_FULL_LIMIT + 3);
   });
 
   test('nothing is deferred until a phase ceremony is acknowledged', () => {
@@ -287,11 +289,14 @@ describe('product-retention-5: dark-phase win-back copy on a lock screen', () =>
 
 describe('narrative-2: post-Arrival resume framing decision', () => {
   test('frames only after the Arrival, only pre-arrival material, only once per resident', () => {
-    expect(shouldFrameArrivalResume({ arrivalOccurred: true, resumedLinePhase: 3, alreadyFramed: false })).toBe(true);
-    expect(shouldFrameArrivalResume({ arrivalOccurred: false, resumedLinePhase: 3, alreadyFramed: false })).toBe(false);
-    expect(shouldFrameArrivalResume({ arrivalOccurred: true, resumedLinePhase: null, alreadyFramed: false })).toBe(false);
-    expect(shouldFrameArrivalResume({ arrivalOccurred: true, resumedLinePhase: 5, alreadyFramed: false })).toBe(false);
-    expect(shouldFrameArrivalResume({ arrivalOccurred: true, resumedLinePhase: 0, alreadyFramed: true })).toBe(false);
+    const prior = { hasPriorConversation: true };
+    expect(shouldFrameArrivalResume({ arrivalOccurred: true, resumedLinePhase: 3, alreadyFramed: false, ...prior })).toBe(true);
+    expect(shouldFrameArrivalResume({ arrivalOccurred: false, resumedLinePhase: 3, alreadyFramed: false, ...prior })).toBe(false);
+    expect(shouldFrameArrivalResume({ arrivalOccurred: true, resumedLinePhase: null, alreadyFramed: false, ...prior })).toBe(false);
+    expect(shouldFrameArrivalResume({ arrivalOccurred: true, resumedLinePhase: 5, alreadyFramed: false, ...prior })).toBe(false);
+    expect(shouldFrameArrivalResume({ arrivalOccurred: true, resumedLinePhase: 0, alreadyFramed: true, ...prior })).toBe(false);
+    // A resident recruited after the Arrival has no conversation to resume.
+    expect(shouldFrameArrivalResume({ arrivalOccurred: true, resumedLinePhase: 0, alreadyFramed: false, hasPriorConversation: false })).toBe(false);
     const line = getArrivalResumeFramingLine('Ember');
     expect(line).toContain('Ember');
     expect(line).not.toMatch(NO_DASHES);

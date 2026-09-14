@@ -177,7 +177,9 @@ describe('DraggableTile exposes one activatable accessibility node per letter', 
     // a click the view never receives.
     expect(wrapper).toContain('focusable={true}');
     expect(wrapper).toContain('{...accessibilityClickProps}');
-    expect(SRC).toMatch(/const accessibilityClickProps: Record<string, unknown> = \{\s*onClick: \(\) => \{ if \(enabledRef\.current\) onTapRef\.current\(\); \},/);
+    // Android only: react-native-web forwards onClick to the DOM, where it
+    // would fire beside the responder tap and toggle the letter twice.
+    expect(SRC).toMatch(/const accessibilityClickProps: Record<string, unknown> = Platform\.OS === 'android'\s*\?\s*\{ onClick: \(\) => \{ if \(enabledRef\.current\) onTapRef\.current\(\); \} \}\s*:\s*\{\}/);
   });
 
   test('the LetterTile content inside the wrapper is hidden from the accessibility tree', () => {

@@ -93,8 +93,6 @@ const CURLY_RE = /[\u2018\u2019\u201C\u201D]/;
  * delete its entry. Never raise a number here.
  */
 const CURLY_BASELINE: Record<string, number> = {
-  'App.tsx': 2,
-  'src/components/share/ShareCard.tsx': 3,
   'src/components/home/HouseUpgradeGiftModal.tsx': 1,
   'src/services/cosmetics.ts': 1,
 };
@@ -355,5 +353,10 @@ describe('no em/en dashes in player-facing text', () => {
     expect(offenders).toEqual([]);
     // Curly quotes: straight is the convention (see CURLY_RE / CURLY_BASELINE).
     expect(curlyOffenders).toEqual([]);
+    // Shrink-only for real: a baseline entry higher than the live count would
+    // let fresh curly quotes back in, so every entry must match exactly.
+    for (const [rel, allowed] of Object.entries(CURLY_BASELINE)) {
+      expect({ file: rel, curly: curlyCounts.get(rel) ?? 0 }).toEqual({ file: rel, curly: allowed });
+    }
   });
 });

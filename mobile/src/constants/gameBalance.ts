@@ -222,7 +222,7 @@ export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3 base (×2 → every 10)
  * preview-graduation toast (PREVIEW_GRADING_FULL_LIMIT = 12), so the marks
  * stepped back and the first ad hit in one breath. 16 puts the first ad at
  * the exit of win 17, clear of graduation (board 13) and the challenge-toggle
- * intro (15). Deliberately not equal to EXIT_NUDGE_MIN_PUZZLES (14): the
+ * intro (15). EXIT_NUDGE_MIN_PUZZLES (16) may equal this: the
  * nudge and the interstitial never stack on one exit anyway
  * (runVictoryExitNudges skips when an interstitial showed). The early
  * one-time-beat timeline: daily unlock 8 / mandatory first harvest 9 /
@@ -349,12 +349,16 @@ export const SEASON_PASS_PREMIUM_AMBER_COST = 2500;
  * 14 (not 12): at 12 the first share/patron alert could fire on the exit of
  * win 13, the SAME board whose start carries the blocking preview-graduation
  * card (PREVIEW_GRADING_FULL_LIMIT = 12) and which follows the phase-1 pit
- * ceremony (MIN_PUZZLES_FOR_PHASE[1] = 12) by one board. At 14 the first
- * exit nudge lands on the exit of win 14 at the earliest, one full board
- * after graduation. The notification prompt runs before this gate and is
- * unaffected.
+ * ceremony (MIN_PUZZLES_FOR_PHASE[1] = 12) by one board. The graduation card
+ * itself defers one board after an acknowledged phase ceremony (so an
+ * engaged player meets it on board 14), and the challenge intro is a home
+ * landing beat at 15, so 16 is the first exit that cannot abut either: the
+ * first exit nudge lands on the exit of win 16 at the earliest. Equal to
+ * INTERSTITIAL_MIN_PUZZLES is harmless (runVictoryExitNudges skips an exit
+ * that showed an interstitial). The notification prompt runs before this
+ * gate and is unaffected.
  */
-export const EXIT_NUDGE_MIN_PUZZLES = 14;
+export const EXIT_NUDGE_MIN_PUZZLES = 16;
 
 /** Minimum completed puzzles between proactive victory-exit nudges. */
 export const EXIT_NUDGE_SPACING_PUZZLES = 5;

@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
-import { Animated, PanResponder, Easing, StyleSheet, View } from 'react-native';
+import { Animated, PanResponder, Easing, Platform, StyleSheet, View } from 'react-native';
 import { getDragShadowColor } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
@@ -274,9 +274,14 @@ export function DraggableTile({
   // `focusable` view dispatches on an accessibility or keyboard activation)
   // that the TypeScript typings do not declare, so it is spread in typed
   // loosely rather than cast at the JSX attribute.
-  const accessibilityClickProps: Record<string, unknown> = {
-    onClick: () => { if (enabledRef.current) onTapRef.current(); },
-  };
+  // Android only: react-native-web forwards `onClick` to the DOM as a real
+  // click handler, so on web it would fire beside the responder's own tap and
+  // toggle the letter twice (select, then deselect); on Android a touch never
+  // reaches performClick (ReactViewGroup consumes it for the JS responder), so
+  // the prop there means exactly an assistive-tech or keyboard activation.
+  const accessibilityClickProps: Record<string, unknown> = Platform.OS === 'android'
+    ? { onClick: () => { if (enabledRef.current) onTapRef.current(); } }
+    : {};
 
   return (
     <View style={styles.wrapper}>

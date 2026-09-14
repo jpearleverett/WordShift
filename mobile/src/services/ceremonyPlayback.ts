@@ -131,7 +131,11 @@ export function createCeremonyPlayback({
           message: 'We need to finish saving this moment. Please retry before continuing.',
         });
         if (owner !== generation) return null;
-        if (finished.record.kind === 'phase') notePhaseCeremonyAcknowledged();
+        // Only the phase-1 ceremony can abut the preview-graduation card
+        // (PREVIEW_GRADING_FULL_LIMIT sits one board past MIN_PUZZLES_FOR_PHASE[1]);
+        // arming on later ceremonies would skip the card on some unrelated
+        // neutral board for no reason.
+        if (finished.record.kind === 'phase' && finished.record.phase === 1) notePhaseCeremonyAcknowledged();
         active = null;
         onEvent(null);
         await retry(() => readNext(owner), {

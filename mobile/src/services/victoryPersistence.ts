@@ -60,6 +60,8 @@ export interface VictoryInput {
   ritualWord?: string;
   phaseBefore?: DialoguePhase;
   dailyDate?: string;
+  /** The daily cohort the board was served under (App's dailyBoardVersionRef); stored with the completion so the standing re-check queries the right partition after a relaunch. */
+  dailyBoardVersion?: string;
   unbrokenWeave?: boolean;
 }
 export const PENDING_VICTORY_KEY = 'wordshift_pending_victory';
@@ -322,7 +324,7 @@ async function computeVictory(input: VictoryInput): Promise<VictoryData> {
         const beforeStreak = before.currentStreak;
         const beforeTotal = before.totalCompleted;
         const boardDate = input.dailyDate ?? input.completedDate;
-        const progress = await recordDailyCompletion(stars, hintsUsed, invalidAttempts, boardDate, input.completedDate);
+        const progress = await recordDailyCompletion(stars, hintsUsed, invalidAttempts, boardDate, input.completedDate, input.dailyBoardVersion);
         const credited = progress.totalCompleted > beforeTotal;
         const milestone = credited ? checkDailyStreakMilestone(progress.currentStreak, beforeStreak, effectivePhase) : null;
         if (milestone) amberResult.newBalance = await awardBonusAmberInTransaction(milestone.amber, 'daily_streak_milestone');

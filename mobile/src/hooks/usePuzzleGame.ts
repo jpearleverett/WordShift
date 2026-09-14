@@ -2347,9 +2347,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // repeat the hidden term.
       if (isBlockedWord(sourceWordStr) || isBlockedWord(targetWordStr)) {
         shakeError(getBlockedWordMessage(currentPhase));
-        setInvalidAttempts(prev => prev + 1);
-        pendingMistakeRef.current = true;
-        cleanMoveStreakRef.current = 0;
+        // Blind judges the chain once at the end: a refused string costs no
+        // attempt there, matching the completed-step guard below.
+        if (!blindMode) {
+          setInvalidAttempts(prev => prev + 1);
+          pendingMistakeRef.current = true;
+          cleanMoveStreakRef.current = 0;
+        }
         return null;
       }
 

@@ -2951,7 +2951,8 @@ export function resolveImperfectStarCause(
 }
 
 /** Phase-aware one-line receipt for the first sub-3-star win, naming the cause. */
-export function getFirstImperfectStarsMessage(phase: number, cause: ImperfectStarCause): string {
+export function getFirstImperfectStarsMessage(phase: number, cause: ImperfectStarCause, stars = 2): string {
+  const opener = stars <= 1 ? 'One star.' : 'Two stars!';
   if (phase >= 5) {
     if (cause === 'both') return 'A hint and a few slips cost a star. The weave keeps the whole solve anyway.';
     if (cause === 'hint') return 'The hint cost a star. Three come from solving unaided. The weave holds either way.';
@@ -2972,9 +2973,9 @@ export function getFirstImperfectStarsMessage(phase: number, cause: ImperfectSta
     if (cause === 'hint') return 'The hint cost a star. Three stars are for solves with no help at all.';
     return 'A few slipped drops cost a star. One slip is forgiven; the second is not.';
   }
-  if (cause === 'both') return 'Two stars! A hint plus a couple of slipped drops each cost one. No help, no slips: three stars.';
-  if (cause === 'hint') return 'Two stars! Using a hint costs one. Solve without help for all three.';
-  return 'Two stars! More than one slipped drop costs a star. One slip is always forgiven.';
+  if (cause === 'both') return `${opener} A hint and more than one slipped drop each cost a star. No help, no slips: three stars.`;
+  if (cause === 'hint') return `${opener} Using a hint costs one. Solve without help for all three.`;
+  return `${opener} More than one slipped drop costs a star. One slip is always forgiven.`;
 }
 
 /**
@@ -2997,7 +2998,7 @@ export async function consumeFirstImperfectStarsReceipt(
   } catch {
     return null;
   }
-  return getFirstImperfectStarsMessage(phase, cause);
+  return getFirstImperfectStarsMessage(phase, cause, win.stars);
 }
 
 // ============================================================================

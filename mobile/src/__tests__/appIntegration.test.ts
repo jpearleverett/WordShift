@@ -1019,7 +1019,7 @@ describe('launch-readiness app-integration wiring', () => {
     // A board this session served is exact from the ref (a legacy_v1 restore
     // is recorded under the compiled constant); a relaunch reads the record.
     expect(recheck).toMatch(
-      /cohort && dailyBoardDateRef\.current === cohort\.date\s*\? dailyBoardVersionRef\.current\s*: cohort\?\.boardVersion;/
+      /const boardVersion = cohort\?\.boardVersion \?\? dailyBoardVersionRef\.current;/
     );
     expect(recheck).toMatch(/await getDailyRank\(date, boardVersion\);/);
     expect(recheck).toMatch(/await refreshDailyLadderRank\(date, rank\);/);

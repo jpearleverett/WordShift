@@ -276,7 +276,7 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
           )}
           {spoilerSafe && result.incantationName && (
             <Text style={[styles.incantation, { color: t.muted }]} numberOfLines={1}>
-              “{result.incantationName}”
+              {`"${result.incantationName}"`}
             </Text>
           )}
 
@@ -292,7 +292,7 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
               drops any accompanying text on Android) still shows the way home */}
           <View style={[styles.footer, { borderTopColor: t.sectionBorder }]}>
             <Text style={[styles.footerText, { color: t.body }]}>
-              {result.isDaily ? 'Take today’s daily challenge' : 'Play WordShift'}
+              {result.isDaily ? "Take today's daily challenge" : 'Play WordShift'}
             </Text>
             <Text style={[styles.footerUrl, { color: t.muted }]} numberOfLines={1}>
               {INSTALL_URL_DISPLAY}

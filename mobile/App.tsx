@@ -177,7 +177,7 @@ import {
   UnbrokenWeaveMastery,
 } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
-import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, buildFinalPuzzleEvent, buildPostRevelationEvent, FinalArrivalContext, NEW_CYCLE_EVENT } from './src/services/phaseEvents';
+import { getPhaseTransitionEvent, PhaseTransitionEvent, buildHouseCompletionEvent, buildFinalPuzzleEvent, buildPostRevelationEvent, FinalArrivalContext, NEW_CYCLE_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, getDailyStatus, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty, getLastDailyCompletionCohort } from './src/services/dailyChallenge';
 import { recordDailyLadderResult, refreshDailyLadderRank, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
@@ -1218,6 +1218,9 @@ function MainApp() {
       boundary: state.boundary, keptPromise: state.memories.seeds?.choice === 'confidence',
       keptRecord: state.memories.record?.choice === 'keep',
       standBeside: state.memories.promise?.choice === undefined ? undefined : state.memories.promise.choice === 'beside',
+      // The house finished after the Arrival (solve-floor endgame path) must
+      // not play the pre-arrival Temple; buildHouseCompletionEvent re-voices it.
+      arrived: context.finalPuzzleCompleted === true || context.postRevelation === true,
     };
   }, [getStoryContext]);
 
@@ -1231,7 +1234,7 @@ function MainApp() {
           if (!event) throw new Error('The saved phase scene is unavailable');
           return event;
         }
-        case 'house': return HOUSE_COMPLETION_EVENT;
+        case 'house': return buildHouseCompletionEvent(await getArrivalContext());
         case 'arrival': return buildFinalPuzzleEvent(await getRitualWords(), await getArrivalContext());
         case 'post_arrival': return buildPostRevelationEvent(await getArrivalContext());
         case 'new_cycle': return NEW_CYCLE_EVENT;
@@ -2268,9 +2271,10 @@ function MainApp() {
         // board this session played; the stored record covers a relaunch.
         const cohort = await getLastDailyCompletionCohort();
         const date = cohort?.date ?? getLocalDateString();
-        const boardVersion = cohort && dailyBoardDateRef.current === cohort.date
-          ? dailyBoardVersionRef.current
-          : cohort?.boardVersion;
+        // The completion record stores the exact version it was played under
+        // (victoryPersistence passes it), so a relaunch queries the right
+        // partition; the session ref only covers a record without one.
+        const boardVersion = cohort?.boardVersion ?? dailyBoardVersionRef.current;
         const rank = await getDailyRank(date, boardVersion);
         if (rank) {
           await refreshDailyLadderRank(date, rank);
@@ -2766,6 +2770,7 @@ function MainApp() {
             ? result.completedWords?.[result.completedWords.length - 1] ?? '' : '',
           phaseBefore: persistence.currentPhase,
           dailyDate: isPlayingDaily ? resolveDailyBoardDate() : undefined,
+          dailyBoardVersion: isPlayingDaily ? dailyBoardVersionRef.current : undefined,
           unbrokenWeave: puzzle.unbrokenWeaveMode,
         },
       ));

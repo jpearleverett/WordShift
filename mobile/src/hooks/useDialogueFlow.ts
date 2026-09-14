@@ -202,8 +202,10 @@ export function shouldFrameArrivalResume(params: {
   arrivalOccurred: boolean;
   resumedLinePhase: number | null;
   alreadyFramed: boolean;
+  /** The resident has regular lines on the read ledger: a RESUMED conversation, not a first one (a resident recruited after the Arrival has nothing to pick back up). */
+  hasPriorConversation: boolean;
 }): boolean {
-  return params.arrivalOccurred && params.resumedLinePhase !== null &&
+  return params.arrivalOccurred && params.hasPriorConversation && params.resumedLinePhase !== null &&
     params.resumedLinePhase <= 4 && !params.alreadyFramed;
 }
 
@@ -1367,6 +1369,7 @@ export function useDialogueFlow({
           arrivalOccurred: true,
           resumedLinePhase: resumed ? resumed.dialogue.phase : null,
           alreadyFramed: framed.has(animal.id),
+          hasPriorConversation: (progress.conversationReadIds?.[animal.id]?.length ?? 0) > 0,
         })) {
           const framedId = animal.id;
           pages.push({
