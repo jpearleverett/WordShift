@@ -52,7 +52,9 @@ function readExtra(): Record<string, any> {
  * internal-testing (release) build can opt into test ads too. Serving LIVE ads
  * to yourself on a test build and clicking them is an AdMob policy violation
  * that can get the whole account limited; this gate is the guard against it.
- * Flip `adsUseTestIds` to false in app.json ONLY for the production build.
+ * The flag is derived in app.config.js from WORDSHIFT_RELEASE_CHANNEL
+ * (production -> false / live units; every other channel keeps the app.json
+ * literal `true`). Never hand-flip the literal.
  */
 function shouldUseTestAds(): boolean {
   if (typeof __DEV__ !== 'undefined' && __DEV__) return true;

@@ -47,7 +47,8 @@ jobs:
         run: |
           npx expo config --type public --json > "$RUNNER_TEMP/expo-config-production.json"
           node - "$RUNNER_TEMP/expo-config-production.json" <<'NODE'
-          const config = require(process.argv[2]);
+          const raw = require('fs').readFileSync(process.argv[2], 'utf8');
+          const config = JSON.parse(raw.slice(raw.indexOf('{')));
           const expected = `${config.version}-production`;
           const failures = [];
           if (config.runtimeVersion !== expected) failures.push(`runtimeVersion ${config.runtimeVersion} != ${expected}`);

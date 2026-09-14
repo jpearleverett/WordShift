@@ -96,20 +96,24 @@ it back. Two options, both delivered on the players' next launch:
   state; the embedded bundle is the reviewed release itself):
 
   ```bash
-  npx eas-cli@latest update:roll-back-to-embedded --channel production --message "Roll back: <reason>"
+  npx eas-cli@latest update:roll-back-to-embedded --channel production --runtime-version 1.3.5-production --message "Roll back: <reason>"
   ```
 
 - **Republish a known-good earlier group** (when a previous OTA fix must stay live
   and only the newest one is bad; take the group ID from `update:list`):
 
   ```bash
-  npx eas-cli@latest update:republish --channel production --group <group-id> --message "Republish <group-id>: <reason>"
+  npx eas-cli@latest update:republish --group <group-id> --message "Republish <group-id>: <reason>"
   ```
 
 After either command, run `update:list --channel production` again and confirm the
 newest entry is the rollback, then cold start a production install twice to see it
-applied. A rollback does not need `WORDSHIFT_RELEASE_CHANNEL` because it publishes
-no new bundle, but setting it is harmless. Note the incident, the bad group ID and
+applied. A rollback needs no `WORDSHIFT_RELEASE_CHANNEL`, but it MUST name the production
+runtime (`<app version>-production`) through `--runtime-version`: without it the CLI
+prompts for a runtime among those on the branch, and a wrong pick reaches nobody.
+`update:republish` takes only the group id (`--channel`, `--branch` and `--group` are
+mutually exclusive; the group already identifies its branch and channel, and
+`--channel production` alone opens an interactive picker instead). Note the incident, the bad group ID and
 the recovery group ID in the release record.
 
 Record commit, app version, runtime, channel, update ID and device result for each

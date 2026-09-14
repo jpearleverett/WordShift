@@ -6269,6 +6269,9 @@ function MainApp() {
  * instead of a fixed 152/244px that jumped on the splash->JS handoff. Shared by
  * the App bootstrap gate and MainApp's onboarding-hydration gate so all three
  * holds (native splash, bootstrap, hydration) read as ONE continuous frame.
+ * On Android 12+ the native splash is the icon-only `splash-icon-android.png`
+ * at 200dp (no wordmark), so the continuous-frame claim holds on iOS; Android
+ * shows the card resize and the wordmark arriving at the handoff.
  */
 // The support mailto names the NATIVE build (the installed versionName), the
 // same identity Settings > About reports, so a report from a boot that never

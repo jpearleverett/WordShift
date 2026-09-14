@@ -283,7 +283,10 @@ ads.
 
 Test with AdMob **test ad unit ids** (or test devices) before going live, and use
 **license testers** for test purchases. License-testing status does not select
-AdMob test units; `adsUseTestIds: true` is the separate ad-safety control.
+AdMob test units; the ad-safety control is the release channel: `app.config.js`
+resolves `adsUseTestIds` to `false` only when `WORDSHIFT_RELEASE_CHANNEL` is
+`production` (the `production` EAS profile), and every other channel keeps the
+`true` literal. Never hand-flip the literal.
 
 ---
 

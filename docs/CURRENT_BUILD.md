@@ -86,10 +86,11 @@ the next artifact, not the current one**, on three blockers:
    minification, resource shrinking and the optimizing ProGuard default all
    landed after the closed test that earned production access (1.2.2 / code 88).
    The production-cut AAB must pass the internal track on physical phones first.
-3. **The production cut is a manual, unenforced edit.** `adsUseTestIds` must be
-   flipped to `false` and the version code bumped by hand; nothing in a build
-   profile or CI enforces either. Follow the checklist's command sequence and run
-   the production-config test before building.
+3. **The production cut was a manual, unenforced edit** (resolved on 2026-09-14):
+   `app.config.js` now derives `adsUseTestIds` from `WORDSHIFT_RELEASE_CHANNEL`,
+   so the `production` EAS profile serves live units by itself and CI validates
+   both channels on every run. Only the version-code bump remains a hand step;
+   follow the checklist's command sequence.
 
 The review's medium and low findings are being fixed in the same native build;
 the backend items are tracked in [backend setup](BACKEND_SETUP.md) (hosted v2

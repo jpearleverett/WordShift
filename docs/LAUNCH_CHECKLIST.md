@@ -82,13 +82,17 @@ verify the latest binary, backend deployment or public release.
   current captures and show the shipped +25% Challenge reward, current counts
   and spoiler-safe UI. Earlier uploaded July/August images were stale; the
   presence of replacements in Git does not update Play Console.
-- [ ] **Production configuration cut.** Change `expo.extra.adsUseTestIds` to
-  `false` only for the reviewed public-release configuration, keep `creatorCode`
-  empty, and target the `production` runtime/channel. Run
-  `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage --testPathPattern=productionConfig`.
-  Update the corresponding CI test environment in the same production-cut change
-  so it enforces the intended ad mode. This documentation update leaves test ads
-  enabled. Follow [OTA instructions](OTA_UPDATES.md) for compatible updates.
+- [ ] **Production configuration cut.** Do NOT edit `expo.extra.adsUseTestIds`
+  or `ci.yml`: `app.config.js` derives the shipped flag from
+  `WORDSHIFT_RELEASE_CHANNEL`, so `eas build --profile production` resolves live
+  ad units by itself and every other channel keeps the `true` literal (a literal
+  `false` would put live ads into the testing channels and fails
+  `productionConfig.test.ts`). Bump `android.versionCode` above the last Play
+  upload, keep `creatorCode` empty, run
+  `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage --testPathPattern=productionConfig`,
+  and confirm `WORDSHIFT_RELEASE_CHANNEL=production npx expo config --type public`
+  shows `adsUseTestIds: false` and runtime `1.3.5-production`. Follow
+  [OTA instructions](OTA_UPDATES.md) for compatible updates.
   The Play release notes for this build must carry the legal line: "Privacy
   Policy and Terms updated (effective September 14, 2026): clarified purchase
   restore and Reset All behavior (September 13 revision) and added data
