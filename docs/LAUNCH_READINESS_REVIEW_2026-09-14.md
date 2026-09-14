@@ -120,16 +120,16 @@ Smoke matrix for the signed internal-track build, on at least two physical Andro
 Run from `mobile/`, in this order:
 
 ```bash
-# 1. app.json: bump android.versionCode above the last Play upload; keep extra.creatorCode "" (adsUseTestIds is derived from the channel since 2026-09-14: never hand-flip it)
+# 1. app.json: bump android.versionCode above the last Play upload, INCLUDING the internal-testing QA upload, which consumes a code of its own; keep extra.creatorCode "" (adsUseTestIds is derived from the channel since 2026-09-14: never hand-flip it)
 WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage --testPathPattern=productionConfig
 npm ci && npm run typecheck && npm run lint -- --max-warnings 0 && npm test -- --no-coverage
-WORDSHIFT_RELEASE_CHANNEL=production npx expo config --type public   # confirm runtimeVersion 1.3.5-production and adsUseTestIds false
+WORDSHIFT_RELEASE_CHANNEL=production npx expo config --type public   # confirm runtimeVersion <app version>-production and adsUseTestIds false
 npx eas-cli@latest build --platform android --profile production      # store AAB by EAS default; needs the SENTRY_AUTH_TOKEN EAS secret
 npx eas-cli@latest submit --platform android --profile production --id <BUILD_ID>   # lands on the INTERNAL track by design
 # 2. install from the internal track, run the smoke matrix above, then promote to Production in Play Console with a staged rollout
 # 3. later JS-only fixes:
 WORDSHIFT_RELEASE_CHANNEL=production npx eas-cli@latest update --channel production --message "..."
-npx eas-cli@latest update:roll-back-to-embedded --channel production   # rollback
+npx eas-cli@latest update:roll-back-to-embedded --channel production --runtime-version <app version>-production   # rollback; without the runtime flag the CLI prompts and a wrong pick reaches nobody
 ```
 
 Both caveats the original review raised here are resolved on the branch: `app.config.js` derives `adsUseTestIds` from `WORDSHIFT_RELEASE_CHANNEL`, so the checked-in value stays `true` for every non-production channel and CI is green in both states (`productionConfig.test.ts` validates both; `WORDSHIFT_PRODUCTION_CUT=1` asserts the current shell resolves to production), and `docs/OTA_UPDATES.md` now carries the rollback runbook.
