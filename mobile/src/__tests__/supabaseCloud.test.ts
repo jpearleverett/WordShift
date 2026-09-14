@@ -1,7 +1,7 @@
 import { clearEvents } from '../services/eventLogger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  installCloudProviderIfConfigured, getCloudProvider, getCloudOwnerId,
+  installCloudProviderIfConfigured, getCloudProvider, getCloudOwnerId, resolveCloudOwnerId,
   getOrCreateRecoveryCode, restoreFromRecoveryCode, maybeAutoRestoreOnFreshInstall,
   clearSyncStatus, setCloudProvider, uploadToCloud, downloadFromCloud, getSyncStatus,
   CloudSaveData, CloudProvider, LEGACY_CLOUD_OWNER_KEY,
@@ -94,14 +94,66 @@ describe('secure cloud provider', () => {
     expect(await maybeAutoRestoreOnFreshInstall()).toBe(false);
     expect(await AsyncStorage.getItem('wordshift_home_progress')).toBeNull();
   });
-  test('auto restore only runs without local progress', async () => {
+  test('auto restore only runs without local progress (retained owner)', async () => {
     install(); reply([row()]);
+    // A reinstall that kept its owner key (or a restored device): the cloud
+    // can hold a row for this id, so the download is worth the round trip.
+    await AsyncStorage.setItem('wordshift_cloud_owner', OWNER);
     await AsyncStorage.setItem('wordshift_home_progress', '{"amber":1}');
     expect(await maybeAutoRestoreOnFreshInstall()).toBe(false);
     expect(global.fetch).not.toHaveBeenCalled();
     await AsyncStorage.removeItem('wordshift_home_progress');
     expect(await maybeAutoRestoreOnFreshInstall()).toBe(true);
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain('/rpc/get_save_v2');
+    expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)).toEqual({ p_owner: OWNER });
     expect(JSON.parse((await AsyncStorage.getItem('wordshift_home_progress'))!).amber).toBe(10);
+  });
+  test('a genuinely fresh install performs NO network request on the boot path', async () => {
+    install();
+    // A hung network: if the download were issued, this would never resolve
+    // (the real client caps it at 8 s, all of it on the boot screen).
+    (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
+    expect(await maybeAutoRestoreOnFreshInstall()).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+    // The identity was minted here (this call created it), and it is a real
+    // secure owner so later uploads and the recovery code work as before.
+    const owner = await AsyncStorage.getItem('wordshift_cloud_owner');
+    expect(owner).toMatch(/^ws2_[a-f0-9]{32}$/);
+    // The legacy reference is the inst2_ install id, which can never match
+    // the UUID upgrade path, so the fresh boot stays fully offline.
+    expect(await AsyncStorage.getItem(LEGACY_CLOUD_OWNER_KEY)).toMatch(/^inst2_/);
+    // A second launch on this install is not "fresh" any more: the owner
+    // exists, so the download is issued and a row can come back.
+    reply([row()]);
+    expect(await maybeAutoRestoreOnFreshInstall()).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+  test('resolveCloudOwnerId reports creation exactly once', async () => {
+    const first = await resolveCloudOwnerId();
+    expect(first.created).toBe(true);
+    const second = await resolveCloudOwnerId();
+    expect(second).toEqual({ owner: first.owner, created: false });
+    expect(await getCloudOwnerId()).toBe(first.owner);
+  });
+  test('a legacy UUID owner skips get_save_v2 and queries only the upgrade RPC', async () => {
+    install();
+    const uuid = '6f1c2a3e-8b4d-4c2e-9a1f-0d2e3f4a5b6c';
+    await AsyncStorage.setItem('wordshift_cloud_owner', uuid);
+    reply([row()]);
+    expect(await maybeAutoRestoreOnFreshInstall()).toBe(true);
+    const calls = (global.fetch as jest.Mock).mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toContain('/rpc/get_legacy_save_for_upgrade');
+    expect(JSON.parse(calls[0][1].body)).toEqual({ p_owner: uuid });
+    expect(await AsyncStorage.getItem(LEGACY_CLOUD_OWNER_KEY)).toBe(uuid);
+    expect(JSON.parse((await AsyncStorage.getItem('wordshift_home_progress'))!).amber).toBe(10);
+  });
+  test('a non-UUID legacy reference never queries the upgrade RPC', async () => {
+    install();
+    await AsyncStorage.setItem('wordshift_cloud_owner', 'INSTMTO7');
+    reply([row()]);
+    expect(await maybeAutoRestoreOnFreshInstall()).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
 

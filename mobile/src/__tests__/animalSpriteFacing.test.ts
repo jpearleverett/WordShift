@@ -8,6 +8,7 @@ let mockLifecycle: {
 } | null = null;
 let mockReducedMotion = false;
 let mockLowTier = false;
+let mockPremount = true;
 const mockTravelCompletions: (() => void)[] = [];
 
 jest.mock('react', () => {
@@ -59,13 +60,18 @@ jest.mock('./__mocks__/fileMock', () => 1);
 jest.mock('react-native-gesture-handler', () => ({ TouchableOpacity: 'TouchableOpacity' }));
 jest.mock('../services/homeWorldData', () => ({ ANIMAL_EMOJIS: {} }));
 jest.mock('../services/settings', () => ({ getSettingsSync: () => ({ reducedMotion: mockReducedMotion }) }));
-jest.mock('../services/deviceTier', () => ({ shouldSimplifyAnimations: () => mockLowTier }));
+jest.mock('../services/deviceTier', () => ({
+  shouldSimplifyAnimations: () => mockLowTier,
+  shouldPremountSpriteLayers: () => mockPremount,
+}));
 jest.mock('../theme/fonts', () => ({ BODY_FONT: 'Body', PIXEL_FONT_BOLD: 'Pixel' }));
 jest.mock('../components/ui/chromeIcons', () => ({ CHROME_ICONS: { alertPip: 'alert' } }));
 
 import {
   AnimalSprite,
+  ANIMAL_SPECIES_NAMES,
   CHARACTER_SPRITES,
+  getRestingPhrase,
   getSpriteFacingCorrection,
   getWalkAtlasFrame,
   getWalkFrameDurationMs,
@@ -86,6 +92,20 @@ function find(node: unknown, testID: string): Node | undefined {
   return element.props?.testID === testID ? element : find(element.props?.children, testID);
 }
 
+function findByProp(node: unknown, prop: string): Node | undefined {
+  if (!node || typeof node !== 'object') return undefined;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findByProp(child, prop);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  const element = node as Node;
+  const props = element.props as Record<string, unknown> | undefined;
+  return props && prop in props ? element : findByProp(props?.children, prop);
+}
+
 function flattenStyle(style: unknown): Record<string, any> {
   return Object.assign({}, ...[style].flat(Infinity).filter(value => typeof value === 'object'));
 }
@@ -96,7 +116,7 @@ function sourceMirror(tree: unknown, pose: 'static' | 'walk-atlas' | 'talk'): nu
   return body.transform[0].scaleX.value * layer.transform[0].scaleX;
 }
 
-function createHarness(type: AnimalType = 'fennec_fox') {
+function createHarness(type: AnimalType = 'fennec_fox', extraProps: Record<string, unknown> = {}) {
   const values = new Map<number, unknown>();
   const effects = new Map<number, { deps?: readonly unknown[]; cleanup?: () => void }>();
   let pending: { index: number; effect: Effect; deps?: readonly unknown[] }[] = [];
@@ -135,7 +155,7 @@ function createHarness(type: AnimalType = 'fennec_fox') {
         cursor = 0;
         changed = false;
         pending = [];
-        tree = AnimalSprite({ animal, roomWidth: 320, roomHeight: 200, currentPhase: phase, onPress: jest.fn() });
+        tree = AnimalSprite({ animal, roomWidth: 320, roomHeight: 200, currentPhase: phase, onPress: jest.fn(), ...extraProps });
         for (const update of pending) {
           effects.get(update.index)?.cleanup?.();
           effects.set(update.index, { deps: update.deps, cleanup: update.effect() || undefined });
@@ -155,6 +175,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   mockReducedMotion = false;
   mockLowTier = false;
+  mockPremount = true;
   mockTravelCompletions.length = 0;
 });
 afterEach(() => {
@@ -223,6 +244,88 @@ describe('the fennec faces its direction of travel in every source pose', () => 
       const tree = harness.render();
       expect(find(tree, 'animal-sprite-walk-atlas')).toBeUndefined();
       expect(sourceMirror(tree, 'static')).toBe(mockReducedMotion ? 1 : -1);
+    } finally { harness.dispose(); }
+  });
+});
+
+describe('sprite layer pre-mount budget', () => {
+  test('the high tier pre-mounts the walk atlas and the talk layer before either is needed', () => {
+    const harness = createHarness();
+    try {
+      const tree = harness.render();
+      expect(find(tree, 'animal-sprite-walk-atlas')).toBeDefined();
+      expect(find(tree, 'animal-sprite-talk')).toBeDefined();
+    } finally { harness.dispose(); }
+  });
+
+  test('a lower tier mounts the walk atlas on the first walk and keeps it afterwards', () => {
+    mockPremount = false;
+    jest.spyOn(Math, 'random').mockReturnValue(0.9);
+    const harness = createHarness();
+    try {
+      const initial = harness.render();
+      expect(find(initial, 'animal-sprite-walk-atlas')).toBeUndefined();
+      expect(find(initial, 'animal-sprite-talk')).toBeUndefined();
+      jest.advanceTimersByTime(3000);
+      const moving = harness.render();
+      expect(flattenStyle(find(moving, 'animal-sprite-walk-atlas')!.props.style).opacity).toBe(1);
+      expect(sourceMirror(moving, 'walk-atlas')).toBe(1);
+      mockTravelCompletions.shift()!();
+      const stopped = harness.render();
+      // Latched: no re-decode on the next step.
+      expect(flattenStyle(find(stopped, 'animal-sprite-walk-atlas')!.props.style).opacity).toBe(0);
+      expect(find(stopped, 'animal-sprite-talk')).toBeUndefined();
+    } finally { harness.dispose(); }
+  });
+
+  test('a lower tier mounts the talk layer when the first talk-frame idle beat starts', () => {
+    mockPremount = false;
+    // 0.9 keeps the wander far off (the beat needs a still animal) and puts
+    // the first idle beat at 8000 + 0.9 * 20000 ms.
+    jest.spyOn(Math, 'random').mockReturnValue(0.9);
+    const harness = createHarness();
+    try {
+      expect(find(harness.render(), 'animal-sprite-talk')).toBeUndefined();
+      jest.advanceTimersByTime(2500);
+      expect(find(harness.render(), 'animal-sprite-talk')).toBeUndefined();
+      jest.advanceTimersByTime(24000);
+      const tree = harness.render();
+      expect(find(tree, 'animal-sprite-talk')).toBeDefined();
+    } finally {
+      // Release the idle-beat turnstile the mocked parallel never completes.
+      mockTravelCompletions.splice(0).forEach(done => done());
+      harness.dispose();
+    }
+  });
+});
+
+describe('accessibility label', () => {
+  test('species read as display names, never the enum', () => {
+    for (const name of Object.values(ANIMAL_SPECIES_NAMES)) {
+      expect(name).not.toMatch(/_/);
+      expect(name).toBe(name.toLowerCase());
+    }
+    expect(Object.keys(ANIMAL_SPECIES_NAMES).sort()).toEqual(Object.keys(CHARACTER_SPRITES).sort());
+    expect(ANIMAL_SPECIES_NAMES.fennec_fox).toBe('fennec fox');
+    expect(ANIMAL_SPECIES_NAMES.red_panda).toBe('red panda');
+    expect(ANIMAL_SPECIES_NAMES.aye_aye).toBe('aye-aye');
+    const harness = createHarness();
+    try {
+      const label = findByProp(harness.render(), 'accessibilityLabel')!.props as Record<string, unknown>;
+      expect(label.accessibilityLabel).toBe('Fennick the fennec fox');
+    } finally { harness.dispose(); }
+  });
+
+  test('a resting animal describes its rest vaguely, never the exact puzzle countdown', () => {
+    expect(getRestingPhrase(1)).toBe('resting, almost ready');
+    expect(getRestingPhrase(3)).toBe('resting, a little longer');
+    expect(getRestingPhrase(7)).toBe('resting, needs more puzzles');
+    expect(getRestingPhrase(undefined)).toBe('resting');
+    const harness = createHarness('fennec_fox', { isOnCooldown: true, cooldownPuzzlesLeft: 4 });
+    try {
+      const label = findByProp(harness.render(), 'accessibilityLabel')!.props as Record<string, unknown>;
+      expect(label.accessibilityLabel).toBe('Fennick the fennec fox, resting, needs more puzzles');
+      expect(label.accessibilityLabel).not.toMatch(/\d/);
     } finally { harness.dispose(); }
   });
 });

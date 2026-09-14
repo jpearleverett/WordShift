@@ -14,6 +14,15 @@ import { logEvent } from './eventLogger';
  * grouping/symbolication ships via the native @sentry/react-native SDK
  * (initialized in App.tsx); `setErrorForwarder` remains an optional seam to
  * also forward `error` from `reportError()` to a custom sink.
+ *
+ * Coverage note: this module captures thrown JS errors (ErrorUtils global
+ * handler), React render errors (via the ErrorBoundary's reportError call)
+ * and anything the app reports explicitly. Unhandled PROMISE REJECTIONS are
+ * NOT captured here: React Native never dispatches a browser-style
+ * `global.onunhandledrejection`, and on Hermes release builds the runtime's
+ * rejection tracker is enabled only by Sentry's ReactNativeErrorHandlers
+ * integration (a single tracker can be installed). Rejections therefore reach
+ * Sentry only, never the local `app_error` stream.
  */
 
 interface ErrorContext {
@@ -109,22 +118,14 @@ export function clearSessionErrors(): void {
 }
 
 /**
- * Install global error handlers.
- * Call once at app startup.
+ * Install the global JS error handler. Call once at app startup.
+ *
+ * Deliberately no promise-rejection hook: the former
+ * `global.onunhandledrejection` assignment was dead code (React Native never
+ * calls it), and Sentry owns the Hermes rejection tracker. See the module
+ * header for the coverage contract.
  */
 export function installGlobalErrorHandler(): void {
-  // Capture unhandled promise rejections
-  const originalHandler = (global as Record<string, unknown>).onunhandledrejection as
-    ((event: { reason: unknown }) => void) | undefined;
-
-  (global as Record<string, unknown>).onunhandledrejection = (event: { reason: unknown }) => {
-    const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
-    reportError(error, {
-      source: 'unhandled_promise_rejection',
-    });
-    if (originalHandler) originalHandler(event);
-  };
-
   // Capture global JS errors
   const originalErrorHandler = ErrorUtils.getGlobalHandler();
   ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {

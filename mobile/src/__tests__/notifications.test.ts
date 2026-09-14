@@ -520,13 +520,12 @@ describe('notifications', () => {
         expectedDayOfMonth(30),
       ]);
 
-      // Daily reminders fire at hour 9 (the default reminder hour). The 8-day
-      // window (today + 7 ahead) loses the +1/+3/+7 win-back days to the
-      // same-local-day dedupe, and today's rung only arms if 9am hasn't passed
-      // yet — so 4 or 5 morning pings remain.
+      // Daily reminders fire at hour 9 (the default reminder hour). Fresh
+      // storage is a NEW install (age 0, 0 solves), so only the thin ladder
+      // (+1/+2/+3/+5/+7) is armed, and the +1/+3/+7 win-back days are lost
+      // to the same-local-day dedupe: exactly two mornings, +2 and +5.
       const daily = triggers.filter((t) => t.hour === 9);
-      expect(daily.length).toBeGreaterThanOrEqual(4);
-      expect(daily.length).toBeLessThanOrEqual(5);
+      expect(daily.map((t) => t.date.getDate())).toEqual([expectedDayOfMonth(2), expectedDayOfMonth(5)]);
 
       // No daily reminder shares a local day with a win-back rung.
       const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -658,25 +657,18 @@ describe('notifications', () => {
         await svc.scheduleAllNotifications(2);
 
         const triggers = scheduledTriggers();
-        // Everything is armed: streak-risk, 5 win-back rungs, quest-expiry,
-        // and a (thinned) morning ladder.
+        // Everything that applies is armed: streak-risk, 5 win-back rungs and
+        // quest-expiry. A 5-day streak holder gets NO morning ladder at all
+        // (the streak-risk ping covers the missed evening).
         expect(triggers.filter((t) => t.hour === 19).length).toBe(1);
         expect(triggers.filter((t) => t.hour === 18).length).toBe(5);
         expect(triggers.filter((t) => t.hour === 17 && t.minute === 30).length).toBe(1);
-        expect(triggers.filter((t) => t.hour === 9).length).toBeGreaterThan(0);
+        expect(triggers.filter((t) => t.hour === 9).length).toBe(0);
 
         // Hard cap: at most ONE notification per local day across the set.
         const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
         const dayStamps = triggers.map((t) => dayKey(t.date));
         expect(new Set(dayStamps).size).toBe(dayStamps.length);
-
-        // Priority order proof: the streak-risk day (today) and the
-        // quest-expiry Sunday both lose their 9am reminder to the dedupe.
-        const morningDays = new Set(
-          triggers.filter((t) => t.hour === 9).map((t) => dayKey(t.date))
-        );
-        expect(morningDays.has(dayKey(new Date(2026, 5, 10)))).toBe(false); // streak-risk day
-        expect(morningDays.has(dayKey(new Date(2026, 5, 14)))).toBe(false); // quest-expiry Sunday
 
         // First missed week (Jun 10-16): at most one ping per day ⇒ at most 7.
         const firstWeek = triggers.filter(
@@ -755,13 +747,15 @@ describe('notifications', () => {
       jest.dontMock('../services/amberCurrency');
     });
 
-    it('does NOT schedule streak-risk when the player already played today (chain safe)', async () => {
+    it('does NOT schedule streak-risk TODAY when the player already played today (chain safe); a 3+ streak arms it for tomorrow evening instead', async () => {
       expoMock = createExpoMock('granted');
       jest.resetModules();
       jest.doMock('expo-notifications', () => expoMock, { virtual: true });
       const { getLocalDateString } = require('../services/dateUtils');
       jest.doMock('../services/amberCurrency', () => ({
-        // Active streak AND played today ⇒ not at risk, suppress the warning.
+        // Active streak AND played today ⇒ not at risk today, so no ping
+        // today. At 3+ the morning ladder stands down for this player, so the
+        // next missed evening (tomorrow 19:00) carries the streak-risk ping.
         getFullProgress: jest.fn(() =>
           Promise.resolve({ currentStreak: 5, lastPlayDate: getLocalDateString() })
         ),
@@ -772,11 +766,12 @@ describe('notifications', () => {
 
       const triggers = scheduledTriggers();
       const streakRisk = triggers.filter((t) => t.hour === 19);
-      expect(streakRisk.length).toBe(0);
-      // A player who kept today alive is NOT lapsed: rung 1 starts at +2 so
-      // tomorrow's slot stays free for the routine morning reminder (the
-      // one-per-day dedupe would otherwise let the 18:00 win-back displace
-      // the user-configured daily ping on day +1, forever).
+      expect(streakRisk.length).toBe(1);
+      expect(streakRisk[0].date.getDate()).toBe(expectedDayOfMonth(1));
+      expect(streakRisk[0].body).toContain('5');
+      expect(triggers.filter((t) => t.hour === 9).length).toBe(0);
+      // A player who kept today alive is NOT lapsed: rung 1 starts at +2, one
+      // day after the streak-risk evening.
       const winBack = triggers.filter((t) => t.hour === 18);
       expect(winBack.length).toBe(5);
       expect(winBack.map((t) => t.date.getDate())).toEqual([
@@ -805,6 +800,108 @@ describe('notifications', () => {
       expect(streakRisk.length).toBe(0);
 
       jest.dontMock('../services/amberCurrency');
+    });
+
+    // =========================================================================
+    // Morning-reminder cadence: thin ladder for new installs, none for 3+
+    // streak holders, the full ladder for a mature install.
+    // =========================================================================
+
+    function loadGrantedWithContext(
+      progress: Record<string, unknown>,
+      installAgeDays: number,
+      prefs?: Partial<NotificationPreferences>
+    ) {
+      expoMock = createExpoMock('granted');
+      jest.resetModules();
+      jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+      jest.doMock('../services/amberCurrency', () => ({
+        getFullProgress: jest.fn(() => Promise.resolve(progress)),
+        isPostRevelation: jest.fn(() => Promise.resolve(false)),
+      }));
+      jest.doMock('../services/eventLogger', () => ({
+        logEvent: jest.fn(),
+        getInstallAgeDays: jest.fn(() => Promise.resolve(installAgeDays)),
+      }));
+      if (prefs) {
+        const AS = require('@react-native-async-storage/async-storage').default;
+        AS.setItem('wordshift_notification_prefs', JSON.stringify({
+          enabled: true, dailyReminderEnabled: true, dailyReminderHour: 9, reengagementEnabled: true, ...prefs,
+        }));
+      }
+      return require('../services/notifications');
+    }
+
+    afterEach(() => {
+      jest.dontMock('../services/amberCurrency');
+      jest.dontMock('../services/eventLogger');
+    });
+
+    const dayOffsetsOf = (hour: number) => {
+      const start = new Date(); start.setHours(0, 0, 0, 0);
+      return scheduledTriggers()
+        .filter((t) => t.hour === hour)
+        .map((t) => { const d = new Date(t.date); d.setHours(0, 0, 0, 0); return Math.round((d.getTime() - start.getTime()) / 86400000); });
+    };
+
+    it('a new install (young AND few solves) arms mornings on +1/+2/+3/+5/+7 only, minus the win-back days', async () => {
+      const svc = loadGrantedWithContext({ currentStreak: 0, lastPlayDate: null, puzzlesSolved: 3 }, 1);
+      await svc.scheduleAllNotifications(0);
+      expect(dayOffsetsOf(18)).toEqual([1, 3, 7, 14, 30]);
+      // +1/+3/+7 belong to the win-back rungs; never today, never +4/+6.
+      expect(dayOffsetsOf(9)).toEqual([2, 5]);
+      const firstWeek = scheduledTriggers().filter((t) => t.date.getTime() < Date.now() + 8 * 86400000);
+      expect(firstWeek.length).toBeLessThanOrEqual(5);
+    });
+
+    it('an install under 14 days is still new even with many solves, and vice versa', async () => {
+      let svc = loadGrantedWithContext({ currentStreak: 0, lastPlayDate: null, puzzlesSolved: 60 }, 5);
+      await svc.scheduleAllNotifications(0);
+      expect(dayOffsetsOf(9)).toEqual([2, 5]);
+      svc = loadGrantedWithContext({ currentStreak: 0, lastPlayDate: null, puzzlesSolved: 10 }, 40);
+      await svc.scheduleAllNotifications(0);
+      expect(dayOffsetsOf(9)).toEqual([2, 5]);
+    });
+
+    it('a mature install (14+ days AND 20+ solves) keeps the full 7-day morning ladder', async () => {
+      const svc = loadGrantedWithContext({ currentStreak: 0, lastPlayDate: null, puzzlesSolved: 40 }, 30);
+      await svc.scheduleAllNotifications(0);
+      const mornings = dayOffsetsOf(9);
+      // Every day 0..7 minus the +1/+3/+7 win-back days (today only if 9am
+      // has not passed yet): +2/+4/+5/+6 always, +0 sometimes.
+      expect(mornings.filter((d) => d > 0)).toEqual([2, 4, 5, 6]);
+      expect(mornings.every((d) => d >= 0 && d <= 7)).toBe(true);
+    });
+
+    it('a 3+ play streak arms no morning reminder; tomorrow 19:00 carries the streak-risk ping', async () => {
+      const { getLocalDateString } = require('../services/dateUtils');
+      const svc = loadGrantedWithContext({ currentStreak: 3, lastPlayDate: getLocalDateString(), puzzlesSolved: 40 }, 30);
+      await svc.scheduleAllNotifications(1);
+      expect(dayOffsetsOf(9)).toEqual([]);
+      expect(dayOffsetsOf(19)).toEqual([1]);
+      expect(dayOffsetsOf(18)).toEqual([2, 3, 7, 14, 30]);
+      const stamps = scheduledTriggers().map((t) => `${t.date.getFullYear()}-${t.date.getMonth()}-${t.date.getDate()}`);
+      expect(new Set(stamps).size).toBe(stamps.length);
+    });
+
+    it('a 2-day streak still gets the morning ladder (below the cover threshold)', async () => {
+      const { getLocalDateString } = require('../services/dateUtils');
+      const svc = loadGrantedWithContext({ currentStreak: 2, lastPlayDate: getLocalDateString(), puzzlesSolved: 40 }, 30);
+      await svc.scheduleAllNotifications(1);
+      expect(dayOffsetsOf(19)).toEqual([]);
+      expect(dayOffsetsOf(9)).toEqual([1, 4, 5, 6]);
+    });
+
+    it('with re-engagement pings OFF a streak holder keeps the morning ladder (nothing else would cover)', async () => {
+      const { getLocalDateString } = require('../services/dateUtils');
+      const svc = loadGrantedWithContext(
+        { currentStreak: 9, lastPlayDate: getLocalDateString(), puzzlesSolved: 40 }, 30,
+        { reengagementEnabled: false }
+      );
+      await svc.scheduleAllNotifications(1);
+      expect(dayOffsetsOf(19)).toEqual([]);
+      expect(dayOffsetsOf(18)).toEqual([]);
+      expect(dayOffsetsOf(9)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     });
 
     // =========================================================================
@@ -840,10 +937,11 @@ describe('notifications', () => {
         Math.random = realRandom;
       }
 
-      // The same-local-day dedupe yields the +1/+3/+7 win-back days to the
-      // win-back ladder, so 4-5 morning pings remain of the 8-day window.
+      // A 4-solve player is a NEW install (thin +1/+2/+3/+5/+7 ladder) and the
+      // same-local-day dedupe yields +1/+3/+7 to the win-back rungs, so the
+      // +2 and +5 mornings remain.
       const morning = scheduledTriggers().filter((t) => t.hour === 9);
-      expect(morning.length).toBeGreaterThanOrEqual(4);
+      expect(morning.length).toBe(2);
       for (const t of morning) {
         expect(t.data).toEqual({ target: 'home' });
         expect(t.body).toBe(expectedBody);
@@ -867,7 +965,7 @@ describe('notifications', () => {
       }
 
       const morning = scheduledTriggers().filter((t) => t.hour === 9);
-      expect(morning.length).toBeGreaterThanOrEqual(4);
+      expect(morning.length).toBe(2); // new install: +2 and +5
       for (const t of morning) {
         expect(t.data).toEqual({ target: 'daily' });
         expect(t.body).toBe(expectedBody);
@@ -882,7 +980,7 @@ describe('notifications', () => {
       await svc.scheduleAllNotifications(2);
 
       const morning = scheduledTriggers().filter((t) => t.hour === 9);
-      expect(morning.length).toBeGreaterThanOrEqual(4);
+      expect(morning.length).toBe(2); // new install: +2 and +5
       morning.forEach((t) => expect(t.data).toEqual({ target: 'daily' }));
 
       jest.dontMock('../services/amberCurrency');

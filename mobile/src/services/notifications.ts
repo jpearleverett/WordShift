@@ -368,14 +368,26 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
   // tomorrow. Rungs escalate per WIN_BACK_RUNG_OFFSETS (+1/+3/+7/+14/+30
   // days). Each app session reschedules, so these only fire on days the
   // player actually missed — an active player never sees a win-back.
+  const streak = await getCurrentStreakSafe();
+  // A streak holder at/above the cover threshold hears from the streak-risk
+  // ping (this evening if today is still open, else tomorrow evening) and
+  // gets NO morning reminder. Only when the re-engagement pings are on: with
+  // them off nothing else would cover that player, so the morning ladder stays.
+  const morningYieldsToStreak = prefs.reengagementEnabled && streak >= STREAK_COVERS_MORNING_REMINDER;
+
   if (prefs.reengagementEnabled) {
-    const streak = await getCurrentStreakSafe();
     // Streak-risk only fires when genuinely at risk: a real streak (>= 2) that
     // hasn't already been kept alive today. If they've played today the chain
-    // is safe, so the warning would contradict reality — suppress it.
+    // is safe, so a ping TODAY would contradict reality — suppress it.
     const hasStreakRisk = streak >= 2 && !playedToday;
     if (hasStreakRisk) {
-      await scheduleStreakRisk(mod, currentPhase, streak, dailyUnlocked, occupiedDays);
+      await scheduleStreakRisk(mod, currentPhase, streak, dailyUnlocked, occupiedDays, 0);
+    } else if (morningYieldsToStreak) {
+      // Today is kept and the morning ladder is standing down for this
+      // player, so the next missed evening is tomorrow's: arm 19:00 tomorrow.
+      // Every session reschedules, so it only fires if tomorrow really is
+      // missed by then.
+      await scheduleStreakRisk(mod, currentPhase, streak, dailyUnlocked, occupiedDays, 1);
     }
     // A finished-story player gets the special tail copy on the +14/+30 rungs.
     let finishedStory = false;
@@ -401,13 +413,20 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
   }
 
   // Schedule daily reminder LAST (lowest dedupe priority — it skips any local
-  // day already claimed above). While the Daily Challenge is still locked (the
+  // day already claimed above, so a morning ping never lands on a win-back
+  // day). New installs arm only NEW_INSTALL_REMINDER_DAY_OFFSETS; streak
+  // holders at STREAK_COVERS_MORNING_REMINDER+ get none (see above). While the
+  // Daily Challenge is still locked (the
   // permission prompt can fire from the 3rd victory; the daily unlocks at 8
   // puzzles / Phase 1) the ladder still arms, but with generic come-back copy
   // routed home — never "your daily puzzle is ready" for content the player
   // can't reach yet.
-  if (prefs.dailyReminderEnabled) {
-    await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase, playedToday, dailyUnlocked, occupiedDays);
+  if (prefs.dailyReminderEnabled && !morningYieldsToStreak) {
+    const newInstall = await isNewInstallSafe();
+    await scheduleDailyReminder(
+      mod, prefs.dailyReminderHour, currentPhase, playedToday, dailyUnlocked, occupiedDays,
+      newInstall ? NEW_INSTALL_REMINDER_DAY_OFFSETS : null
+    );
   }
 }
 
@@ -473,6 +492,26 @@ export function getEarlyReminderMessage(phase: number): string {
 const DAILY_REMINDER_LOOKAHEAD_DAYS = 7;
 
 /**
+ * A NEW install (younger than NEW_INSTALL_MAX_AGE_DAYS OR fewer than
+ * NEW_INSTALL_MAX_SOLVES solves) gets a thinner morning ladder: only these
+ * day offsets are armed, never today, so a player who lapses right after the
+ * permission prompt hears from the house on at most five mornings in the
+ * first week instead of every single day (the +1/+3/+7 win-back rungs then
+ * claim three of those, leaving mornings on +2 and +5).
+ */
+export const NEW_INSTALL_REMINDER_DAY_OFFSETS: readonly number[] = [1, 2, 3, 5, 7];
+export const NEW_INSTALL_MAX_AGE_DAYS = 14;
+export const NEW_INSTALL_MAX_SOLVES = 20;
+
+/**
+ * Play streak at/above which the morning reminder is not armed at all: a
+ * player this engaged does not need "your puzzle is ready" every morning for a
+ * puzzle they were going to play anyway. The streak-risk ping covers their
+ * next missed evening instead (armed for tomorrow 19:00 when today is kept).
+ */
+export const STREAK_COVERS_MORNING_REMINDER = 3;
+
+/**
  * Days-from-reschedule offsets for the escalating win-back ladder. Rung 1
  * shifts to +2 for streak holders (the streak-risk ping leads the ladder).
  */
@@ -492,7 +531,8 @@ async function scheduleDailyReminder(
   phase: number,
   playedToday: boolean,
   dailyUnlocked: boolean,
-  occupiedDays: Set<string>
+  occupiedDays: Set<string>,
+  dayOffsets: readonly number[] | null
 ): Promise<void> {
   try {
     // Strategy: instead of one unconditional REPEATING daily trigger (which pings
@@ -511,8 +551,11 @@ async function scheduleDailyReminder(
     const now = new Date();
     // Skip today's reminder entirely if the player already engaged today;
     // otherwise arm it (the in-loop past-time guard drops it if the hour passed).
+    // A new install arms only its thinner explicit offsets (never today).
     const startOffset = playedToday ? 1 : 0;
-    for (let dayOffset = startOffset; dayOffset <= DAILY_REMINDER_LOOKAHEAD_DAYS; dayOffset++) {
+    const offsets = dayOffsets
+      ?? Array.from({ length: DAILY_REMINDER_LOOKAHEAD_DAYS + 1 }, (_, i) => i).filter((i) => i >= startOffset);
+    for (const dayOffset of offsets) {
       const triggerDate = new Date();
       triggerDate.setDate(triggerDate.getDate() + dayOffset);
       triggerDate.setHours(hour, 0, 0, 0);
@@ -636,6 +679,27 @@ async function hasPlayedTodaySafe(): Promise<boolean> {
 }
 
 /**
+ * Whether this is still a NEW install for the morning-reminder cadence:
+ * younger than NEW_INSTALL_MAX_AGE_DAYS OR fewer than NEW_INSTALL_MAX_SOLVES
+ * solves. Lazy requires (same seam as the helpers above). On any failure the
+ * answer is true: the thinner ladder is the safe default.
+ */
+async function isNewInstallSafe(): Promise<boolean> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
+    const { getInstallAgeDays } = require('./eventLogger');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
+    const { getFullProgress } = require('./amberCurrency');
+    const installAgeDays: number = await getInstallAgeDays();
+    const progress = await getFullProgress();
+    const puzzlesSolved: number = progress?.puzzlesSolved ?? 0;
+    return installAgeDays < NEW_INSTALL_MAX_AGE_DAYS || puzzlesSolved < NEW_INSTALL_MAX_SOLVES;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Whether the Daily Challenge is unlocked for this player. Uses the canonical
  * check from dailyChallenge.ts (puzzle count OR phase) fed by the same
  * progress read as the other seams here. Lazy require — not for a cycle
@@ -740,19 +804,23 @@ async function scheduleStreakRisk(
   phase: number,
   streak: number,
   dailyUnlocked: boolean,
-  occupiedDays: Set<string>
+  occupiedDays: Set<string>,
+  daysAhead: 0 | 1
 ): Promise<void> {
   const message = getStreakRiskMessage(phase, streak);
   try {
-    // This only runs when the player has NOT played today (gated in
+    // daysAhead 0: the player has NOT played today (gated in
     // scheduleAllNotifications), so the streak is genuinely at risk THIS
     // evening — target today's 7pm if it hasn't passed yet, otherwise the
-    // next evening. Rescheduled forward every session, so it only ever fires
+    // next evening. daysAhead 1: today is kept but the morning reminder is
+    // standing down for this streak holder, so the next missed evening is
+    // tomorrow's. Rescheduled forward every session, so it only ever fires
     // on a day the player still hasn't played by then; the moment they play,
     // the next session's reschedule drops this notification entirely.
     const now = new Date();
     const triggerDate = new Date();
-    triggerDate.setHours(19, 0, 0, 0); // 7pm today
+    triggerDate.setDate(triggerDate.getDate() + daysAhead);
+    triggerDate.setHours(19, 0, 0, 0); // 7pm
     if (triggerDate.getTime() <= now.getTime()) {
       triggerDate.setDate(triggerDate.getDate() + 1); // 7pm already passed → tomorrow
     }

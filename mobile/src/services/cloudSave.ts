@@ -211,7 +211,7 @@ const CURRENT_SAVE_VERSION = 1;
 /** Local override for the cloud owner id (set when linking a recovery code). */
 const CLOUD_OWNER_KEY = 'wordshift_cloud_owner';
 export const LEGACY_CLOUD_OWNER_KEY = 'wordshift_cloud_legacy_owner';
-let ownerCreation: Promise<string> | null = null;
+let ownerCreation: Promise<CloudOwnerIdentity> | null = null;
 /** A populated progress key signals this install is NOT a fresh reinstall. */
 const FRESH_INSTALL_SENTINEL_KEY = 'wordshift_home_progress';
 
@@ -266,25 +266,41 @@ function sb(): typeof import('./supabaseClient') {
   return require('./supabaseClient');
 }
 
+/** The resolved owner id plus whether THIS call minted it. */
+export interface CloudOwnerIdentity {
+  owner: string;
+  /**
+   * True when no secure owner existed before the call and a brand-new random
+   * id was generated. The server has never seen such an id, so no cloud row
+   * can exist for it: callers use this to skip a guaranteed-miss download.
+   */
+  created: boolean;
+}
+
 /**
  * Resolve the stable cloud owner id for this install: a locally-stored
  * strong recovery capability. Preserve a legacy reference without importing
- * ambiguous old short-code rows.
+ * ambiguous old short-code rows. Reports whether the id was created here.
  */
-export async function getCloudOwnerId(): Promise<string> {
+export async function resolveCloudOwnerId(): Promise<CloudOwnerIdentity> {
   if (ownerCreation) return ownerCreation;
-  ownerCreation = (async () => {
+  ownerCreation = (async (): Promise<CloudOwnerIdentity> => {
     const existing = await AsyncStorage.getItem(CLOUD_OWNER_KEY);
-    if (isSecureIdentity(existing)) return existing;
+    if (isSecureIdentity(existing)) return { owner: existing, created: false };
     // Keep the legacy reference for support. Never read/merge a short code's
     // cloud row automatically: unrelated installs may already share that row.
     const legacy = existing || await sb().getBackendIdentity();
     const owner = await createSecureIdentity();
     if (legacy) await AsyncStorage.setItem(LEGACY_CLOUD_OWNER_KEY, legacy);
     await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
-    return owner;
+    return { owner, created: true };
   })();
   try { return await ownerCreation; } finally { ownerCreation = null; }
+}
+
+/** The stable cloud owner id for this install (see resolveCloudOwnerId). */
+export async function getCloudOwnerId(): Promise<string> {
+  return (await resolveCloudOwnerId()).owner;
 }
 
 class SupabaseCloudProvider implements CloudProvider {
@@ -402,8 +418,19 @@ export async function maybeAutoRestoreOnFreshInstall(shouldContinue: () => boole
     const local = await AsyncStorage.getItem(FRESH_INSTALL_SENTINEL_KEY);
     if (local && local.trim()) return false;
 
-    let cloudData = await provider.download();
-    if (!cloudData && provider instanceof SupabaseCloudProvider) {
+    // A genuinely fresh install mints its owner id right here, and the server
+    // has never seen that random id, so get_save_v2 is a guaranteed miss: skip
+    // the round trip (it sat on the boot screen for up to the 8 s fetch cap on
+    // a stalled network). A retained ws2_ owner (reinstall with the key kept,
+    // a restored device) still downloads; a legacy UUID owner still takes the
+    // upgrade RPC below. Non-Supabase providers keep their own download path.
+    const isSupabase = provider instanceof SupabaseCloudProvider;
+    const identity = isSupabase ? await resolveCloudOwnerId() : null;
+    let cloudData: CloudSaveData | null = null;
+    if (!identity || !identity.created) {
+      cloudData = await provider.download(identity?.owner);
+    }
+    if (!cloudData && isSupabase) {
       const legacy = await AsyncStorage.getItem(LEGACY_CLOUD_OWNER_KEY);
       if (legacy && /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(legacy)) {
         const rows = await sb().sbRpc<SaveRow[]>('get_legacy_save_for_upgrade', { p_owner: legacy });

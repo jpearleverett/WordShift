@@ -18,7 +18,41 @@ import { CandyColors } from '../../theme/colors';
 import { CHROME_ICONS } from '../ui/chromeIcons';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { getSettingsSync } from '../../services/settings';
-import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { shouldSimplifyAnimations, shouldPremountSpriteLayers } from '../../services/deviceTier';
+
+/**
+ * Species as a screen reader should say them. `Animal.type` is the enum
+ * (`fennec_fox`, `red_panda`, `aye_aye`), which TalkBack read out with the
+ * underscores; the accessibility label uses these instead.
+ */
+export const ANIMAL_SPECIES_NAMES: Record<AnimalType, string> = {
+  red_panda: 'red panda',
+  axolotl: 'axolotl',
+  pangolin: 'pangolin',
+  sloth: 'sloth',
+  fennec_fox: 'fennec fox',
+  fox: 'fox',
+  owl: 'owl',
+  capybara: 'capybara',
+  wombat: 'wombat',
+  rabbit: 'rabbit',
+  tarsier: 'tarsier',
+  aye_aye: 'aye-aye',
+  kakapo: 'kakapo',
+};
+
+/**
+ * How long a resting animal's dialogue stays closed, kept deliberately vague:
+ * sighted players are never shown the exact puzzle countdown (the design
+ * hides it, see dialogueSession.formatTimeRemaining), so the accessibility
+ * label must not leak it either. Same bands as that helper.
+ */
+export function getRestingPhrase(cooldownPuzzlesLeft: number | null | undefined): string {
+  if (cooldownPuzzlesLeft == null || cooldownPuzzlesLeft <= 0) return 'resting';
+  if (cooldownPuzzlesLeft <= 1) return 'resting, almost ready';
+  if (cooldownPuzzlesLeft <= 3) return 'resting, a little longer';
+  return 'resting, needs more puzzles';
+}
 
 // Gesture Handler retains native pan arbitration. Its web Touchable emits
 // nested buttons for this accessible sprite; the RN web control has one target.
@@ -708,6 +742,16 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     !shouldSimplifyAnimations()
   );
 
+  // On-demand mount latches for the tiers that do not pre-mount (see the
+  // render below): once a layer has been needed it stays mounted, so the
+  // decode is paid at most once per mount and never again per step.
+  // Render-phase derived state (the sanctioned "adjust state during render"
+  // pattern, as in hooks/useArrivalGate): the first walking render latches
+  // the walk stack in the same pass, so the atlas mounts with the step.
+  const [walkStackWarmed, setWalkStackWarmed] = useState(false);
+  if (walkActive && !walkStackWarmed) setWalkStackWarmed(true);
+  const [talkLayerWarmed, setTalkLayerWarmed] = useState(false);
+
   useEffect(() => {
     if (!gaitActive) {
       gaitAnim.setValue(0); // 0 = neutral pose (no lean, no bob, scale 1)
@@ -1256,6 +1300,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       // Only fire on a genuine idle moment, and only if the house turnstile is free.
       if (!isMovingRef.current && idleBeatTokenHolder === null) {
         idleBeatTokenHolder = myId;
+        // Lower tiers mount the talk layer on demand: latch it before the
+        // first talk-frame beat so the crossfade has a layer to reach.
+        if (hasTalk) setTalkLayerWarmed(true);
         const anim = buildBeat();
         activeAnim = anim;
         anim.start(() => finishBeat());
@@ -1365,9 +1412,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             ? `${animal.name}, gift ready to give`
             : isOnCooldown
               ? cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0
-                ? `${animal.name} the ${animal.type}, resting for ${cooldownPuzzlesLeft === 1 ? '1 more puzzle' : `${cooldownPuzzlesLeft} more puzzles`}`
-                : `${animal.name} the ${animal.type}, resting`
-              : `${animal.name} the ${animal.type}`
+                ? `${animal.name} the ${ANIMAL_SPECIES_NAMES[animal.type]}, ${getRestingPhrase(cooldownPuzzlesLeft)}`
+                : `${animal.name} the ${ANIMAL_SPECIES_NAMES[animal.type]}, resting`
+              : `${animal.name} the ${ANIMAL_SPECIES_NAMES[animal.type]}`
         }
         accessibilityRole="button"
       >
@@ -1431,27 +1478,32 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                 const staticPose = currentPhase >= 4 && sprites.robed ? 'robed' : 'idle';
                 const staticSource = staticPose === 'robed' ? sprites.robed! : sprites.idle;
                 const dreadTint = getSpriteDreadTint(currentPhase);
-                // Walk frames stay MOUNTED (opacity-switched) whenever they
-                // could play — swapping one Image's `source` mid-gait forces an
-                // async decode per frame the first time through the cycle,
-                // which reads as flicker. Mounting decodes everything up front.
-                // Skipped when the walk can never run (robed phases, reduced
+                // Walk frames stay MOUNTED (opacity-switched) once mounted —
+                // swapping one Image's `source` mid-gait forces an async decode
+                // per frame the first time through the cycle, which reads as
+                // flicker. WHEN they mount is a device-tier budget: the high
+                // tier pre-mounts them so even the first step is decoded ahead
+                // of time; lower tiers mount on the first walk and keep the
+                // stack from then on (walkStackWarmed), so a full house does not
+                // hold thirteen decoded atlases it may never animate. Skipped
+                // entirely when the walk can never run (robed phases, reduced
                 // motion, low-tier devices) so those paths pay no decode cost.
-                const mountWalkStack = Boolean(
-                  hasWalkFrames &&
+                const layersEligible =
                   currentPhase < 4 &&
                   !getSettingsSync().reducedMotion &&
-                  !shouldSimplifyAnimations()
+                  !shouldSimplifyAnimations();
+                const premount = shouldPremountSpriteLayers();
+                const mountWalkStack = Boolean(
+                  hasWalkFrames && layersEligible && (premount || walkActive || walkStackWarmed)
                 );
                 // The rare-idle "chirp"/"mutter" beats crossfade to the talk
-                // frame. Like the walk stack it is PRE-MOUNTED (opacity-switch,
-                // never a source swap) so the first chirp never decode-flickers.
-                // Same gates as the scheduler that drives it.
+                // frame. Same budget: the high tier PRE-MOUNTS it (opacity-
+                // switch, never a source swap, so the first chirp never decode-
+                // flickers); lower tiers mount it when the first talk beat
+                // starts (talkLayerWarmed) and keep it. Same gates as the
+                // scheduler that drives it.
                 const mountIdleTalkLayer = Boolean(
-                  sprites.talk &&
-                  currentPhase < 4 &&
-                  !getSettingsSync().reducedMotion &&
-                  !shouldSimplifyAnimations()
+                  sprites.talk && layersEligible && (premount || talkLayerWarmed)
                 );
                 // Phases 1-3 layer a tinted copy on top of each layer (tintColor
                 // honours the sprite's alpha, so only the animal shape cools).

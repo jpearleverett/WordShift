@@ -1289,6 +1289,7 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
     <Animated.Image
       source={SHADOW_FIGURE_IMG}
       resizeMode="contain"
+      resizeMethod="resize"
       style={{
         position: 'absolute',
         // Rise well above the roofline; the base dissolves behind the house.
@@ -2450,6 +2451,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     panning as one 1:1 plane, the art covers the frame across the
                     whole pan range exactly as the seat geometry was tuned for. */}
                 <UpperSkyAtmosphere phase={currentPhase} height={upperAtmosphereHeight} />
+                {/* resizeMethod="resize": decode near the view size on Android.
+                    Fresco never upscales a decode, so this only trims the
+                    941x1972 art on densities where the box is smaller. */}
                 <Image
                   source={
                     currentPhase >= 5 ? SKY_PEACE :
@@ -2461,6 +2465,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   }
                   style={[styles.skyBackground, { width: SCREEN_WIDTH, height: SKY_BOX_HEIGHT }]}
                   resizeMode="cover"
+                  resizeMethod="resize"
                 />
 
                 {/* Ground seam guard: a band below the container bottom (1px

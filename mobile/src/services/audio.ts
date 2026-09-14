@@ -5,10 +5,12 @@ import { getSettings, getSettingsSync, subscribeSettings } from './settings';
  * Sound effects + ambient music system for WordShift
  *
  * SFX: short WAV assets from assets/sounds/ via expo-audio (expo-av's SDK 56
- * replacement). Sounds are lazily loaded on first play and cached for instant
- * replay; hot-path sounds are preloaded during initAudio(). Every sound checks
- * the user's sound preference before playing, and all errors are swallowed —
- * sounds must never crash gameplay.
+ * replacement). Sounds are lazily loaded on first play and cached in a small
+ * LRU (SFX_CACHE_LIMIT players, evicted with remove()); the few sounds that
+ * fire in the first seconds are preloaded synchronously in initAudio() and
+ * the rest of the hot path is warmed from an idle callback after first paint.
+ * Every sound checks the user's sound preference before playing, and all
+ * errors are swallowed — sounds must never crash gameplay.
  *
  * Phase awareness: App mirrors the narrative phase here via setAudioPhase().
  * At Phase 3+ any sound with a registered `<name>_dark` variant automatically
@@ -150,24 +152,41 @@ export function hasMusicTrack(name: string): boolean {
   return source !== undefined && source !== null;
 }
 
-// Hot-path sounds preloaded at init for latency-free first playback
-const PRELOAD_SOUND_NAMES = [
+// Sounds that can fire within the first seconds of a session (the first menu
+// tap, the first letter pick-up, the first move). Created synchronously in
+// initAudio so those first plays are latency-free. Kept to a handful on
+// purpose: on Android every expo-audio player is a full ExoPlayer plus a
+// registered MediaSession, so a burst of players on the first frame competes
+// with the home screen's first decode for main-thread time.
+export const IMMEDIATE_PRELOAD_SOUND_NAMES = [
+  'ui_tap', // UI taps fire from the very first menu interaction
+  'ui_tick',
   'tap',
   'letter_select',
   'valid_move',
+];
+
+// The rest of the hot path, warmed after first paint from an idle callback.
+// Base names: they resolve through the phase mirror at warm time so a Phase
+// 3+ or Phase 5 player warms the variant that will actually play instead of
+// filling the small cache with bright sounds they never hear.
+export const DEFERRED_PRELOAD_SOUND_NAMES = [
   'valid_move_2', // combo ladder fires within seconds of the first clean streak
   'valid_move_3',
   'invalid_move',
   'victory',
   'star_pop_1', // fires in the victory choreography, right after 'victory'
   'amber_earn',
-  'ui_tap', // UI taps fire from the very first menu interaction
-  'ui_tick',
-  'valid_move_dark', // hot path once the descent deepens (Phase 3+)
-  'valid_move_2_dark',
-  'valid_move_peace', // hot path for post-revelation players (Phase 5)
   'pit_devour', // fires on every tap-devour + the Offer-All cascade in the pit
 ];
+
+/**
+ * Cap on cached SFX players. Each cached entry is a native player (an
+ * ExoPlayer + MediaSession on Android), so the cache is a small LRU rather
+ * than one permanent player per registered sound: 60 names across the bright,
+ * dark and peace tiers would otherwise all stay resident by the endgame.
+ */
+export const SFX_CACHE_LIMIT = 16;
 
 const SOUND_VOLUME = 0.8;
 
@@ -217,10 +236,36 @@ export async function initAudio(): Promise<void> {
     console.warn('Failed to initialize audio:', err);
   }
 
-  // Preload hot-path sounds (fire-and-forget — failures are non-critical)
-  for (const name of PRELOAD_SOUND_NAMES) {
+  // Preload the first-seconds sounds now (fire-and-forget — failures are
+  // non-critical), and the rest of the hot path once the first frame is up.
+  for (const name of IMMEDIATE_PRELOAD_SOUND_NAMES) {
     loadSound(name).catch(() => {});
   }
+  scheduleDeferredPreload();
+}
+
+let deferredPreloadScheduled = false;
+
+/** Fallback delay for the deferred preload when requestIdleCallback is absent. */
+const DEFERRED_PRELOAD_FALLBACK_MS = 1500;
+
+/**
+ * Warm the deferred hot-path sounds from an idle callback after first paint
+ * (requestIdleCallback where the runtime provides it, a short timeout
+ * otherwise), resolved through the phase mirror so the variant warmed is the
+ * one this player will hear. Runs once per process.
+ */
+function scheduleDeferredPreload(): void {
+  if (deferredPreloadScheduled) return;
+  deferredPreloadScheduled = true;
+  const warm = () => {
+    for (const name of DEFERRED_PRELOAD_SOUND_NAMES) {
+      loadSound(resolveSfxForPhase(name, audioPhase)).catch(() => {});
+    }
+  };
+  const idle = (globalThis as { requestIdleCallback?: (cb: () => void) => unknown }).requestIdleCallback;
+  if (typeof idle === 'function') idle(warm);
+  else setTimeout(warm, DEFERRED_PRELOAD_FALLBACK_MS);
 }
 
 async function isEnabled(): Promise<boolean> {
@@ -228,8 +273,56 @@ async function isEnabled(): Promise<boolean> {
   return settings.soundEnabled;
 }
 
-// Sound cache for loaded players
+// Sound cache for loaded players. Insertion order IS recency order: a hit
+// re-inserts the entry at the tail, and an insert past SFX_CACHE_LIMIT evicts
+// from the head (see cacheSound), so the map doubles as the LRU list.
 const soundCache: Map<string, AudioPlayer> = new Map();
+
+/** Cache hit that also marks the entry most-recently used. */
+function touchCached(name: string): AudioPlayer | undefined {
+  const player = soundCache.get(name);
+  if (!player) return undefined;
+  soundCache.delete(name);
+  soundCache.set(name, player);
+  return player;
+}
+
+/**
+ * Insert a player, evicting least-recently-used entries past the cap. A
+ * player mid-playback is skipped over when an idle one is available (SFX are
+ * sub-second, so this is rarely more than one skip); the evicted player is
+ * released with remove() so its native resources go with it.
+ */
+function cacheSound(name: string, player: AudioPlayer): void {
+  const previous = soundCache.get(name);
+  if (previous && previous !== player) {
+    try { previous.remove(); } catch {}
+  }
+  soundCache.delete(name);
+  soundCache.set(name, player);
+  while (soundCache.size > SFX_CACHE_LIMIT) {
+    let victim: string | null = null;
+    for (const [key, cached] of soundCache) {
+      if (key === name) continue;
+      if (!cached.playing) { victim = key; break; }
+      victim ??= key;
+    }
+    if (victim === null) break;
+    const evicted = soundCache.get(victim)!;
+    soundCache.delete(victim);
+    try { evicted.remove(); } catch {}
+  }
+}
+
+/** Number of cached SFX players (exported for tests). */
+export function getCachedSoundCount(): number {
+  return soundCache.size;
+}
+
+/** Whether a sound name currently has a cached player (exported for tests). */
+export function isSoundCached(name: string): boolean {
+  return soundCache.has(name);
+}
 
 // Guards against concurrent first-loads of the same sound
 const loadingSounds: Map<string, Promise<AudioPlayer | null>> = new Map();
@@ -278,7 +371,7 @@ subscribeSettings(() => {
  * Returns null (never throws) when the sound can't be loaded.
  */
 async function loadSound(name: string): Promise<AudioPlayer | null> {
-  const cached = soundCache.get(name);
+  const cached = touchCached(name);
   if (cached) return cached;
 
   const inFlight = loadingSounds.get(name);
@@ -292,7 +385,7 @@ async function loadSound(name: string): Promise<AudioPlayer | null> {
     try {
       const player = createAudioPlayer(source);
       player.volume = SOUND_VOLUME;
-      soundCache.set(name, player);
+      cacheSound(name, player);
       return player;
     } catch {
       return null;
@@ -330,7 +423,7 @@ export async function preloadSound(name: string, source: any): Promise<void> {
   try {
     const player = createAudioPlayer(source);
     player.volume = SOUND_VOLUME;
-    soundCache.set(name, player);
+    cacheSound(name, player);
   } catch (err) {
     console.warn(`Failed to preload sound ${name}:`, err);
   }
@@ -348,6 +441,9 @@ export async function unloadAllSounds(): Promise<void> {
   }
   soundCache.clear();
   loadingSounds.clear();
+  // A full teardown: the next initAudio re-applies the audio mode and re-warms.
+  deferredPreloadScheduled = false;
+  audioInitialized = false;
   teardownMusic();
 }
 

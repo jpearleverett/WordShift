@@ -27,6 +27,13 @@ import {
   getActiveMusicTrack,
   unloadAllSounds,
   createCinematicSoundScope,
+  initAudio,
+  preloadSound,
+  getCachedSoundCount,
+  isSoundCached,
+  IMMEDIATE_PRELOAD_SOUND_NAMES,
+  DEFERRED_PRELOAD_SOUND_NAMES,
+  SFX_CACHE_LIMIT,
 } from '../services/audio';
 import { resetSettings, updateSetting } from '../services/settings';
 
@@ -214,6 +221,100 @@ describe('audio', () => {
       await soundValidMove();
       await soundTap();
       expect(expoAudio.createAudioPlayer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('SFX player cache (bounded LRU + staged preload)', () => {
+    test('initAudio creates only the first-seconds players synchronously and defers the rest to idle', async () => {
+      await initAudio();
+      expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(IMMEDIATE_PRELOAD_SOUND_NAMES.length);
+      expect(IMMEDIATE_PRELOAD_SOUND_NAMES.length).toBeLessThanOrEqual(5);
+      for (const name of IMMEDIATE_PRELOAD_SOUND_NAMES) expect(isSoundCached(name)).toBe(true);
+      for (const name of DEFERRED_PRELOAD_SOUND_NAMES) expect(isSoundCached(name)).toBe(false);
+
+      // Node has no requestIdleCallback, so the fallback timer stands in for
+      // the idle callback: nothing more is created until it fires.
+      jest.advanceTimersByTime(1400);
+      expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(IMMEDIATE_PRELOAD_SOUND_NAMES.length);
+      jest.advanceTimersByTime(200);
+      await Promise.resolve();
+      expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(
+        IMMEDIATE_PRELOAD_SOUND_NAMES.length + DEFERRED_PRELOAD_SOUND_NAMES.length
+      );
+      for (const name of DEFERRED_PRELOAD_SOUND_NAMES) expect(isSoundCached(name)).toBe(true);
+      expect(getCachedSoundCount()).toBeLessThanOrEqual(SFX_CACHE_LIMIT);
+    });
+
+    test('the deferred warm resolves through the phase mirror at warm time', async () => {
+      await initAudio();
+      setAudioPhase(3);
+      jest.advanceTimersByTime(1500);
+      await Promise.resolve();
+      expect(isSoundCached('valid_move_2_dark')).toBe(true);
+      expect(isSoundCached('valid_move_2')).toBe(false);
+      // Every deferred name has a dark mirror, so the bright set stays cold.
+      expect(isSoundCached('star_pop_1_dark')).toBe(true);
+      expect(isSoundCached('star_pop_1')).toBe(false);
+    });
+
+    test('a second initAudio never re-arms the deferred warm', async () => {
+      await initAudio();
+      await initAudio();
+      jest.advanceTimersByTime(3000);
+      await Promise.resolve();
+      expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(
+        IMMEDIATE_PRELOAD_SOUND_NAMES.length + DEFERRED_PRELOAD_SOUND_NAMES.length
+      );
+    });
+
+    test('the cache is capped at SFX_CACHE_LIMIT and evicted players are removed', async () => {
+      const total = SFX_CACHE_LIMIT + 4;
+      for (let i = 0; i < total; i++) await preloadSound(`sfx_${i}`, i);
+      expect(getCachedSoundCount()).toBe(SFX_CACHE_LIMIT);
+      const players = getPlayers();
+      expect(players.length).toBe(total);
+      // The four oldest are gone (and released); the newest sixteen remain.
+      for (let i = 0; i < 4; i++) {
+        expect(isSoundCached(`sfx_${i}`)).toBe(false);
+        expect(players[i].remove).toHaveBeenCalledTimes(1);
+      }
+      for (let i = 4; i < total; i++) {
+        expect(isSoundCached(`sfx_${i}`)).toBe(true);
+        expect(players[i].remove).not.toHaveBeenCalled();
+      }
+    });
+
+    test('a cache hit refreshes recency so a sound just played is not the next evicted', async () => {
+      // Fill the cache with 'tap' as its OLDEST entry, then play it.
+      await preloadSound('tap', 0);
+      for (let i = 1; i < SFX_CACHE_LIMIT; i++) await preloadSound(`sfx_${i}`, i);
+      expect(getCachedSoundCount()).toBe(SFX_CACHE_LIMIT);
+      await soundTap();
+      expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(SFX_CACHE_LIMIT); // cache hit
+      await preloadSound('sfx_new', 99);
+      expect(isSoundCached('tap')).toBe(true);
+      expect(isSoundCached('sfx_1')).toBe(false); // the true least-recently-used
+      expect(getPlayers()[0].remove).not.toHaveBeenCalled();
+    });
+
+    test('eviction prefers an idle player over one mid-playback', async () => {
+      for (let i = 0; i < SFX_CACHE_LIMIT; i++) await preloadSound(`sfx_${i}`, i);
+      getPlayers()[0].playing = true; // the oldest is still sounding
+      await preloadSound('sfx_new', 99);
+      expect(isSoundCached('sfx_0')).toBe(true);
+      expect(isSoundCached('sfx_1')).toBe(false);
+      expect(getPlayers()[0].remove).not.toHaveBeenCalled();
+      expect(getPlayers()[1].remove).toHaveBeenCalledTimes(1);
+    });
+
+    test('SFX eviction never touches the music bed', async () => {
+      await updateSetting('musicEnabled', true);
+      await startMusicForPhase(0);
+      const bed = getPlayers().find((p) => p.loop === true)!;
+      expect(bed).toBeDefined();
+      for (let i = 0; i < SFX_CACHE_LIMIT + 8; i++) await preloadSound(`sfx_${i}`, i);
+      expect(bed.remove).not.toHaveBeenCalled();
+      expect(getCachedSoundCount()).toBe(SFX_CACHE_LIMIT);
     });
   });
 
