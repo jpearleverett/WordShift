@@ -46,9 +46,7 @@ import {
 } from '../services/tending';
 import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
 import { clearChoiceState, recordChoice } from '../services/dialogueChoices';
-import {
-  advanceAnimalAcquaintance, invalidateAnimalAcquaintanceCache, openAnimalAcquaintance,
-} from '../services/animalAcquaintance';
+import { getDialoguesForAnimal } from '../services/dialogue/animalDialogueBase';
 import { clearAllSessions, isOnCooldown, startCooldown, updatePuzzleCount } from '../services/dialogueSession';
 import { DIALOGUE_SESSION_CONFIG } from '../types/homeWorld';
 
@@ -58,7 +56,6 @@ beforeEach(async () => {
   await clearProgress();
   await clearTendingState();
   await clearChoiceState();
-  invalidateAnimalAcquaintanceCache();
   await clearAllSessions();
 });
 
@@ -310,7 +307,7 @@ describe('getRoomsWithStatus', () => {
   });
 });
 
-describe('late-unlock dialogue fast-forward', () => {
+describe('late-unlock dialogue starts at the beginning', () => {
   const { getPhaseStartIndex, getDialoguesForAnimal } =
     require('../services/dialogue/animalDialogueBase');
 
@@ -331,7 +328,7 @@ describe('late-unlock dialogue fast-forward', () => {
     expect(all[idx].phase).toBe(2);
   });
 
-  // Behavioral coverage through purchaseUnlock (the fast-forward's caller).
+  // Behavioral coverage through the ordinary character purchase path.
   // Buys every unlock in order up to and including the target, so room
   // prerequisites are always satisfied.
   async function unlockThrough(targetUnlockId: string) {
@@ -343,7 +340,7 @@ describe('late-unlock dialogue fast-forward', () => {
     }
   }
 
-  test('no fast-forward below global Phase 2', async () => {
+  test('a recruit below global Phase 2 starts at the beginning', async () => {
     const p = await loadProgress();
     p.puzzlesSolved = 40; // clears the jungle gate (19)
     p.currentPhase = 1;
@@ -352,30 +349,25 @@ describe('late-unlock dialogue fast-forward', () => {
     expect(after.lastDialogueRead['sloth'] ?? 0).toBe(0);
   });
 
-  // The bright-replay seam: sloth is lagging (-1), so at global Phase 2 its
-  // animalPhase is 1 and "one phase behind" used to compute phase 0 — a dark
-  // catch-up intro followed by bright small talk under a dusk sky. The
-  // fast-forward now floors at phase 1 whenever it applies at all.
-  test('lagging animal unlocked at global Phase 2 starts at phase 1, never phase 0', async () => {
+  test('a lagging animal unlocked at global Phase 2 retains its Phase 0 conversation', async () => {
     const p = await loadProgress();
     p.puzzlesSolved = 40;
     p.currentPhase = 2;
     await unlockThrough('unlock_sloth');
-    const start = getPhaseStartIndex('sloth', 1);
-    expect(start).toBeGreaterThan(0); // floor is meaningful: phase 1, not 0
     const after = await loadProgress();
-    expect(after.lastDialogueRead['sloth']).toBe(start);
+    expect(after.lastDialogueRead['sloth'] ?? 0).toBe(0);
+    expect((await getAnimalsWithStatus()).find(animal => animal.id === 'sloth')!.currentDialogueIndex).toBe(0);
   });
 
-  test('vanguard behavior unchanged: owl at global Phase 2 starts at phase 2 (animalPhase 3 minus one)', async () => {
+  test('a vanguard owl at global Phase 2 also starts at the beginning', async () => {
     const p = await loadProgress();
     p.currentPhase = 2;
     await unlockThrough('unlock_owl');
     const after = await loadProgress();
-    expect(after.lastDialogueRead['owl']).toBe(getPhaseStartIndex('owl', 2));
+    expect(after.lastDialogueRead['owl'] ?? 0).toBe(0);
   });
 
-  test('Vesper starts at her current effective phase instead of replaying an earlier block', async () => {
+  test('Vesper retains every earlier chapter when recruited at the reveal', async () => {
     const p = await loadProgress();
     p.puzzlesSolved = 200;
     // Weighted progress must be set alongside raw solves: the descent-trio
@@ -386,12 +378,12 @@ describe('late-unlock dialogue fast-forward', () => {
     await unlockThrough('unlock_tarsier');
 
     const after = await loadProgress();
-    expect(after.lastDialogueRead['tarsier']).toBe(getPhaseStartIndex('tarsier', 4));
+    expect(after.lastDialogueRead['tarsier'] ?? 0).toBe(0);
   });
 
   // Lagging converges to phase 4 at the reveal (getAnimalPhase drops the -1
   // at global Phase 4), so Moss's effective phase here is 4, not 3.
-  test('Moss starts at his current effective lagging phase', async () => {
+  test('Moss retains every earlier chapter when recruited at the reveal', async () => {
     const p = await loadProgress();
     p.puzzlesSolved = 200;
     p.phaseProgress = 200; // see Vesper above: the trio floor reads weighted progress
@@ -399,7 +391,7 @@ describe('late-unlock dialogue fast-forward', () => {
     await unlockThrough('unlock_kakapo');
 
     const after = await loadProgress();
-    expect(after.lastDialogueRead['kakapo']).toBe(getPhaseStartIndex('kakapo', 4));
+    expect(after.lastDialogueRead['kakapo'] ?? 0).toBe(0);
   });
 
   test('never rewinds an existing read position', async () => {
@@ -413,7 +405,7 @@ describe('late-unlock dialogue fast-forward', () => {
 });
 
 describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
-  test('new personal visits stay available through the normal conversation cooldown', async () => {
+  test('an unfinished ordinary welcome stays available through the normal conversation cooldown', async () => {
     const progress = await loadProgress();
     progress.currentPhase = 4;
     progress.unlockedAnimals = ['wombat'];
@@ -427,18 +419,12 @@ describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
     expect(isOnCooldown('wombat')).toBe(true);
     expect((await getAnimalsWithStatus()).find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(true);
 
-    await openAnimalAcquaintance('wombat', 4, 'introduction');
     progress.introsSeen = ['wombat'];
-    for (let visit = 0; visit < 3; visit += 1) {
-      expect((await getAnimalsWithStatus()).find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(true);
-      let memory = await openAnimalAcquaintance('wombat', 4, 'continue');
-      while (memory) memory = await advanceAnimalAcquaintance('wombat', memory.visit, memory.page);
-    }
     expect((await getAnimalsWithStatus()).find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(false);
     expect(progress.lastDialogueRead.wombat).toBe(9999);
   });
 
-  test('existing friends are not auto-enrolled and locked future residents never get a badge', async () => {
+  test('established friends recover unread early lines while locked residents never get a badge', async () => {
     const progress = await loadProgress();
     progress.currentPhase = 4;
     progress.unlockedAnimals = ['wombat'];
@@ -446,10 +432,11 @@ describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
     progress.lastDialogueRead = { wombat: 9999 };
     await recordChoice('wombat', 'refuse');
     const animals = await getAnimalsWithStatus();
-    expect(animals.find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(false);
+    expect(animals.find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(true);
+    expect(animals.find(animal => animal.id === 'wombat')!.currentDialogueIndex).toBe(0);
     expect(animals.find(animal => animal.id === 'kakapo')!.hasNewDialogue).toBe(false);
-    await openAnimalAcquaintance('wombat', 4, 'optional');
-    expect((await getAnimalsWithStatus()).find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(true);
+    progress.conversationReadIds = { wombat: getDialoguesForAnimal('wombat', 4).map(line => line.id) };
+    expect((await getAnimalsWithStatus()).find(animal => animal.id === 'wombat')!.hasNewDialogue).toBe(false);
   });
 
   test('an unanswered reveal choice is news after the regular dialogue is exhausted', async () => {
@@ -457,6 +444,8 @@ describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
     p.currentPhase = 4;
     p.unlockedAnimals = ['pangolin'];
     p.lastDialogueRead = { pangolin: 134 };
+    p.introsSeen = ['pangolin'];
+    p.conversationReadIds = { pangolin: getDialoguesForAnimal('pangolin', 4).map(line => line.id) };
     expect((await getAnimalsWithStatus()).find(a => a.id === 'pangolin')!.hasNewDialogue).toBe(true);
     await recordChoice('pangolin', 'refuse');
     expect((await getAnimalsWithStatus()).find(a => a.id === 'pangolin')!.hasNewDialogue).toBe(false);
@@ -470,7 +459,9 @@ describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
     const p = await loadProgress();
     p.currentPhase = 0;
     p.unlockedAnimals = ['fox', 'pangolin'];
+    p.introsSeen = ['fox', 'pangolin'];
     p.lastDialogueRead = { ...(p.lastDialogueRead ?? {}), pangolin: index };
+    p.conversationReadIds = { pangolin: getDialoguesForAnimal('pangolin', 0).slice(0, index).map(line => line.id) };
     const animals = await getAnimalsWithStatus();
     return animals.find(a => a.id === 'pangolin')!;
   }
@@ -490,18 +481,23 @@ describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
     expect(pangolin.hasNewDialogue).toBe(false);
   });
 
-  test('Phase 5 badge ignores old regular backlog and relights for a new Tending milestone line', async () => {
+  test('Phase 5 badge first retains unread regular conversations, then follows Tending progress', async () => {
     const p = await loadProgress();
     p.currentPhase = 5;
     p.postRevelation = true;
     p.unlockedAnimals = ['pangolin'];
-    // Deliberately stale: Phase 5 must never advertise unread Phase 3/4 lines.
+    p.introsSeen = ['pangolin'];
+    // The old cursor never proves any of these regular lines were read.
     p.lastDialogueRead = { pangolin: 0 };
 
     const basePoolLength = buildPhase5Pool('pangolin', 0, null).length;
     await setPhase5CaughtUp('pangolin', basePoolLength);
 
     let animals = await getAnimalsWithStatus();
+    expect(animals.find(a => a.id === 'pangolin')!.hasNewDialogue).toBe(true);
+    expect(animals.find(a => a.id === 'pangolin')!.currentDialogueIndex).toBe(0);
+    p.conversationReadIds = { pangolin: getDialoguesForAnimal('pangolin', 4).map(line => line.id) };
+    animals = await getAnimalsWithStatus();
     expect(animals.find(a => a.id === 'pangolin')!.hasNewDialogue).toBe(false);
 
     for (let level = 1; level <= 5; level++) {

@@ -791,11 +791,10 @@ describe('animal cooldown motion contract', () => {
     expect(SPRITE_SRC).not.toMatch(/currentPhase, isOnCooldown\]/);
   });
 
-  it('leaves isOnCooldown only the badge and the accessibility label', () => {
-    const uses = SPRITE_SRC.match(/isOnCooldown/g) ?? [];
-    // prop decl, default destructure, a11y label, badge gate.
-    expect(uses.length).toBe(4);
+  it('uses cooldown for conversation news while a waiting gift remains available', () => {
     expect(SPRITE_SRC).toMatch(/animal\.hasNewDialogue && !isOnCooldown &&/);
+    expect(SPRITE_SRC).toMatch(/hasPendingGift \|\| \(animal\.hasNewDialogue && !isOnCooldown/);
+    expect(SPRITE_SRC).toMatch(/hasPendingGift\s*\n\s*\? `\$\{animal\.name\}, gift ready to give`/);
     expect(SPRITE_SRC).toMatch(/isOnCooldown\s*\n\s*\?\s*cooldownPuzzlesLeft/);
   });
 

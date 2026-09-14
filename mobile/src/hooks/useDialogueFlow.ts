@@ -5,14 +5,10 @@ import {
   AnimalType,
   HomeWorldProgress,
   getAnimalPhase,
-  DialoguePhase,
   ANIMAL_AWARENESS_TIERS,
-  LATE_PHASE_RECRUITS,
-  getCatchUpSessionBonus,
+  DialoguePhase,
 } from '../types/homeWorld';
 import {
-  getCurrentDialogue,
-  hasMoreDialogues,
   resolveDialogueIndex,
   getCrossAnimalReference,
   getTriggerWordReaction,
@@ -46,7 +42,6 @@ import {
 import { getPhaseStartIndex } from '../services/dialogue/animalDialogueBase';
 import {
   markDialogueRead,
-  markIntroSeen,
   consumeTriggerWords,
   getPendingVariantTutorials,
   acknowledgeVariantTutorial,
@@ -84,12 +79,9 @@ import {
 import { buildPhase5Pool, buildPhase5Eligibility } from '../services/dialogue/phase5Pool';
 import { getModalInSpring } from '../theme/surfaces';
 import { showGameAlert } from '../services/gameAlert';
-import {
-  AnimalAcquaintanceState,
-  loadAnimalAcquaintanceState,
-  hasPendingAnimalAcquaintance,
-  canOfferAnimalAcquaintance,
-} from '../services/animalAcquaintance';
+import { getNextAnimalConversation, completeAnimalConversationLine } from '../services/conversationProgress';
+import { adaptAnimalConversationText, hasAnimalConversationArrivalOccurred } from '../services/dialogue/animalConversationText';
+import { StorageRecoveryRequiredError } from '../services/persistenceStorage';
 
 /**
  * Maximum characters shown per dialogue page. Lines longer than this are split
@@ -326,8 +318,9 @@ interface UseDialogueFlowParams {
   progress: HomeWorldProgress | null;
   setAnimals: React.Dispatch<React.SetStateAction<Animal[]>>;
   onFoxPlayPrompt?: () => void;
-  /** Present a personal visit before the phase-aware regular conversation. */
-  onAcquaintance?: (animal: Animal, optional?: boolean) => Promise<void>;
+  /** Every new resident receives their full introduction through ordinary Talk. */
+  onIntroduction?: (animal: Animal) => Promise<void>;
+  onConversationProgress?: (ids: Record<string, string[]>, cycleCount: number) => void;
   /**
    * Quests completed by THIS visit (talk-to-animals quests). recordAnimalVisit
    * mutates the quest objects in the module-level cache in place, and the home
@@ -394,9 +387,7 @@ interface UseDialogueFlowReturn {
   /** Only an in-flight durable answer blocks another tap or dismissal. */
   choiceSaving: boolean;
   choiceError: string | null;
-  canOfferAcquaintance: boolean;
-  handleOpenAcquaintance: () => Promise<void>;
-  refreshAcquaintanceState: () => Promise<void>;
+  dialogueSaveError: string | null;
   /**
    * The answer the player just gave, echoed above the animal's reply; null
    * again once the reply is left.
@@ -440,7 +431,8 @@ export function useDialogueFlow({
   setAnimals,
   onFoxPlayPrompt,
   onQuestsCompleted,
-  onAcquaintance,
+  onIntroduction,
+  onConversationProgress,
 }: UseDialogueFlowParams): UseDialogueFlowReturn {
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [showDialogue, setShowDialogue] = useState(false);
@@ -485,27 +477,13 @@ export function useDialogueFlow({
   const [answeredAnimals, setAnsweredAnimals] = useState<string[]>([]);
   const choiceSubmissionRef = useRef(false);
   const choiceSavePendingRef = useRef(false);
-  const acquaintanceOpeningRef = useRef(false);
-  const [acquaintanceState, setAcquaintanceState] = useState<AnimalAcquaintanceState>({ version: 1, animals: {} });
-  const refreshAcquaintanceState = useCallback(async () => {
-    setAcquaintanceState(await loadAnimalAcquaintanceState());
-  }, []);
-
-  // Intro completion and cloud/reset reloads refresh progress in the host.
-  // The relationship visit has its own cursor and never edits regular dialogue.
-  useEffect(() => {
-    let cancelled = false;
-    void loadAnimalAcquaintanceState().then(state => {
-      if (!cancelled) setAcquaintanceState(state);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [progress]);
-
-  const hasPendingAcquaintance = useCallback((animal: Animal): boolean => Boolean(
-    onAcquaintance && progress && hasPendingAnimalAcquaintance(
-      acquaintanceState, animal.type, progress.currentPhase, progress.introsSeen.includes(animal.id)
-    )
-  ), [acquaintanceState, onAcquaintance, progress]);
+  const [conversationReads, setConversationReads] = useState<{
+    source: HomeWorldProgress | null;
+    ids: Record<string, string[]>;
+  } | null>(null);
+  const [lineSaving, setLineSaving] = useState(false);
+  const [dialogueSaveError, setDialogueSaveError] = useState<string | null>(null);
+  const lineRecoveryRequired = useRef(false);
   // A visit is assembled through several storage reads. Closing/unmounting
   // invalidates that work, so an old opener cannot replace a newer visit.
   const visitGenerationRef = useRef(0);
@@ -577,39 +555,12 @@ export function useDialogueFlow({
   const getUnlockedTypes = useCallback((): Set<AnimalType> =>
     new Set((progress?.unlockedAnimals ?? []) as AnimalType[]), [progress?.unlockedAnimals]);
 
-  // Catch-up session boost: extra lines per session for an animal with unread
-  // REGULAR (indexed, non-pool) backlog inside a compressed window — a late
-  // recruit (the descent trio, unlockable only at global Phase 3+) so Moss's
-  // arc is not consumed unheard after the Sky Garden gate at 135, and a
-  // lagging-tier animal at global Phase 4, which converges to phase 4 at the
-  // reveal and gains its whole Phase-4 block with the finale ~32 puzzles out.
-  // Post-compression geography: house completion/recruit is ~96-100, capped
-  // dwell ~104-108, arming 115 (FINALE_ARM_MIN_PUZZLES), the final board ~116,
-  // and post-revelation ~117-122 (MIN_PUZZLES_FOR_PHASE[5] = 120). The older
-  // 136/143/160/161/162 figures predate two arc compressions. Computed per call from
-  // current state and passed into the session layer, which stays a pure
-  // counter. The newly-unlocked grace period is untouched (that's cooldowns).
-  const getSessionBonus = useCallback((animal: Animal): number => {
-    if (!progress) return 0;
-    const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
-    // Phase 5 is pool-only: all regular backlog is retired at the reveal, and
-    // the cycling post-revelation/Tending pool never earns catch-up boosts.
-    if (animalPhase === 5) return 0;
-    const regularPhase = animalPhase as DialoguePhase;
-    const resolved = resolveDialogueIndex(
-      animal.type,
-      animal.currentDialogueIndex,
-      regularPhase,
-      getUnlockedTypes()
-    );
-    const hasUnreadRegular = resolved < getTotalDialogueCount(animal.type, regularPhase);
-    return getCatchUpSessionBonus(
-      progress.currentPhase,
-      LATE_PHASE_RECRUITS.has(animal.type),
-      hasUnreadRegular,
-      ANIMAL_AWARENESS_TIERS[animal.type] === 'lagging'
-    );
-  }, [progress, getUnlockedTypes]);
+  const getRegularConversation = useCallback((animal: Animal) => {
+    if (!progress) return null;
+    const ids = conversationReads?.source === progress ? conversationReads.ids : progress.conversationReadIds;
+    return getNextAnimalConversation({ ...progress, conversationReadIds: ids }, animal.type,
+      getAnimalPhase(progress.currentPhase, animal.type), getUnlockedTypes());
+  }, [progress, conversationReads, getUnlockedTypes]);
 
   // Keep the session layer's phase mirror current.
   //
@@ -649,7 +600,8 @@ export function useDialogueFlow({
     animalPhase: DialoguePhase,
     unlocked: Set<AnimalType>
   ): DialoguePhase => {
-    // Phase 5 is pool-only; there is no indexed block to read a phase from.
+    // After Arrival, ambient reactions describe the current house even while
+    // older personal lines continue through their adapted wording.
     if (animalPhase >= 5) return animalPhase;
     const resolved = resolveDialogueIndex(
       animal.type,
@@ -767,45 +719,27 @@ export function useDialogueFlow({
     if (!selectedAnimal || !progress) return '';
     const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
 
-    // Phase 5 is an immediate, clean handoff to the post-revelation/Tending
-    // pool. Never leak unread Phase 3/4 regular lines after the arrival.
-    if (animalPhase === 5) {
-      return selectPhase5(selectedAnimal.type, selectedAnimal.currentDialogueIndex).text;
+    const regular = getRegularConversation(selectedAnimal);
+    if (regular) {
+      return adaptAnimalConversationText({
+        animalType: selectedAnimal.type,
+        id: regular.dialogue.id,
+        text: regular.dialogue.text,
+        authoredPhase: regular.dialogue.phase,
+        worldPhase: progress.currentPhase,
+        arrivalOccurred: hasAnimalConversationArrivalOccurred(progress),
+      });
     }
-
-    // Phase 2: once the base block is exhausted, serve the exhaustion pool
-    // (in order, then cycling) instead of re-reading the last base line.
+    // Repeating pools follow the complete eligible personal conversation.
+    // Arrival unlocks its pool without deleting any earlier unread passage.
+    if (animalPhase === 5) return selectPhase5(selectedAnimal.type, selectedAnimal.currentDialogueIndex).text;
     if (animalPhase === 2) {
-      const total2 = getTotalDialogueCount(selectedAnimal.type, 2);
-      const resolved = resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, 2, getUnlockedTypes());
-      if (resolved >= total2) {
-        const poolLine = getPhase2PoolLine(selectedAnimal.type, phase2Cursors[selectedAnimal.type] ?? 0);
-        if (poolLine) return poolLine;
-      }
+      const line = getPhase2PoolLine(selectedAnimal.type, phase2Cursors[selectedAnimal.type] ?? 0);
+      if (line) return line;
     }
+    return getDialogueCaughtUpLine(animalPhase);
 
-    const resolvedIndex = resolveDialogueIndex(
-      selectedAnimal.type,
-      selectedAnimal.currentDialogueIndex,
-      animalPhase,
-      getUnlockedTypes()
-    );
-    // A finite block that is read out must not replay its last line. The
-    // terminal read in closeDialogue parks the index AT total so the badge goes
-    // honest-dark, but the animal stays tappable, and getCurrentDialogue clamps
-    // an over-range index to the tail: every visit re-served the same closing
-    // line verbatim (Ember repeating her goodbye until the next phase opened).
-    // Speak an honest "that is all for now" instead. hasMoreToShow already
-    // reads false at this index, so the button offers Close, nothing is
-    // recorded and no session budget is spent; any pre-dialogue pages (a
-    // coordinated event, a trigger reaction) still deliver ahead of it.
-    if (resolvedIndex >= getTotalDialogueCount(selectedAnimal.type, animalPhase)) {
-      return getDialogueCaughtUpLine(animalPhase);
-    }
-
-    const dialogue = getCurrentDialogue(selectedAnimal.type, resolvedIndex, animalPhase);
-    return dialogue?.text || 'Hello, friend!';
-  }, [preDialoguePages, selectedAnimal, progress, selectPhase5, getUnlockedTypes, phase2Cursors]);
+  }, [preDialoguePages, selectedAnimal, progress, selectPhase5, getRegularConversation, phase2Cursors]);
 
   // The VISIBLE dialogue text: the current page of the current line. Lines at
   // or under the budget pass through unchanged (same string identity, so the
@@ -837,16 +771,11 @@ export function useDialogueFlow({
     if (!selectedAnimal || !progress) return false;
     const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
 
-    // Phase 5: post-revelation dialogues always cycle (never truly exhausted)
+    // Even the last regular line needs an explicit Next to save it. A
+    // backdrop close or interrupted typewriter must never retire that line.
+    if (getRegularConversation(selectedAnimal)) return true;
     if (animalPhase === 5) return true;
-
-    // Phase 2: the exhaustion pool cycles, so there is always another line
-    if (animalPhase === 2 && getPhase2ExtraDialogues(selectedAnimal.type).length > 0) return true;
-
-    const unlocked = getUnlockedTypes();
-    const cur = resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase, unlocked);
-    const next = resolveDialogueIndex(selectedAnimal.type, cur + 1, animalPhase, unlocked);
-    return next < getTotalDialogueCount(selectedAnimal.type, animalPhase);
+    return animalPhase === 2 && getPhase2ExtraDialogues(selectedAnimal.type).length > 0;
   };
 
   // The current page's full text, computed once per render and shared by the
@@ -938,32 +867,15 @@ export function useDialogueFlow({
     const generation = ++visitGenerationRef.current;
     const ownsVisit = () => generation === visitGenerationRef.current;
     try {
-    if (choiceSavePendingRef.current || acquaintanceOpeningRef.current) return;
-    if (onAcquaintance && progress) {
-      acquaintanceOpeningRef.current = true;
+    if (choiceSavePendingRef.current) return;
+    if (onIntroduction && progress && !progress.introsSeen.includes(animal.id)) {
       try {
-        const state = await loadAnimalAcquaintanceState();
-        if (!ownsVisit()) return;
-        setAcquaintanceState(state);
-        let introSeen = progress.introsSeen.includes(animal.id);
-        // A visit is saved before the host updates the legacy intro flag. A
-        // cold restart between those writes must not replay a finished welcome.
-        if (!introSeen && (state.animals[animal.type]?.nextVisit ?? 0) > 0) {
-          await markIntroSeen(animal.id);
-          introSeen = true;
-        }
-        if (hasPendingAnimalAcquaintance(state, animal.type, progress.currentPhase, introSeen)) {
-          setCooldownMessage(null);
-          await onAcquaintance(animal);
-          await refreshAcquaintanceState();
-          return;
-        }
+        setCooldownMessage(null);
+        await onIntroduction(animal);
       } catch {
-        setCooldownMessage("Couldn't open this conversation. Tap your friend to try again.");
-        return;
-      } finally {
-        acquaintanceOpeningRef.current = false;
+        if (ownsVisit()) setCooldownMessage("Couldn't open this conversation. Tap your friend to try again.");
       }
+      return;
     }
     // Pick up any Tending done since the hook mounted (e.g. the player just
     // deepened the pattern in the pit) so Phase-5 selection/badge are current.
@@ -973,7 +885,7 @@ export function useDialogueFlow({
     // layer is reading THIS phase and not its module default (see the mirror
     // effect above) before either is consulted.
     if (progress) updateSessionPhase(progress.currentPhase);
-    const availability = await checkDialogueAvailability(animal.id, getSessionBonus(animal));
+    const availability = await checkDialogueAvailability(animal.id, 0);
     if (!ownsVisit()) return;
 
     if (!availability.available) {
@@ -1009,25 +921,12 @@ export function useDialogueFlow({
         })
         .catch(() => {});
 
-      // Skip past any lines that reference still-locked animals so the
-      // stored read position never points at a blocked line.
-      const tapPhase = getAnimalPhase(progress.currentPhase, animal.type);
-      const resolved = tapPhase === 5
-        ? Math.max(
-            animal.currentDialogueIndex,
-            getTotalDialogueCount(animal.type, 4)
-          )
-        : resolveDialogueIndex(
-            animal.type,
-            animal.currentDialogueIndex,
-            tapPhase,
-            getUnlockedTypes()
-          );
-      if (resolved !== animal.currentDialogueIndex) {
-        markDialogueRead(animal.id, resolved).catch(() => {});
-        setAnimals(prev => prev.map(a => (a.id === animal.id ? { ...a, currentDialogueIndex: resolved } : a)));
-        animal = { ...animal, currentDialogueIndex: resolved };
-      }
+      // Resolving an eligible line is presentation only. Locked-resident
+      // lines stay unread and return naturally once that resident arrives.
+      const regular = getRegularConversation(animal);
+      const cap = getTotalDialogueCount(animal.type, Math.min(getAnimalPhase(progress.currentPhase, animal.type), 4) as DialoguePhase);
+      const index = regular?.index ?? (progress.currentPhase === 5 ? Math.max(cap, animal.currentDialogueIndex) : cap);
+      animal = { ...animal, currentDialogueIndex: index };
     }
 
     // Build pre-dialogue pages: these show as sequential conversation pages
@@ -1046,8 +945,8 @@ export function useDialogueFlow({
       : 0;
 
     // A due relationship choice leads the visit, ahead of optional atmosphere.
-    // A relationship choice follows the reader into the reveal, including
-    // late recruits whose introduction starts directly on Phase-4 material.
+    // A relationship choice follows the reader into the reveal once their
+    // personal conversation reaches it, including residents invited later.
     // Never offer it after arrival or recall a branch the player did not choose.
     if (animalPhase === 3 || animalPhase === 4) {
       try {
@@ -1329,6 +1228,8 @@ export function useDialogueFlow({
     resetPageQueue();
     setChoiceSaving(false);
     setChoiceError(null);
+    setDialogueSaveError(null);
+    lineRecoveryRequired.current = false;
     setChoiceOpen(false);
     setChoiceEcho(null);
     setActiveChoice(pendingVisitChoice);
@@ -1340,7 +1241,7 @@ export function useDialogueFlow({
     await commitPage(pages[0]);
     if (!ownsVisit()) return;
 
-    const status = getSessionStatus(animal.id, getSessionBonus(animal));
+    const status = getSessionStatus(animal.id, 0);
     setSessionInfo(status);
 
     // Animate dialogue modal in — the entrance spring ages with the descent
@@ -1360,17 +1261,18 @@ export function useDialogueFlow({
     } finally {
       if (ownsVisit()) openingVisitRef.current = false;
     }
-  }, [dialogueSlide, progress, refreshTendingState, resetPageQueue, onQuestsCompleted, onAcquaintance, refreshAcquaintanceState, getSessionBonus, getUnlockedTypes, setAnimals]);
+  }, [dialogueSlide, progress, refreshTendingState, resetPageQueue, onQuestsCompleted, onIntroduction, getRegularConversation, getUnlockedTypes]);
 
   // Recompute hasNewDialogue for a specific animal after session changes
   const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
     if (!animal.isUnlocked || !progress) return false;
-    if (hasPendingAcquaintance(animal)) return true;
+    if (onIntroduction && !progress.introsSeen.includes(animal.id)) return true;
     if (isOnCooldown(animal.id)) return false;
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
-    const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
+    const totalDialogues = getTotalDialogueCount(animal.type, Math.min(animalPhase, 4) as DialoguePhase);
+    if (getRegularConversation(animal)) return true;
     if (animalPhase === 5) {
-      // Pool-only badge: regular backlog is irrelevant after the reveal.
+      // Once the regular conversation is complete, only new pool lines light the badge.
       const pool = buildPhase5Pool(animal.type, tendingLevel, playerChoices[animal.type] ?? null);
       const caughtUp = tendingCaughtUp[animal.type] ?? 0;
       // Not `caughtUp < pool.length`: that lights for a pool whose only
@@ -1382,16 +1284,15 @@ export function useDialogueFlow({
         buildPhase5Eligibility(animal.type, pool, progress.unlockedAnimals ?? [])
       );
     }
-    const resolved = resolveDialogueIndex(animal.type, animal.currentDialogueIndex, animalPhase, getUnlockedTypes());
-    if (animalPhase === 2 && resolved >= totalDialogues) {
+    if (animalPhase === 2) {
       // Base block exhausted — honest badge: lit only while the exhaustion
       // pool still has undelivered (genuinely new) lines.
       return phase2PoolHasNew(animal.type, phase2Cursors[animal.type] ?? 0);
     }
-    return resolved < totalDialogues || hasPendingDialogueChoice(
-      animal.type, animalPhase, resolved, answeredAnimals
+    return hasPendingDialogueChoice(
+      animal.type, animalPhase, totalDialogues, answeredAnimals
     );
-  }, [progress, tendingLevel, tendingCaughtUp, playerChoices, answeredAnimals, phase2Cursors, getUnlockedTypes, hasPendingAcquaintance]);
+  }, [progress, tendingLevel, tendingCaughtUp, playerChoices, answeredAnimals, phase2Cursors, getRegularConversation, onIntroduction]);
 
   // Handle closing dialogue. Manual closes keep the session warm so
   // checking in with an animal never feels punitive.
@@ -1401,56 +1302,12 @@ export function useDialogueFlow({
     hapticLight();
     const closingAnimal = selectedAnimal;
 
-    // Terminal read: if the player is closing while on the LAST available line
-    // for this animal at a finite phase (nothing more to advance to), advance
-    // the stored index PAST it so the "!" badge goes honest-dark. Without this
-    // the index caps at the last line forever (index < total stays true), so an
-    // exhausted animal — lagging animals like the sloth hit this first — keeps
-    // re-lighting its badge after every cooldown while showing only "Close",
-    // which reads as being stuck. The cycling pools (Phase 2 exhaustion / Phase 5
-    // post-revelation) genuinely always have more, so they're excluded.
-    let terminalIndex: number | null = null;
-    if (closingAnimal && progress && preDialoguePages.length === 0) {
-      const animalPhase = getAnimalPhase(progress.currentPhase, closingAnimal.type);
-      const isCyclingPool =
-        animalPhase === 5 ||
-        (animalPhase === 2 && getPhase2ExtraDialogues(closingAnimal.type).length > 0);
-      if (!isCyclingPool) {
-        // animalPhase is 0-4 here (5 is a cycling pool, excluded above).
-        const unlocked = getUnlockedTypes();
-        const cur = resolveDialogueIndex(closingAnimal.type, closingAnimal.currentDialogueIndex, animalPhase, unlocked);
-        const next = resolveDialogueIndex(closingAnimal.type, cur + 1, animalPhase, unlocked);
-        const total = getTotalDialogueCount(closingAnimal.type, animalPhase);
-        if (next >= total && closingAnimal.currentDialogueIndex < total) {
-          terminalIndex = total;
-          await markDialogueRead(closingAnimal.id, total);
-        }
-      }
-    }
-
     if (closingAnimal && startCooldown) {
       await endSession(closingAnimal.id);
     }
-    // Refresh the animal's badge on cooldown-close OR when a terminal read just
-    // advanced its index — either way hasNewDialogue may have changed.
-    if (closingAnimal && (startCooldown || terminalIndex !== null)) {
-      // Derive the committed index from the CURRENT state value inside the
-      // functional update — never from this callback's closure. The forced
-      // close that ends a session runs in the same tick as handleNextDialogue's
-      // index advance, so the closure's copy of the animal is one line behind;
-      // writing it back rolled the in-memory index backwards, and a newly
-      // unlocked animal's grace period (no cooldown, no storage reload) then
-      // re-served the already-read line at the start of the next session.
-      setAnimals(prev =>
-        prev.map(a => {
-          if (a.id !== closingAnimal.id) return a;
-          const idx = terminalIndex !== null
-            ? Math.max(terminalIndex, a.currentDialogueIndex)
-            : a.currentDialogueIndex;
-          const committed = { ...a, currentDialogueIndex: idx };
-          return { ...committed, hasNewDialogue: recomputeHasNewDialogue(committed) };
-        })
-      );
+    if (closingAnimal && startCooldown) {
+      setAnimals(prev => prev.map(animal => animal.id === closingAnimal.id
+        ? { ...animal, hasNewDialogue: recomputeHasNewDialogue(animal) } : animal));
     }
     setShowDialogue(false);
     setSelectedAnimal(null);
@@ -1460,39 +1317,18 @@ export function useDialogueFlow({
     setChoiceOpen(false);
     setChoiceEcho(null);
     setChoiceError(null);
+    setDialogueSaveError(null);
     // Closing mid-pages behaves exactly like closing mid-line: nothing extra
     // beyond clearing the page queue so it can't leak into the next session.
     resetPageQueue();
-  }, [selectedAnimal, progress, preDialoguePages, recomputeHasNewDialogue, setAnimals, resetPageQueue, getUnlockedTypes]);
+  }, [selectedAnimal, recomputeHasNewDialogue, setAnimals, resetPageQueue]);
 
   // Leaving an unanswered question records no answer. Its existing pending
   // choice badge brings the player back; only an in-flight save must finish.
   const handleCloseDialogue = useCallback(async () => {
-    if (choiceSavePendingRef.current || advancingDialogueRef.current) return;
+    if (choiceSavePendingRef.current || advancingDialogueRef.current || lineRecoveryRequired.current) return;
     await closeDialogue(false);
   }, [closeDialogue]);
-
-  const canOfferAcquaintance = Boolean(
-    onAcquaintance && selectedAnimal && progress &&
-    progress.introsSeen.includes(selectedAnimal.id) &&
-    canOfferAnimalAcquaintance(acquaintanceState, selectedAnimal.type)
-  );
-
-  const handleOpenAcquaintance = useCallback(async () => {
-    if (!selectedAnimal || !onAcquaintance || !canOfferAcquaintance ||
-      choiceSavePendingRef.current || acquaintanceOpeningRef.current) return;
-    const animal = selectedAnimal;
-    acquaintanceOpeningRef.current = true;
-    try {
-      await closeDialogue(false);
-      await onAcquaintance(animal, true);
-      await refreshAcquaintanceState();
-    } catch {
-      setCooldownMessage("Couldn't open this conversation. Tap your friend to try again.");
-    } finally {
-      acquaintanceOpeningRef.current = false;
-    }
-  }, [selectedAnimal, onAcquaintance, canOfferAcquaintance, closeDialogue, refreshAcquaintanceState]);
 
   // Availability signal for the "visit next friend" chain — the SAME news
   // signal the home "!" badge uses (recomputeHasNewDialogue already folds in
@@ -1502,15 +1338,14 @@ export function useDialogueFlow({
   const isChainCandidate = useCallback(
     (animal: Animal): boolean => {
       if (!animal.isUnlocked) return false;
-      if (hasPendingAcquaintance(animal)) return true;
+      if (onIntroduction && progress && !progress.introsSeen.includes(animal.id)) return true;
       if (!recomputeHasNewDialogue(animal)) return false;
-      const status = getSessionStatus(animal.id, getSessionBonus(animal));
+      const status = getSessionStatus(animal.id, 0);
       if (status.status === 'cooldown') return false;
       if (status.status === 'in_session' && (status.dialoguesRemaining ?? 0) <= 0) return false;
       return true;
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [recomputeHasNewDialogue, hasPendingAcquaintance, progress]
+    [recomputeHasNewDialogue, onIntroduction, progress]
   );
 
   // Resolve the next unlocked animal with news, wrapping in display/unlock
@@ -1525,14 +1360,14 @@ export function useDialogueFlow({
   );
 
   // Chain to the next friend: run the exact same close bookkeeping as the
-  // Close button (closeDialogue(false) — terminal-read advancement, badge
-  // honesty refresh, session left warm exactly like a manual close), then
+  // Close button (closeDialogue(false), keeping the current line unread and
+  // the session warm), then
   // open the next animal through the normal tap path. handleAnimalTap
   // re-checks availability itself, so if the animal's state changed between
   // render and tap the standard cooldown message shows — no special casing.
   const handleVisitNextAnimal = useCallback(
     async (next: Animal) => {
-      if (!next || !next.isUnlocked || choiceSavePendingRef.current || advancingDialogueRef.current || openingVisitRef.current) return;
+      if (!next || !next.isUnlocked || choiceSavePendingRef.current || advancingDialogueRef.current || openingVisitRef.current || lineRecoveryRequired.current) return;
       if (selectedAnimal && next.id === selectedAnimal.id) return;
       await closeDialogue(false);
       await handleAnimalTap(next);
@@ -1543,11 +1378,6 @@ export function useDialogueFlow({
   // Handle dialogue advance
   const handleNextDialogue = useCallback(async () => {
     if (!selectedAnimal || !progress || choiceSavePendingRef.current || advancingDialogueRef.current || openingVisitRef.current) return;
-    if (hasPendingAcquaintance(selectedAnimal)) {
-      await closeDialogue(false);
-      await handleAnimalTap(selectedAnimal);
-      return;
-    }
     advancingDialogueRef.current = true;
     try {
     hapticSelection();
@@ -1595,7 +1425,7 @@ export function useDialogueFlow({
       const nextHead = preDialoguePages[1];
       // A choice reached on the session's last regular line is still answered
       // in this visit. Its reply/convergence finish before the session closes.
-      const remaining = getSessionStatus(selectedAnimal.id, getSessionBonus(selectedAnimal)).dialoguesRemaining;
+      const remaining = getSessionStatus(selectedAnimal.id, 0).dialoguesRemaining;
       if (!nextHead && remaining !== undefined && remaining <= 0) {
         await closeDialogue(true);
         return;
@@ -1608,7 +1438,7 @@ export function useDialogueFlow({
     }
 
     // Regular dialogue advance — check if session is still available
-    const availability = await checkDialogueAvailability(selectedAnimal.id, getSessionBonus(selectedAnimal));
+    const availability = await checkDialogueAvailability(selectedAnimal.id, 0);
     if (!availability.available) {
       const animalId = selectedAnimal.id;
       const animalName = selectedAnimal.name;
@@ -1619,17 +1449,61 @@ export function useDialogueFlow({
 
     // Per-animal phase awareness for dialogue progression
     const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
-    // Phase 2: the exhaustion pool means there is always another line — the
-    // base block hands off to the pool instead of dead-ending on its last line.
+    const regular = getRegularConversation(selectedAnimal);
+    if (regular) {
+      const generation = visitGenerationRef.current;
+      setLineSaving(true);
+      setDialogueSaveError(null);
+      try {
+        const result = await completeAnimalConversationLine(selectedAnimal.id, regular.dialogue.id, progress.cycleCount ?? 0);
+        if (generation !== visitGenerationRef.current) return;
+        if (result.completed) await recordDialogue(selectedAnimal.id);
+        if (generation !== visitGenerationRef.current) return;
+        let pendingChoice: DialogueChoice | null = null;
+        if (!activeChoice && (animalPhase === 3 || animalPhase === 4)) {
+          try { pendingChoice = await getChoiceForAnimal(selectedAnimal.type, animalPhase, result.nextIndex); } catch {}
+        }
+        if (generation !== visitGenerationRef.current) return;
+        lineRecoveryRequired.current = false;
+        onConversationProgress?.(result.conversationReadIds, result.cycleCount);
+        setConversationReads({ source: progress, ids: result.conversationReadIds });
+        const status = getSessionStatus(selectedAnimal.id, 0);
+        setSessionInfo(status);
+        const hasNews = !!result.next || !!pendingChoice || (animalPhase === 2
+          ? phase2PoolHasNew(selectedAnimal.type, phase2Cursors[selectedAnimal.type] ?? 0)
+          : animalPhase === 5 && selectPhase5(selectedAnimal.type, result.nextIndex).isNew);
+        const updated = { ...selectedAnimal, currentDialogueIndex: result.nextIndex,
+          hasNewDialogue: !isOnCooldown(selectedAnimal.id) && hasNews };
+        setAnimals(prev => prev.map(animal => animal.id === updated.id ? updated : animal));
+        setSelectedAnimal(updated);
+        resetPageQueue();
+        if (pendingChoice) {
+          setActiveChoice(pendingChoice);
+          setChoiceOpen(false);
+          setChoiceEcho(null);
+          setChoiceError(null);
+          choiceSubmissionRef.current = false;
+          setPreDialoguePages([{ text: pendingChoice.prompt }]);
+        } else if (status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
+          await closeDialogue(true);
+          const resting = isOnCooldown(updated.id);
+          setAnimals(prev => prev.map(animal => animal.id === updated.id
+            ? { ...animal, hasNewDialogue: !resting && hasNews } : animal));
+          setCooldownMessage(sessionEndMessage(updated.name, resting));
+        }
+      } catch (error) {
+        if (generation === visitGenerationRef.current) {
+          if (error instanceof StorageRecoveryRequiredError) lineRecoveryRequired.current = true;
+          setDialogueSaveError('Your place could not be saved. Please retry to continue this conversation.');
+        }
+      } finally {
+        setLineSaving(false);
+      }
+      return;
+    }
+
     const phase2Pool = animalPhase === 2 ? getPhase2ExtraDialogues(selectedAnimal.type) : [];
-    // Phase 5: the post-revelation pool cycles forever, and it only engages at
-    // index >= totalRegular — without this clause the session would dead-end on
-    // the last regular line and the pool could never be reached.
-    const hasMore = animalPhase === 5 || phase2Pool.length > 0 || hasMoreDialogues(
-      selectedAnimal.type,
-      selectedAnimal.currentDialogueIndex,
-      animalPhase
-    );
+    const hasMore = animalPhase === 5 || phase2Pool.length > 0;
 
     if (hasMore) {
       await recordDialogue(selectedAnimal.id);
@@ -1664,7 +1538,7 @@ export function useDialogueFlow({
         }
       }
 
-      const status = getSessionStatus(selectedAnimal.id, getSessionBonus(selectedAnimal));
+      const status = getSessionStatus(selectedAnimal.id, 0);
       setSessionInfo(status);
 
       const unlocked = getUnlockedTypes();
@@ -1808,7 +1682,7 @@ export function useDialogueFlow({
     } finally {
       advancingDialogueRef.current = false;
     }
-  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, choiceOpen, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getSessionBonus, getUnlockedTypes, selectPhase5, hasPendingAcquaintance, handleAnimalTap]);
+  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingCaughtUp, phase2Cursors, activeChoice, choiceOpen, pageCursor, pageSource, resetPageQueue, getFullDialogueText, getPhase5Pool, getUnlockedTypes, selectPhase5, getRegularConversation, onConversationProgress]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
@@ -1867,12 +1741,10 @@ export function useDialogueFlow({
     hasMoreToShow: computeHasMore(),
     activeChoice,
     choiceOpen,
-    choiceSaving,
+    choiceSaving: choiceSaving || lineSaving,
     choiceError,
     choiceEcho,
-    canOfferAcquaintance,
-    handleOpenAcquaintance,
-    refreshAcquaintanceState,
+    dialogueSaveError,
     handleAnimalTap,
     handleNextDialogue,
     handleCloseDialogue,
@@ -1881,4 +1753,3 @@ export function useDialogueFlow({
     handleVisitNextAnimal,
   };
 }
-

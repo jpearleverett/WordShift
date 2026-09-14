@@ -1,6 +1,6 @@
 # WordShift: the house can change
 
-> Current behavior reviewed against `main` at `6f96ebb` on September 13, 2026. Build configuration, merged fixes and validation limits: [current build](CURRENT_BUILD.md). The original implementation validation below is historical evidence, not a test report for the latest Android bundle.
+> Updated September 13, 2026 for the sequential-conversation follow-up to `main` at `f1f7cd5`. The compact next-unlock sign, attunement layout fix and delivered house-upgrade gifts remain included. Build configuration, source changes and validation limits: [current build](CURRENT_BUILD.md). Earlier CI and original implementation validation remain historical evidence, not a test report for the latest Android bundle.
 
 This implementation follows [the editorial review](STORY_EDITORIAL_REVIEW.md). It preserves the word puzzle, thirteen residents, growing pixel house and gradual tonal descent, while giving that descent an observable cost and the player an answer that survives the ending.
 
@@ -14,7 +14,7 @@ There is one arrival: the midnight descent, an opening in the sky, the presence 
 
 ## Essential conversations
 
-More than 2,000 existing utterances were revised across the cast, including introductions, visits, reactions, tending and the aftermath. Existing dialogue IDs and pool lengths remain stable for saved visit positions. The new durable conversation sequence is scheduled around ordinary play. Optional visits retain their separate voices. Closing a conversation saves its current page and releases the pending gameplay action; it does not consume unseen pages or select a response. Older missed scenes are explicitly retrospective. An armed finale prioritizes the complete council explanation even when a player skipped earlier visits.
+More than 2,000 existing utterances were revised across the cast, including introductions, visits, reactions, tending and the aftermath. Existing dialogue IDs and pool lengths remain stable. The core story sequence is scheduled around ordinary play; optional resident conversations retain their separate voices. Closing a core story scene saves its current page and releases the pending gameplay action without consuming unseen pages or selecting a response. Ordinary resident lines use the separate completion rules below. Older missed scenes are explicitly retrospective. An armed finale prioritizes the complete council explanation even when a player skipped earlier visits.
 
 | Conversation | Purpose |
 | --- | --- |
@@ -36,17 +36,23 @@ More than 2,000 existing utterances were revised across the cast, including intr
 
 Scene speakers and concrete callbacks adapt to the recruited roster and delivered memories. Things We Kept stores the player's actual conversation transcript and answer. Earlier conversations makes phase-appropriate regular dialogue available without changing live visit progression or revealing future chapters.
 
-## Getting to know later residents
+## Complete resident conversations
 
-Warren (wombat), Thyme (rabbit), Bamboo (red panda), Vesper (tarsier), Tock (aye-aye) and Moss (kakapo) have a separate three-visit acquaintance arc. For a new arrival first met in Phase 2 or later, the visits introduce the resident, offer ordinary company, then connect that personal detail to the house's current circumstances. These pages select the resident's existing introduction, regular dialogue and aftermath prose verbatim; they do not replace the manuscript or rewind the regular dialogue cursor.
+Every resident receives their complete normal introduction, regardless of the house phase when they join. Their ordinary conversation then starts with the earliest eligible unread line and continues through all 134 regular lines in authored order. Future chapters remain gated by the resident's effective phase. Reaching a later phase or the Arrival never deletes earlier unread material. A line requiring a still-locked resident waits without being marked read; later eligible lines can proceed, and the deferred line returns once that resident joins.
 
-The selected words, visit and current page persist in `wordshift_animal_acquaintance`. Leaving a visit defers the remaining pages. Existing friends can opt in to the company and current-concern visits without being introduced as new arrivals again. A visit reopened after the Arrival uses its Phase-5 setting rather than preserving a prediction about an event that has already happened.
+The September 13 follow-up retires the separate three-visit acquaintance arc, catch-up introductions and “Tell me about yourself” action. Their former service/manuscript remains compatibility history, not an active alternate path. A normal welcome is acknowledged only after its final page; closing early leaves it pending. The durable `introsSeen` acknowledgement does not claim that any regular conversation line has been read.
+
+Individual event-dependent passages have authored temporal variants selected by the current global phase and acknowledged Arrival (`hasAnimalConversationArrivalOccurred`). The helper requires the queued Arrival ceremony to be acknowledged, or an existing post-revelation/Phase-5 save. A completed final board with Arrival still queued does not qualify. This includes the interval after the Arrival while the house has not yet entered Phase 5. Early discoveries can be recalled after the event without predicting it again. Hobbies, jokes and ordinary company stay in the resident's original voice. The variants preserve stable line IDs, reading order and the player's actual choices; they do not add a generic recap to every early line.
+
+`conversationProgress.ts` stores completed line IDs in `conversationReadIds`, with `conversationReadVersion: 1`, inside the existing synced home-progress record. Next on a line's final page commits that exact line transactionally, including the last available line. Closing, switching friends, backdrop dismissal or interrupting the text reveal leaves the current line unread. Reopening an unfinished ordinary line starts at its first page. Save failures expose retry, and duplicate or stale-cycle completions cannot consume a different line.
+
+Old `lastDialogueRead` counters cannot distinguish actual reading from automatic skips. An absent read-ID ledger therefore starts empty once; some already-read passages may repeat, but potentially skipped material remains available. The house, amber, completed introductions, story state, saved choices and separate pool counters are preserved. New Cycle clears the regular read-ID ledger and changes the completion epoch. At Phase 5, eligible unread Phase-0–4 conversations continue before the post-arrival/Tending pool.
 
 The tea/cocoa decision is one of several authored choices. The story spine also includes sharing or keeping the first account, a road or room precaution, the kept record, a confidence about leaving, Ember's proximity and the player's reply after the Arrival; availability and wording depend on the recruited cast and delivered memories. Separately, each resident has one personal ask/refuse choice offered after the relevant Phase-3 material, with late availability through Phase 4 and callbacks that require a saved answer. Phase 5 does not manufacture a missed pre-arrival decision.
 
 Resident choice pages keep the speaker and full question above two equally weighted, wrapping answers. “Come back later” leaves the question unanswered. Controls lock as soon as saving begins; a save failure exposes a retry instead of advancing to a response that was never stored. The response can repeat the player's own words in a “You said” panel. This is relationship and narrative consequence, not an amber advantage for a preferred answer.
 
-Implementation: `animalAcquaintance.ts`, `dialogue/animalAcquaintanceContent.ts`, `dialogueChoices.ts`, `storySpine.ts`, `useDialogueFlow.ts` and `DialogueChoicePage.tsx` under `mobile/src/`.
+Implementation: `conversationProgress.ts`, `dialogue/animalConversationText.ts`, the three `dialogue/conversationAdaptations*.ts` tables, `amberCurrency.ts`, `homeWorldData.ts`, `useDialogueFlow.ts` and `HomeScreen.tsx`. Personal choices retain `dialogueChoices.ts` and `DialogueChoicePage.tsx`; the core story retains `storySpine.ts`.
 
 ## The last arrangement
 
@@ -80,7 +86,9 @@ Tall-house air gains restrained clouds, haze and later-phase stars above the exi
 
 The puzzle now shares the house's material language: painted clay, sage, lilac and ochre tokens; warm paper rows; timber edges; a restrained forest backdrop; and quieter particles. Source-letter ink adapts to equipped cosmetic palettes and meets a 4.5:1 contrast check across the catalog. Existing purchased materials retain their individual finishes.
 
-All thirteen rooms have five amber purchase steps: one decoration, one deepening and three attunement levels. Deepening and attunement each require the decoration; attunement does not require buying the deepening first. Room-specific coordinates in `roomUpgradeVisuals.ts` place props on their actual floor, table, wall, hanging or water surface. A deepening can add or replace a prop, or change the existing room through an effect. Light sources and marks belong to each room's art rather than a shared center glow. The paid `purchaseHouseUpgrade` path saves amber, ledger and ownership in one storage transaction, and checks the requested attunement level before charging.
+All thirteen rooms have five amber purchase steps: one decoration, one deepening and three attunement levels. The paid `purchaseHouseUpgrade` path saves amber, ledger and an exact pending gift together. The player visits the room, taps its invited animal and chooses Give; only then does the room improve, followed by dialogue specific to the upgrade and current phase. A delivered receipt persists until the reaction is completed. Deepening and attunement require the delivered decoration; attunement does not require the deepening, and a pending attunement cannot unlock the next level. Existing installed upgrades remain installed without gift backfill or another charge.
+
+Room-specific coordinates in `roomUpgradeVisuals.ts` place props on their actual floor, table, wall, hanging or water surface. A deepening can add or replace a prop, or change the room through an effect. Light sources and marks belong to each room's art rather than a shared center glow. The next-unlock sign remains one compact text row with full requirements available through accessibility and tapped details. Attunement cards restore their visible state and use separate keys per offered level so repeated purchases do not leave growing blank space.
 
 Fox retains ten individual walk frames. Eleven other residents have eight-frame atlases; axolotl retains its existing movement. Fennec's left-facing idle/speaking/robed art is normalized separately from its right-facing walking atlas. Walking frames run in Phases 0–3 when animation settings and device tier permit; robed phases retain their existing glide. Provenance and rebuilding instructions are in the [walk source README](../mobile/assets/raw/animal_walk_sheets/README.md).
 

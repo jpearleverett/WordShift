@@ -111,9 +111,8 @@ import {
   ANIMAL_INFO,
   getIntroDialogueLine,
   getIntroDialogueCount,
-  getCatchupIntroDialogue,
-  getCatchupIntroDialogueCount,
 } from '../../services/animalDialogue';
+import { adaptAnimalIntroductionLines, hasAnimalConversationArrivalOccurred } from '../../services/dialogue/animalConversationText';
 import {
   loadDialogueSessions,
   updatePuzzleCount,
@@ -121,13 +120,6 @@ import {
 
 import { useDialogueFlow } from '../../hooks/useDialogueFlow';
 import { useUnlockFlow } from '../../hooks/useUnlockFlow';
-import {
-  advanceAnimalAcquaintance,
-  loadAnimalAcquaintanceState,
-  openAnimalAcquaintance,
-  type AnimalAcquaintanceMemory,
-} from '../../services/animalAcquaintance';
-import { ACQUAINTANCE_ANIMALS } from '../../services/dialogue/animalAcquaintanceContent';
 
 import { JuicyButton } from './JuicyButton';
 import { CelebrationConfetti } from './CelebrationConfetti';
@@ -720,8 +712,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'acquaintance' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro' | 'keeper_record_intro' | 'offering_intro'>('animal_intro');
-  const [acquaintanceMemory, setAcquaintanceMemory] = useState<AnimalAcquaintanceMemory | null>(null);
+  const introArrivalOccurred = progress ? hasAnimalConversationArrivalOccurred(progress) : false;
+  // The normal introduction keeps every page. Only its phrasing changes with
+  // the house; global tutorial overrides retain their own existing scripts.
+  const currentIntroLines = useMemo(() => {
+    if (introOverrideLines) return introOverrideLines;
+    if (!introAnimal) return [];
+    const normalLines = Array.from({ length: getIntroDialogueCount(introAnimal.type) },
+      (_, index) => getIntroDialogueLine(introAnimal.type, index) ?? '');
+    return adaptAnimalIntroductionLines(introAnimal.type, normalLines, homePhase, introArrivalOccurred);
+  }, [introOverrideLines, introAnimal, homePhase, introArrivalOccurred]);
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge' | 'unbroken_weave_intro' | 'keeper_record_intro' | 'offering_intro'>('animal_intro');
   const [introSaving, setIntroSaving] = useState(false);
   const [introSaveError, setIntroSaveError] = useState<string | null>(null);
   const [introOpenError, setIntroOpenError] = useState<string | null>(null);
@@ -842,8 +843,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [attunedRooms, setAttunedRooms] = useState<Record<string, number>>(homeSceneSnapshot?.attuned ?? {});
   const [tendingLevel, setTendingLevel] = useState(homeSceneSnapshot?.tendingLevel ?? 0);
 
-  // Personal visits have their own saved position. They never rewind the
-  // world's dialogue cursor or change answers an established friend remembers.
+  // Every new resident gets their complete introduction before regular visits.
+  // Opening and final acknowledgment retain ownership across storage awaits.
   const claimIntroOpening = useCallback((): number => {
     const token = introPresentationRef.current.claim();
     if (token === null) throw new Error('Another conversation is still open.');
@@ -853,36 +854,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setIntroOpening(true);
     return token;
   }, []);
-
-  const presentAnimalAcquaintance = useCallback(async (animal: Animal, optional = false, ownedToken?: number) => {
-    const token = ownedToken ?? claimIntroOpening();
-    const owner = introPresentationRef.current;
-    try {
-      const freshProgress = await getFullProgress();
-      const state = await loadAnimalAcquaintanceState();
-      if (!owner.owns(token)) return;
-      const memory = await openAnimalAcquaintance(
-        animal.type,
-        freshProgress.currentPhase,
-        optional ? 'optional' : state.animals[animal.type] ? 'continue' : 'introduction',
-      );
-      if (!owner.owns(token)) return;
-      if (!memory) throw new Error('This conversation is no longer available.');
-      setIntroOpenError(null);
-      setAcquaintanceMemory(memory);
-      setIntroSaveError(null);
-      setIntroAnimal(animal);
-      setIntroDialogueIndex(memory.page);
-      setIntroOverrideLines(memory.lines);
-      setIntroContext('acquaintance');
-      setShowIntroDialogue(true);
-    } catch (error) {
-      if (ownedToken === undefined && owner.release(token)) setIntroOpening(false);
-      throw error;
-    } finally {
-      if (owner.owns(token)) setIntroOpening(false);
-    }
-  }, [claimIntroOpening]);
 
   const presentAnimalIntroduction = useCallback(async (animal: Animal) => {
     const owner = introPresentationRef.current;
@@ -895,14 +866,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     try {
       const freshProgress = await getFullProgress();
       if (!owner.owns(token)) return;
-      if (ACQUAINTANCE_ANIMALS.has(animal.type) && freshProgress.currentPhase >= 2) {
-        await presentAnimalAcquaintance(animal, false, token);
+      if (freshProgress.introsSeen.includes(animal.id)) {
+        owner.release(token);
+        setIntroOpening(false);
         return;
       }
       setIntroOpenError(null);
-      setAcquaintanceMemory(null);
       setIntroSaveError(null);
-      setIntroOverrideLines(null);
+      const normalLines = Array.from({ length: getIntroDialogueCount(animal.type) },
+        (_, index) => getIntroDialogueLine(animal.type, index) ?? '');
+      setIntroOverrideLines(adaptAnimalIntroductionLines(animal.type, normalLines, freshProgress.currentPhase, hasAnimalConversationArrivalOccurred(freshProgress)));
       setIntroContext('animal_intro');
       setIntroAnimal(animal);
       setIntroDialogueIndex(0);
@@ -917,14 +890,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     } finally {
       if (owner.owns(token)) setIntroOpening(false);
     }
-  }, [claimIntroOpening, presentAnimalAcquaintance]);
+  }, [claimIntroOpening]);
 
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
     progress,
     setAnimals,
     onFoxPlayPrompt: () => setHighlightPlayButton(true),
-    onAcquaintance: presentAnimalAcquaintance,
+    onIntroduction: presentAnimalIntroduction,
+    onConversationProgress: (ids, cycleCount) => setProgress(previous =>
+      previous && (previous.cycleCount ?? 0) === cycleCount
+        ? { ...previous, conversationReadVersion: 1, conversationReadIds: ids }
+        : previous),
   });
   const handleRegularAnimalTap = dialogueFlow.handleAnimalTap;
 
@@ -977,7 +954,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     resetIntroOverrides: () => {
       setIntroOverrideLines(null);
       setIntroContext('animal_intro');
-      setAcquaintanceMemory(null);
       setIntroSaveError(null);
     },
   });
@@ -1113,7 +1089,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Gifts own a separate conversation: they never consume story pages, choices,
   // or a resident's dialogue allowance. Claim the surface before any reads.
   const handleAnimalPress = useCallback(async (animal: Animal) => {
-    if (giftSurfaceRef.current || introSurfaceBusyRef.current || regularDialogueBusyRef.current) return;
+    // The quiet landing delays automatic interruptions, but an explicit tap
+    // is the player's invitation to talk. Every actual reading keeps ownership.
+    if (giftSurfaceRef.current || regularDialogueBusyRef.current ||
+      introPresentationRef.current.busy() || introPresentationRef.current.pendingCount() > 0 ||
+      showIntroDialogue || !!introOverrideLines || introOpening || pendingAnimalIntroCount > 0 ||
+      storyOverlayActive || showStoryInspection || showHouseCompletion ||
+      (introSurfaceBusyRef.current && !quietLanding)) return;
+    setQuietLandingKey(null);
     giftSurfaceRef.current = true;
     introSurfaceBusyRef.current = true;
     const session = ++giftSessionRef.current;
@@ -1142,7 +1125,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     } finally {
       if (session === giftSessionRef.current) setGiftOpening(false);
     }
-  }, [handleRegularAnimalTap]);
+  }, [handleRegularAnimalTap, showIntroDialogue, introOverrideLines, introOpening,
+    pendingAnimalIntroCount, storyOverlayActive, showStoryInspection, showHouseCompletion, quietLanding]);
 
   const handleCloseHouseGift = useCallback(() => {
     if (giftSavingRef.current || giftRecoveryRequired || activeHouseGift?.deliveredAt !== undefined) return;
@@ -1972,51 +1956,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Handle advancing intro dialogue
   const handleAdvanceIntroDialogue = async () => {
     if (!introAnimal || !progress) return;
-
-    if (introContext === 'acquaintance' && acquaintanceMemory) {
-      if (introSavingRef.current) return;
-      const owner = introPresentationRef.current;
-      const token = owner.current();
-      if (!owner.owns(token)) return;
-      introSavingRef.current = true;
-      setIntroSaving(true);
-      setIntroSaveError(null);
-      try {
-        const next = await advanceAnimalAcquaintance(
-          introAnimal.type, acquaintanceMemory.visit, acquaintanceMemory.page,
-        );
-        if (!owner.owns(token)) return;
-        if (next) {
-          setAcquaintanceMemory(next);
-          setIntroDialogueIndex(next.page);
-          setIntroOverrideLines(next.lines);
-        } else {
-          // The service's expected-page guard also makes retrying this final
-          // receipt safe if marking the original introduction fails.
-          await markIntroSeen(introAnimal.id);
-          const [freshProgress, freshAnimals] = await Promise.all([getFullProgress(), getAnimalsWithStatus()]);
-          if (!owner.owns(token)) return;
-          setProgress(freshProgress);
-          setAnimals(freshAnimals);
-          await dialogueFlow.refreshAcquaintanceState();
-          if (!owner.owns(token)) return;
-          owner.release(token);
-          setShowIntroDialogue(false);
-          setIntroAnimal(null);
-          setIntroDialogueIndex(0);
-          setIntroOverrideLines(null);
-          setAcquaintanceMemory(null);
-          setIntroContext('animal_intro');
-        }
-      } catch {
-        if (owner.owns(token)) setIntroSaveError("Couldn't save your place. Try again.");
-      } finally {
-        introSavingRef.current = false;
-        setIntroSaving(false);
-      }
-      return;
-    }
-
     if (introSavingRef.current) return;
     const owner = introPresentationRef.current;
     const token = owner.current() ?? owner.claim();
@@ -2025,11 +1964,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setIntroSaving(true);
     setIntroSaveError(null);
     try {
-      const totalIntro = introOverrideLines
-        ? introOverrideLines.length
-        : shouldUseCatchup()
-          ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
-          : getIntroDialogueCount(introAnimal.type);
+      const totalIntro = currentIntroLines.length;
       const nextIndex = introDialogueIndex + 1;
 
       if (nextIndex < totalIntro) {
@@ -2070,6 +2005,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           }
         } else {
           await markIntroSeen(introAnimal.id);
+          const [freshProgress, freshAnimals] = await Promise.all([getFullProgress(), getAnimalsWithStatus()]);
+          if (!owner.owns(token)) return;
+          setProgress(freshProgress);
+          setAnimals(freshAnimals);
         }
         if (!owner.owns(token)) return;
         owner.release(token);
@@ -2097,22 +2036,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setIntroSaving(true);
     setIntroSaveError(null);
     try {
-      if (introContext === 'acquaintance') {
-        if (!owner.owns(token)) return;
-        owner.release(token);
-        // Opening and advancing already saved the page. Leaving is a pause,
-        // including on the last page; only Finish visit completes this visit.
-        setShowIntroDialogue(false);
-        setIntroAnimal(null);
-        setIntroDialogueIndex(0);
-        setIntroOverrideLines(null);
-        setAcquaintanceMemory(null);
-        setIntroSaveError(null);
-        setIntroContext('animal_intro');
-        return;
-      }
       if (introAnimal) {
-        // Mark intros as seen even if closed early so the player isn't forced repeatedly.
+        // Animal introductions pause without being marked heard. Global
+        // tutorial dismissals keep their one-time receipts and never replay.
         if (introContext === 'challenge_intro') {
           await markChallengeIntroSeen();
         } else if (introContext === 'pit_nudge') {
@@ -2142,8 +2068,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               type: 'keepsake',
             }).catch(() => {});
           }
-        } else {
-          await markIntroSeen(introAnimal.id);
         }
       }
       if (!owner.owns(token)) return;
@@ -2266,34 +2190,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setShowUtilityModal(true);
   }, []);
 
-  // Determine if catch-up dialogues should be used (animal unlocked at Phase 2+)
-  const shouldUseCatchup = (): boolean => {
-    if (!introAnimal || !progress) return false;
-    if (introOverrideLines) return false;
-    return getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase) > 0;
-  };
-
-  // Get current intro dialogue text (uses catch-up dialogues at Phase 2+)
-  const getCurrentIntroText = (): string => {
-    if (!introAnimal || !progress) return '';
-    if (introOverrideLines) {
-      return introOverrideLines[introDialogueIndex] || '';
-    }
-    if (shouldUseCatchup()) {
-      return getCatchupIntroDialogue(introAnimal.type, progress.currentPhase, introDialogueIndex) || '';
-    }
-    return getIntroDialogueLine(introAnimal.type, introDialogueIndex) || '';
-  };
+  const getCurrentIntroText = (): string => currentIntroLines[introDialogueIndex] ?? '';
 
   // Check if there are more intro dialogues
   const hasMoreIntroDialogues = (): boolean => {
     if (!introAnimal || !progress) return false;
-    const total = introOverrideLines
-      ? introOverrideLines.length
-      : shouldUseCatchup()
-        ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
-        : getIntroDialogueCount(introAnimal.type);
-    return introDialogueIndex + 1 < total;
+    return introDialogueIndex + 1 < currentIntroLines.length;
   };
 
   const isStreakAtRisk = useMemo(() => {
@@ -2965,28 +2867,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <DialogueBody text={dialogueFlow.revealedText} style={[styles.dialogueText, { color: panelSt.body }]} />
                   </TouchableOpacity>
 
-                  <View>
-                  {dialogueFlow.canOfferAcquaintance ? (
-                    <BevelRowButton
-                      phase={progress.currentPhase}
-                      variant="secondary"
-                      hostDark={dtHostDark}
-                      onPress={dialogueFlow.handleOpenAcquaintance}
-                      soundKind="dialogue"
-                      accessibilityLabel="Tell me about yourself"
-                      style={styles.dialogueNextFriendBevel}
-                    >
-                      <AppText textRole="label" style={[styles.nextFriendButtonText, { color: pixelSkin.ink.secondary }]}>
-                        Tell me about yourself
-                      </AppText>
-                    </BevelRowButton>
+                  {dialogueFlow.dialogueSaveError ? (
+                    <AppText textRole="body" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: panelSt.body, marginTop: 12 }}>
+                      {dialogueFlow.dialogueSaveError}
+                    </AppText>
                   ) : null}
+                  <View>
                   {nextFriendWithNews ? (
                     <BevelRowButton
                       phase={progress.currentPhase}
                       variant="secondary"
                       hostDark={dtHostDark}
                       onPress={() => dialogueFlow.handleVisitNextAnimal(nextFriendWithNews)}
+                      disabled={dialogueFlow.choiceSaving}
                       soundKind="dialogue"
                       accessibilityLabel={getNextFriendPrompt(progress.currentPhase, nextFriendWithNews.name)}
                       style={styles.dialogueNextFriendBevel}
@@ -3010,18 +2903,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         // Tapping Next/Close while the line is still revealing
                         // (F25) completes the reveal first; it never advances
                         // the dialogue on the same tap that finishes the text.
-                        if (dialogueFlow.revealInProgress) {
+                        if (dialogueFlow.dialogueSaveError) {
+                          dialogueFlow.handleNextDialogue();
+                        } else if (dialogueFlow.revealInProgress) {
                           dialogueFlow.completeReveal();
                         } else {
                           dialogueFlow.handleNextDialogue();
                         }
                       }}
+                      disabled={dialogueFlow.choiceSaving}
                       soundKind="dialogue"
-                      accessibilityLabel={dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? 'Choose a response' : 'Continue dialogue'}
+                      accessibilityLabel={dialogueFlow.dialogueSaveError ? 'Retry saving conversation' : dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? 'Choose a response' : 'Continue dialogue'}
                       style={styles.dialogueContinueBevel}
                     >
                       <AppText textRole="label" style={[styles.continueButtonText, { color: pixelSkin.ink.primary }]}>
-                        {dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? 'Choose a response' : dialogueFlow.hasMoreToShow ? 'Next' : 'Close'}
+                        {dialogueFlow.dialogueSaveError ? 'Try again' : dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? 'Choose a response' : dialogueFlow.hasMoreToShow ? 'Next' : 'Close'}
                       </AppText>
                     </BevelRowButton>
                   </View>
@@ -3974,11 +3870,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       edgeDp={CARD_EDGE_DP}
                       fillColor={pixelSkin.fillCard}
                     />
-                    {acquaintanceMemory && introContext === 'acquaintance' ? (
-                      <AppText textRole="label" style={{ color: panelSt.muted, marginBottom: 10 }}>
-                        {acquaintanceMemory.title}
-                      </AppText>
-                    ) : null}
                     <DialogueBody text={getCurrentIntroText()} style={[styles.dialogueText, { color: panelSt.body }]} />
                   </View>
 
@@ -3995,30 +3886,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       onPress={handleAdvanceIntroDialogue}
                       disabled={introSaving}
                       soundKind="dialogue"
-                      accessibilityLabel={introSaveError ? 'Retry saving conversation' : hasMoreIntroDialogues() ? 'Continue intro' : introContext === 'acquaintance' ? 'Finish visit' : 'Welcome and close'}
+                      accessibilityLabel={introSaveError ? 'Retry saving conversation' : hasMoreIntroDialogues() ? 'Continue intro' : introContext === 'animal_intro' ? 'Welcome and close' : 'Continue'}
                       style={styles.dialogueContinueBevel}
                     >
                       <AppText textRole="label" style={[styles.continueButtonText, { color: pixelSkin.ink.primary }]}>
-                        {introSaveError ? 'Try again' : hasMoreIntroDialogues() ? 'Next' : introContext === 'acquaintance' ? 'Finish visit' : introContext === 'animal_intro' ? 'Welcome!' : 'Continue'}
+                        {introSaveError ? 'Try again' : hasMoreIntroDialogues() ? 'Next' : introContext === 'animal_intro' ? 'Welcome!' : 'Continue'}
                       </AppText>
                     </BevelRowButton>
                   </View>
-                  {introContext === 'acquaintance' ? (
-                    <BevelRowButton
-                      phase={progress.currentPhase}
-                      variant="secondary"
-                      hostDark={dtHostDark}
-                      onPress={handleCloseIntroDialogue}
-                      disabled={introSaving}
-                      soundKind="dialogue"
-                      accessibilityLabel="Come back later"
-                      style={styles.dialogueNextFriendBevel}
-                    >
-                      <AppText textRole="label" style={[styles.nextFriendButtonText, { color: pixelSkin.ink.secondary }]}>
-                        Come back later
-                      </AppText>
-                    </BevelRowButton>
-                  ) : null}
                 </View>
               </ScrollView>
             )}

@@ -40,17 +40,11 @@ export const DIALOGUE_SESSION_CONFIG = {
   DIALOGUES_PER_SESSION: DIALOGUE_SESSION_DEFAULTS.DIALOGUES_PER_SESSION,
   PUZZLES_BETWEEN_SESSIONS: DIALOGUE_SESSION_DEFAULTS.PUZZLES_BETWEEN_SESSIONS,
   GRACE_PERIOD_SESSIONS: DIALOGUE_SESSION_DEFAULTS.GRACE_PERIOD_SESSIONS,
-  // Catch-up session boost: a late recruit (see LATE_PHASE_RECRUITS) that still
-  // has unread REGULAR dialogue at global Phase 3+ reads this many extra lines
-  // per session. Without it the descent trio is stranded: house completion and
-  // Moss's recruit land around 96-100, the eight-win dwell completes around
-  // 104-108, arming waits for 115, the final board is ~116, and
-  // post-revelation is ~117-122. At 4-6 lines per session with 5-puzzle
-  // cooldowns the ending consumes his arc unheard. The lagging tier borrows the same boost at global Phase 4,
-  // where it converges to phase 4 and gains its whole Phase-4 block at once
-  // (see getCatchUpSessionBonus).
+  // Compatibility constants for getCatchUpSessionBonus's retired policy.
+  // Live sessions use ordinary phase limits and retain unread lines through
+  // Arrival; these values no longer shorten a resident's reading window.
   CATCH_UP_BONUS_DIALOGUES: 2,
-  // The boost only exists in the compressed endgame window.
+  // Historical minimum for compatibility callers of the retired helper.
   CATCH_UP_MIN_GLOBAL_PHASE: 3,
 };
 
@@ -114,8 +108,9 @@ export const ANIMAL_AWARENESS_TIERS: Record<AnimalType, AnimalAwarenessTier> = {
  *
  * The tiers stagger the DESCENT (phases 1-3), never the ARRIVAL — in either
  * direction. Upward: an animal's phase may only ever reach 5 through the
- * global phase-5 gate, because the arrival itself is gated on the actual
- * post-revelation event (markPostRevelation pins the global phase to 5).
+ * global phase-5 gate (markPostRevelation pins that phase). The completed
+ * Arrival ceremony is tracked separately for temporal wording in the short
+ * interval before Phase 5; finishing the final board only queues that scene.
  * Pre-arrival the result is hard-capped at 4 — without that cap a vanguard
  * animal (+1) at global Phase 4 resolved to 5 and the game's most-visited
  * characters (Ember, Archimedes, Vesper) leaked "the shadow has settled"
@@ -123,20 +118,20 @@ export const ANIMAL_AWARENESS_TIERS: Record<AnimalType, AnimalAwarenessTier> = {
  * descended. Downward: the lagging -1 applies only through global Phase 3.
  * The Phase-4 reveal is house-wide (every sprite is already robed at global
  * Phase 4), so the lagging tier converges to 4 at the reveal — holding it at
- * 3 through the whole reveal era orphaned its Phase-4 blocks permanently,
- * because the phase-5 handoff skips unread earlier lines by design. And at
- * global phase 5 every animal clamps to 5 so no tier sits at Phase 4 forever
- * and misses its post-revelation dialogue.
+ * 3 through the whole reveal era formerly kept its Phase-4 blocks unavailable
+ * before Arrival. At global phase 5 every animal clamps to 5, opening the
+ * remaining regular corpus and, once it is read, its post-revelation pool.
+ * Eligibility never marks an earlier line read; conversationProgress owns
+ * those completion receipts independently of the world's phase.
  *
  * CONSEQUENCE WORTH KNOWING: the lagging tier therefore never resolves to 3
  * (global 3 -> 2, global 4 -> 4). Anything keyed on `animalPhase === 3` is
  * unreachable for those five animals, which is why the phase-3 choice point,
  * cross-references and trigger reactions are selected from the animal's
  * READING position (see getFlavorPhase in useDialogueFlow and the index band
- * in getChoiceForAnimal) rather than from this number alone. Do not "fix" that
- * by routing the lagging tier through a transitional 3 here: it would re-open
- * the Phase-4 orphan and desync getCatchUpSessionBonus, whose lagging claimant
- * is keyed on global phase 4 with animalPhase already 4.
+ * in getChoiceForAnimal) rather than from this number alone. Preserve the
+ * house-wide Phase-4 convergence; the retired catch-up-session helper is no
+ * longer part of the live conversation route.
  */
 export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalType): DialoguePhase {
   if (globalPhase === 5) return 5;
@@ -151,18 +146,12 @@ export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalTyp
 }
 
 /**
- * Animals whose unlock can only ever open at global Phase 3+ — the descent
- * trio, whose intro is always the catch-up variant. This is the signal for the
- * catch-up session boost. Chosen over a persisted "phase at unlock" record
- * (nothing stores one, and adding one would need a save migration for players
- * already past the gates) and over the catchup-intro flag (introsSeen records
- * WHO was introduced, not at what phase): it is static, save-independent, and
- * derivable from the unlock data — the trio's room gates (84/88/92) all sit
- * at or past the Phase-3 weighted threshold (PHASE_THRESHOLDS[3] = 84), and
- * weighted phase progress never trails raw puzzles solved, so by construction
- * these three cannot exist before global Phase 3. Pinned against
- * UNLOCK_PROGRESSION by homeWorldData.test.ts so the set can't silently drift
- * from the real gates.
+ * The descent trio whose room unlocks require global Phase 3+. This static
+ * set remains part of the real unlock/reservation gate in homeWorldData and
+ * is checked against UNLOCK_PROGRESSION by its tests. It no longer selects
+ * catch-up introductions, skips regular lines or adds a session bonus:
+ * these residents receive their complete normal introduction and conversation.
+ * introsSeen records a completed welcome, not the phase when it happened.
  */
 export const LATE_PHASE_RECRUITS: ReadonlySet<AnimalType> = new Set<AnimalType>([
   'tarsier',
@@ -171,17 +160,12 @@ export const LATE_PHASE_RECRUITS: ReadonlySet<AnimalType> = new Set<AnimalType>(
 ]);
 
 /**
- * Extra dialogues per session for an animal still working through its regular
- * (indexed, non-pool) backlog inside a compressed window. Two claimants share
- * the SAME boost and cap (never stacked):
- *  - a late recruit (the descent trio) at global Phase 3+, whose whole arc
- *    lands just before the finale;
- *  - a lagging-tier animal at global Phase 4, which converges to phase 4 at
- *    the reveal (see getAnimalPhase) and gains its 30-line Phase-4 block with
- *    only ~32 puzzles before post-revelation retires unread lines for good.
- * 0 whenever neither window applies or once the backlog is read out. The
- * cycling pools (Phase-2 exhaustion, Phase-5 post-revelation) never earn the
- * boost — they are ambience, not arc.
+ * Retained compatibility helper for the former catch-up-session policy.
+ * Live useDialogueFlow visits no longer call this helper: ordinary phase-aware
+ * session limits apply, and unread regular lines survive Arrival. Its original
+ * calculation remains available to compatibility callers/tests: one shared,
+ * non-stacking bonus for late recruits at Phase 3+ or lagging residents at the
+ * Phase-4 reveal, only while an indexed regular backlog remains.
  */
 export function getCatchUpSessionBonus(
   globalPhase: DialoguePhase,
@@ -325,6 +309,9 @@ export interface HomeWorldProgress {
   // Tracking for phase transitions
   phasePuzzleThresholds: number[];
   lastDialogueRead: { [animalId: string]: number };
+  /** Actual completed regular lines, independent of historical cursor jumps. */
+  conversationReadIds?: Record<string, string[]>;
+  conversationReadVersion?: 1;
   // Track which animals have had their intro dialogue shown
   introsSeen: string[];
   // Streak tracking for bonus amber
@@ -639,4 +626,3 @@ export function calculateStreakMultiplier(streak: number): number {
 
 // CHALLENGE_MODE_CONFIG is now imported from constants/gameBalance.ts
 // and re-exported at the top of this file.
-

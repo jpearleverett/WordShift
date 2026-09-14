@@ -75,7 +75,6 @@ import { FIRST_COMPLETION_BONUS, checkMilestone, getMilestoneMessage } from '../
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  getPhaseStartIndex,
   getTotalDialogueCount,
 } from '../services/dialogue/animalDialogueBase';
 
@@ -113,7 +112,7 @@ describe('loadProgress', () => {
     expect(progress.unlockedAnimals).toHaveLength(0);
   });
 
-  test('self-heals unlocked vanguard Vesper to her effective Phase 4 start in global Phase 3', async () => {
+  test('loading a late Vesper never skips her unread early conversation', async () => {
     const legacy = {
       ...(await loadProgress()),
       currentPhase: 3,
@@ -123,14 +122,14 @@ describe('loadProgress', () => {
     await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
     invalidateProgressCache();
 
-    const expected = getPhaseStartIndex('tarsier', 4);
+    const expected = 0;
     expect((await loadProgress()).lastDialogueRead.tarsier).toBe(expected);
 
     invalidateProgressCache();
     expect((await loadProgress()).lastDialogueRead.tarsier).toBe(expected);
   });
 
-  test('self-heals Phase 2 late recruits to their current effective phases, including lagging Phase 1', async () => {
+  test('loading Phase 2 late recruits preserves every unread early conversation', async () => {
     const legacy = {
       ...(await loadProgress()),
       currentPhase: 2,
@@ -141,15 +140,15 @@ describe('loadProgress', () => {
     invalidateProgressCache();
 
     expect((await loadProgress()).lastDialogueRead).toMatchObject({
-      tarsier: getPhaseStartIndex('tarsier', 3),
-      aye_aye: getPhaseStartIndex('aye_aye', 2),
-      kakapo: getPhaseStartIndex('kakapo', 1),
+      tarsier: 0,
+      aye_aye: 0,
+      kakapo: 0,
     });
   });
 
   // Lagging converges to phase 4 at the reveal (getAnimalPhase drops the -1
   // at global Phase 4), so Moss's effective phase in global Phase 4 is 4.
-  test('self-heals unlocked lagging Moss to his effective Phase 4 start in global Phase 4', async () => {
+  test('loading Moss at the reveal preserves his unread early conversation', async () => {
     const legacy = {
       ...(await loadProgress()),
       currentPhase: 4,
@@ -159,12 +158,10 @@ describe('loadProgress', () => {
     await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
     invalidateProgressCache();
 
-    expect((await loadProgress()).lastDialogueRead.kakapo).toBe(
-      getPhaseStartIndex('kakapo', 4)
-    );
+    expect((await loadProgress()).lastDialogueRead.kakapo).toBe(0);
   });
 
-  test('late-recruit self-heal never rewinds an existing dialogue position', async () => {
+  test('loading keeps existing legacy counters for compatibility', async () => {
     const legacy = {
       ...(await loadProgress()),
       currentPhase: 4,
@@ -1216,21 +1213,23 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     expect(await getCurrentPhase()).toBe(5);
   });
 
-  test('markPostRevelation retires every unlocked animal regular-dialogue index', async () => {
+  test('markPostRevelation preserves regular conversation receipts and late-pool counters', async () => {
     const progress = await loadProgress();
-    const foxTotal = getTotalDialogueCount('fox', 4);
     const pangolinTotal = getTotalDialogueCount('pangolin', 4);
     progress.unlockedAnimals = ['fox', 'pangolin'];
     progress.lastDialogueRead = {
       fox: 0,
       pangolin: pangolinTotal + 3,
     };
+    progress.conversationReadVersion = 1;
+    progress.conversationReadIds = { fox: ['fx_0_1'] };
 
     await markPostRevelation();
 
     const after = await getFullProgress();
-    expect(after.lastDialogueRead.fox).toBe(foxTotal);
+    expect(after.lastDialogueRead.fox).toBe(0);
     expect(after.lastDialogueRead.pangolin).toBe(pangolinTotal + 3);
+    expect(after.conversationReadIds).toEqual({ fox: ['fx_0_1'] });
   });
 
   test('awardPuzzleAmber never downgrades the phase after post-revelation', async () => {
@@ -1276,8 +1275,7 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     expect(reloaded.currentPhase).toBe(5);
   });
 
-  test('Phase 5 retirement takes precedence over late-recruit fast-forward', async () => {
-    const tarsierTotal = getTotalDialogueCount('tarsier', 4);
+  test('loading Phase 5 never retires unfinished regular conversation', async () => {
     const legacy = {
       ...(await loadProgress()),
       currentPhase: 5,
@@ -1289,10 +1287,10 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     invalidateProgressCache();
 
     const progress = await loadProgress();
-    expect(progress.lastDialogueRead.tarsier).toBe(tarsierTotal);
+    expect(progress.lastDialogueRead.tarsier).toBe(2);
 
     invalidateProgressCache();
-    expect((await loadProgress()).lastDialogueRead.tarsier).toBe(tarsierTotal);
+    expect((await loadProgress()).lastDialogueRead.tarsier).toBe(2);
   });
 
   test('non-post-revelation saves are untouched on load', async () => {

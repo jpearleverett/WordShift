@@ -1,10 +1,10 @@
 # Current build and documentation
 
-Audited **September 13, 2026** against `main` commit [`6f96ebb583f591f46c9c023be6462d99d816a8e7`](https://github.com/jpearleverett/WordShift/commit/6f96ebb583f591f46c9c023be6462d99d816a8e7). This page describes checked-in code and observed CI results. It does not certify an uploaded AAB, a Play rollout, or hosted service configuration.
+Updated **September 13, 2026** for the sequential-conversation follow-up to `main` at `f1f7cd5`. The earlier CI audit remains tied to [`6f96ebb583f591f46c9c023be6462d99d816a8e7`](https://github.com/jpearleverett/WordShift/commit/6f96ebb583f591f46c9c023be6462d99d816a8e7). This page distinguishes current implementation from recorded validation; it does not certify an uploaded AAB, a Play rollout, or hosted service configuration.
 
 ## Build identity
 
-Current source starts from main `b8fd15d` (app 1.3.5 / Android 99). The CI audit above and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source builds on main `f1f7cd5`, retaining its compact next-unlock sign, attunement layout fix and house-upgrade gifts. App version **1.3.5** and Android version code **99** remain unchanged. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
@@ -20,13 +20,14 @@ Current source starts from main `b8fd15d` (app 1.3.5 / Android 99). The CI audit
 
 The owner tests a signed Android build installed through **Google Play internal testing**. Web and Expo Go previews cannot validate native billing, ads, release R8 behavior or Android lifecycle behavior. Both configured Android submit profiles currently target the **internal** Play track; a profile named `production` is not proof of a production rollout.
 
-## Recent merged behavior
+## Current implementation and recent merged behavior
 
 These entries describe implementation, with acceptance checks below. They are not claims that every possible interruption has been tested on a device.
 
 | Area | Current behavior | Implementation / change |
 |---|---|---|
-| Late animal introductions | Animals 8–13 unlocked at phase 2 or later receive three personal visits using existing character prose before ordinary catch-up. Earlier acquaintances can be revisited voluntarily. The active visit and progress survive interruption. | `animalAcquaintance.ts`, `useDialogueFlow.ts`; [PR 433](https://github.com/jpearleverett/WordShift/pull/433) |
+| Complete resident conversations | All 13 residents receive their full normal introduction and then their 134 regular lines in authored order, subject to existing chapter gates and deferred locked-resident references. Phase changes and Arrival never consume unread lines; Phase 5 serves remaining regular dialogue before Tending. The separate acquaintance/catch-up route and “Tell me about yourself” action are retired. | Current follow-up: `conversationProgress.ts`, `homeWorldData.ts`, `useDialogueFlow.ts`, `HomeScreen.tsx`; supersedes the acquaintance routing in [PR 433](https://github.com/jpearleverett/WordShift/pull/433) |
+| Conversation receipts and wording | Next after the final page records one stable line ID; Close and interruptions leave it unread. Individual temporal variants use the current phase and actual Arrival. Ambiguous legacy cursor histories begin an empty read ledger without resetting the house, intros or choices; New Cycle resets regular receipts. | Current follow-up: `conversationProgress.ts`, `amberCurrency.ts`, `animalConversationText.ts`, `conversationAdaptations*.ts` |
 | Story choices | Animal choice screens have clearer answer cards, responsive reading space and durable selections. Deferred choices remain unanswered. | `DialogueChoicePage.tsx`, `dialogueChoices.ts`, `useDialogueFlow.ts`; [PR 433](https://github.com/jpearleverett/WordShift/pull/433) |
 | Room upgrades | All 13 rooms / 65 upgrade steps become saved gifts on purchase. Visit the room, tap its animal and choose Give to apply the improvement and hear its current-phase reaction. Debit, ledger and pending gift share a transaction; delivery and reaction acknowledgement are durable. Existing installed upgrades remain installed. | `roomUpgrades.ts`, `HouseUpgradeGiftModal.tsx`, `houseUpgradeDialogue.ts` |
 | House layout | The next-unlock sign uses one compact text row, with full requirements in its accessible label and tapped details. Attunement offers restore visible opacity and use separate view keys per level, preventing invisible cards from leaving blank space after purchase. | `HomeScreen.tsx`, `ShopScreen.tsx` |
@@ -48,11 +49,17 @@ The [CI run for the audited main commit](https://github.com/jpearleverett/WordSh
 
 The vocabulary check reports **4,372 eligible boards in 7,356 stored records**, across **30 bank families**, with at least 100 eligible boards per family. Stored counts are not all freshly deliverable boards. Routine top-ups must use the [gated generation instructions](../CLAUDE.md#regenerating-puzzle-banks).
 
-The documentation/upload cleanup adds no gameplay changes. It also clarifies the existing purchase-restore and Reset All behavior in the [privacy policy](privacy-policy.md) and [terms](terms.md), with September 13 effective dates. These source edits take effect on the public site when the documentation is merged and deployed. Its archive checks are recorded in [Build and upload](BUILD_AND_UPLOAD.md). Test totals above are tied to the linked source commit; consult the cleanup PR's checks for its own result.
+The earlier documentation/upload cleanup changed no gameplay. It clarified the existing purchase-restore and Reset All behavior in the [privacy policy](privacy-policy.md) and [terms](terms.md), with September 13 effective dates. Public-site deployment remains separate from source validation. Its archive checks are recorded in [Build and upload](BUILD_AND_UPLOAD.md). Test totals above are tied to the linked source commit; consult the cleanup PR's checks for its own result.
 
 ## House-gift change validation
 
 The September 13 house-gift and layout changes passed **279 focused tests in 10 suites**, TypeScript, lint with zero warnings, and the story corpus integrity audit. These cover exact purchase/delivery receipts, restart recovery, legacy ownership, absent recipients, New Cycle preservation and all 65 upgrades across current dialogue phases. All **four targeted browser journeys** also passed: 320/390px single-row banner bounds and full accessible requirements; normal-motion repeated-attunement layout; all five gift handovers with unopened/unfinished-reaction relaunch recovery; and interrupted purchase retry without a second debit. These browser checks are not a signed-device pass.
+
+## Sequential-conversation follow-up validation
+
+The final focused regression run passed **906 tests in 27 suites**, plus TypeScript and lint with zero warnings. Coverage includes all 134 regular lines for each of the 13 residents, temporal wording, legacy cursor ambiguity, deferred resident references, interrupted and idempotent receipts, terminal Next versus Close, parent progress updates, welcome acknowledgement, New Cycle, cloud/reset behavior and house-upgrade gifts.
+
+All **three conversation browser journeys** passed: actual Phase-3 recruitment with a complete welcome followed by the earliest unread lines across phase changes and relaunch; an adapted post-Arrival conversation that survives interruption and advances one saved line at a time; and reachable response controls at 320px with enlarged text. Explicit animal taps also work during the post-Arrival quiet period. The earlier house-gift browser checks and CI totals above retain their original scope. These checks do not certify a signed Android build.
 
 ## Remaining release evidence
 

@@ -115,6 +115,13 @@ jest.mock('../services/dialogueSession', () => ({
   updateSessionPhase: jest.fn(),
 }));
 
+// Exercise the hook against explicit line receipts. The service's real storage,
+// migration and eligibility behavior is covered by conversationProgress.test.
+jest.mock('../services/conversationProgress', () => ({
+  getNextAnimalConversation: jest.fn((...args: unknown[]) => mockSelectConversation(...args)),
+  completeAnimalConversationLine: jest.fn((...args: unknown[]) => mockCompleteConversation(...args)),
+}));
+
 jest.mock('../services/amberCurrency', () => ({
   markDialogueRead: jest.fn(async () => {}),
   markIntroSeen: jest.fn(async () => {}),
@@ -141,11 +148,6 @@ jest.mock('../services/dialogueChoices', () => ({
   loadChoiceState: jest.fn(async () => ({ choices: {} })),
   getPhase4CallbackPage: jest.fn(async () => null),
   markPhase4CallbackShown: jest.fn(async () => {}),
-}));
-
-jest.mock('../services/animalAcquaintance', () => ({
-  ...jest.requireActual('../services/animalAcquaintance'),
-  loadAnimalAcquaintanceState: jest.fn(async () => ({ version: 1, animals: {} })),
 }));
 
 jest.mock('../services/whisperGallery', () => ({
@@ -187,6 +189,8 @@ import { markDialogueRead, markIntroSeen } from '../services/amberCurrency';
 import { recordWhisper } from '../services/whisperGallery';
 import { setPhase5CaughtUp } from '../services/tending';
 import { getChoiceForAnimal, recordChoice } from '../services/dialogueChoices';
+import { getNextAnimalConversation, completeAnimalConversationLine } from '../services/conversationProgress';
+import { StorageRecoveryRequiredError } from '../services/persistenceStorage';
 
 const getCurrentDialogueMock = getCurrentDialogue as jest.Mock;
 const recordDialogueMock = recordDialogue as jest.Mock;
@@ -194,6 +198,8 @@ const markDialogueReadMock = markDialogueRead as jest.Mock;
 const recordWhisperMock = recordWhisper as jest.Mock;
 const checkDialogueAvailabilityMock = checkDialogueAvailability as jest.Mock;
 const setPhase5CaughtUpMock = setPhase5CaughtUp as jest.Mock;
+const completeConversationMock = completeAnimalConversationLine as jest.Mock;
+const conversationProgressCallback = jest.fn();
 
 // A deterministic over-budget line (14 sentences, ~1300 chars => 3+ pages)
 const LONG_LINE = Array.from(
@@ -211,13 +217,60 @@ const progress = {
   puzzlesSolved: 10,
   phasePuzzleThresholds: [],
   lastDialogueRead: {},
-  introsSeen: [],
+  introsSeen: [] as string[],
   currentStreak: 0,
   lastPlayDate: null,
   phaseProgress: 10,
   consumedCoordinatedEvents: [],
   totalWordsFormed: 0,
+  conversationReadIds: {} as Record<string, string[]>,
+  cycleCount: 0,
 };
+
+let mockActiveProgress = progress;
+let mockSavedReads: Record<string, string[]> = {};
+const lineId = (type: string, index: number) => `test_${type}_${index}`;
+function markReadThrough(type: string, count: number) {
+  progress.conversationReadIds[type] = Array.from({ length: count }, (_, index) => lineId(type, index));
+}
+
+function mockSelectConversation(...args: unknown[]) {
+  const [state, type, phase] = args as [typeof progress, string, number];
+  const dialogue = jest.requireMock('../services/animalDialogue');
+  const limit = dialogue.getTotalDialogueCount(type, Math.min(phase, 4));
+  const completed = new Set(state.conversationReadIds?.[type] ?? []);
+  for (let index = 0; index < limit; index++) {
+    if (completed.has(lineId(type, index))) continue;
+    const text = dialogue.getCurrentDialogue(type, index, phase);
+    return { index, dialogue: { ...text, id: lineId(type, index), phase: 0 } };
+  }
+  return null;
+}
+
+async function mockCompleteConversation(...args: unknown[]) {
+  const [type, id, expectedCycle] = args as [string, string, number];
+  if (expectedCycle !== mockActiveProgress.cycleCount) throw new Error('Stale cycle');
+  const ids = { ...mockActiveProgress.conversationReadIds, ...mockSavedReads };
+  const completed = !(ids[type] ?? []).includes(id);
+  mockSavedReads = { ...ids, [type]: completed ? [...(ids[type] ?? []), id] : ids[type] };
+  const { getAnimalPhase } = jest.requireActual('../types/homeWorld');
+  const phase = getAnimalPhase(mockActiveProgress.currentPhase, type);
+  const next = mockSelectConversation({ ...mockActiveProgress, conversationReadIds: mockSavedReads }, type, phase);
+  return { conversationReadIds: mockSavedReads, next,
+    nextIndex: next?.index ?? jest.requireMock('../services/animalDialogue').getTotalDialogueCount(type, Math.min(phase, 4)),
+    completed, cycleCount: expectedCycle };
+}
+
+beforeEach(() => {
+  for (const key of Object.keys(progress.conversationReadIds)) delete progress.conversationReadIds[key];
+  mockSavedReads = {};
+  mockActiveProgress = progress;
+  progress.cycleCount = 0;
+  (getNextAnimalConversation as jest.Mock).mockReset().mockImplementation(mockSelectConversation);
+  completeConversationMock.mockReset().mockImplementation(mockCompleteConversation);
+  jest.requireMock('../services/animalDialogue').getTotalDialogueCount.mockImplementation((_type: string, phase: number) =>
+    [24, 48, 76, 106, 136][Math.min(phase, 4)]);
+});
 
 // Pangolin is a 'middle' awareness tier: animal phase 0 at global phase 0,
 // so no pre-dialogue pages fire (no tutorial callback, refs mocked to null).
@@ -243,10 +296,12 @@ const setAnimals = (updater: unknown) => {
 
 function render() {
   rewindHookIndices();
+  mockActiveProgress = progress;
   // eslint-disable-next-line react-hooks/rules-of-hooks
   return useDialogueFlow({
     progress: progress as never,
     setAnimals: setAnimals as never,
+    onConversationProgress: conversationProgressCallback,
   });
 }
 
@@ -310,8 +365,9 @@ describe('useDialogueFlow long-line pagination (drain behavior)', () => {
     hook = render();
 
     expect(recordDialogueMock).toHaveBeenCalledTimes(1);
-    expect(markDialogueReadMock).toHaveBeenCalledTimes(1);
-    expect(markDialogueReadMock).toHaveBeenCalledWith('pangolin', 1);
+    expect(completeConversationMock).toHaveBeenCalledTimes(1);
+    expect(completeConversationMock).toHaveBeenCalledWith('pangolin', lineId('pangolin', 0), 0);
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
     // A base conversation line is NEVER copied into the whisper gallery: it is
     // already kept, complete, in the journal's earlier conversations. This
     // used to record the full unpaginated line here, which made the gallery a
@@ -334,7 +390,8 @@ describe('useDialogueFlow long-line pagination (drain behavior)', () => {
     hook = render();
 
     expect(recordDialogueMock).toHaveBeenCalledTimes(1);
-    expect(markDialogueReadMock).toHaveBeenCalledTimes(1);
+    expect(completeConversationMock).toHaveBeenCalledTimes(1);
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
     // Short or paginated, a base line still never reaches the gallery.
     expect(recordWhisperMock).not.toHaveBeenCalled();
   });
@@ -498,7 +555,7 @@ describe('useDialogueFlow Fox Phase 4 tutorial callback gating', () => {
   });
 });
 
-describe('useDialogueFlow Phase 5 pool-only delivery', () => {
+describe('useDialogueFlow Phase 5 pools after completed base conversation', () => {
   const phase5Line = 'The pattern continues in a quieter shape.';
   const fox = {
     ...pangolin,
@@ -523,6 +580,7 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     progress.unlockedAnimals = ['fox', 'pangolin', 'tarsier'];
     animals = [{ ...pangolin }];
     getCurrentDialogueMock.mockReturnValue({ text: 'Legacy regular dialogue.' });
+    for (const type of progress.unlockedAnimals) markReadThrough(type, 136);
 
     const phase5Pool = jest.requireMock('../services/dialogue/phase5Pool') as {
       buildPhase5Pool: jest.Mock;
@@ -552,19 +610,26 @@ describe('useDialogueFlow Phase 5 pool-only delivery', () => {
     progress.unlockedAnimals = ['fox', 'pangolin'];
   });
 
-  it('serves and advances the post-revelation pool immediately from a low legacy index', async () => {
+  it('finishes unread base material before serving the pool, regardless of the legacy index', async () => {
+    markReadThrough('pangolin', 135);
     const legacyAnimal = { ...pangolin, currentDialogueIndex: 0 };
     let hook = render();
     await hook.handleAnimalTap(legacyAnimal as never);
     hook = render();
 
-    expect(hook.dialogueText).toBe(phase5Line);
+    expect(hook.dialogueText).toBe('Legacy regular dialogue.');
     expect(hook.hasMoreToShow).toBe(true);
-    expect(getCurrentDialogueMock).not.toHaveBeenCalled();
+    expect(setPhase5CaughtUpMock).not.toHaveBeenCalled();
 
     await hook.handleNextDialogue();
+    hook = render();
+    expect(completeConversationMock).toHaveBeenCalledWith('pangolin', lineId('pangolin', 135), 0);
+    expect(hook.dialogueText).toBe(phase5Line);
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
+    expect(setPhase5CaughtUpMock).not.toHaveBeenCalled();
 
-    expect(markDialogueReadMock).toHaveBeenCalledWith('pangolin', 25);
+    await hook.handleNextDialogue();
+    expect(markDialogueReadMock).toHaveBeenCalledWith('pangolin', 137);
     expect(setPhase5CaughtUpMock).toHaveBeenCalledWith('pangolin', 1);
   });
 
@@ -898,6 +963,7 @@ describe('useDialogueFlow Phase-3 choice reachability', () => {
   });
 
   it('consults the choice for a lagging animal at global Phase 4 (animal-phase 4)', async () => {
+    markReadThrough('sloth', 76);
     progress.currentPhase = 4;
     progress.puzzlesSolved = 95;
     const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
@@ -920,6 +986,7 @@ describe('useDialogueFlow Phase-3 choice reachability', () => {
   });
 
   it('still consults the choice at animal-phase 3 for the middle tier', async () => {
+    markReadThrough('pangolin', 76);
     progress.currentPhase = 3;
     progress.puzzlesSolved = 70;
     const dialogueChoices = jest.requireMock('../services/dialogueChoices') as {
@@ -1035,6 +1102,7 @@ describe('useDialogueFlow keeps the late-pool lines the journal cannot show', ()
 
   it('records a post-revelation / Tending pool line as a passage', async () => {
     progress.currentPhase = 5;
+    markReadThrough('pangolin', 136);
     tending.selectPhase5Dialogue.mockReturnValue({ text: POOL_LINE, isNew: true, nextCaughtUp: 1 });
 
     let hook = render();
@@ -1069,9 +1137,8 @@ describe('useDialogueFlow keeps the late-pool lines the journal cannot show', ()
 });
 
 describe('useDialogueFlow exhausted regular block (no last-line replay)', () => {
-  // The mocked total is 24 and resolveDialogueIndex is the identity, so an
-  // index of 24 is exactly where closeDialogue's terminal read parks an animal
-  // whose block is read out: badge dark, still tappable.
+  // Only explicit receipts establish exhaustion; a legacy numeric cursor
+  // cannot prove that the old automatic jumps actually showed these lines.
   const exhausted = { ...pangolin, currentDialogueIndex: 24, hasNewDialogue: false };
 
   beforeEach(() => {
@@ -1079,6 +1146,7 @@ describe('useDialogueFlow exhausted regular block (no last-line replay)', () => 
     animals = [{ ...exhausted }];
     jest.clearAllMocks();
     getCurrentDialogueMock.mockImplementation(() => ({ text: 'The last line of the block.' }));
+    markReadThrough('pangolin', 24);
   });
 
   it('speaks the caught-up line instead of replaying the last line, and offers Close', async () => {
@@ -1125,6 +1193,7 @@ describe('useDialogueFlow exhausted regular block (no last-line replay)', () => 
   });
 
   it('an unread block is untouched: the indexed line still serves', async () => {
+    markReadThrough('pangolin', 23);
     let hook = render();
     await hook.handleAnimalTap({ ...exhausted, currentDialogueIndex: 23 } as never);
     hook = render();
@@ -1147,6 +1216,7 @@ describe('useDialogueFlow choice page (replies, postponement, echoed pick)', () 
 
   function renderAt3() {
     rewindHookIndices();
+    mockActiveProgress = progress3;
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useDialogueFlow({ progress: progress3 as never, setAnimals: setAnimals as never });
   }
@@ -1269,6 +1339,7 @@ describe('choice delivery during the current visit', () => {
   const currency = require('../services/amberCurrency');
   function renderReveal() {
     rewindHookIndices();
+    mockActiveProgress = revealProgress;
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useDialogueFlow({ progress: revealProgress as never, setAnimals: setAnimals as never });
   }
@@ -1279,6 +1350,7 @@ describe('choice delivery during the current visit', () => {
     dialogue.getTotalDialogueCount.mockReturnValue(134);
     dialogue.hasMoreDialogues.mockReturnValue(true);
     dialogue.getCurrentDialogue.mockReturnValue({ text: 'The pear has stopped ripening.' });
+    markReadThrough('pangolin', 75);
     dialogue.getCoordinatedEventLine.mockReturnValue(null);
     dialogue.getCrossAnimalReference.mockReturnValue(null);
     sessions.checkDialogueAvailability.mockResolvedValue({ available: true });
@@ -1325,6 +1397,7 @@ describe('choice delivery during the current visit', () => {
   });
 
   it('leads with a due choice and preserves the later event until it is visible', async () => {
+    markReadThrough('pangolin', 76);
     dialogue.getCoordinatedEventLine.mockReturnValueOnce({ text: 'The house heard a knock.', deliveryKey: 'knock:pangolin' });
     let hook = renderReveal();
     await hook.handleAnimalTap({ ...nearChoice, currentDialogueIndex: 76 } as never);
@@ -1344,6 +1417,7 @@ describe('choice delivery during the current visit', () => {
   });
 
   it('keeps the options open after a failed save and allows an answer retry', async () => {
+    markReadThrough('pangolin', 76);
     (recordChoice as jest.Mock).mockRejectedValueOnce(new Error('disk full'));
     let hook = renderReveal();
     await hook.handleAnimalTap({ ...nearChoice, currentDialogueIndex: 76 } as never);
@@ -1366,6 +1440,7 @@ describe('choice delivery during the current visit', () => {
   });
 
   it('accepts one answer while the first tap is still saving', async () => {
+    markReadThrough('pangolin', 76);
     let finish!: (value: unknown) => void;
     (recordChoice as jest.Mock).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
     let hook = renderReveal();
@@ -1392,84 +1467,232 @@ describe('choice delivery during the current visit', () => {
 });
 
 
-describe('late-resident personal visits before regular dialogue', () => {
-  const acquaintance = require('../services/animalAcquaintance');
-  const sessions = require('../services/dialogueSession');
+describe('regular conversation completion and retry', () => {
+  const sessions = jest.requireMock('../services/dialogueSession');
+  beforeEach(() => {
+    resetHookState();
+    jest.clearAllMocks();
+    progress.currentPhase = 0;
+    animals = [{ ...pangolin }];
+    sessions.checkDialogueAvailability.mockResolvedValue({ available: true });
+    sessions.getSessionStatus.mockReturnValue({ status: 'in_session', dialoguesRemaining: 5 });
+    sessions.isOnCooldown.mockReturnValue(false);
+    (getChoiceForAnimal as jest.Mock).mockReset().mockResolvedValue(null);
+    getCurrentDialogueMock.mockImplementation((_type, index) => ({ text: index === 0 ? 'The first conversation.' : SHORT_LINE }));
+  });
+  afterEach(() => { progress.currentPhase = 0; progress.cycleCount = 0; });
+
+  it('does not trust a high legacy cursor as proof that earlier lines were heard', async () => {
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 120 } as never);
+    hook = render();
+    expect(hook.selectedAnimal?.currentDialogueIndex).toBe(0);
+    expect(hook.dialogueText).toBe('The first conversation.');
+    expect(completeConversationMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves the terminal line unread on Close, then saves it only after explicit Next', async () => {
+    markReadThrough('pangolin', 23);
+    let hook = render();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = render();
+    expect(hook.hasMoreToShow).toBe(true);
+    await hook.handleCloseDialogue();
+    expect(completeConversationMock).not.toHaveBeenCalled();
+    expect(recordDialogueMock).not.toHaveBeenCalled();
+    hook = render();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = render();
+    expect(hook.selectedAnimal?.currentDialogueIndex).toBe(23);
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(completeConversationMock).toHaveBeenCalledWith('pangolin', lineId('pangolin', 23), 0);
+    expect(hook.dialogueText).toBe('caught up (phase 0)');
+    expect(hook.hasMoreToShow).toBe(false);
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps a failed receipt on the same line and publishes progress only after retry succeeds', async () => {
+    completeConversationMock.mockRejectedValueOnce(new Error('disk full'));
+    let hook = render();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = render();
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(hook.dialogueSaveError).toMatch(/retry/);
+    expect(hook.choiceSaving).toBe(false);
+    expect(hook.dialogueText).toBe('The first conversation.');
+    expect(recordDialogueMock).not.toHaveBeenCalled();
+    expect(conversationProgressCallback).not.toHaveBeenCalled();
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(completeConversationMock.mock.calls).toEqual([
+      ['pangolin', lineId('pangolin', 0), 0], ['pangolin', lineId('pangolin', 0), 0],
+    ]);
+    expect(hook.dialogueSaveError).toBeNull();
+    expect(hook.dialogueText).toBe(SHORT_LINE);
+    expect(conversationProgressCallback).toHaveBeenCalledWith({ pangolin: [lineId('pangolin', 0)] }, 0);
+    expect(recordDialogueMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks close and visit chaining while a durable write still needs recovery', async () => {
+    completeConversationMock.mockRejectedValueOnce(new StorageRecoveryRequiredError(new Error('interrupted commit')));
+    let hook = render();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = render();
+    await hook.handleNextDialogue();
+    hook = render();
+    await hook.handleCloseDialogue();
+    await hook.handleVisitNextAnimal({ ...pangolin, id: 'fox', type: 'fox' } as never);
+    hook = render();
+    expect(hook.showDialogue).toBe(true);
+    expect(hook.selectedAnimal?.id).toBe('pangolin');
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(hook.dialogueSaveError).toBeNull();
+    await hook.handleCloseDialogue();
+    expect(render().showDialogue).toBe(false);
+  });
+
+  it('accepts one completion while a slow save owns the visit', async () => {
+    let finish!: (result: unknown) => void;
+    completeConversationMock.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    let hook = render();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = render();
+    const first = hook.handleNextDialogue();
+    await Promise.resolve();
+    hook = render();
+    expect(hook.choiceSaving).toBe(true);
+    await hook.handleNextDialogue();
+    await hook.handleCloseDialogue();
+    expect(completeConversationMock).toHaveBeenCalledTimes(1);
+    finish(await mockCompleteConversation('pangolin', lineId('pangolin', 0), 0));
+    await first;
+    hook = render();
+    expect(hook.selectedAnimal?.currentDialogueIndex).toBe(1);
+    expect(conversationProgressCallback).toHaveBeenCalledTimes(1);
+    expect(recordDialogueMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not publish a completed old visit after its owner unmounts', async () => {
+    let finish!: (result: unknown) => void;
+    completeConversationMock.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    let hook = render();
+    const disposeVisit = effectCallbacks[0]() as unknown as () => void;
+    await hook.handleAnimalTap(pangolin as never);
+    hook = render();
+    const first = hook.handleNextDialogue();
+    await Promise.resolve();
+    const result = await mockCompleteConversation('pangolin', lineId('pangolin', 0), 0);
+    disposeVisit();
+    finish(result);
+    await first;
+    expect(conversationProgressCallback).not.toHaveBeenCalled();
+    expect(recordDialogueMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps a rejected earlier-cycle completion from becoming new-cycle progress', async () => {
+    let finish!: () => void;
+    completeConversationMock.mockImplementationOnce((...args) => new Promise((resolve, reject) => {
+      finish = () => { void mockCompleteConversation(...args).then(resolve, reject); };
+    }));
+    let hook = render();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = render();
+    const first = hook.handleNextDialogue();
+    await Promise.resolve();
+    progress.cycleCount = 1;
+    finish();
+    await first;
+    expect(completeConversationMock).toHaveBeenCalledWith('pangolin', lineId('pangolin', 0), 0);
+    expect(conversationProgressCallback).not.toHaveBeenCalled();
+    expect(recordDialogueMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps completed receipts through a later parent amber update', async () => {
+    let ownedProgress = { ...progress, conversationReadIds: {} as Record<string, string[]> };
+    const publish = jest.fn((ids: Record<string, string[]>) => { ownedProgress = { ...ownedProgress, conversationReadIds: ids }; });
+    const renderOwned = () => {
+      rewindHookIndices();
+      mockActiveProgress = ownedProgress;
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      return useDialogueFlow({ progress: ownedProgress as never, setAnimals: setAnimals as never, onConversationProgress: publish });
+    };
+    let hook = renderOwned();
+    await hook.handleAnimalTap(pangolin as never);
+    hook = renderOwned();
+    await hook.handleNextDialogue();
+    ownedProgress = { ...ownedProgress, amber: 100 };
+    hook = renderOwned();
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(hook.dialogueText).toBe(SHORT_LINE);
+    expect(hook.selectedAnimal?.currentDialogueIndex).toBe(1);
+  });
+
+  it.each([2, 3, 4, 5])('uses the normal visit allowance for late residents at phase %i', async (phase) => {
+    progress.currentPhase = phase;
+    const hook = render();
+    await hook.handleAnimalTap({ ...pangolin, id: 'tarsier', type: 'tarsier' } as never);
+    expect(checkDialogueAvailabilityMock).toHaveBeenCalledWith('tarsier', 0);
+  });
+});
+
+describe('full introductions before regular dialogue', () => {
+  const sessions = jest.requireMock('../services/dialogueSession');
   const thyme = { ...pangolin, id: 'rabbit', type: 'rabbit', name: 'Thyme', currentDialogueIndex: 76 };
-  let acquaintanceProgress: Omit<typeof progress, 'introsSeen'> & { introsSeen: string[] };
-  const presentAcquaintance = jest.fn(async () => {});
+  let introductionProgress: typeof progress;
+  const presentIntroduction = jest.fn(async () => {});
   function renderPersonal() {
     rewindHookIndices();
+    mockActiveProgress = introductionProgress;
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useDialogueFlow({ progress: acquaintanceProgress as never, setAnimals: setAnimals as never,
-      onAcquaintance: presentAcquaintance });
+    return useDialogueFlow({ progress: introductionProgress as never, setAnimals: setAnimals as never,
+      onIntroduction: presentIntroduction });
   }
   beforeEach(() => {
     resetHookState();
     jest.clearAllMocks();
-    acquaintanceProgress = { ...progress, currentPhase: 3, unlockedAnimals: ['pangolin', 'rabbit'], introsSeen: ['pangolin'] };
+    introductionProgress = { ...progress, currentPhase: 3, unlockedAnimals: ['pangolin', 'rabbit'], introsSeen: ['pangolin'] };
     animals = [pangolin, thyme];
-    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: {} });
     sessions.checkDialogueAvailability.mockResolvedValue({ available: true });
     sessions.isOnCooldown.mockReturnValue(false);
     sessions.getSessionStatus.mockReturnValue({ status: 'in_session', dialoguesRemaining: 5 });
     (getChoiceForAnimal as jest.Mock).mockReset().mockResolvedValue(null);
     getCurrentDialogueMock.mockReturnValue({ text: 'An ordinary conversation.' });
-    presentAcquaintance.mockResolvedValue(undefined);
+    presentIntroduction.mockReset().mockResolvedValue(undefined);
   });
 
-  it('opens a new late resident before cooldown, choices, or regular cursor writes', async () => {
+  it.each([0, 3, 4, 5])('opens an unseen resident at world phase %i before cooldown or any cursor writes', async (phase) => {
+    introductionProgress.currentPhase = phase;
     sessions.checkDialogueAvailability.mockResolvedValue({ available: false });
     let hook = renderPersonal();
     await hook.handleAnimalTap(thyme as never);
     hook = renderPersonal();
-    expect(presentAcquaintance).toHaveBeenCalledWith(thyme);
+    expect(presentIntroduction).toHaveBeenCalledWith(thyme);
     expect(checkDialogueAvailability).not.toHaveBeenCalled();
     expect(getChoiceForAnimal).not.toHaveBeenCalled();
+    expect(markIntroSeen).not.toHaveBeenCalled();
+    expect(completeConversationMock).not.toHaveBeenCalled();
     expect(markDialogueRead).not.toHaveBeenCalled();
     expect(recordDialogue).not.toHaveBeenCalled();
     expect(hook.showDialogue).toBe(false);
   });
 
-  it('keeps an enrolled visit freely available after the first introduction', async () => {
-    acquaintanceProgress = { ...acquaintanceProgress, introsSeen: ['pangolin', 'rabbit'] };
-    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: { rabbit: { nextVisit: 1 } } });
-    sessions.checkDialogueAvailability.mockResolvedValue({ available: false });
-    const hook = renderPersonal();
-    await hook.handleAnimalTap(thyme as never);
-    expect(presentAcquaintance).toHaveBeenCalledWith(thyme);
-    expect(checkDialogueAvailability).not.toHaveBeenCalled();
-    expect(markDialogueRead).not.toHaveBeenCalled();
-  });
-
-  it('does not automatically reintroduce an existing friend, but offers an optional visit', async () => {
-    acquaintanceProgress = { ...acquaintanceProgress, introsSeen: ['pangolin', 'rabbit'] };
+  it('keeps established introductions and begins their oldest unread regular line', async () => {
+    introductionProgress = { ...introductionProgress, introsSeen: ['pangolin', 'rabbit'] };
     let hook = renderPersonal();
     await hook.handleAnimalTap(thyme as never);
     hook = renderPersonal();
-    expect(presentAcquaintance).not.toHaveBeenCalled();
+    expect(presentIntroduction).not.toHaveBeenCalled();
     expect(hook.showDialogue).toBe(true);
-    expect(hook.canOfferAcquaintance).toBe(true);
-    await hook.handleOpenAcquaintance();
-    expect(presentAcquaintance).toHaveBeenCalledWith(thyme, true);
-    expect(renderPersonal().showDialogue).toBe(false);
+    expect(hook.selectedAnimal?.currentDialogueIndex).toBe(0);
+    expect(hook.dialogueText).toBe('An ordinary conversation.');
+    expect(completeConversationMock).not.toHaveBeenCalled();
     expect(recordChoice).not.toHaveBeenCalled();
   });
 
-  it('does not replace completed personal visits with a second introduction', async () => {
-    acquaintanceProgress = { ...acquaintanceProgress, introsSeen: ['pangolin', 'rabbit'] };
-    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: { rabbit: { nextVisit: 3 } } });
-    let hook = renderPersonal();
-    await hook.handleAnimalTap(thyme as never);
-    hook = renderPersonal();
-    expect(presentAcquaintance).not.toHaveBeenCalled();
-    expect(hook.showDialogue).toBe(true);
-    expect(hook.canOfferAcquaintance).toBe(false);
-  });
-
-  it('offers an enrolled friend in the visit chain despite a spent session and cooldown', async () => {
-    acquaintanceProgress = { ...acquaintanceProgress, introsSeen: ['pangolin', 'rabbit'] };
-    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: { rabbit: { nextVisit: 1 } } });
+  it('offers an unseen friend in the visit chain despite a spent session and cooldown', async () => {
     let hook = renderPersonal();
     await hook.handleAnimalTap(pangolin as never);
     hook = renderPersonal();
@@ -1478,32 +1701,17 @@ describe('late-resident personal visits before regular dialogue', () => {
     expect(hook.getNextAnimalWithNews([pangolin, thyme] as never)).toEqual(thyme);
   });
 
-
-  it.each([1, 3])('repairs an interrupted intro-flag write from durable visit %i without replaying it', async (nextVisit) => {
-    acquaintance.loadAnimalAcquaintanceState.mockResolvedValue({ version: 1, animals: { rabbit: { nextVisit } } });
-    const hook = renderPersonal();
-    await hook.handleAnimalTap(thyme as never);
-    expect(markIntroSeen).toHaveBeenCalledWith('rabbit');
-    if (nextVisit === 1) {
-      expect(presentAcquaintance).toHaveBeenCalledWith(thyme);
-      expect(checkDialogueAvailability).not.toHaveBeenCalled();
-    } else {
-      expect(presentAcquaintance).not.toHaveBeenCalled();
-      expect(renderPersonal().showDialogue).toBe(true);
-    }
-  });
-
-  it('keeps a failed personal visit retryable and never falls into skipped regular material', async () => {
-    presentAcquaintance.mockRejectedValueOnce(new Error('disk full'));
+  it('keeps a failed introduction retryable without consuming regular material', async () => {
+    presentIntroduction.mockRejectedValueOnce(new Error('disk full'));
     let hook = renderPersonal();
     await hook.handleAnimalTap(thyme as never);
     hook = renderPersonal();
     expect(hook.cooldownMessage).toMatch(/try again/);
     expect(hook.showDialogue).toBe(false);
     expect(checkDialogueAvailability).not.toHaveBeenCalled();
-    expect(markDialogueRead).not.toHaveBeenCalled();
+    expect(completeConversationMock).not.toHaveBeenCalled();
     await hook.handleAnimalTap(thyme as never);
-    expect(presentAcquaintance).toHaveBeenCalledTimes(2);
+    expect(presentIntroduction).toHaveBeenCalledTimes(2);
     expect(renderPersonal().cooldownMessage).toBeNull();
   });
 });

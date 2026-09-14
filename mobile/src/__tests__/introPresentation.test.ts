@@ -61,9 +61,13 @@ it('cannot apply or release a stale save result over the next reading', () => {
 
 it('wires opening, pending arrivals, and stale-save guards into the actual HomeScreen', () => {
   const home = fs.readFileSync(path.join(__dirname, '../components/home/HomeScreen.tsx'), 'utf8');
-  const opening = home.slice(home.indexOf('const presentAnimalAcquaintance'), home.indexOf('// Dialogue flow hook'));
+  const opening = home.slice(home.indexOf('const presentAnimalIntroduction'), home.indexOf('// Dialogue flow hook'));
   expect(opening.indexOf('claimIntroOpening()')).toBeLessThan(opening.indexOf('await getFullProgress()'));
   expect(opening).toContain('owner.enqueue(animal)');
+  expect(opening).toContain('getIntroDialogueCount(animal.type)');
+  expect(opening).toContain('adaptAnimalIntroductionLines(animal.type, normalLines, freshProgress.currentPhase, hasAnimalConversationArrivalOccurred(freshProgress))');
+  expect(home).toContain('onIntroduction: presentAnimalIntroduction');
+  expect(home).not.toMatch(/getCatchupIntroDialogue|presentAnimalAcquaintance|Tell me about yourself/);
   const completion = home.slice(home.indexOf('// Play the house-completion'), home.indexOf('const claimableQuestAmber'));
   expect(completion).toContain('introOpening || pendingAnimalIntroCount > 0');
   expect(completion).toContain('introPresentationRef.current.busy()');
@@ -72,24 +76,24 @@ it('wires opening, pending arrivals, and stale-save guards into the actual HomeS
   expect(advance).toContain('owner.release(token)');
 });
 
-it('serializes actual generic close handlers so a second close cannot dismiss the next arrival', async () => {
+it('serializes global tutorial dismissals so a second close cannot dismiss the next arrival', async () => {
   const home = fs.readFileSync(path.join(__dirname, '../components/home/HomeScreen.tsx'), 'utf8');
   const source = home.slice(home.indexOf('  const handleCloseIntroDialogue = async () => {'), home.indexOf('  const handleOpenQuestModal'));
   const guard = createIntroPresentationGuard<{ id: string }>(value => value.id);
   let finishSave!: () => void;
   const scope = {
     introSavingRef: { current: false }, introPresentationRef: { current: guard },
-    introContext: 'animal_intro', introAnimal: animal('rabbit'),
+    introContext: 'challenge_intro', introAnimal: animal('fox'),
     setIntroSaving: jest.fn(), setIntroSaveError: jest.fn(),
-    markIntroSeen: jest.fn(() => new Promise<void>(resolve => { finishSave = resolve; })),
+    markChallengeIntroSeen: jest.fn(() => new Promise<void>(resolve => { finishSave = resolve; })),
     setShowIntroDialogue: jest.fn(), setIntroAnimal: jest.fn(),
     setIntroDialogueIndex: jest.fn(), setIntroOverrideLines: jest.fn(),
-    setAcquaintanceMemory: jest.fn(), setIntroContext: jest.fn(),
+    setIntroContext: jest.fn(),
   };
   const close = new Function(...Object.keys(scope), `${source}; return handleCloseIntroDialogue;`)(...Object.values(scope));
   const first = close();
   await close();
-  expect(scope.markIntroSeen).toHaveBeenCalledTimes(1);
+  expect(scope.markChallengeIntroSeen).toHaveBeenCalledTimes(1);
   expect(guard.busy()).toBe(true);
   guard.enqueue(animal('kakapo'));
   finishSave();
@@ -99,4 +103,58 @@ it('serializes actual generic close handlers so a second close cannot dismiss th
   const next = guard.claim();
   await Promise.resolve();
   expect(guard.owns(next)).toBe(true);
+});
+
+it('pauses a normal introduction without marking its unread pages heard', async () => {
+  const home = fs.readFileSync(path.join(__dirname, '../components/home/HomeScreen.tsx'), 'utf8');
+  const source = home.slice(home.indexOf('  const handleCloseIntroDialogue = async () => {'), home.indexOf('  const handleOpenQuestModal'));
+  const guard = createIntroPresentationGuard<{ id: string }>(value => value.id);
+  guard.claim();
+  const scope = {
+    introSavingRef: { current: false }, introPresentationRef: { current: guard },
+    introContext: 'animal_intro', introAnimal: animal('rabbit'),
+    setIntroSaving: jest.fn(), setIntroSaveError: jest.fn(), markIntroSeen: jest.fn(),
+    setShowIntroDialogue: jest.fn(), setIntroAnimal: jest.fn(),
+    setIntroDialogueIndex: jest.fn(), setIntroOverrideLines: jest.fn(), setIntroContext: jest.fn(),
+  };
+  const close = new Function(...Object.keys(scope), `${source}; return handleCloseIntroDialogue;`)(...Object.values(scope));
+  await close();
+  expect(scope.markIntroSeen).not.toHaveBeenCalled();
+  expect(scope.setShowIntroDialogue).toHaveBeenCalledWith(false);
+  expect(scope.setIntroDialogueIndex).toHaveBeenCalledWith(0);
+  expect(guard.busy()).toBe(false);
+});
+
+it('keeps the final welcome visible after a failed save and permits its durable retry', async () => {
+  const home = fs.readFileSync(path.join(__dirname, '../components/home/HomeScreen.tsx'), 'utf8');
+  const source = home.slice(home.indexOf('  const handleAdvanceIntroDialogue = async () => {'), home.indexOf('  // Handle closing intro dialogue'));
+  const guard = createIntroPresentationGuard<{ id: string }>(value => value.id);
+  guard.claim();
+  const freshProgress = { introsSeen: ['rabbit'] };
+  const freshAnimals = [animal('rabbit')];
+  const scope = {
+    introSavingRef: { current: false }, introPresentationRef: { current: guard },
+    introContext: 'animal_intro', introAnimal: animal('rabbit'), progress: {},
+    currentIntroLines: ['One', 'Two', 'Three', 'Four', 'Five', 'Six'], introDialogueIndex: 5,
+    setIntroSaving: jest.fn(), setIntroSaveError: jest.fn(),
+    markIntroSeen: jest.fn().mockRejectedValueOnce(new Error('save failed')).mockResolvedValue(undefined),
+    getFullProgress: jest.fn(async () => freshProgress), getAnimalsWithStatus: jest.fn(async () => freshAnimals),
+    setProgress: jest.fn(), setAnimals: jest.fn(),
+    setShowIntroDialogue: jest.fn(), setIntroAnimal: jest.fn(),
+    setIntroDialogueIndex: jest.fn(), setIntroOverrideLines: jest.fn(), setIntroContext: jest.fn(),
+  };
+  const advance = new Function(...Object.keys(scope), `${source}; return handleAdvanceIntroDialogue;`)(...Object.values(scope));
+  await advance();
+  expect(scope.markIntroSeen).toHaveBeenCalledWith('rabbit');
+  expect(scope.setIntroSaveError).toHaveBeenLastCalledWith("Couldn't save your place. Try again.");
+  expect(scope.setShowIntroDialogue).not.toHaveBeenCalled();
+  expect(scope.setIntroDialogueIndex).not.toHaveBeenCalled();
+  expect(guard.busy()).toBe(true);
+
+  await advance();
+  expect(scope.markIntroSeen).toHaveBeenCalledTimes(2);
+  expect(scope.setProgress).toHaveBeenCalledWith(freshProgress);
+  expect(scope.setAnimals).toHaveBeenCalledWith(freshAnimals);
+  expect(scope.setShowIntroDialogue).toHaveBeenCalledWith(false);
+  expect(guard.busy()).toBe(false);
 });

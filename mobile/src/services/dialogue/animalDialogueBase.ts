@@ -1909,8 +1909,8 @@ export function resolveDialogueIndex(
 
 /**
  * Index of the first dialogue belonging to `phase` for an animal — i.e. how
- * many of its lines belong to earlier phases. Used to fast-forward animals
- * unlocked late so they don't replay bright-days small talk under a dark sky.
+ * many of its lines belong to earlier phases. Used for chapter boundaries and
+ * dialogue-choice placement; reaching a phase never consumes its earlier lines.
  */
 export function getPhaseStartIndex(
   animalType: AnimalType,

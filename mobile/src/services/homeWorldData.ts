@@ -1,13 +1,13 @@
 import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase, LATE_PHASE_RECRUITS } from '../types/homeWorld';
-import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead, reserveUnlock, getReservedUnlockId, claimReservedUnlock, spendAmber } from './amberCurrency';
-import { getPhaseStartIndex, phase2PoolHasNew, resolveDialogueIndex } from './dialogue/animalDialogueBase';
+import { loadProgress, unlockAnimal, unlockRoom, canAfford, reserveUnlock, getReservedUnlockId, claimReservedUnlock, spendAmber } from './amberCurrency';
+import { phase2PoolHasNew } from './dialogue/animalDialogueBase';
 import { getPhase2PoolCursors } from './dialogue/animalDialogueNarrative';
 import { getTotalDialogueCount } from './animalDialogue';
 import { isOnCooldown } from './dialogueSession';
 import { logEvent } from './eventLogger';
 import { loadTendingState, hasNewPhase5Line } from './tending';
 import { loadChoiceState, hasPendingDialogueChoice } from './dialogueChoices';
-import { loadAnimalAcquaintanceState, hasPendingAnimalAcquaintance } from './animalAcquaintance';
+import { getNextAnimalConversation } from './conversationProgress';
 import { buildPhase5Pool, buildPhase5Eligibility } from './dialogue/phase5Pool';
 import { UNLOCK_SKIP_PREMIUM, PHASE_THRESHOLDS } from '../constants/gameBalance';
 
@@ -959,9 +959,9 @@ export async function isUnlockAvailable(unlockId: string): Promise<{
   // boards break exactly that: they pay full amber but +0 phase progress
   // (skipPhaseProgress), so ~25 friend-link wins inside the first 84 solves put
   // a player at 84 solves with weighted progress still under the Phase-3
-  // threshold — the Star Loft opens, Vesper arrives under a dusk sky delivering
-  // Phase-3 dread, and her catch-up boost (which needs global Phase 3) never
-  // applies. Gate on the WEIGHTED number, which is what the derivation actually
+  // threshold. Gate on the WEIGHTED number to preserve the authored room
+  // recruitment order, independently of each resident's reading position.
+  // This is the progression scale the derivation actually
   // wants (see isDescentTrioHeld for why it is not `currentPhase`). A no-op for
   // anyone who has never won a shared-challenge board.
   if (isDescentTrioHeld(unlock, progress)) {
@@ -987,37 +987,6 @@ export async function isUnlockAvailable(unlockId: string): Promise<{
  * Attempt to purchase an unlock
  */
 
-/**
- * Animals unlocked at Phase 2+ skip ahead instead of replaying bright-days
- * small talk under a dark sky. The descent trio starts at its CURRENT effective
- * animal phase because its mandatory phase-aware catch-up intro already
- * summarizes the earlier arc; replaying another whole block strands its late
- * dialogue before the finale. Earlier recruits retain the prior one-phase-back
- * behavior. Never rewinds an existing read position.
- *
- * Floor at phase 1: a lagging-tier animal unlocked at global Phase 2 has
- * animalPhase 1, so "one phase behind" used to compute 0 and its dark catch-up
- * intro was followed by bright Phase-0 small talk under a dusk sky. Once this
- * fast-forward applies at all (global Phase 2+), no animal starts below the
- * Curious Thoughts block. Vanguard/middle tiers are unaffected (their
- * animalPhase - 1 is already >= 1 whenever this runs).
- */
-async function fastForwardLateUnlockDialogue(animalId: string): Promise<void> {
-  const progress = await loadProgress();
-  if (progress.currentPhase < 2) return;
-
-  const animalType = animalId as AnimalType;
-  const animalPhase = getAnimalPhase(progress.currentPhase, animalType);
-  const startPhase = LATE_PHASE_RECRUITS.has(animalType)
-    ? animalPhase
-    : Math.max(1, animalPhase - 1) as DialoguePhase;
-  const startIndex = getPhaseStartIndex(animalType, startPhase);
-  const existing = progress.lastDialogueRead[animalId] ?? 0;
-  if (startIndex > existing) {
-    await markDialogueRead(animalId, startIndex);
-  }
-}
-
 export async function purchaseUnlock(unlockId: string): Promise<{
   success: boolean;
   error?: string;
@@ -1041,9 +1010,6 @@ export async function purchaseUnlock(unlockId: string): Promise<{
   let success: boolean;
   if (unlock.type === 'character') {
     success = await unlockAnimal(unlock.targetId, unlock.cost);
-    if (success) {
-      await fastForwardLateUnlockDialogue(unlock.targetId);
-    }
   } else {
     success = await unlockRoom(unlock.targetId, unlock.cost);
   }
@@ -1202,9 +1168,6 @@ export async function skipUnlockGate(unlockId: string): Promise<{
     : await unlockRoom(unlock.targetId, skipCost);
   if (!success) return { success: false, error: 'Not enough amber' };
 
-  if (unlock.type === 'character') {
-    await fastForwardLateUnlockDialogue(unlock.targetId);
-  }
   logEvent({
     type: 'unlock_purchased',
     data: { unlockId: unlock.id, targetId: unlock.targetId, cost: skipCost, skippedGate: true },
@@ -1411,9 +1374,6 @@ export async function skipReservedUnlock(unlockId: string): Promise<{
   // Base cost was already spent at reserve time — claim marks it unlocked and
   // clears the reservation (no further spend).
   await claimReservedUnlock(unlock.targetId, unlock.type);
-  if (unlock.type === 'character') {
-    await fastForwardLateUnlockDialogue(unlock.targetId);
-  }
   logEvent({
     type: 'unlock_purchased',
     data: { unlockId: unlock.id, targetId: unlock.targetId, cost: premium, skippedReservedGate: true },
@@ -1466,9 +1426,6 @@ export async function claimReservedUnlockIfReady(): Promise<Unlockable | null> {
   }
 
   await claimReservedUnlock(unlock.targetId, unlock.type);
-  if (unlock.type === 'character') {
-    await fastForwardLateUnlockDialogue(unlock.targetId);
-  }
   logEvent({ type: 'unlock_purchased', data: { unlockId: unlock.id, targetId: unlock.targetId, cost: unlock.cost, claimedFromReserve: true } });
   return unlock;
 }
@@ -1531,32 +1488,30 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
   const nearEndgame = progress.currentPhase >= 5;
   const tendingState = nearEndgame ? await loadTendingState() : null;
   const choiceState = progress.currentPhase >= 2 ? await loadChoiceState() : null;
-  const acquaintanceState = await loadAnimalAcquaintanceState();
   // Phase-2 exhaustion pool: badge honesty for animals whose base block is
   // done but who still have undelivered pool lines. Loaded once, not per animal.
   const phase2Cursors = progress.currentPhase >= 1 && progress.currentPhase <= 3
     ? await getPhase2PoolCursors()
     : {};
-  // Animal types currently unlocked — needed to resolve stored dialogue
-  // indices past lines gated on still-locked animals. Animal ids double as
-  // types (mirrors useDialogueFlow.getUnlockedTypes).
+  // Locked-resident references wait unread until that friend joins the house.
   const unlockedTypes = new Set(progress.unlockedAnimals as AnimalType[]);
 
   return ANIMALS.map(animal => {
     const unlocked = progress.unlockedAnimals.includes(animal.id);
-    const dialogueIndex = progress.lastDialogueRead[animal.id] ?? 0;
-
-    // Getting to know a new friend never requires waiting for the normal
-    // conversation cooldown. Existing friends are enrolled only if they ask.
-    let hasNewDialogue = unlocked && hasPendingAnimalAcquaintance(
-      acquaintanceState, animal.type, progress.currentPhase,
-      (progress.introsSeen ?? []).includes(animal.id),
-    );
+    const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
+    const next = getNextAnimalConversation(progress, animal.type, animalPhase, unlockedTypes);
+    const total = getTotalDialogueCount(animal.type, Math.min(animalPhase, 4) as DialoguePhase);
+    const dialogueIndex = next?.index ?? (animalPhase === 5
+      ? Math.max(total, progress.lastDialogueRead[animal.id] ?? 0) : total);
+    const introSeen = (progress.introsSeen ?? []).includes(animal.id);
+    // An unfinished welcome remains available even during a conversation rest.
+    let hasNewDialogue = unlocked && !introSeen;
     if (unlocked && !hasNewDialogue && !isOnCooldown(animal.id)) {
-      const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
-      if (animalPhase === 5 && tendingState) {
-        // Post-revelation is pool-only. Regular Phase 3/4 backlog is retired
-        // at the reveal and must never light the badge again.
+      if (next) {
+        hasNewDialogue = true;
+      } else if (animalPhase === 5 && tendingState) {
+        // Tending follows every eligible unread regular conversation, including
+        // early chapters a late arrival or an old automatic jump left unheard.
         const pool = buildPhase5Pool(
           animal.type,
           tendingState.level,
@@ -1572,28 +1527,10 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
           buildPhase5Eligibility(animal.type, pool, progress.unlockedAnimals ?? [])
         );
       } else if (animalPhase === 2) {
-        const totalDialogues = getTotalDialogueCount(animal.type, 2);
-        // Resolve the raw stored index past lines gated on still-locked
-        // animals (resolveDialogueIndex is pure and cheap), mirroring
-        // useDialogueFlow.recomputeHasNewDialogue — the raw index can sit
-        // below the total while every remaining line is blocked, which would
-        // misreport "new" instead of consulting the exhaustion pool.
-        const resolvedIndex = resolveDialogueIndex(animal.type, dialogueIndex, 2, unlockedTypes);
-        if (resolvedIndex < totalDialogues) {
-          hasNewDialogue = true;
-        } else {
-          // Base block exhausted — lit only while the exhaustion pool still
-          // has genuinely-new lines (mirrors useDialogueFlow's honest badge).
-          hasNewDialogue = phase2PoolHasNew(animal.type, phase2Cursors[animal.type] ?? 0);
-        }
+        hasNewDialogue = phase2PoolHasNew(animal.type, phase2Cursors[animal.type] ?? 0);
       } else {
-        // Resolve the stored index past any lines gated on still-locked animals
-        // (mirrors useDialogueFlow.recomputeHasNewDialogue) so the badge is never
-        // lit for an animal whose only remaining lines are all blocked.
-        const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
-        const resolvedIndex = resolveDialogueIndex(animal.type, dialogueIndex, animalPhase, unlockedTypes);
-        hasNewDialogue = resolvedIndex < totalDialogues || hasPendingDialogueChoice(
-          animal.type, animalPhase, resolvedIndex, choiceState?.offeredBy ?? []
+        hasNewDialogue = hasPendingDialogueChoice(
+          animal.type, animalPhase, dialogueIndex, choiceState?.offeredBy ?? []
         );
       }
     }
@@ -1601,6 +1538,7 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
     return {
       ...animal,
       isUnlocked: unlocked,
+      hasSeenIntro: introSeen,
       currentDialogueIndex: dialogueIndex,
       hasNewDialogue,
     };

@@ -13,9 +13,6 @@ import {
   checkMilestone,
   NARRATIVE_ACCELERATION,
   CHALLENGE_MODE_CONFIG,
-  AnimalType,
-  getAnimalPhase,
-  LATE_PHASE_RECRUITS,
   PendingCeremony,
 } from '../types/homeWorld';
 import {
@@ -95,70 +92,6 @@ function getDefaultProgress(): HomeWorldProgress {
     phaseProgressFraction: 0,
     reservedUnlockId: null,
   };
-}
-
-/**
- * Phase 5 is a clean handoff to the post-revelation/Tending pool. Retire any
- * unread regular backlog for unlocked animals while preserving indices already
- * beyond the regular corpus (those positions drive deterministic pool re-reads).
- * Lazy-load the dialogue corpus only at the reveal/load self-heal boundary so
- * the foundational currency service does not evaluate it during normal startup.
- */
-function retireUnlockedRegularDialogue(progress: HomeWorldProgress): boolean {
-  const unlocked = progress.unlockedAnimals ?? [];
-  if (unlocked.length === 0) return false;
-  if (!progress.lastDialogueRead) progress.lastDialogueRead = {};
-  const { getTotalDialogueCount } =
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
-    require('./dialogue/animalDialogueBase') as typeof import('./dialogue/animalDialogueBase');
-  let changed = false;
-  for (const animalId of unlocked) {
-    const totalRegular = getTotalDialogueCount(animalId as AnimalType, 4);
-    const existing = progress.lastDialogueRead[animalId] ?? 0;
-    if (existing < totalRegular) {
-      progress.lastDialogueRead[animalId] = totalRegular;
-      changed = true;
-    }
-  }
-  return changed;
-}
-
-/**
- * Existing saves may already contain the descent trio from before their
- * current-era fast-forward was added to the unlock path. Match the live unlock
- * boundary (global Phase 2+) and bring those animals to the start of their
- * effective era without rewinding any dialogue progress.
- */
-function fastForwardExistingLateRecruitDialogue(progress: HomeWorldProgress): boolean {
-  if (
-    progress.postRevelation === true ||
-    progress.currentPhase < 2 ||
-    progress.currentPhase > 4
-  ) {
-    return false;
-  }
-
-  const unlocked = progress.unlockedAnimals ?? [];
-  if (unlocked.length === 0) return false;
-  if (!progress.lastDialogueRead) progress.lastDialogueRead = {};
-  const { getPhaseStartIndex } =
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
-    require('./dialogue/animalDialogueBase') as typeof import('./dialogue/animalDialogueBase');
-  let changed = false;
-
-  for (const animalId of unlocked) {
-    const animalType = animalId as AnimalType;
-    if (!LATE_PHASE_RECRUITS.has(animalType)) continue;
-    const animalPhase = getAnimalPhase(progress.currentPhase, animalType);
-    const startIndex = getPhaseStartIndex(animalType, animalPhase);
-    const existing = progress.lastDialogueRead[animalId] ?? 0;
-    if (startIndex > existing) {
-      progress.lastDialogueRead[animalId] = startIndex;
-      changed = true;
-    }
-  }
-
-  return changed;
 }
 
 // MIN_PUZZLES_FOR_PHASE imported from constants/gameBalance.ts (single source of truth).
@@ -385,16 +318,6 @@ export async function loadProgress(): Promise<HomeWorldProgress> {
       if (progressCache!.postRevelation === true && progressCache!.currentPhase !== 5) {
         progressCache!.currentPhase = effectivePhaseFor(progressCache!);
         progressCache!.pendingPhaseTransition = null;
-        healedProgress = true;
-      }
-      // Existing Phase-5 saves may still point into Phase 3/4 regular dialogue.
-      // Normalize those positions even when currentPhase was already correct;
-      // retirement takes precedence over the pre-revelation catch-up heal.
-      if (progressCache!.postRevelation === true) {
-        if (retireUnlockedRegularDialogue(progressCache!)) {
-          healedProgress = true;
-        }
-      } else if (fastForwardExistingLateRecruitDialogue(progressCache!)) {
         healedProgress = true;
       }
       if (healedProgress) {
@@ -1348,15 +1271,20 @@ export async function hasSeenIntro(animalId: string): Promise<boolean> {
  * Mark an animal's intro dialogue as seen
  */
 export async function markIntroSeen(animalId: string): Promise<void> {
-  const progress = await loadProgress();
-  // Handle old progress data that doesn't have introsSeen array
-  if (!progress.introsSeen) {
-    progress.introsSeen = [];
-  }
-  if (!progress.introsSeen.includes(animalId)) {
-    progress.introsSeen.push(animalId);
-    progressCache = progress;
-    await saveProgress();
+  try {
+    await runStorageTransaction('animal_introduction_read', async () => {
+      const progress = await loadFreshCeremonyProgress();
+      const seen = progress.introsSeen ?? [];
+      if (!Array.isArray(seen) || !seen.every(id => typeof id === 'string')) {
+        throw new Error('Your introductions could not be read. Please try again.');
+      }
+      if (seen.includes(animalId)) return;
+      // Only a successful durable welcome may publish this flag. Closing or
+      // failing to save leaves the ordinary introduction available to resume.
+      await AsyncStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify({ ...progress, introsSeen: [...seen, animalId] }));
+    });
+  } finally {
+    invalidateProgressCache();
   }
 }
 
@@ -1931,7 +1859,6 @@ export async function markPostRevelation(): Promise<void> {
   // (useDialogueFlow, HomeScreen, homeWorldData) — pin it here.
   progress.currentPhase = effectivePhaseFor(progress);
   progress.pendingPhaseTransition = null;
-  retireUnlockedRegularDialogue(progress);
   progressCache = progress;
   await saveProgress();
 
@@ -2043,6 +1970,8 @@ export async function startNewCycle(): Promise<number> {
   progress.finaleArmed = false;
   // Dialogue replays from the top; drop the progress-owned dialogue bookkeeping.
   progress.lastDialogueRead = {};
+  progress.conversationReadIds = {};
+  progress.conversationReadVersion = 1;
   progress.consumedCoordinatedEvents = [];
   progress.triggerWordQueue = [];
 

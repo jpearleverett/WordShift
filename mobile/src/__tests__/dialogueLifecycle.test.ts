@@ -91,6 +91,20 @@ jest.mock('../services/animalDialogue', () => ({
   advancePhase2PoolCursor: jest.fn(async () => 0),
 }));
 
+jest.mock('../services/conversationProgress', () => ({
+  getNextAnimalConversation: jest.fn((progress, type) => {
+    const index = (progress.conversationReadIds?.[type] ?? []).length;
+    return { dialogue: { id: `test_${type}_${index}`, phase: 0, text: `Regular line ${index}.` }, index };
+  }),
+  completeAnimalConversationLine: jest.fn(async (type, id) => ({
+    conversationReadIds: { [type]: [id] },
+    next: { dialogue: { id: `test_${type}_1`, phase: 0, text: 'Regular line 1.' }, index: 1 },
+    nextIndex: 1,
+    cycleCount: 0,
+    completed: true,
+  })),
+}));
+
 jest.mock('../services/dialogueSession', () => ({
   checkDialogueAvailability: jest.fn(async () => ({ available: true })),
   recordDialogue: jest.fn(async () => {}),
@@ -165,6 +179,7 @@ import { showGameAlert } from '../services/gameAlert';
 import { getCurrentDialogue } from '../services/animalDialogue';
 import { checkDialogueAvailability, recordDialogue } from '../services/dialogueSession';
 import { markDialogueRead } from '../services/amberCurrency';
+import { completeAnimalConversationLine } from '../services/conversationProgress';
 
 const getCurrentDialogueMock = getCurrentDialogue as jest.Mock;
 const recordDialogueMock = recordDialogue as jest.Mock;
@@ -346,7 +361,9 @@ describe('dialogue visit ownership and rapid navigation', () => {
     expect(render().showDialogue).toBe(true);
     pending.resolve();
     await advance;
-    expect(markDialogueReadMock).toHaveBeenCalledTimes(1);
+    expect(completeAnimalConversationLine).toHaveBeenCalledTimes(1);
+    expect(completeAnimalConversationLine).toHaveBeenCalledWith('pangolin', 'test_pangolin_0', 0);
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
     expect(render().dialogueText).toBe('Regular line 1.');
   });
 });

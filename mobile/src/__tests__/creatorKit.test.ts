@@ -47,6 +47,8 @@ import { clearStats, getCumulativeStats } from '../services/starRating';
 import { clearAchievements, getUnlockedCount } from '../services/achievements';
 import { isOnboardingComplete, resetOnboarding } from '../services/onboarding';
 import { MIN_PUZZLES_FOR_PHASE } from '../constants/gameBalance';
+import { getNextAnimalConversation } from '../services/conversationProgress';
+import { AnimalType } from '../types/homeWorld';
 
 const CODE = 'REVIEW-EMBER-2026';
 
@@ -152,9 +154,12 @@ describe('applyCreatorSnapshot', () => {
       // Intro dialogue marked seen for every unlocked animal.
       for (const animalId of progress.unlockedAnimals) {
         expect(progress.introsSeen).toContain(animalId);
+        // The creator history advances the house, not conversations the
+        // reviewer never read. Every resident retains their complete opening.
+        expect(progress.conversationReadIds?.[animalId] ?? []).toEqual([]);
+        expect(getNextAnimalConversation(progress, animalId as AnimalType)?.index).toBe(0);
       }
-      // Dialogue indices fast-forwarded so animals speak era-appropriate lines.
-      expect(progress.lastDialogueRead['fox']).toBeGreaterThan(0);
+      expect(progress.lastDialogueRead['fox'] ?? 0).toBe(0);
       // Stats mirror the simulated history.
       const stats = await getCumulativeStats();
       expect(stats.totalPuzzlesCompleted).toBe(progress.puzzlesSolved);

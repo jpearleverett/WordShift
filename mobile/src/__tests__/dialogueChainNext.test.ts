@@ -182,6 +182,7 @@ import {
 } from '../services/dialogueSession';
 import { markDialogueRead } from '../services/amberCurrency';
 import { recordAnimalVisit } from '../services/weeklyQuests';
+import { getDialoguesForAnimal } from '../services/dialogue/animalDialogueBase';
 
 const checkDialogueAvailabilityMock = checkDialogueAvailability as jest.Mock;
 const endSessionMock = endSession as jest.Mock;
@@ -262,6 +263,7 @@ const progress = {
   puzzlesSolved: 50,
   phasePuzzleThresholds: [],
   lastDialogueRead: {},
+  conversationReadIds: {} as Record<string, string[]>,
   introsSeen: [],
   currentStreak: 0,
   lastPlayDate: null,
@@ -281,14 +283,15 @@ const baseAnimal = {
   direction: 'left' as const,
 };
 
-// Pangolin sits on its LAST available line (index 23 of 24): the session has
-// no more content, so the button reads "Close" and the chain can offer.
+// Pangolin has explicitly finished all 24 available lines, so the card can
+// offer another friend without consuming anything on Close.
 const pangolin = {
   ...baseAnimal,
   id: 'pangolin',
   type: 'pangolin',
   name: 'Panko',
-  currentDialogueIndex: 23,
+  currentDialogueIndex: 24,
+  hasNewDialogue: false,
 };
 
 const fox = {
@@ -318,6 +321,9 @@ describe('useDialogueFlow visit-next-friend chain', () => {
   beforeEach(() => {
     resetHookState();
     animals = [{ ...pangolin }, { ...fox }];
+    progress.conversationReadIds = {
+      pangolin: getDialoguesForAnimal('pangolin', 0).map(line => line.id),
+    };
     jest.clearAllMocks();
     // Re-pin the default implementations the per-test overrides below replace
     // (clearAllMocks clears calls, not implementations).
@@ -331,7 +337,7 @@ describe('useDialogueFlow visit-next-friend chain', () => {
     await hook.handleAnimalTap({ ...pangolin } as never);
     hook = render();
 
-    // Terminal line: button would read "Close"
+    // All lines already have completion receipts: button reads "Close".
     expect(hook.hasMoreToShow).toBe(false);
 
     const next = hook.getNextAnimalWithNews(animals as never);
@@ -344,8 +350,9 @@ describe('useDialogueFlow visit-next-friend chain', () => {
   });
 
   it('never offers the current animal even when it alone has unread lines', async () => {
-    // Fox is fully read (index at total): no news anywhere but pangolin itself.
+    // Only completion receipts prove Fox is fully read; a legacy index cannot.
     animals = [{ ...pangolin }, { ...fox, currentDialogueIndex: 24 }];
+    progress.conversationReadIds = { fox: getDialoguesForAnimal('fox', 1).map(line => line.id) };
     let hook = render();
     await hook.handleAnimalTap({ ...pangolin } as never);
     hook = render();
@@ -390,10 +397,8 @@ describe('useDialogueFlow visit-next-friend chain', () => {
     await hook.handleVisitNextAnimal(next as never);
     hook = render();
 
-    // Close bookkeeping for pangolin: terminal read advanced the stored index
-    // PAST the last line (badge honesty), and the manual close kept the
-    // session warm (no endSession — identical to tapping Close).
-    expect(markDialogueReadMock).toHaveBeenCalledWith('pangolin', 24);
+    // Switching friends never consumes another line and leaves the session warm.
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
     expect(endSessionMock).not.toHaveBeenCalled();
     const storedPangolin = (animals as { id: string; currentDialogueIndex: number; hasNewDialogue: boolean }[])
       .find(a => a.id === 'pangolin')!;
@@ -432,7 +437,15 @@ describe('choice-only conversation news', () => {
     jest.clearAllMocks();
     isOnCooldownMock.mockReturnValue(false);
     getSessionStatusMock.mockReturnValue({ status: 'in_session', dialoguesRemaining: 5 });
-    const revealProgress = { ...progress, currentPhase: 4 };
+    jest.requireMock('../services/animalDialogue').getTotalDialogueCount.mockReturnValue(134);
+    const revealProgress = {
+      ...progress,
+      currentPhase: 4,
+      conversationReadIds: {
+        fox: getDialoguesForAnimal('fox', 4).map(line => line.id),
+        pangolin: getDialoguesForAnimal('pangolin', 4).map(line => line.id),
+      },
+    };
     const renderReveal = () => {
       rewindHookIndices();
       // eslint-disable-next-line react-hooks/rules-of-hooks
