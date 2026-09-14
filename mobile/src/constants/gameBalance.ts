@@ -222,9 +222,14 @@ export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3 base (×2 → every 10)
  * preview-graduation toast (PREVIEW_GRADING_FULL_LIMIT = 12), so the marks
  * stepped back and the first ad hit in one breath. 16 puts the first ad at
  * the exit of win 17, clear of graduation (board 13) and the challenge-toggle
- * intro (15). Deliberately no longer equal to EXIT_NUDGE_MIN_PUZZLES (12):
- * the nudge and the interstitial never stack on one exit anyway
- * (runVictoryExitNudges skips when an interstitial showed).
+ * intro (15). Deliberately not equal to EXIT_NUDGE_MIN_PUZZLES (14): the
+ * nudge and the interstitial never stack on one exit anyway
+ * (runVictoryExitNudges skips when an interstitial showed). The early
+ * one-time-beat timeline: daily unlock 8 / mandatory first harvest 9 /
+ * reverse variant 10 / phase-1 pit ceremony 12 (engaged players; 13-16 at
+ * lower 3-star rates) / preview graduation 13 (deferred one board when a
+ * ceremony was just acknowledged, see ceremonyPlayback) / first exit nudge
+ * 14 / challenge intro 15 / first ad on the exit of win 17.
  */
 export const INTERSTITIAL_MIN_PUZZLES = 16;
 
@@ -339,8 +344,17 @@ export const SEASON_PASS_PREMIUM_AMBER_COST = 2500;
 // Gentle, frequency-capped nudges (never modal spam). All are suppressed for
 // players who already own the relevant entitlement.
 
-/** Earliest puzzle count at which the shared victory-exit nudge chain may run. */
-export const EXIT_NUDGE_MIN_PUZZLES = 12;
+/**
+ * Earliest puzzle count at which the shared victory-exit nudge chain may run.
+ * 14 (not 12): at 12 the first share/patron alert could fire on the exit of
+ * win 13, the SAME board whose start carries the blocking preview-graduation
+ * card (PREVIEW_GRADING_FULL_LIMIT = 12) and which follows the phase-1 pit
+ * ceremony (MIN_PUZZLES_FOR_PHASE[1] = 12) by one board. At 14 the first
+ * exit nudge lands on the exit of win 14 at the earliest, one full board
+ * after graduation. The notification prompt runs before this gate and is
+ * unaffected.
+ */
+export const EXIT_NUDGE_MIN_PUZZLES = 14;
 
 /** Minimum completed puzzles between proactive victory-exit nudges. */
 export const EXIT_NUDGE_SPACING_PUZZLES = 5;

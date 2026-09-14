@@ -157,6 +157,8 @@ jest.mock('../services/whisperGallery', () => ({
 jest.mock('../services/phaseNarrative', () => ({
   getFoxPostTutorialPlayPrompt: jest.fn(() => 'Go solve a puzzle, friend.'),
   getDialogueCaughtUpLine: jest.fn((phase: number) => `caught up (phase ${phase})`),
+  getDialogueRevealSkipHint: jest.fn(() => 'Tap the words to skip ahead.'),
+  getArrivalResumeFramingLine: jest.fn((name: string) => `${name} settles in (resume framing).`),
 }));
 
 jest.mock('../services/weeklyQuests', () => ({
@@ -182,7 +184,13 @@ jest.mock('../services/dialogue/phase5Pool', () => ({
   buildPhase5Eligibility: jest.fn(() => () => true),
 }));
 
-import { useDialogueFlow, splitDialogueIntoPages } from '../hooks/useDialogueFlow';
+import {
+  useDialogueFlow,
+  splitDialogueIntoPages,
+  markArrivalResumeFramed,
+  ARRIVAL_RESUME_FRAMING_SEEN_KEY,
+} from '../hooks/useDialogueFlow';
+import storage from '@react-native-async-storage/async-storage';
 import { getCurrentDialogue, getCoordinatedEventLine } from '../services/animalDialogue';
 import { checkDialogueAvailability, recordDialogue, endSession } from '../services/dialogueSession';
 import { markDialogueRead, markIntroSeen } from '../services/amberCurrency';
@@ -612,6 +620,10 @@ describe('useDialogueFlow Phase 5 pools after completed base conversation', () =
 
   it('finishes unread base material before serving the pool, regardless of the legacy index', async () => {
     markReadThrough('pangolin', 135);
+    // This resident already had their post-Arrival resume framing (covered
+    // below), so the visit opens straight on the unread regular line.
+    await storage.clear();
+    await markArrivalResumeFramed('pangolin');
     const legacyAnimal = { ...pangolin, currentDialogueIndex: 0 };
     let hook = render();
     await hook.handleAnimalTap(legacyAnimal as never);
@@ -631,6 +643,35 @@ describe('useDialogueFlow Phase 5 pools after completed base conversation', () =
     await hook.handleNextDialogue();
     expect(markDialogueReadMock).toHaveBeenCalledWith('pangolin', 137);
     expect(setPhase5CaughtUpMock).toHaveBeenCalledWith('pangolin', 1);
+  });
+
+  it('frames resumed pre-arrival material once per resident after the Arrival (narrative-2)', async () => {
+    markReadThrough('pangolin', 135);
+    await storage.clear();
+    const legacyAnimal = { ...pangolin, currentDialogueIndex: 0 };
+    let hook = render();
+    await hook.handleAnimalTap(legacyAnimal as never);
+    hook = render();
+
+    // The lead-in frames the older line as recollection: a pre-dialogue page,
+    // presentation only. No receipt, no read-ID write, no gallery record.
+    expect(hook.dialogueText).toBe('Panko settles in (resume framing).');
+    expect(hook.hasMoreToShow).toBe(true);
+    expect(completeConversationMock).not.toHaveBeenCalled();
+    expect(recordWhisperMock).not.toHaveBeenCalled();
+    expect(await storage.getItem(ARRIVAL_RESUME_FRAMING_SEEN_KEY)).toContain('pangolin');
+
+    await hook.handleNextDialogue();
+    hook = render();
+    expect(hook.dialogueText).toBe('Legacy regular dialogue.');
+    expect(completeConversationMock).not.toHaveBeenCalled();
+
+    // A second visit does not frame again: the flag is per resident, once.
+    await hook.handleCloseDialogue();
+    hook = render();
+    await hook.handleAnimalTap(legacyAnimal as never);
+    hook = render();
+    expect(hook.dialogueText).toBe('Legacy regular dialogue.');
   });
 
   it('opens Fox on the Phase 5 pool without invoking any Phase 4 callback queue', async () => {

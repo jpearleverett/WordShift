@@ -12,6 +12,51 @@ interface PlaybackDependencies {
   retry?: typeof saveWithPlayerRetry;
 }
 
+// ---------------------------------------------------------------------------
+// Preview-graduation deferral (ftue-2). For an engaged new player the phase-1
+// pit ceremony lands on win 12 and the blocking preview-graduation card
+// (PREVIEW_GRADING_FULL_LIMIT = 12) opens on board 13: two "the rules just
+// changed" modals inside one board. Acknowledging a PHASE ceremony arms a
+// one-board deferral; the host consults it before showing the graduation card
+// on the first neutral board and, when it is armed, skips that ONE board
+// without spending the beat. Session-scoped by design (a kill in between
+// simply shows the card on the next neutral board, the pre-existing
+// behaviour). House/arrival/post-arrival/new-cycle ceremonies never arm it:
+// graduation is long past by then.
+// ---------------------------------------------------------------------------
+let graduationDeferralArmed = false;
+
+/** Arm the one-board graduation deferral (called once a phase ceremony is acknowledged). */
+export function notePhaseCeremonyAcknowledged(): void {
+  graduationDeferralArmed = true;
+}
+
+/**
+ * Pure decision: should the preview-graduation card wait one board? True
+ * exactly when a phase ceremony was acknowledged and no board has consumed
+ * the deferral since.
+ */
+export function shouldDeferPreviewGraduation(armed: boolean = graduationDeferralArmed): boolean {
+  return armed;
+}
+
+/**
+ * Consume the deferral for the board being opened: returns true (skip the card
+ * on THIS board, keep the beat for the next one) at most once per armed
+ * ceremony. The host calls it only where the card would otherwise show, so a
+ * graded or blind board never spends it.
+ */
+export function consumePreviewGraduationDeferral(): boolean {
+  const defer = shouldDeferPreviewGraduation();
+  graduationDeferralArmed = false;
+  return defer;
+}
+
+/** Test/reset hook: clear any armed deferral. */
+export function resetPreviewGraduationDeferral(): void {
+  graduationDeferralArmed = false;
+}
+
 /** The disk queue owns delivery; animation and navigation never consume it. */
 export function createCeremonyPlayback({
   build, onEvent, onWaiting,
@@ -86,6 +131,7 @@ export function createCeremonyPlayback({
           message: 'We need to finish saving this moment. Please retry before continuing.',
         });
         if (owner !== generation) return null;
+        if (finished.record.kind === 'phase') notePhaseCeremonyAcknowledged();
         active = null;
         onEvent(null);
         await retry(() => readNext(owner), {

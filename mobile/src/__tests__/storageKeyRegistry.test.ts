@@ -53,6 +53,9 @@ const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
   wordshift_swift_hint_seen: 'One-time UI pointer toast; device-local UX, not progress.',
   wordshift_first_stuck_seen: 'One-time mercy notice; a returning player may deserve it once more.',
   wordshift_preview_graduation_seen_v2: 'One-time teaching card, device-local by design.',
+  wordshift_first_imperfect_stars_seen: 'One-time star-rule receipt on the first sub-3-star win; device-local UX pointer like first_stuck_seen.',
+  wordshift_reveal_skip_hint_seen: 'One-time tap-to-skip pointer under the first dialogue reveal; device-local UX, not progress.',
+  wordshift_arrival_resume_framing_seen: 'Per-resident one-time presentation-only lead-in when pre-arrival lines resume after the Arrival; never a conversation receipt, so a fresh device may frame once more.',
   wordshift_local_reset_at: 'Stamps when THIS device was reset; syncing it would round-trip through a restore and defeat its own purpose. Deliberately survives Reset All (like wordshift_pending_iap_grants), so a post-reset relaunch whose upload failed cannot auto-restore the pre-reset save.',
 };
 

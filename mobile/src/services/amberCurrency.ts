@@ -1119,12 +1119,34 @@ export async function acknowledgeCeremony(id: string): Promise<void> {
   }
 }
 
+/** The house ceremony is held in the queue until the reveal has been confirmed. */
+export const HOUSE_CEREMONY_MIN_PHASE: DialoguePhase = 4;
+
+/**
+ * Pure decision: may the house ceremony be queued now? Detection happens the
+ * moment the last resident is invited, which for a below-ramp (1.0x) player
+ * lands ~20 solves BEFORE the Phase-4 reveal (the Sky Garden gate is 92 solves
+ * while the weighted threshold is 124). The Temple scene presumes the reveal
+ * (Ember: "I owe you the rest of what I knew", the waiting shadow), so it is
+ * HELD until confirmPhaseTransition has committed Phase 4; the queue is
+ * ordered, so the phase-4 entry always plays first. Holding changes nothing
+ * about house completion itself: `houseCompleted` is set at detection as
+ * before, the endgame chain reads that flag, and the ceremony simply queues
+ * on the first home landing after the reveal. Legacy / New Cycle saves whose
+ * house is already celebrated are unaffected.
+ */
+export function canQueueHouseCeremony(progress: Pick<HomeWorldProgress,
+  'houseCompleted' | 'houseCompletionCelebrated' | 'currentPhase'>): boolean {
+  return progress.houseCompleted === true && progress.houseCompletionCelebrated !== true &&
+    progress.currentPhase >= HOUSE_CEREMONY_MIN_PHASE;
+}
+
 /** Queue the built house's still-unseen ceremony without spending it at detection. */
 export async function queueHouseCeremony(): Promise<PendingCeremony | null> {
   try {
     return await runStorageTransaction('ceremony_house', async () => {
       const progress = await loadFreshCeremonyProgress();
-      if (!progress.houseCompleted || progress.houseCompletionCelebrated) return null;
+      if (!canQueueHouseCeremony(progress)) return null;
       const existing = readCeremonies(progress).find(entry =>
         entry.kind === 'house' && entry.cycle === (progress.cycleCount ?? 0));
       if (existing) return { ...existing };

@@ -1177,6 +1177,14 @@ export function getCeremonyHoldHint(): string {
 interface RulesText {
   title: string;
   steps: { heading: string; desc: string }[];
+  /**
+   * The star rule (ftue-7), rendered under the four steps: three stars for a
+   * solve with no hints and at most one slipped drop; a hint or a couple of
+   * slips costs one; a solve with no hints, slips or undos is Flawless. Kept
+   * out of the step list on purpose: each step has its own diagram
+   * (RULES_STEP_ART) and the step count is pinned at four.
+   */
+  starRule: string;
   dismissLabel: string;
 }
 
@@ -1195,6 +1203,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Make Real Words', desc: 'Both words must be valid English!' },
       { heading: 'Complete All Rows', desc: 'Work through every row to win!' },
     ],
+    starRule: 'Stars: three for a solve with no hints and no more than one slipped drop. A hint, or a couple of slips, costs one. No hints, slips or undos at all is a Flawless solve!',
     dismissLabel: "LET'S PLAY!",
   },
   1: {
@@ -1205,6 +1214,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Form Valid Words', desc: 'Both words must exist in the dictionary.' },
       { heading: 'Solve the Chain', desc: 'Complete each row to progress.' },
     ],
+    starRule: 'Stars: three for a chain solved without hints and at most one slipped drop. A hint or a couple of slips costs one. A solve with no hints, slips or undos is Flawless.',
     dismissLabel: 'UNDERSTOOD',
   },
   2: {
@@ -1215,6 +1225,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Words Must Be Valid', desc: 'The dictionary decides. Not you.' },
       { heading: 'Finish the Chain', desc: 'Row by row. There is no shortcut.' },
     ],
+    starRule: 'Stars: three when you needed no hint and slipped at most once. A hint, or more than one slip, takes one away. Nothing borrowed, nothing undone: Flawless.',
     dismissLabel: 'CONTINUE',
   },
   3: {
@@ -1225,6 +1236,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Valid Words Only', desc: 'Some arrangements are forbidden.' },
       { heading: 'Complete the Sequence', desc: 'Keep a path open through the remaining rows.' },
     ],
+    starRule: 'Stars: three if you asked for nothing and slipped no more than once. Each hint, each second slip, dims one. A sequence with no hint, no slip and no undo is Flawless.',
     dismissLabel: 'PROCEED',
   },
   4: {
@@ -1235,6 +1247,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'The Words Must Be Real', desc: 'As real as anything here.' },
       { heading: 'Complete the Ritual', desc: 'Row by row. Closer and closer.' },
     ],
+    starRule: 'Stars: three when the hands needed no hint and faltered at most once. A hint, or a second falter, costs one. Unaided, unfaltering, undone by nothing: Flawless.',
     dismissLabel: '...',
   },
   5: {
@@ -1245,6 +1258,7 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'The Words Are Real', desc: 'As real as the silence between them.' },
       { heading: 'Continue the Pattern', desc: 'Row by row. The weave holds.' },
     ],
+    starRule: 'Stars: three for a thread pulled without a hint and no more than one slip. A hint, or a second slip, lets one go. No hint, no slip, no undo: Flawless.',
     dismissLabel: 'Continue',
   },
 };
@@ -2906,6 +2920,111 @@ export function getPreviewGraduationConfirm(phase: number): string {
 }
 
 // ============================================================================
+// FIRST IMPERFECT STARS — a one-line receipt the first time a win lands under
+// three stars, naming the cause (a hint, slipped drops, or both). The star rule
+// itself lives in the How-to-Play star line; this is the moment it first
+// matters. Device-local once flag (a fresh device may deserve it once more).
+// ============================================================================
+
+/** Device-local once flag for the first sub-3-star receipt (see App). */
+export const FIRST_IMPERFECT_STARS_SEEN_KEY = 'wordshift_first_imperfect_stars_seen';
+
+export type ImperfectStarCause = 'hint' | 'slips' | 'both';
+
+/**
+ * Why a win fell short of three stars (starRating: 3 stars = 0 hints and at
+ * most 1 invalid attempt). Null when the win was a full three stars, or when
+ * neither counter explains it.
+ */
+export function resolveImperfectStarCause(
+  stars: number,
+  hintsUsed: number,
+  invalidAttempts: number,
+): ImperfectStarCause | null {
+  if (stars >= 3) return null;
+  const hint = hintsUsed > 0;
+  const slips = invalidAttempts > 1;
+  if (hint && slips) return 'both';
+  if (hint) return 'hint';
+  if (slips) return 'slips';
+  return null;
+}
+
+/** Phase-aware one-line receipt for the first sub-3-star win, naming the cause. */
+export function getFirstImperfectStarsMessage(phase: number, cause: ImperfectStarCause): string {
+  if (phase >= 5) {
+    if (cause === 'both') return 'A hint and a few slips cost a star. The weave keeps the whole solve anyway.';
+    if (cause === 'hint') return 'The hint cost a star. Three come from solving unaided. The weave holds either way.';
+    return 'A few slipped drops cost a star. One slip is forgiven; more are not. The weave holds either way.';
+  }
+  if (phase >= 4) {
+    if (cause === 'both') return 'Guidance and faltering hands cost a star. The arrangement counts both.';
+    if (cause === 'hint') return 'The guidance cost a star. Three are given only to hands that asked for nothing.';
+    return 'The faltering cost a star. One slip is overlooked. A second is not.';
+  }
+  if (phase >= 3) {
+    if (cause === 'both') return 'A hint and more than one slip: two reasons the third star stayed dark.';
+    if (cause === 'hint') return 'The hint kept the third star dark. Three stars belong to unaided solves.';
+    return 'More than one slipped drop kept the third star dark. One slip is forgiven.';
+  }
+  if (phase >= 2) {
+    if (cause === 'both') return 'A hint and a few slips together cost a star. Three stars ask for neither.';
+    if (cause === 'hint') return 'The hint cost a star. Three stars are for solves with no help at all.';
+    return 'A few slipped drops cost a star. One slip is forgiven; the second is not.';
+  }
+  if (cause === 'both') return 'Two stars! A hint plus a couple of slipped drops each cost one. No help, no slips: three stars.';
+  if (cause === 'hint') return 'Two stars! Using a hint costs one. Solve without help for all three.';
+  return 'Two stars! More than one slipped drop costs a star. One slip is always forgiven.';
+}
+
+/**
+ * The once-ever receipt: returns the phase-aware line the FIRST time a win
+ * lands under three stars for a nameable reason, marking the device flag as it
+ * does, and null on every later call (or when the win was three stars).
+ * Broken storage is treated as already seen so it can never repeat.
+ */
+export async function consumeFirstImperfectStarsReceipt(
+  phase: number,
+  win: { stars: number; hintsUsed: number; invalidAttempts: number },
+): Promise<string | null> {
+  const cause = resolveImperfectStarCause(win.stars, win.hintsUsed, win.invalidAttempts);
+  if (!cause) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- guarded lazy require keeps the helpers Node-importable
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    if ((await AsyncStorage.getItem(FIRST_IMPERFECT_STARS_SEEN_KEY)) === 'true') return null;
+    await AsyncStorage.setItem(FIRST_IMPERFECT_STARS_SEEN_KEY, 'true');
+  } catch {
+    return null;
+  }
+  return getFirstImperfectStarsMessage(phase, cause);
+}
+
+// ============================================================================
+// DIALOGUE REVEAL SKIP HINT — the bubble is tappable to land the whole page at
+// once, but nothing tells a new player. Shown once, under the first reveal
+// (see useDialogueFlow.revealSkipHint). Phase 0-1 only in practice; later
+// phases keep the wording in register in case the first visit comes late.
+// ============================================================================
+
+export function getDialogueRevealSkipHint(phase: number): string {
+  if (phase >= 4) return 'Tap the words and they will all arrive at once.';
+  if (phase >= 2) return 'Tap the words to let them land all at once.';
+  return 'Tap the words to skip ahead.';
+}
+
+// ============================================================================
+// ARRIVAL RESUME FRAMING — one-time, per resident: when a resident resumes
+// their pre-arrival conversation after the Arrival, a single lead-in frames the
+// older material as recollection. Presentation only; it never touches the
+// conversation ledger (see useDialogueFlow).
+// ============================================================================
+
+export function getArrivalResumeFramingLine(animalName: string): string {
+  return `${animalName} settles in. "There is more I meant to tell you before that night. Let me say it the way I had it then."`;
+}
+
+// ============================================================================
 // SWIFT VICTORY POINTER — one-time hint that a quicker victory style exists in
 // Settings. In-world voice (the house offers), never a tutorial voice.
 // ============================================================================
@@ -3579,30 +3698,51 @@ export function getGoalSuggestion(
 // HOME SCREEN NUDGE — pull puzzle-focused players toward animal dialogue
 // ============================================================================
 
+// Five lines per phase (ftue-5): the nudge is shown at most once per app
+// session (see useVictoryOrchestration), so a chaining player meets one line
+// per session and the pool has to stay fresh across many sessions.
 const HOME_NUDGE_MESSAGES: Record<number, string[]> = {
   0: [
     '{name} has been waiting to talk to you. Visit the house!',
     'Your friends miss you! Head home and say hi.',
+    '{name} saved you a seat by the window. Drop in whenever you like.',
+    'The kettle is on at home. {name} keeps glancing at the door.',
+    'A little news is waiting at the house. {name} is bursting to share it.',
   ],
   1: [
     '{name} has something on their mind. You should visit.',
     'The house feels quiet without you. {name} noticed.',
+    '{name} has been turning a thought over. It might be one for you.',
+    'The lamps are lit at home. {name} is up late, thinking.',
+    'Something small changed at the house. {name} would like to tell you what.',
   ],
   2: [
     '{name} has been staring at the walls. You should check on them.',
     'Something is different at home. {name} wants to talk.',
+    '{name} left a question by the door. It is still there.',
+    'The house has gone quiet in a new way. {name} noticed first.',
+    '{name} has started counting things. Ask them what.',
   ],
   3: [
     '{name} needs you to hear something. It cannot wait much longer.',
     'The house is restless. {name} has been pacing.',
+    '{name} stopped mid-sentence this morning. They want to finish it with you.',
+    'The rooms are colder than they were. {name} has been keeping a lamp lit for you.',
+    '{name} has been listening at the floor. They would rather tell you than write it down.',
   ],
   4: [
     'The keepers are calling for you. {name} says it is time.',
     '{name} says: "We have waited long enough."',
+    '{name} keeps your place at the pattern. Nobody else will sit there.',
+    'The house holds its breath between your visits. {name} counts them.',
+    '{name} has one more thing to tell you before the hour. Come home.',
   ],
   5: [
     '{name} is humming softly. The house hums with them.',
     'The weave holds. {name} wants you to know that.',
+    '{name} mended a cup this morning. They would like to show you.',
+    'The house rests. {name} is on the porch, saving the good chair.',
+    '{name} has a story from the quiet days. No hurry. It keeps.',
   ],
 };
 
@@ -4603,19 +4743,22 @@ const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string, string, 
     'Two weeks. The stillness has settled into something almost like waiting.',
     'A month. The house does not forget. It simply waits, and the waiting deepens.',
   ],
+  // A notification is read out of context, by anyone who sees the phone. The
+  // dark rungs stay unsettling in the house's own register but never carry a
+  // second-person threat: the phase-2 and phase-5 pools are the model.
   3: [
     'The house is quieter without you. The animals have noticed.',
-    'Something pauses while you are away. It does not like pausing.',
+    'Three days. Your chair is still turned toward the fire. Nobody has moved it.',
     'Seven days. The house has held its breath the whole time.',
-    'Two weeks. What was building does not unbuild. It only leans closer to the door.',
+    'Two weeks. The rooms have gone still, the way a room does when someone stops mid-sentence.',
     'A month of your absence. The pattern has not moved. It is very good at not moving.',
   ],
   4: [
     'The arrangement is incomplete without you.',
-    'The keepers hold your place at the pattern. They are patient. It is less so.',
-    'Seven days of silence. What comes through still waits for your hand.',
+    'The keepers hold your place at the pattern. Nobody else will sit there.',
+    'Seven days of silence. The keepers keep the lamps lit, and keep your place.',
     'Two weeks. The keepers have not moved from their places. Neither has it.',
-    'A month at the threshold. It has waited longer than this. It can wait for you.',
+    'A month at the threshold. It has waited longer than this. The keepers still keep your place.',
   ],
   5: [
     'The house rests. It will be here when you return.',

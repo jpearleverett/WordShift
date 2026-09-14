@@ -8,6 +8,7 @@ import {
   markFinalPuzzleCompleted,
   markPostRevelation,
   queueHouseCeremony,
+  canQueueHouseCeremony,
 } from '../services/amberCurrency';
 import {
   runStorageTransaction,
@@ -167,35 +168,70 @@ test('legacy completed phases and endings do not suddenly replay on upgrade', as
   expect(await getPendingCeremonies()).toEqual([]);
 });
 
+// The house ceremony presumes the reveal, so it is held until Phase 4 has
+// been confirmed (narrative-3). These seeds sit at the reveal's doorstep.
+const revealSeed = { currentPhase: 3 as const, pendingPhaseTransition: 4 as const, houseCompleted: true };
+
 test('house detection stays uncelebrated until its own final page is acknowledged', async () => {
-  await seed({ houseCompleted: true });
+  await seed(revealSeed);
+  await confirmPhaseTransition();
   const [first, duplicate] = await Promise.all([queueHouseCeremony(), queueHouseCeremony()]);
   expect(first).toEqual(duplicate);
   expect((await saved()).houseCompletionCelebrated).not.toBe(true);
-  await confirmPhaseTransition();
-  await acknowledgeCeremony('0:phase:2');
+  await acknowledgeCeremony('0:phase:4');
   expect((await saved()).houseCompletionCelebrated).not.toBe(true);
   await acknowledgeCeremony(first!.id);
   expect((await saved()).houseCompletionCelebrated).toBe(true);
   expect(await queueHouseCeremony()).toBeNull();
 });
 
-test('a queued house scene keeps its original identity if the world phase changes', async () => {
-  await seed({ houseCompleted: true });
-  const first = await queueHouseCeremony();
+test('a house finished before the reveal is held, then queues behind the Phase-4 scene', async () => {
+  await seed(revealSeed);
+  // Detection at Phase 3 (a 1.0x player buys Moss ~solve 94, reveal ~112-124):
+  // nothing is queued and nothing about completion changes.
+  expect(canQueueHouseCeremony({ houseCompleted: true, houseCompletionCelebrated: false, currentPhase: 3 })).toBe(false);
+  expect(await queueHouseCeremony()).toBeNull();
+  let progress = await saved();
+  expect(progress.houseCompleted).toBe(true);
+  expect(progress.houseCompletionCelebrated).not.toBe(true);
+  expect(progress.pendingCeremonies ?? []).toEqual([]);
+  // The reveal is confirmed at the pit; the next home landing queues the house
+  // BEHIND the phase-4 entry, so the ordered queue plays the reveal first.
   await confirmPhaseTransition();
+  const house = await queueHouseCeremony();
+  expect(house).toEqual({ id: '0:house:4', kind: 'house', phase: 4, cycle: 0 });
+  expect((await getPendingCeremonies()).map(entry => entry.kind)).toEqual(['phase', 'house']);
+  progress = await saved();
+  expect(progress.houseCompleted).toBe(true);
+  expect(progress.houseCompletionCelebrated).not.toBe(true);
+});
+
+test('a post-Arrival house queues at Phase 5 and a celebrated house never re-queues', async () => {
+  await seed({ currentPhase: 5, pendingPhaseTransition: null, houseCompleted: true,
+    finalPuzzleCompleted: true, postRevelation: true });
+  expect(canQueueHouseCeremony({ houseCompleted: true, houseCompletionCelebrated: false, currentPhase: 5 })).toBe(true);
+  expect(canQueueHouseCeremony({ houseCompleted: true, houseCompletionCelebrated: true, currentPhase: 5 })).toBe(false);
+  expect(canQueueHouseCeremony({ houseCompleted: false, houseCompletionCelebrated: false, currentPhase: 5 })).toBe(false);
+  expect((await queueHouseCeremony())?.kind).toBe('house');
+});
+
+test('a queued house scene keeps its original identity if the world phase changes', async () => {
+  await seed({ ...revealSeed, currentPhase: 4, pendingPhaseTransition: null, finalPuzzleCompleted: true });
+  const first = await queueHouseCeremony();
+  await markPostRevelation();
+  expect((await saved()).currentPhase).toBe(5);
   expect(await queueHouseCeremony()).toEqual(first);
   expect((await getPendingCeremonies()).filter(entry => entry.kind === 'house')).toHaveLength(1);
 });
 
 test('an unknown or repeated completion cannot consume another queued ceremony', async () => {
-  await seed({ houseCompleted: true });
+  await seed(revealSeed);
   await confirmPhaseTransition();
   const house = await queueHouseCeremony();
   await acknowledgeCeremony('stale-component');
   expect(await getPendingCeremonies()).toHaveLength(2);
-  await acknowledgeCeremony('0:phase:2');
-  await acknowledgeCeremony('0:phase:2');
+  await acknowledgeCeremony('0:phase:4');
+  await acknowledgeCeremony('0:phase:4');
   expect(await getPendingCeremonies()).toEqual([house]);
 });
 
@@ -209,7 +245,7 @@ test('a failed completion before commit leaves the scene available after restart
 });
 
 test('committed house completion recovers both its receipt and queue removal', async () => {
-  await seed({ houseCompleted: true });
+  await seed({ ...revealSeed, currentPhase: 4, pendingPhaseTransition: null });
   const house = await queueHouseCeremony();
   failNextWrite(KEY);
   await expect(acknowledgeCeremony(house!.id)).rejects.toBeInstanceOf(StorageRecoveryRequiredError);

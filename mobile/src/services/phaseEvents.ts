@@ -346,7 +346,7 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
     {
       // The oldest planted seed pays off: Ember's onboarding wrong-note
       // ("hoping for someone like you") is revealed as recruitment.
-      text: 'Ember looks from the old hearth to the new rooms.\n“I asked you to build a home. I owe you the rest of what I knew.”',
+      text: 'Ember looks from the old hearth to the new rooms.\n"I asked you to build a home. I owe you the rest of what I knew."',
       image: 'kept_table',
       imageOpacity: 1,
       delay: 10600,
@@ -364,6 +364,27 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
   ],
 };
 
+/**
+ * The house can be finished on either side of the Arrival: the finale arms on
+ * a real-solve floor (FINALE_ARM_MIN_PUZZLES) independent of the build, so a
+ * player short of the last rooms plays the Arrival first and buys Sky Garden
+ * and Moss afterwards. The static ceremony above anticipates a waiting
+ * presence, which reads as a contradiction once it has descended and settled.
+ * With `arrived`, Ember's promise becomes an acknowledgment and the closing
+ * glimpse becomes the settled shadow at its post-revelation opacity, never a
+ * waiting one. Without context (or before the Arrival) the authored constant
+ * is returned untouched.
+ */
+export function buildHouseCompletionEvent(context?: FinalArrivalContext): PhaseTransitionEvent {
+  if (context?.arrived !== true) return HOUSE_COMPLETION_EVENT;
+  const scenes = HOUSE_COMPLETION_EVENT.scenes.map(scene => ({ ...scene }));
+  scenes[3].text = 'Ember looks from the old hearth to the new rooms.\n"I asked you to build a home. You finished it after you learned what I knew."';
+  scenes[4].text = 'The house is whole.\nWhat came through was already here to see it finished.';
+  // The settled presence, at the opacity After leaves it: present, not waiting.
+  scenes[4].imageOpacity = POST_REVELATION_EVENT.backdrop?.opacity ?? 0.14;
+  return { ...HOUSE_COMPLETION_EVENT, scenes };
+}
+
 // ============================================================================
 // FINAL PUZZLE EVENT
 // ============================================================================
@@ -375,6 +396,13 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
  */
 export interface FinalArrivalContext {
   houseComplete?: boolean;
+  /**
+   * The Arrival has already happened (the final board is complete, or the
+   * save is post-revelation). Lets a ceremony that can play on either side of
+   * the Arrival, the house completion, stop anticipating a presence that has
+   * already descended and settled.
+   */
+  arrived?: boolean;
   unlockedAnimals?: string[];
   boundary?: 'remember' | 'release' | null;
   keptPromise?: boolean;
@@ -402,7 +430,7 @@ export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
     { text: 'For a moment, nothing moves.', image: 'house', imageOpacity: 0.9, delay: 14800, duration: 2000 },
     { text: 'The seam opens above the roof.\nSomething descends, carrying the warmth you knew.', image: 'shadow_figure', imageOpacity: 0.7, effect: 'descend', delay: 17000, duration: 5000 },
     { text: 'The warmth reaches for every room.\nAt the doorstep, a cold draft remains.', image: 'shadow_figure', imageOpacity: 0.7, delay: 22200, duration: 5000 },
-    { text: 'Ember leaves the door on its latch.\n“I wanted us safe. I did not know what it would try to stop.”', speaker: 'fox', image: 'shadow_figure', imageOpacity: 0.55, delay: 27400, duration: 4500 },
+    { text: 'Ember leaves the door on its latch.\n"I wanted us safe. I did not know what it would try to stop."', speaker: 'fox', image: 'shadow_figure', imageOpacity: 0.55, delay: 27400, duration: 4500 },
     { text: 'The seam closes. The presence stays.\nSomewhere in the house, a cup begins to cool.', image: 'shadow_figure', imageOpacity: 0.45, delay: 32100, duration: 3500 },
   ],
 };
@@ -432,7 +460,7 @@ export function buildFinalPuzzleEvent(
   scenes[7].image = 'kept_table';
   scenes[7].imageOpacity = 1;
   if (met.has('fox') && context?.standBeside === true) {
-    scenes[7].text = 'Ember stands beside you, leaving a little space.\n“I will tell you when I do not know. That promise I can keep.”';
+    scenes[7].text = 'Ember stands beside you, leaving a little space.\n"I will tell you when I do not know. That promise I can keep."';
   } else if (met.has('fox') && context?.standBeside === false) {
     scenes[7].text = 'Ember stays by the hearth.\nYour place in the house does not depend on how close you stand to her.';
   }
@@ -456,15 +484,15 @@ export function buildFinalPuzzleEvent(
     scenes[2].text = 'Some rooms remain unbuilt.\nThe warmth follows the words through the rooms you raised.';
   }
   if (met.has('wombat')) {
-    scenes[2].text += '\nWarren braces the join. “Room to move. It needs room to move.”';
+    scenes[2].text += '\nWarren braces the join. "Room to move. It needs room to move."';
     scenes[2].speaker = 'wombat';
   }
 
   if (met.has('aye_aye')) {
-    scenes[3].text = 'Tock takes his paw off the rope.\n“Your words first. She can answer.”';
+    scenes[3].text = 'Tock takes his paw off the rope.\n"Your words first. She can answer."';
     scenes[3].speaker = 'aye_aye';
   } else if (met.has('fennec_fox')) {
-    scenes[3].text = 'Fennick lowers one ear to the floor.\n“The small sounds are still here. Keep them here.”';
+    scenes[3].text = 'Fennick lowers one ear to the floor.\n"The small sounds are still here. Keep them here."';
     scenes[3].speaker = 'fennec_fox';
   }
 
@@ -485,14 +513,14 @@ export function buildFinalPuzzleEvent(
     scenes[8].cue = 'answer';
   }
   if (context?.keptRecord && met.has('capybara')) {
-    scenes[4].text = 'Chill holds the original page flat.\n“The correction stays beside it. It does not replace it.”';
+    scenes[4].text = 'Chill holds the original page flat.\n"The correction stays beside it. It does not replace it."';
     scenes[4].image = 'kept_table';
     scenes[4].imageOpacity = 1;
     scenes[4].imageFraming = 'detail';
     scenes[4].speaker = 'capybara';
     scenes[4].duration = 3500;
   } else if (context?.keptPromise && met.has('rabbit')) {
-    scenes[4].text = 'Thyme keeps the seed tin in her own pocket.\n“Still mine.”';
+    scenes[4].text = 'Thyme keeps the seed tin in her own pocket.\n"Still mine."';
     scenes[4].image = 'private_room';
     scenes[4].imageOpacity = 1;
     scenes[4].speaker = 'rabbit';

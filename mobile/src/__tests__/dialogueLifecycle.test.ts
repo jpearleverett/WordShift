@@ -149,6 +149,8 @@ jest.mock('../services/whisperGallery', () => ({
 jest.mock('../services/phaseNarrative', () => ({
   getFoxPostTutorialPlayPrompt: jest.fn(() => 'Go solve a puzzle, friend.'),
   getDialogueCaughtUpLine: jest.fn((phase: number) => `caught up (phase ${phase})`),
+  getDialogueRevealSkipHint: jest.fn(() => 'Tap the words to skip ahead.'),
+  getArrivalResumeFramingLine: jest.fn((name: string) => `${name} settles in (resume framing).`),
 }));
 
 jest.mock('../services/weeklyQuests', () => ({

@@ -50,12 +50,14 @@ beforeEach(async () => {
 });
 
 describe('pure decisions', () => {
-  it('exit nudges start at puzzle 12 and require five puzzles between presentations', () => {
-    expect(shouldAllowExitNudge({ puzzlesSolved: 11, lastExitNudgePuzzle: null })).toBe(false);
-    expect(shouldAllowExitNudge({ puzzlesSolved: 12, lastExitNudgePuzzle: null })).toBe(true);
-    expect(shouldAllowExitNudge({ puzzlesSolved: 16, lastExitNudgePuzzle: 12 })).toBe(false);
-    expect(shouldAllowExitNudge({ puzzlesSolved: 17, lastExitNudgePuzzle: 12 })).toBe(true);
-    expect(EXIT_NUDGE_MIN_PUZZLES).toBe(12);
+  it('exit nudges start at puzzle 14 and require five puzzles between presentations', () => {
+    // 14, not 12: the first nudge must never land on the exit of win 13, the
+    // board whose start carries the blocking preview-graduation card.
+    expect(shouldAllowExitNudge({ puzzlesSolved: 13, lastExitNudgePuzzle: null })).toBe(false);
+    expect(shouldAllowExitNudge({ puzzlesSolved: 14, lastExitNudgePuzzle: null })).toBe(true);
+    expect(shouldAllowExitNudge({ puzzlesSolved: 18, lastExitNudgePuzzle: 14 })).toBe(false);
+    expect(shouldAllowExitNudge({ puzzlesSolved: 19, lastExitNudgePuzzle: 14 })).toBe(true);
+    expect(EXIT_NUDGE_MIN_PUZZLES).toBe(14);
     expect(EXIT_NUDGE_SPACING_PUZZLES).toBe(5);
   });
 
@@ -91,21 +93,21 @@ describe('pure decisions', () => {
 
 describe('exit-nudge cadence (canShowExitNudge / recordExitNudgeShown)', () => {
   it('persists the last shown puzzle and enforces spacing across reads', async () => {
-    expect(await canShowExitNudge(12)).toBe(true);
-    await recordExitNudgeShown(12);
-    expect(await canShowExitNudge(16)).toBe(false);
-    expect(await canShowExitNudge(17)).toBe(true);
+    expect(await canShowExitNudge(14)).toBe(true);
+    await recordExitNudgeShown(14);
+    expect(await canShowExitNudge(18)).toBe(false);
+    expect(await canShowExitNudge(19)).toBe(true);
 
     const raw = await AsyncStorage.getItem('wordshift_monet_prompts');
     expect(raw).toBeTruthy();
-    expect(JSON.parse(raw as string).lastExitNudgePuzzle).toBe(12);
+    expect(JSON.parse(raw as string).lastExitNudgePuzzle).toBe(14);
   });
 
   it('Reset All clears the last shown puzzle', async () => {
-    await recordExitNudgeShown(12);
-    expect(await canShowExitNudge(16)).toBe(false);
+    await recordExitNudgeShown(14);
+    expect(await canShowExitNudge(18)).toBe(false);
     await clearMonetPrompts();
-    expect(await canShowExitNudge(12)).toBe(true);
+    expect(await canShowExitNudge(14)).toBe(true);
   });
 });
 

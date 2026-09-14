@@ -66,7 +66,12 @@ import {
   markPhase4CallbackShown,
 } from '../services/dialogueChoices';
 import { recordWhisper } from '../services/whisperGallery';
-import { getFoxPostTutorialPlayPrompt, getDialogueCaughtUpLine } from '../services/phaseNarrative';
+import {
+  getFoxPostTutorialPlayPrompt,
+  getDialogueCaughtUpLine,
+  getDialogueRevealSkipHint,
+  getArrivalResumeFramingLine,
+} from '../services/phaseNarrative';
 import { recordAnimalVisit, Quest } from '../services/weeklyQuests';
 import { hapticLight, hapticSelection } from '../services/haptics';
 import {
@@ -107,6 +112,100 @@ export const DIALOGUE_PAGE_CHAR_BUDGET = 200;
  * motion (see the reveal effect in the hook body).
  */
 export const DIALOGUE_REVEAL_CHAR_MS = 22;
+
+/**
+ * Bright-days reveal cadence (ftue-6): the 22 ms tick gave a full 200-char
+ * page 4.4 s of typewriter, and the phase 0-1 visits are three lines of
+ * ~273 chars, so a new player sat through ~20 s of reveal per visit if they
+ * never learned the bubble was tappable. 15 ms is the documented 3.0 s page.
+ * From Phase 2 on the slowness is the point, so 22 ms stays there.
+ */
+export const DIALOGUE_REVEAL_CHAR_MS_BRIGHT = 15;
+
+/** Phase-aware per-character reveal cadence: quick through Phase 1, slow after. */
+export function getDialogueRevealCharMs(phase: number): number {
+  return phase <= 1 ? DIALOGUE_REVEAL_CHAR_MS_BRIGHT : DIALOGUE_REVEAL_CHAR_MS;
+}
+
+// ---------------------------------------------------------------------------
+// Device-local one-time flags owned by this hook. Guarded lazy requires so the
+// pure helpers above stay importable in Node without an AsyncStorage mock.
+// ---------------------------------------------------------------------------
+
+/** One-time tap-to-skip hint under the first dialogue reveal (ftue-6). */
+export const DIALOGUE_REVEAL_SKIP_HINT_SEEN_KEY = 'wordshift_reveal_skip_hint_seen';
+/** Per-resident one-time post-Arrival framing of resumed pre-arrival lines (narrative-2). */
+export const ARRIVAL_RESUME_FRAMING_SEEN_KEY = 'wordshift_arrival_resume_framing_seen';
+
+async function readLocalFlag(key: string): Promise<string | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- guarded lazy require keeps the helpers Node-importable
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    return await AsyncStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+async function writeLocalFlag(key: string, value: string): Promise<void> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- guarded lazy require keeps the helpers Node-importable
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    await AsyncStorage.setItem(key, value);
+  } catch {
+    // Non-critical: a lost flag repeats a one-line pointer, nothing more.
+  }
+}
+
+/** Has the one-time reveal skip hint been shown on this device? Broken storage counts as seen. */
+export async function hasSeenRevealSkipHint(): Promise<boolean> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- guarded lazy require keeps the helpers Node-importable
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    return (await AsyncStorage.getItem(DIALOGUE_REVEAL_SKIP_HINT_SEEN_KEY)) === 'true';
+  } catch {
+    return true;
+  }
+}
+
+export function markRevealSkipHintSeen(): Promise<void> {
+  return writeLocalFlag(DIALOGUE_REVEAL_SKIP_HINT_SEEN_KEY, 'true');
+}
+
+/**
+ * Which residents have already had their post-Arrival resume framing. Parsed
+ * defensively; a corrupt value simply frames again.
+ */
+export async function getArrivalResumeFramedAnimals(): Promise<Set<string>> {
+  const raw = await readLocalFlag(ARRIVAL_RESUME_FRAMING_SEEN_KEY);
+  if (!raw) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export async function markArrivalResumeFramed(animalId: string): Promise<void> {
+  const framed = await getArrivalResumeFramedAnimals();
+  framed.add(animalId);
+  await writeLocalFlag(ARRIVAL_RESUME_FRAMING_SEEN_KEY, JSON.stringify([...framed]));
+}
+
+/**
+ * Pure decision (narrative-2): frame this visit's regular line as recollection?
+ * Only after the Arrival, only when the resumed line is pre-arrival material
+ * (authored phase 0-4, which every regular line is), only once per resident.
+ */
+export function shouldFrameArrivalResume(params: {
+  arrivalOccurred: boolean;
+  resumedLinePhase: number | null;
+  alreadyFramed: boolean;
+}): boolean {
+  return params.arrivalOccurred && params.resumedLinePhase !== null &&
+    params.resumedLinePhase <= 4 && !params.alreadyFramed;
+}
 
 /**
  * Per-species mouth-flap cadence (F25): how fast the talk/idle sprite layers
@@ -373,6 +472,13 @@ interface UseDialogueFlowReturn {
   revealInProgress: boolean;
   /** Jump the current reveal straight to the full text. No-op once complete. */
   completeReveal: () => void;
+  /**
+   * One-time tap-to-skip pointer (ftue-6): the phase-aware hint string while
+   * the FIRST reveal this device has ever shown is still in progress, else
+   * null. The host renders it faintly under the bubble; the flag commits when
+   * that reveal ends (by tap or by landing), so it is shown exactly once.
+   */
+  revealSkipHint: string | null;
   sessionInfo: SessionInfo | null;
   cooldownMessage: string | null;
   cooldownOpacity: Animated.Value;
@@ -447,6 +553,10 @@ export function useDialogueFlow({
   const [reveal, setReveal] = useState({ source: '', count: 0 });
   const [dialogueVisit, setDialogueVisit] = useState(0);
   const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Skip-hint eligibility (ftue-6): null until the device flag has been read,
+  // then true exactly until the first reveal it decorated has ended.
+  const [revealSkipHintEligible, setRevealSkipHintEligible] = useState<boolean | null>(null);
+  const revealSkipHintShowingRef = useRef(false);
 
   // Pre-dialogue pages: shown before regular dialogue, one at a time
   // These are trigger reactions, cross-animal refs, coordinated events, etc.
@@ -787,6 +897,7 @@ export function useDialogueFlow({
   const visibleDialogueText = getDialogueText();
   const revealSource = `${dialogueVisit}:${visibleDialogueText}`;
   const reducedMotionNow = getSettingsSync().reducedMotion;
+  const revealCharMs = getDialogueRevealCharMs(progress?.currentPhase ?? 0);
   const revealedChars = reveal.source === revealSource ? reveal.count : 0;
   // A reveal is "in progress" only while the modal is up, motion isn't
   // reduced, and the typewriter hasn't caught up to the full page yet.
@@ -825,14 +936,37 @@ export function useDialogueFlow({
         }
         return { source: revealSource, count: Math.min(next, total) };
       });
-    }, DIALOGUE_REVEAL_CHAR_MS);
+    }, revealCharMs);
     return () => {
       if (revealTimerRef.current) {
         clearInterval(revealTimerRef.current);
         revealTimerRef.current = null;
       }
     };
-  }, [visibleDialogueText, revealSource, showDialogue, reducedMotionNow]);
+  }, [visibleDialogueText, revealSource, showDialogue, reducedMotionNow, revealCharMs]);
+
+  // One-time tap-to-skip hint (ftue-6). Read the device flag once the first
+  // dialogue opens; the hint rides the first reveal it finds in progress and
+  // commits the flag the moment that reveal ends, however it ended.
+  useEffect(() => {
+    if (!showDialogue || revealSkipHintEligible !== null) return;
+    let current = true;
+    hasSeenRevealSkipHint().then(seen => { if (current) setRevealSkipHintEligible(!seen); });
+    return () => { current = false; };
+  }, [showDialogue, revealSkipHintEligible]);
+  const revealSkipHint =
+    revealInProgress && revealSkipHintEligible === true
+      ? getDialogueRevealSkipHint(progress?.currentPhase ?? 0)
+      : null;
+  useEffect(() => {
+    if (revealSkipHintShowingRef.current && !revealInProgress) {
+      revealSkipHintShowingRef.current = false;
+      setRevealSkipHintEligible(false);
+      markRevealSkipHintSeen().catch(() => {});
+    } else if (revealSkipHint !== null) {
+      revealSkipHintShowingRef.current = true;
+    }
+  }, [revealInProgress, revealSkipHint]);
 
   // Mouth-flap effect (F25): the talk/idle sprite layers alternate at a
   // per-species cadence ONLY while a reveal is in progress, and settle to a
@@ -1218,6 +1352,32 @@ export function useDialogueFlow({
       }
     }
 
+
+    // Post-Arrival resume framing (narrative-2): the first time a resident
+    // picks their pre-arrival conversation back up after the Arrival, one
+    // lead-in page frames the older material as recollection. Presentation
+    // only: a pre-dialogue page, no receipt, no read-ID change; its commit
+    // marks the per-resident device flag when the page is actually shown.
+    if (progress && hasAnimalConversationArrivalOccurred(progress)) {
+      try {
+        const resumed = getRegularConversation(animal);
+        const framed = await getArrivalResumeFramedAnimals();
+        if (!ownsVisit()) return;
+        if (shouldFrameArrivalResume({
+          arrivalOccurred: true,
+          resumedLinePhase: resumed ? resumed.dialogue.phase : null,
+          alreadyFramed: framed.has(animal.id),
+        })) {
+          const framedId = animal.id;
+          pages.push({
+            text: getArrivalResumeFramingLine(animal.name),
+            commit: () => markArrivalResumeFramed(framedId),
+          });
+        }
+      } catch {
+        // Framing is decoration; never block the visit on it.
+      }
+    }
 
     if (!ownsVisit()) return;
     setSelectedAnimal(animal);
@@ -1743,6 +1903,7 @@ export function useDialogueFlow({
     revealedText,
     revealInProgress,
     completeReveal,
+    revealSkipHint,
     sessionInfo,
     cooldownMessage,
     cooldownOpacity,
