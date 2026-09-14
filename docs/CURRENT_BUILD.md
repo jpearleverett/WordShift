@@ -1,10 +1,10 @@
 # Current build and documentation
 
-Updated **September 13, 2026** for the sequential-conversation follow-up to `main` at `f1f7cd5`. The earlier CI audit remains tied to [`6f96ebb583f591f46c9c023be6462d99d816a8e7`](https://github.com/jpearleverett/WordShift/commit/6f96ebb583f591f46c9c023be6462d99d816a8e7). This page distinguishes current implementation from recorded validation; it does not certify an uploaded AAB, a Play rollout, or hosted service configuration.
+Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main` at `687a08d` (the launch-readiness merge, PR 439). The earlier CI audit remains tied to [`6f96ebb583f591f46c9c023be6462d99d816a8e7`](https://github.com/jpearleverett/WordShift/commit/6f96ebb583f591f46c9c023be6462d99d816a8e7). This page distinguishes current implementation from recorded validation; it does not certify an uploaded AAB, a Play rollout, or hosted service configuration.
 
 ## Build identity
 
-Current source builds on main `f1f7cd5`, retaining its compact next-unlock sign, attunement layout fix and house-upgrade gifts. App version **1.3.5** and Android version code **99** remain unchanged. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source builds on main `687a08d` (PR 439, the launch-readiness fixes) plus the in-band CI exit-code fix, retaining the compact next-unlock sign, attunement layout fix and house-upgrade gifts. App version **1.3.5** and Android version code **99** remain unchanged. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
@@ -68,6 +68,31 @@ The [failed CI run on `a0fbb05`](https://github.com/jpearleverett/WordShift/acti
 The footer now says `Talk to <name>` and opens the same gift/introduction/conversation route as a house tap. Browser testing reproduced the old pending-gift bypass; ordinary, unseen-introduction and gift handoffs all pass after the fix. Duplicate taps are fenced and failed opens provide retry guidance.
 
 Local validation passed **4,789 tests in 197 suites**, the **11 reverse-composition script tests**, TypeScript, zero-warning lint, story integrity, vocabulary/branching and bank-route audits, and the daily cohort check. The **three shortcut browser journeys** passed. CI uses Node-24-based v6 checkout/setup/upload actions while retaining Node 22 for the application; browser evidence uploads only after the browser step runs. ESLint excludes generated browser reports and traces. App version 1.3.5 / Android version code 99 are unchanged.
+
+## September 14 launch-readiness merge and the in-band CI exit code
+
+PR 439 merged the launch-readiness branch into `main` at `687a08d`. Its
+[CI run 442](https://github.com/jpearleverett/WordShift/actions/runs/34876474354)
+passed TypeScript and zero-warning lint and reported **209 suites / 4,997 tests
+passed**, yet the Test step exited 1. No test failed: four suites
+(`ceremonyPlayback`, `useVictoryDouble`, `billingPurchaseSafety`, `adsConsent`)
+reach `logEvent` without mocking `eventLogger`, which arms its 5 s debounce
+timer; under `--runInBand` one process outlives every suite, the timer fires
+during a later suite, and the flush's deferred `require('./telemetry')` trips
+Jest's import-after-teardown guard, which sets `process.exitCode = 1`. A
+multi-worker run discards each worker's exit code, which is why the same suite
+was green locally. Reproduced locally in CI's mode before the fix (exit 1, the
+same four leaks).
+
+The fix: a global Jest setup (`src/__tests__/helpers/jestSetup.ts`,
+`setupFilesAfterEnv`) cancels the timer after every suite through the new
+`cancelPendingFlushForTests`; the timer's clearer is captured when it is armed
+so a suite that switches to fake timers cannot mismatch it; and `flushEvents`
+resolves the telemetry module synchronously at flush start (cached on success
+only) so the deferred require can no longer run in a later tick. Local
+validation in CI's mode (`npm test -- --no-coverage --ci --runInBand`):
+**209 suites / 4,997 tests, exit 0, zero teardown imports**, plus TypeScript and
+zero-warning lint. App version 1.3.5 / code 99 unchanged; nothing native moved.
 
 ## Launch readiness review (2026-09-14)
 
