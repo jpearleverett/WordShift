@@ -113,6 +113,19 @@ test('a full but stale checkpoint cannot bypass regeneration through the driver 
   expect(node(script, [checkpoint]).stdout.trim()).toBe('1');
 });
 
+// Every gated driver reads this count into shell arithmetic, so the number must
+// survive a coloured environment: console.log(<number>) would emit ANSI codes
+// under FORCE_COLOR (an interactive Jest run propagates it, which is how this
+// first surfaced) and `$((new_count - count))` then dies on the escape.
+test('the driver count stays machine-readable when the environment forces colour', () => {
+  const script = join(fixture, 'scripts/tools/gatedCheckpointCount.mjs');
+  const checkpoint = join(fixture, 'src/data/checkpoint.json');
+  const coloured = { ...process.env, FORCE_COLOR: '1' };
+  expect(node(script, [checkpoint], coloured).stdout).toBe('0\n');
+  writeFileSync(checkpoint, JSON.stringify({ puzzles: [{ id: 'reviewed' }, { id: 'second' }], vocabularyPolicyHash: GATED_POLICY_HASH }));
+  expect(node(script, [checkpoint], coloured).stdout).toBe('2\n');
+});
+
 
 test('top-ups dilute inherited letter spikes and refuse additions that exceed the existing 30% guards', () => {
   const puzzle = (start: string, moved: string) => ({ words: [start + 'EAR'], solution: [{ stepIndex: 0, sourceWord: start + 'EAR', targetWord: 'LAST', letterToMove: moved, explanation: '' }] });
