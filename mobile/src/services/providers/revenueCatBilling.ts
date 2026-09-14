@@ -177,9 +177,10 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
    * iap.ts must be told both or the listener/cold-start recovery re-credits
    * every consumable. `purchaseToken` is NOT emitted on the customer-info
    * surface (TransactionMapper.kt maps only id/product/date), so the link is
-   * found by diffing this product's entries against the pre-checkout snapshot;
-   * when nothing new appears there (a lagging customer info), the newest
-   * entry for the product is used only if it dates from around this checkout.
+   * found by diffing this product's entries against the pre-checkout snapshot,
+   * keeping only an entry dated around this checkout; when nothing qualifies
+   * (a lagging customer info) no link is returned and iap.ts's same-product
+   * time window plus the durable receipt alias cover the late receipt.
    */
   function linkedReceiptIds(
     customerInfo: any,
@@ -192,10 +193,13 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
       .filter(entry => entry.productId === productId && typeof entry.transactionId === 'string');
     const newest = (list: StorePurchaseTransaction[]) => list.reduce<StorePurchaseTransaction | null>((best, entry) =>
       best === null || (Number.isFinite(entry.purchasedAt) && entry.purchasedAt >= best.purchasedAt) ? entry : best, null);
-    const fresh = newest(entries.filter(entry => !before.has(entry.transactionId)));
-    const recent = newest(entries.filter(entry =>
+    // A receipt names THIS purchase only when it is both new since the sheet
+    // opened AND dated around this checkout: an older known receipt is a
+    // different purchase, and a new-but-old-dated one is the late approval of
+    // an earlier pending payment that must keep its own credit.
+    const match = newest(entries.filter(entry =>
+      !before.has(entry.transactionId) &&
       Number.isFinite(entry.purchasedAt) && entry.purchasedAt >= checkoutStartedAt - CHECKOUT_RECEIPT_SKEW_MS));
-    const match = fresh ?? recent;
     return match && match.transactionId !== orderId ? [match.transactionId] : [];
   }
 

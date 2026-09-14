@@ -576,6 +576,52 @@ describe('RevenueCat adapter — one purchase, two ids (Play order id vs Revenue
     expect(await getHintBalance()).toBe(hintsBefore + STARTER_PACK_GRANTS.hints);
   });
 
+  it('does not link a receipt that was known before checkout even when it is recent', async () => {
+    rc.__state.products = [storeProduct(PRODUCT_IDS.AMBER_SMALL)];
+    rc.__state.transactionId = ORDER_ID;
+    // A known receipt from two minutes ago is an earlier purchase, not this one.
+    rc.__state.transactions = [{ transactionIdentifier: 'rc_two_minutes_ago', productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date(Date.now() - 2 * 60_000).toISOString() }];
+    const p = await initProvider();
+    await flushBackgroundChain();
+    const result = await p.purchase(PRODUCT_IDS.AMBER_SMALL);
+    expect(result.transactionId).toBe(ORDER_ID);
+    expect(result.linkedTransactionIds).toBeUndefined();
+  });
+
+  it('a late receipt covered only by the time window is recorded as delivered, so a cold start cannot re-credit it', async () => {
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    const { setBillingProvider, purchaseConsumable, settleConsumableGrant } = await import('../services/iap');
+    rc.__state.products = [storeProduct(PRODUCT_IDS.AMBER_SMALL)];
+    rc.__state.transactionId = ORDER_ID;
+    const p = await initProvider();
+    setBillingProvider(p);
+    await flushBackgroundChain();
+    // The post-purchase customer info lags: nothing new for the product yet,
+    // so the checkout captures no linked receipt id.
+    rc.__state.transactions = [];
+    const result = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    expect(result.success).toBe(true);
+    await settleConsumableGrant(result.grantId!);
+    const afterCheckout = await getAmberBalance();
+
+    // Seconds later the listener delivers the same purchase under RC's id.
+    rc.__state.transactions = [{ transactionIdentifier: RC_ID, productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date().toISOString() }];
+    rc.__state.listeners[0]({ entitlements: { active: {} }, nonSubscriptionTransactions: rc.__state.transactions });
+    await flushBackgroundChain();
+    await flushBackgroundChain();
+    expect(await getAmberBalance()).toBe(afterCheckout);
+
+    // The alias is durable: the applied ledger now names the receipt id, which
+    // is what protects the next cold start (in-memory session receipts gone).
+    const storage: any = jest.requireMock('@react-native-async-storage/async-storage');
+    const applied = JSON.parse(await (storage.default ?? storage).getItem('wordshift_applied_iap_grants') ?? '[]');
+    expect(applied).toContain(RC_ID);
+    await initProvider();
+    await flushBackgroundChain();
+    await flushBackgroundChain();
+    expect(await getAmberBalance()).toBe(afterCheckout);
+  });
+
   it('a receipt for the same product minutes later is still a NEW purchase', async () => {
     const { getAmberBalance } = await import('../services/amberCurrency');
     const { AMBER_PACK_GRANTS, FIRST_PURCHASE_AMBER_MULTIPLIER } = await import('../constants/gameBalance');

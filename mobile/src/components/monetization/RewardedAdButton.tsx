@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Text, StyleSheet, TouchableOpacity, Animated, Image, View } from 'react-native';
 import { CHROME_ICONS } from '../ui/chromeIcons';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
@@ -6,6 +6,8 @@ import {
   showRewarded,
   isRewardedCapReached,
   isAdsReady,
+  subscribeAdsReady,
+  retryAdConsentIfUnready,
   RewardedPlacement,
 } from '../../services/ads';
 import { isPatronSync } from '../../services/entitlements';
@@ -103,7 +105,17 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
 }) => {
   // Patron suppression is synchronous and permanent for this render.
   const patron = isPatronSync();
-  const providerReady = isAdsReady();
+  // Subscribed, not sampled: a consent retry (below) can make the provider
+  // ready while this button is already on screen.
+  const providerReady = useSyncExternalStore(subscribeAdsReady, isAdsReady, () => false);
+
+  // A rewarded surface that renders unready is an ad exposure too: re-ask for
+  // consent (an offline cold start's failed update) so the button can come up
+  // once the network is back.
+  useEffect(() => {
+    if (patron || providerReady) return;
+    retryAdConsentIfUnready(true).catch(() => {});
+  }, [patron, providerReady]);
 
   const [capReached, setCapReached] = useState(false);
   const [busy, setBusy] = useState(false);

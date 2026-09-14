@@ -115,6 +115,7 @@ import {
   isAdsReady,
   subscribeAdsReady,
   showRewarded,
+  retryAdConsentIfUnready,
 } from '../services/ads';
 
 const admob = jest.requireMock('react-native-google-mobile-ads');
@@ -254,6 +255,39 @@ describe('AdMob adapter — UMP consent ordering', () => {
     expect(admob.__state.calls.filter((c: string) => c === 'consent.gather')).toHaveLength(3);
     expect(a.isReady()).toBe(true);
     expect(admob.__state.calls).toContain('sdk.initialize');
+  });
+
+  it('retryAdConsentIfUnready re-asks from an unready rewarded surface or a resume, never as a bare first ask', async () => {
+    admob.__state.gatherError = true;
+    admob.__state.canRequestAds = false;
+    const a = createAdMobAdProvider({ interstitialId: 'ca-x/1', rewardedId: 'ca-x/2' });
+    setAdProvider(a);
+    await a.initialize();
+    await flushBackgroundChain();
+    expect(a.isReady()).toBe(false);
+    const gathers = () => admob.__state.calls.filter((c: string) => c === 'consent.gather').length;
+    expect(gathers()).toBe(1);
+
+    // A foreground resume before any exposure is not a first ask.
+    await retryAdConsentIfUnready();
+    expect(gathers()).toBe(1);
+
+    // A rewarded surface rendering unready IS an exposure: it asks again.
+    await retryAdConsentIfUnready(true);
+    expect(gathers()).toBe(2);
+    expect(a.isReady()).toBe(false);
+
+    // Back online: the next resume's retry succeeds and ads come up.
+    admob.__state.gatherError = false;
+    admob.__state.canRequestAds = true;
+    await retryAdConsentIfUnready();
+    await flushBackgroundChain();
+    expect(gathers()).toBe(3);
+    expect(a.isReady()).toBe(true);
+
+    // Ready: further calls are no-ops.
+    await retryAdConsentIfUnready(true);
+    expect(gathers()).toBe(3);
   });
 
   it('a completed refusal is final for the session: exposures never re-ask', async () => {

@@ -45,7 +45,7 @@ jest.mock('../services/settings', () => ({ getSettingsSync: () => ({ reducedMoti
 jest.mock('../services/a11yAnnounce', () => ({ announceForA11y: jest.fn() }));
 jest.mock('../services/haptics', () => ({ hapticLight: jest.fn(), hapticMedium: jest.fn() }));
 jest.mock('../services/eventLogger', () => ({ logEvent: jest.fn() }));
-jest.mock('../services/ads', () => ({ isAdsReady: () => true, isRewardedCapReached: jest.fn(async () => false) }));
+jest.mock('../services/ads', () => ({ isAdsReady: () => true, isRewardedCapReached: jest.fn(async () => false), retryAdConsentIfUnready: jest.fn(async () => undefined), subscribeAdsReady: () => () => {} }));
 jest.mock('../services/dailyAmberReward', () => ({
   claimDailyAmberReward: jest.fn(), createDailyAmberClaimId: jest.fn(() => 'claim-one'),
   getDailyAmberStatus: jest.fn(),

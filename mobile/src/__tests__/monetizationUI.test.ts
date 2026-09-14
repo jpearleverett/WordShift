@@ -68,6 +68,9 @@ jest.mock('react', () => {
       if (!refStore.has(idx)) refStore.set(idx, { current: initial });
       return refStore.get(idx)!;
     },
+    // The button subscribes to ad readiness; outside a real renderer the
+    // snapshot is simply read (no dispatcher to schedule a re-render).
+    useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
     useCallback: (fn: unknown) => fn,
     useMemo: (fn: () => unknown) => fn(),
   };
@@ -153,6 +156,8 @@ jest.mock('../services/ads', () => ({
   isRewardedCapReached: (...args: unknown[]) => mockIsRewardedCapReached(...args),
   getAdProviderName: () => mockAdProviderName,
   isAdsReady: () => mockAdsReady,
+  subscribeAdsReady: () => () => {},
+  retryAdConsentIfUnready: async () => undefined,
 }));
 
 // ---------------------------------------------------------------------------

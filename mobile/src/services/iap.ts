@@ -844,7 +844,14 @@ export function reconcileStorePurchaseHistory(transactions: StorePurchaseTransac
         // Same product, same moment as a grant this device already recorded
         // under another id (a lagging customer info left no linked id to
         // match): the checkout path owns its delivery, so never re-grant it.
-        if (receiptCoveredByGrant(transaction, snapshot.pending)) continue;
+        if (receiptCoveredByGrant(transaction, snapshot.pending)) {
+          // Record the receipt's own ids as delivered NOW: the covering grant
+          // knows nothing of this id, so once it has settled (or the app
+          // restarts and sessionCheckoutReceipts is empty) nothing else would
+          // stop the next reconcile from crediting the same purchase again.
+          await saveWithPlayerRetry(() => recordReceiptAliases(ids), PAID_SAVE_COPY);
+          continue;
+        }
         await saveWithPlayerRetry(() => persistRecoveredStorePurchase(transaction), PAID_SAVE_COPY);
       }
       for (const id of settleIds) await saveWithPlayerRetry(() => settleConsumableGrant(id), PAID_SAVE_COPY);
@@ -853,6 +860,19 @@ export function reconcileStorePurchaseHistory(transactions: StorePurchaseTransac
   });
   historyRecovery = run;
   return run;
+}
+
+/**
+ * Durably mark receipt-history ids as already delivered: they name a purchase
+ * this device credited under another id (the checkout grant), so neither the
+ * listener nor a later cold-start reconcile may credit them again.
+ */
+async function recordReceiptAliases(ids: string[]): Promise<void> {
+  await runStorageTransaction('iap_receipt_alias', async () => {
+    const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
+    for (const id of ids) applied.add(id);
+    await AsyncStorage.setItem(APPLIED_GRANTS_KEY, JSON.stringify([...applied]));
+  });
 }
 
 async function persistRecoveredStorePurchase(transaction: StorePurchaseTransaction): Promise<void> {

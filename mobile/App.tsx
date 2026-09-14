@@ -195,7 +195,7 @@ import {
   hasPromptedForNotifications,
   markPromptedForNotifications,
 } from './src/services/notifications';
-import { maybeShowInterstitial, showRewarded, isRewardedCapReached, isAdsReady, RewardedPlacement, isDailyInterstitialAllowed } from './src/services/ads';
+import { maybeShowInterstitial, showRewarded, isRewardedCapReached, isAdsReady, RewardedPlacement, isDailyInterstitialAllowed, retryAdConsentIfUnready } from './src/services/ads';
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { installGlobalFont } from './src/theme/fonts';
 import { addHints, grantBonusHint } from './src/services/hints';
@@ -1715,6 +1715,17 @@ function MainApp() {
       if (dailyTasksDateRef.current === null) return;
       if (dailyTasksDateRef.current === getLocalDateString()) return;
       runDailyLaunchTasksRef.current(true).catch(() => {});
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // A foreground resume re-asks for ad consent only when a first exposure
+  // already tried and the provider is still not ready (an offline cold start
+  // whose UMP update failed); never a first ask on its own.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      retryAdConsentIfUnready().catch(() => {});
     });
     return () => subscription.remove();
   }, []);

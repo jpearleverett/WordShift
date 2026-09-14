@@ -64,7 +64,7 @@ import { logEvent } from '../../services/eventLogger';
 import { RewardedAdButton } from './RewardedAdButton';
 import { RewardReveal } from '../ui/RewardReveal';
 import { GiftOverlay, GiftItem } from './GiftOverlay';
-import { isAdsReady, isRewardedCapReached } from '../../services/ads';
+import { isAdsReady, isRewardedCapReached, retryAdConsentIfUnready } from '../../services/ads';
 import { getStoreArt, STORE_ART_KEYS } from './storeArt';
 import {
   getDailyAmberStatus,
@@ -355,6 +355,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     isRewardedCapReached().then(value => { if (!cancelled) setRewardedCapReached(value); }).catch(() => {});
     logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     return () => { cancelled = true; };
+  }, [visible]);
+
+  // Opening the Store is an ad exposure for the Free Amber card: if consent
+  // failed at boot (offline cold start), re-ask now so the card can appear.
+  useEffect(() => {
+    if (!visible) return;
+    retryAdConsentIfUnready(true).catch(() => {});
   }, [visible]);
 
   // Fetch localized price strings from the store; NoOp returns [] → fallbacks used.
