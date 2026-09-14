@@ -2662,10 +2662,8 @@ export function getStreakHeldMessage(heldAt: number, phase: number = 0): string 
 // visit in-world (the house passes the player along; never an errand voice).
 // ============================================================================
 
-export function getNextFriendPrompt(phase: number, name: string): string {
-  if (phase >= 4) return `${name} is waiting to speak.`;
-  if (phase >= 2) return `${name} has something to tell you.`;
-  return `${name} has news for you!`;
+export function getNextFriendPrompt(_phase: number, name: string): string {
+  return `Talk to ${name}`;
 }
 
 // ============================================================================

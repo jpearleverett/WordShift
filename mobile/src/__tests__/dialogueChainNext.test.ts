@@ -8,9 +8,9 @@
  *    animal whose dialogue is genuinely available right now (badge news
  *    signal + the synchronous session-budget equivalent of
  *    checkDialogueAvailability), and handleVisitNextAnimal runs the EXACT
- *    Close bookkeeping for the current animal (terminal-read advancement,
+ *    Close bookkeeping for the current animal (no unread lines consumed,
  *    warm session — no endSession) before opening the next animal through
- *    the normal handleAnimalTap path.
+ *    the host's normal gift/introduction/conversation path.
  *
  * Uses the repo's manual React-hook mock convention (see
  * dialogueFlowPagination.test.ts): hooks run synchronously in Node and the
@@ -426,6 +426,42 @@ describe('useDialogueFlow visit-next-friend chain', () => {
     expect(checkDialogueAvailabilityMock).not.toHaveBeenCalled();
     expect(hook.selectedAnimal?.id).toBe('pangolin');
     expect(hook.showDialogue).toBe(true);
+  });
+
+  it('closes first and hands the destination to the host without bypassing a pending gift', async () => {
+    await render().handleAnimalTap(pangolin as never);
+    checkDialogueAvailabilityMock.mockClear();
+    const openVisit = jest.fn(async () => {
+      expect(render().showDialogue).toBe(false);
+      expect(render().selectedAnimal).toBeNull();
+    });
+    await render().handleVisitNextAnimal(fox as never, openVisit);
+    expect(openVisit).toHaveBeenCalledWith(fox);
+    expect(checkDialogueAvailabilityMock).not.toHaveBeenCalled();
+    expect(markDialogueReadMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts only one shortcut tap while the destination is still opening', async () => {
+    await render().handleAnimalTap(pangolin as never);
+    let finish!: () => void;
+    const openVisit = jest.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const hook = render();
+    const first = hook.handleVisitNextAnimal(fox as never, openVisit);
+    await Promise.resolve();
+    await hook.handleVisitNextAnimal(fox as never, openVisit);
+    expect(openVisit).toHaveBeenCalledTimes(1);
+    finish();
+    await first;
+  });
+
+  it('reports a failed destination open and lets the player try the visit again', async () => {
+    await render().handleAnimalTap(pangolin as never);
+    const openVisit = jest.fn().mockRejectedValueOnce(new Error('read interrupted'));
+    await expect(render().handleVisitNextAnimal(fox as never, openVisit)).resolves.toBeUndefined();
+    expect(render().cooldownMessage).toMatch(/Ember.*try again/);
+    await render().handleAnimalTap(fox as never);
+    expect(render().selectedAnimal?.id).toBe('fox');
+    expect(render().showDialogue).toBe(true);
   });
 });
 

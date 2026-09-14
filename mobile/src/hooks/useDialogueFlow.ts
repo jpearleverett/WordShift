@@ -406,9 +406,9 @@ interface UseDialogueFlowReturn {
   getNextAnimalWithNews: (animals: Animal[]) => Animal | null;
   /**
    * Chain to another animal: runs the EXACT Close bookkeeping for the current
-   * animal, then opens the next one through the normal tap path.
+   * animal, then opens the next one through the host's normal visit path.
    */
-  handleVisitNextAnimal: (next: Animal) => Promise<void>;
+  handleVisitNextAnimal: (next: Animal, openVisit?: (animal: Animal) => Promise<void>) => Promise<void>;
 }
 
 /**
@@ -489,6 +489,7 @@ export function useDialogueFlow({
   const visitGenerationRef = useRef(0);
   const openingVisitRef = useRef(false);
   const advancingDialogueRef = useRef(false);
+  const visitingNextRef = useRef(false);
   useEffect(() => () => {
     visitGenerationRef.current += 1;
     openingVisitRef.current = false;
@@ -1326,7 +1327,7 @@ export function useDialogueFlow({
   // Leaving an unanswered question records no answer. Its existing pending
   // choice badge brings the player back; only an in-flight save must finish.
   const handleCloseDialogue = useCallback(async () => {
-    if (choiceSavePendingRef.current || advancingDialogueRef.current || lineRecoveryRequired.current) return;
+    if (choiceSavePendingRef.current || advancingDialogueRef.current || visitingNextRef.current || lineRecoveryRequired.current) return;
     await closeDialogue(false);
   }, [closeDialogue]);
 
@@ -1361,23 +1362,33 @@ export function useDialogueFlow({
 
   // Chain to the next friend: run the exact same close bookkeeping as the
   // Close button (closeDialogue(false), keeping the current line unread and
-  // the session warm), then
-  // open the next animal through the normal tap path. handleAnimalTap
+  // the session warm), then open the next animal through the host's complete
+  // gift/introduction/conversation path. The fallback handleAnimalTap
   // re-checks availability itself, so if the animal's state changed between
   // render and tap the standard cooldown message shows — no special casing.
   const handleVisitNextAnimal = useCallback(
-    async (next: Animal) => {
-      if (!next || !next.isUnlocked || choiceSavePendingRef.current || advancingDialogueRef.current || openingVisitRef.current || lineRecoveryRequired.current) return;
+    async (next: Animal, openVisit?: (animal: Animal) => Promise<void>) => {
+      if (!next || !next.isUnlocked || choiceSavePendingRef.current || advancingDialogueRef.current || visitingNextRef.current || openingVisitRef.current || lineRecoveryRequired.current) return;
       if (selectedAnimal && next.id === selectedAnimal.id) return;
-      await closeDialogue(false);
-      await handleAnimalTap(next);
+      visitingNextRef.current = true;
+      const closing = closeDialogue(false);
+      const generation = visitGenerationRef.current;
+      try {
+        await closing;
+        if (generation !== visitGenerationRef.current) return;
+        await (openVisit ?? handleAnimalTap)(next);
+      } catch {
+        setCooldownMessage(`Couldn't open ${next.name}'s conversation. Tap them to try again.`);
+      } finally {
+        visitingNextRef.current = false;
+      }
     },
     [selectedAnimal, closeDialogue, handleAnimalTap]
   );
 
   // Handle dialogue advance
   const handleNextDialogue = useCallback(async () => {
-    if (!selectedAnimal || !progress || choiceSavePendingRef.current || advancingDialogueRef.current || openingVisitRef.current) return;
+    if (!selectedAnimal || !progress || choiceSavePendingRef.current || advancingDialogueRef.current || visitingNextRef.current || openingVisitRef.current) return;
     advancingDialogueRef.current = true;
     try {
     hapticSelection();

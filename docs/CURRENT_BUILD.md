@@ -61,6 +61,14 @@ The final focused regression run passed **906 tests in 27 suites**, plus TypeScr
 
 All **three conversation browser journeys** passed: actual Phase-3 recruitment with a complete welcome followed by the earliest unread lines across phase changes and relaunch; an adapted post-Arrival conversation that survives interruption and advances one saved line at a time; and reachable response controls at 320px with enlarged text. Explicit animal taps also work during the post-Arrival quiet period. The earlier house-gift browser checks and CI totals above retain their original scope. These checks do not certify a signed Android build.
 
+## September 14 CI and conversation-shortcut follow-up
+
+The [failed CI run on `a0fbb05`](https://github.com/jpearleverett/WordShift/actions/runs/34799279373) passed TypeScript and lint, then failed five invitation tests because their extracted HomeScreen harness lacked `houseGiftBusy`. The harness now includes that state and gift/invitation race coverage. Conversation persistence tests isolate the event logger so its delayed telemetry import cannot outlive Jest teardown.
+
+The footer now says `Talk to <name>` and opens the same gift/introduction/conversation route as a house tap. Browser testing reproduced the old pending-gift bypass; ordinary, unseen-introduction and gift handoffs all pass after the fix. Duplicate taps are fenced and failed opens provide retry guidance.
+
+Local validation passed **4,789 tests in 197 suites**, the **11 reverse-composition script tests**, TypeScript, zero-warning lint, story integrity, vocabulary/branching and bank-route audits, and the daily cohort check. The **three shortcut browser journeys** passed. CI uses Node-24-based v6 checkout/setup/upload actions while retaining Node 22 for the application; browser evidence uploads only after the browser step runs. ESLint excludes generated browser reports and traces. App version 1.3.5 / Android version code 99 are unchanged.
+
 ## Remaining release evidence
 
 Use the [launch checklist](LAUNCH_CHECKLIST.md) to record results against the actual candidate AAB/version code. In particular:

@@ -2878,7 +2878,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       phase={progress.currentPhase}
                       variant="secondary"
                       hostDark={dtHostDark}
-                      onPress={() => dialogueFlow.handleVisitNextAnimal(nextFriendWithNews)}
+                      onPress={() => dialogueFlow.handleVisitNextAnimal(nextFriendWithNews, async animal => {
+                        // The hook has closed the previous card. Transfer its
+                        // ownership synchronously, before React mirrors that
+                        // close, then use the same visit as a tap in the house.
+                        regularDialogueBusyRef.current = false;
+                        await handleAnimalPress(animal);
+                      })}
                       disabled={dialogueFlow.choiceSaving}
                       soundKind="dialogue"
                       accessibilityLabel={getNextFriendPrompt(progress.currentPhase, nextFriendWithNews.name)}

@@ -15,6 +15,7 @@ function createHarness(readSeen: () => Promise<boolean>) {
   const scope = {
     hasHomeProgress: true, isOnboarding: false, showIntroDialogue: false,
     introOverrideLines: null, introOpening: false, pendingAnimalIntroCount: 0,
+    houseGiftBusy: false,
     homePhase: 4, storyOverlayActive: false,
     dialogueFlow: { showDialogue: false }, pendingHouseCompletion: false,
     pitPhaseReady: false, animals: [fox], ANIMALS: [fox],
@@ -86,7 +87,51 @@ test('leaving home during the saved-flag read cannot open an orphaned modal', as
   expect(harness.scope.setShowIntroDialogue).not.toHaveBeenCalled();
 });
 
+test('a house-upgrade gift holds the invitation until a fresh quiet interval after delivery', async () => {
+  const harness = createHarness(async () => false);
+  harness.scope.houseGiftBusy = true;
+  harness.scope.introSurfaceBusyRef.current = true;
+  harness.render();
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(harness.scope.hasSeenOfferingIntro).not.toHaveBeenCalled();
 
+  harness.scope.houseGiftBusy = false;
+  harness.scope.introSurfaceBusyRef.current = false;
+  harness.render();
+  await jest.advanceTimersByTimeAsync(699);
+  expect(harness.scope.setShowIntroDialogue).not.toHaveBeenCalled();
+  await jest.advanceTimersByTimeAsync(1);
+  expect(harness.scope.setShowIntroDialogue).toHaveBeenCalledTimes(1);
+  expect(harness.scope.setIntroContext).toHaveBeenCalledWith('offering_intro');
+  harness.unmount();
+});
+
+test('a gift claimed during the saved-flag read cancels that invitation and re-arms after delivery', async () => {
+  let resolveSeen!: (seen: boolean) => void;
+  const readSeen = jest.fn<Promise<boolean>, []>()
+    .mockImplementationOnce(() => new Promise(resolve => { resolveSeen = resolve; }))
+    .mockResolvedValue(false);
+  const harness = createHarness(readSeen);
+  harness.render();
+  await jest.advanceTimersByTimeAsync(700);
+  expect(harness.scope.hasSeenOfferingIntro).toHaveBeenCalledTimes(1);
+
+  harness.scope.houseGiftBusy = true;
+  harness.scope.introSurfaceBusyRef.current = true;
+  harness.render();
+  resolveSeen(false);
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(harness.scope.setShowIntroDialogue).not.toHaveBeenCalled();
+  expect(harness.scope.hasSeenOfferingIntro).toHaveBeenCalledTimes(1);
+
+  harness.scope.houseGiftBusy = false;
+  harness.scope.introSurfaceBusyRef.current = false;
+  harness.render();
+  await jest.advanceTimersByTimeAsync(700);
+  expect(harness.scope.hasSeenOfferingIntro).toHaveBeenCalledTimes(2);
+  expect(harness.scope.setShowIntroDialogue).toHaveBeenCalledTimes(1);
+  harness.unmount();
+});
 
 test.each(['opening', 'queued'])('an %s animal introduction holds ambient invitations until it finishes', async (kind) => {
   const harness = createHarness(async () => false);

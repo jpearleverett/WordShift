@@ -16,10 +16,10 @@ jobs:
         working-directory: mobile
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -53,11 +53,12 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Rendered game journeys
+        id: browser_tests
         run: npm run test:e2e
 
       - name: Upload browser evidence
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && (steps.browser_tests.outcome == 'success' || steps.browser_tests.outcome == 'failure') }}
+        uses: actions/upload-artifact@v6
         with:
           name: rendered-game-journeys
           path: |

@@ -4,9 +4,16 @@ import { getDialoguesForAnimal, getTotalDialogueCount } from '../services/dialog
 import { ANIMALS } from '../services/homeWorldData';
 import { getFullProgress, invalidateProgressCache, markIntroSeen, hasSeenIntro, markPostRevelation, startNewCycle } from '../services/amberCurrency';
 import { STORAGE_COMMIT_KEY } from '../services/persistenceStorage';
+import { logEvent } from '../services/eventLogger';
 import { AnimalType, DialoguePhase, HomeWorldProgress } from '../types/homeWorld';
 
 jest.mock('@react-native-async-storage/async-storage', () => require('./helpers/mockAsyncStorage').createMockAsyncStorage());
+// Arrival delegates analytics to this service. Keep its debounced upload timer
+// outside conversation persistence tests, where it could outlive Jest teardown.
+jest.mock('../services/eventLogger', () => ({
+  logEvent: jest.fn(),
+  getInstallAgeDays: jest.fn(async () => 0),
+}));
 
 const PROGRESS_KEY = 'wordshift_home_progress';
 const originalRead = (NativeStorage.getItem as jest.Mock).getMockImplementation()!;
@@ -26,6 +33,7 @@ async function seed(overrides: Partial<HomeWorldProgress> = {}): Promise<HomeWor
 }
 
 beforeEach(async () => {
+  (logEvent as jest.Mock).mockClear();
   (NativeStorage.getItem as jest.Mock).mockImplementation(originalRead);
   (NativeStorage.setItem as jest.Mock).mockImplementation(originalWrite);
   await NativeStorage.clear();
@@ -75,6 +83,10 @@ test('phase changes open later chapters without retiring earlier unread lines', 
   progress = await seed({ currentPhase: 3 });
   expect(getNextAnimalConversation(progress, type)!.dialogue.phase).toBe(1);
   await markPostRevelation();
+  expect(logEvent).toHaveBeenCalledWith({
+    type: 'phase_reached',
+    data: { phase: 5, puzzlesSolved: progress.puzzlesSolved, installAgeDays: 0 },
+  });
   progress = await getFullProgress();
   expect(progress.currentPhase).toBe(5);
   expect(getNextAnimalConversation(progress, type)!.dialogue.phase).toBe(1);
