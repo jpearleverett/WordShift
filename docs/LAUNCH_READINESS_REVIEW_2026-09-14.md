@@ -8,11 +8,44 @@ Reviewed against `main` at `8233184` (identical to `claude/wordshift-launch-read
 
 | # | Blocker | Kind | Why it blocks | Fix |
 |---|---|---|---|---|
-| B1 | **Every consumable purchase is credited twice** (amber packs, hint packs, the starter pack; the first amber pack three times). | Code defect, JavaScript | Real money is paid out double from the very first purchase and cannot be clawed back. The checkout keys the grant ledger on the Google Play order id, while receipt recovery keys the same purchase on RevenueCat's own transaction id, so recovery treats every fresh purchase as an unrecovered payment. | One-line-class fix in `mobile/src/services/providers/revenueCatBilling.ts` plus a regression test whose mock uses two different ids (details below). |
+| B1 (fixed 2026-09-14) | **Every consumable purchase is credited twice** (amber packs, hint packs, the starter pack; the first amber pack three times). | Code defect, JavaScript | Real money is paid out double from the very first purchase and cannot be clawed back. The checkout keys the grant ledger on the Google Play order id, while receipt recovery keys the same purchase on RevenueCat's own transaction id, so recovery treats every fresh purchase as an unrecovered payment. | One-line-class fix in `mobile/src/services/providers/revenueCatBilling.ts` plus a regression test whose mock uses two different ids (details below). |
 | B2 | **The build that would ship has never run on a device.** R8 minification, resource shrinking and the optimizing ProGuard default were enabled on 2026-09-12; SDK 57 / RN 0.86 landed on 2026-09-06; the closed test that earned production access ended on 2026-08-31 on version 1.2.2 (code 88). | Process gate | Green JavaScript CI cannot catch a reflection-dependent native SDK, a font registration or a resource that R8 stripped. The repo's own checklist says the same. | Build the production-cut AAB from this commit (with B1 fixed), install it from the internal track on two physical phones, and run the smoke matrix in this document. |
-| B3 | **The production cut is a manual, unenforced edit.** `adsUseTestIds` must flip to `false` and the version code must be bumped, and no build profile or CI step enforces either. | Process gate | Shipping with test ads means zero revenue for every install until an OTA; shipping live ads into a test track is an AdMob policy violation. | Follow the exact command sequence below and run the production-config test before building. |
+| B3 (resolved 2026-09-14) | **The production cut is a manual, unenforced edit.** `adsUseTestIds` must flip to `false` and the version code must be bumped, and no build profile or CI step enforces either. | Process gate | Shipping with test ads means zero revenue for every install until an OTA; shipping live ads into a test track is an AdMob policy violation. | Follow the exact command sequence below and run the production-config test before building. |
 
 Everything else in this document is either a "fix it in the same native build since you need one anyway" item, a "fix during the staged rollout" item, or a Play Console task that cannot be verified from the repository.
+
+## Resolution status (branch `claude/wordshift-launch-readiness-wnuzh1`, 2026-09-14)
+
+The findings were worked the same day, in file-owned packages, each reviewed
+line by line before merge into the branch. Of the 83 findings in Appendix A,
+**66 are fixed in the repository**; the 17 that remain are owner tasks, device
+evidence, or deliberate deferrals, listed below with the reason.
+
+| Blocker | Status |
+|---|---|
+| B1 double credit | **Fixed.** Checkout links the RevenueCat receipt id to the grant in the same durable write; recovery resolves a receipt by either id; a 60 s same-product window and a durable receipt alias cover a late receipt with no link. The reproduction that credited 0 to 1200 to 1800 now credits once. Regressions in `billingAdapterSdk.test.ts` and `billingPurchaseSafety.test.ts`. |
+| B2 untested minified build | **Still the gate.** Nothing here replaces a signed, minified AAB on two physical phones through the internal track. The smoke matrix below is unchanged; add the `aapt2 dump permissions` check, a TalkBack pass over a board and a three-button-navigation pass over the sheets. |
+| B3 unenforced production cut | **Resolved.** `app.config.js` derives `adsUseTestIds` from `WORDSHIFT_RELEASE_CHANNEL` (production means live units), CI validates both channels on every run, and the checklist's command sequence no longer hand-flips anything. The version-code bump is the one remaining manual step. |
+
+Still open, and why:
+
+| ID | Why it is not fixed in the repository |
+|---|---|
+| `engineering-hygiene-1`, `release-config-1` | B2: the device pass on the production toolchain. |
+| `accessibility-devices-4`, `performance-size-5`, `product-retention-1` | Evidence that only a physical device or real players can produce (TalkBack and large-text pass, cold-start and memory numbers on a low-end phone, external play through the reveal). |
+| `backend-ops-3`, `store-policy-legal-2`, `store-policy-legal-3`, `product-retention-10` | Play Console and RevenueCat dashboard work: RTDN, fresh screenshots, IARC and target-audience answers. |
+| `release-config-3` | Sentry Android Gradle plugin mapping upload. Deferred by choice; Play Vitals deobfuscates native traces from the bundle's own mapping. |
+| `gameplay-4` | Late-game content top-up (HARD/EXPERT extendable boards, daily pool permutation). A bank regeneration campaign with its own review, not a same-day fix. |
+| `ftue-3` | Partly addressed: the store-review ask moved to a settle-in floor of 20 solves (`REVIEW_MIN_PUZZLES`), so win 10 no longer stacks the review sheet on the milestone toasts and the Reverse card. |
+| `ftue-8` | EEA/UK consent over the cold-open board is a policy constraint (consent must precede ad initialisation); deferring the form would delay ads for the session. Accepted. |
+| `boot-persistence-7` | A re-entrancy guard in `persistenceStorage` is a defensive change with no known trigger; deferred to avoid touching the journal path without a reproduction. |
+| `accessibility-devices-7`, `performance-size-6`, `product-retention-8` | Tablet layout, install footprint and in-game word definitions are product work, not launch fixes. |
+
+Native-build note: `expo-device` (installed-RAM device tier, Android only) is a
+new native module, and the expo-audio plugin options, blocked permissions,
+launcher name and Android 12 splash icon also changed, so the next Play
+artifact must be a new native build. An OTA onto the current binary stays safe
+(the guarded require falls back to the pixel heuristic).
 
 ## How this was assessed
 
@@ -176,7 +209,7 @@ Run the five-reader story pilot in `docs/STORY_PLAYTEST_PROTOCOL.md` during the 
 
 ## Appendix A. Findings and verification status
 
-Status legend: **confirmed** means an independent reviewer re-traced the code and agreed; **plausible** means the reviewer could not refute it but the answer depends on something outside the repository (a device, the console, live data); **refuted** means the reviewer found a guard or test the auditor missed, and the finding is kept here for the record; **low, not verified** means it was rated low and deliberately not spent verification effort on. Severity is the value after review. "(re-verified)" in the narrative above marks findings the author re-read personally.
+Resolution: every finding below is fixed on the review branch unless it appears in the "Still open" table under Resolution status above. Status legend: **confirmed** means an independent reviewer re-traced the code and agreed; **plausible** means the reviewer could not refute it but the answer depends on something outside the repository (a device, the console, live data); **refuted** means the reviewer found a guard or test the auditor missed, and the finding is kept here for the record; **low, not verified** means it was rated low and deliberately not spent verification effort on. Severity is the value after review. "(re-verified)" in the narrative above marks findings the author re-read personally.
 
 | ID | Dimension | Finding | Severity after review | Status | Where |
 |---|---|---|---|---|---|

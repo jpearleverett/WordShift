@@ -21,6 +21,9 @@ jest.mock('react', () => ({
   },
   useCallback: (callback: unknown) => callback,
   useEffect: (effect: Effect) => mockEffects.push(effect),
+  // The button subscribes to provider readiness through useSyncExternalStore;
+  // the harness has no dispatcher, so read the snapshot directly.
+  useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
 }));
 jest.mock('react-native', () => {
   const inert = () => ({ start: jest.fn(), stop: jest.fn() });
@@ -43,6 +46,8 @@ jest.mock('../services/ads', () => ({
   showRewarded: (...args: unknown[]) => mockShowRewarded(...args),
   isRewardedCapReached: async () => false,
   isAdsReady: () => mockAdsReady,
+  subscribeAdsReady: () => () => {},
+  retryAdConsentIfUnready: async () => {},
 }));
 
 import { RewardedAdButton } from '../components/monetization/RewardedAdButton';
