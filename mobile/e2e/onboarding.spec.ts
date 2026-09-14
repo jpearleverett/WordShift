@@ -76,13 +76,14 @@ test('a fresh install is walked from the cold-open board to a complete onboardin
   await expect(page.getByText(/Hello up there/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toHaveCount(0);
 
-  // Invite Fox. The den's free invite chip is on screen during home_empty, and
-  // the home screen raises the invite prompt on its own after the reveal
-  // delay (INVITE_PROMPT_REVEAL_DELAY_MS), hiding the chip once the prompt is
-  // up. Pin the EFFECT deterministically: never tap the chip here, so a
-  // regression in the automatic invite cannot hide behind the tap route.
+  // Invite Fox. The home screen raises the invite prompt on its own after the
+  // reveal delay (INVITE_PROMPT_REVEAL_DELAY_MS) and hides the den's free
+  // invite chip once the prompt is up. Pin the EFFECT deterministically: the
+  // chip is never tapped here, so a regression in the automatic invite cannot
+  // hide behind the tap route. (The chip's own visibility is not asserted
+  // first: the polls above can outlast the 2.6 s delay, so by the time this
+  // line runs the prompt may already be up and the chip already gone.)
   const denChip = page.getByRole('button', { name: 'Invite animal to Cozy Den for free', exact: true });
-  await expect(denChip).toBeVisible();
   const welcome = page.getByRole('button', { name: 'Welcome friend', exact: true });
   await expect(welcome).toBeVisible({ timeout: 10_000 });
   await expect(denChip).toHaveCount(0);
