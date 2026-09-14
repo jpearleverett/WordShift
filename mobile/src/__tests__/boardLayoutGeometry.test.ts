@@ -17,6 +17,9 @@ import {
   ARC_SLOT_MARGIN_H,
   ARC_SLOT_OUTER_MARGIN_H,
   ARC_SLOT_CELL_W,
+  ARC_SLOT_RENDERED_WIDTH_COMPACT,
+  ARC_SLOT_CELL_W_COMPACT,
+  arcSlotCellWidth,
   ARC_LETTER_MARGIN_H,
   STANDARD_TILE_W,
   STANDARD_TILE_MARGIN_H,
@@ -54,7 +57,9 @@ describe('letter centre offsets', () => {
       // the arcSlotWrapper, and this test used to recompute the step WITHOUT it
       // (16dp against a rendered 20dp), so it pinned the drift rather than
       // catching it.
-      const arcStep = tileW + ARC_LETTER_MARGIN_H * 2 + ARC_SLOT_CELL_W;
+      // Compact rows render the narrower slot, so the step asks the shared
+      // helper rather than the standard cell constant.
+      const arcStep = tileW + ARC_LETTER_MARGIN_H * 2 + arcSlotCellWidth(compact);
       for (const n of COUNTS) {
         for (let i = 1; i < n; i++) {
           // Consecutive arc letters are one letter cell + one slot cell apart.
@@ -133,8 +138,13 @@ describe('arc slot cell matches Row.tsx', () => {
     }
   });
 
-  it('slotCompact renders ARC_SLOT_RENDERED_WIDTH', () => {
+  it('slotCompact renders ARC_SLOT_RENDERED_WIDTH, and compact rows narrow it', () => {
     expect(ROW_SRC).toMatch(/slotCompact:\s*\{[^}]*width:\s*ARC_SLOT_RENDERED_WIDTH/);
+    // The narrow slot rides the compactTiles flag (6+ letters), the same flag
+    // slotEstimation branches on, so render and drag math share one width.
+    expect(ROW_SRC).toMatch(/slotNarrow:\s*\{[^}]*width:\s*ARC_SLOT_RENDERED_WIDTH_COMPACT/);
+    expect(ROW_SRC).toContain('narrow={compactTiles}');
+    expect(ROW_SRC).toContain('narrow && styles.slotNarrow');
   });
 
   it('the cell constant sums all THREE terms (18 + 2*2 - 1*2 = 20)', () => {
@@ -142,6 +152,14 @@ describe('arc slot cell matches Row.tsx', () => {
       ARC_SLOT_RENDERED_WIDTH + ARC_SLOT_OUTER_MARGIN_H * 2 + ARC_SLOT_MARGIN_H * 2,
     );
     expect(ARC_SLOT_CELL_W).toBe(20);
+    // Compact rows (6+ letters) give back 4dp of slot width; the wrapper
+    // margins are unchanged, so the compact cell is 16.
+    expect(ARC_SLOT_CELL_W_COMPACT).toBe(
+      ARC_SLOT_RENDERED_WIDTH_COMPACT + ARC_SLOT_OUTER_MARGIN_H * 2 + ARC_SLOT_MARGIN_H * 2,
+    );
+    expect(ARC_SLOT_CELL_W_COMPACT).toBe(16);
+    expect(arcSlotCellWidth(false)).toBe(ARC_SLOT_CELL_W);
+    expect(arcSlotCellWidth(true)).toBe(ARC_SLOT_CELL_W_COMPACT);
     // The value the consumers used to compute, which is what regressed.
     expect(ARC_SLOT_CELL_W).not.toBe(ARC_SLOT_RENDERED_WIDTH + ARC_SLOT_MARGIN_H * 2);
   });

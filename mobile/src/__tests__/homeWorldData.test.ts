@@ -676,6 +676,23 @@ describe('skip the wait (pay premium, unlock now)', () => {
     expect(getUnlockSkipCost(jungle)).toBeGreaterThan(jungle.cost);
   });
 
+  test('the premium is 1.5 (skip = 2.5x build cost), a real decision rather than loose change', () => {
+    // product-retention-3: at the old 0.5 (1.5x) a casual 2/day player held
+    // 2-5x the premium at every non-trio gate from solve ~13, so the gates
+    // only paced players who never read the button (all six mid-house skips
+    // cost 3,640 amber, earned by day ~17). At 2.5x the same six cost ~6,050.
+    expect(UNLOCK_SKIP_PREMIUM).toBe(1.5);
+    const gated = UNLOCK_PROGRESSION.filter(u => u.type === 'room' && u.minPuzzles !== undefined);
+    expect(gated.length).toBeGreaterThan(0);
+    for (const room of gated) {
+      expect(getUnlockSkipCost(room)).toBe(Math.ceil(room.cost * 2.5));
+    }
+    // Reserve is still the plain build cost: the premium sits on top of it,
+    // never on the non-paying path.
+    const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+    expect(getUnlockSkipCost(jungle) - jungle.cost).toBe(Math.ceil(jungle.cost * 1.5));
+  });
+
   test('canSkipUnlockGate: true when gated + premium affordable + prerequisites met', async () => {
     await unlockUpTo('unlock_jungle');
     expect(await canSkipUnlockGate('unlock_jungle')).toBe(true);

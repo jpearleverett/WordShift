@@ -62,6 +62,8 @@ jest.mock('../theme/fonts', () => ({
   BODY_FONT_ITALIC: 'Font',
 }));
 
+import fs from 'fs';
+import path from 'path';
 import { getSlotAccessibilityLabel } from '../components/Row';
 
 describe('getSlotAccessibilityLabel', () => {
@@ -145,5 +147,52 @@ describe('getSlotAccessibilityLabel', () => {
     expect(src).toMatch(/slotPreviewNeutral/);
     // The graded styles must stay gated behind validityVisible.
     expect(src).toMatch(/validityVisible\s*\n?\s*\? \(preview\.isValid \? styles\.slotPreviewValid : styles\.slotPreviewInvalid\)\s*\n?\s*: styles\.slotPreviewNeutral/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Draggable source tiles expose exactly ONE accessibility node
+// (accessibility-devices-3). The DraggableTile wrapper used to be an
+// `accessible` role=button node with the instructional hint but no click
+// handler (a bare PanResponder never receives TalkBack's ACTION_CLICK), while
+// the LetterTile content inside it was a second, hint-less "Letter X" stop:
+// every letter was announced twice and the stop carrying the guidance was the
+// inert one. Source pins (no renderer in this environment).
+// ---------------------------------------------------------------------------
+describe('DraggableTile exposes one activatable accessibility node per letter', () => {
+  const SRC = fs.readFileSync(path.join(__dirname, '../components/DraggableTile.tsx'), 'utf8');
+  const wrapperStart = SRC.indexOf('{/* Source tile (dims during drag)');
+  const wrapperEnd = SRC.indexOf('{/* Floating drag tile', wrapperStart);
+  const wrapper = SRC.slice(wrapperStart, wrapperEnd);
+
+  test('the wrapper is the accessible node and carries the hint', () => {
+    expect(wrapper).toContain('accessible={true}');
+    expect(wrapper).toContain('accessibilityRole="button"');
+    expect(wrapper).toContain('accessibilityHint="Double tap to pick up this letter, then choose a drop slot"');
+  });
+
+  test('the wrapper is focusable and activates through onClick (Android topClick)', () => {
+    // `focusable` is what installs the Android OnClickListener that turns an
+    // accessibility activation into topClick; without it role=button promises
+    // a click the view never receives.
+    expect(wrapper).toContain('focusable={true}');
+    expect(wrapper).toContain('{...accessibilityClickProps}');
+    expect(SRC).toMatch(/const accessibilityClickProps: Record<string, unknown> = \{\s*onClick: \(\) => \{ if \(enabledRef\.current\) onTapRef\.current\(\); \},/);
+  });
+
+  test('the LetterTile content inside the wrapper is hidden from the accessibility tree', () => {
+    // One stop per letter: the child content (which announces "Letter X" on
+    // its own when not wrapped in a touchable) is excluded on both platforms.
+    expect(wrapper).toMatch(/<View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>\s*\{children\}/);
+  });
+
+  test('the floating drag copy is never an accessibility stop', () => {
+    const floating = SRC.slice(wrapperEnd, SRC.indexOf('const styles = StyleSheet.create'));
+    expect(floating).toContain('importantForAccessibility="no-hide-descendants"');
+    expect(floating).toContain('accessibilityElementsHidden');
+  });
+
+  test('the hint contains no em dashes (player-facing text convention)', () => {
+    expect(wrapper).not.toMatch(/[\u2014\u2013]/);
   });
 });

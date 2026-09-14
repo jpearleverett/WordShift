@@ -16,9 +16,9 @@ import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from '../s
 
 describe('estimateSlotIndex', () => {
   // With a 400px screen width:
-  // ROW_HORIZONTAL_MARGIN=12, ROW_PADDING=8 → rowInnerW = 400-24-16 = 360
+  // ROW_HORIZONTAL_MARGIN=4, ROW_PADDING=4 → rowInnerW = 400-8-8 = 384
   // Standard tiles (wordLength < 6): 52px + 2×3 margin = 58px per letter cell
-  // Arc slot: 14 + 2×(-1) = 12px effective width
+  // Arc slot cell: 18 + 2×2 outer - 2×1 arc margin = 20px (16px on compact rows)
   // Arc letter wrapper margin: -3 each side = -6 per letter
 
   it('returns slot 0 for far-left drop', () => {
@@ -111,10 +111,32 @@ describe('computeBoardScale', () => {
   it.each([320, 360, 390, 400, 768])('fits independently measured row footprints at width %i', width => {
     for (const base of [4, 5, 6]) {
       const widest = base + 1;
-      // Rendered tree: 18dp slot + two 2dp outer margins - two 1dp arc margins.
-      const rendered = (widest + 1) * (18 + 4 - 2) + widest * (widest >= 6 ? 42 + 4 - 6 : 52 + 6 - 6);
-      expect(rendered * computeBoardScale(width, base)).toBeLessThanOrEqual(width - 40 + 0.00001);
+      // Rendered tree: an 18dp slot (14dp on a compact row) + two 2dp outer
+      // margins - two 1dp arc margins; a 52dp tile + two 3dp margins - two 3dp
+      // arc margins (42 + 2x1 - 6 on a compact row). The row keeps 4dp margin
+      // + 4dp padding each side, so the inner width is `width - 16`.
+      const slotCell = widest >= 6 ? 14 + 4 - 2 : 18 + 4 - 2;
+      const letterCell = widest >= 6 ? 42 + 2 - 6 : 52 + 6 - 6;
+      const rendered = (widest + 1) * slotCell + widest * letterCell;
+      expect(rendered * computeBoardScale(width, base)).toBeLessThanOrEqual(width - 16 + 0.00001);
     }
+  });
+
+  // accessibility-devices-1: the 6-letter tier (EXPERT + every Sunday daily)
+  // used to scale to 0.727 on the dominant 360dp Android width, rendering
+  // ~30x38dp compact tiles. The margin/padding/slot/tile-margin reclaim above
+  // lifts it past 0.85 (tiles >= 36x44dp); pin the floor so a future geometry
+  // change cannot quietly give it back.
+  it('keeps a 6-letter board at or above 0.85 on a 360dp phone', () => {
+    const s = computeBoardScale(360, 6);
+    expect(s).toBeGreaterThanOrEqual(0.85);
+    expect(42 * s).toBeGreaterThanOrEqual(36); // compact tile width
+    expect(52 * s).toBeGreaterThanOrEqual(44); // compact tile height
+  });
+
+  it('lets a 5-letter board fit a 360dp phone unscaled and a 4-letter board above 0.9', () => {
+    expect(computeBoardScale(360, 5)).toBe(1);
+    expect(computeBoardScale(360, 4)).toBeGreaterThanOrEqual(0.9);
   });
 
   it('scales DOWN below 1 when the widest row would overflow a narrow screen', () => {
@@ -137,7 +159,10 @@ describe('computeBoardScale', () => {
 
 describe('rendered slot boundary alignment', () => {
   it.each([0.75, 1, 1.2])('uses the complete cell footprint at scale %s', scale => {
-    const centers = [20, 80, 140, 200, 260, 320, 380].map(center => 200 + (center - 200) * scale);
+    // 6-letter compact row on a 400dp screen: 7 x 16dp slot cells + 6 x 38dp
+    // letter cells = 340dp, centred at 30dp; slot 0's centre is 38 and each
+    // step is one slot cell + one letter cell = 54.
+    const centers = [38, 92, 146, 200, 254, 308, 362].map(center => 200 + (center - 200) * scale);
     for (let index = 0; index < centers.length - 1; index++) {
       const midpoint = (centers[index] + centers[index + 1]) / 2;
       expect(estimateSlotIndex(midpoint - 0.1, 7, 6, undefined, scale)).toBe(index);

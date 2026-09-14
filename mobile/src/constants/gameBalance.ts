@@ -452,15 +452,19 @@ export const HARVEST_NUDGE_MIN_AMBER = 150;
 /**
  * Amber premium for skipping a level-gated room's puzzle requirement and
  * unlocking it immediately (vs Reserve, which pays the plain cost and waits for
- * the gate). skip cost = ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)). This is
- * convenience pricing: a meaningful premium over Reserve so the gate keeps its
- * shape, sized so a player who can afford the room can usually also afford the
- * skip with a session or two of earnings. At 0.5 the gated rooms (build
- * 200-550) skip for 300-825. Reserve (base cost, auto-build at the gate) stays
- * the non-paying path, so the premium is a convenience, never a wall. Tune
- * post-launch on real data.
+ * the gate). skip cost = ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)).
+ *
+ * 1.5 (skip = 2.5x build cost; was 0.5 = 1.5x). The launch-readiness economy
+ * simulation (product-retention-3) found a casual MEDIUM 2/day player holding
+ * 2-5x the old premium at EVERY non-trio gate from solve ~13, so the gates
+ * only paced players who never read the button: skipping all six mid-house
+ * gates cost 3,640 amber, earned by day ~17. At 2.5x the gated rooms (build
+ * 200-550) skip for 500-1,375 (all six: ~6,050), a real decision against the
+ * Phase-2 house upgrades rather than loose change. Reserve (base cost,
+ * auto-build at the gate) stays the non-paying path, so the premium is a
+ * convenience, never a wall. Tune post-launch on unlock_purchased.skippedGate.
  */
-export const UNLOCK_SKIP_PREMIUM = 0.5;
+export const UNLOCK_SKIP_PREMIUM = 1.5;
 
 // ============================================================================
 // STREAK

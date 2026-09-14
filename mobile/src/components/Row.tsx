@@ -23,6 +23,7 @@ import {
   ROW_HORIZONTAL_MARGIN,
   ROW_PADDING,
   ARC_SLOT_RENDERED_WIDTH,
+  ARC_SLOT_RENDERED_WIDTH_COMPACT,
   ARC_LETTER_MARGIN_H,
   ARC_SLOT_MARGIN_H,
   STANDARD_TILE_W,
@@ -221,6 +222,8 @@ const Slot: React.FC<{
   /** Total slot count in the target row (for the "N of M" accessibility label). */
   slotCount?: number;
   compact?: boolean;
+  /** 6+ letter rows: the narrower drop slot (tileLayout ARC_SLOT_RENDERED_WIDTH_COMPACT). */
+  narrow?: boolean;
   phase?: number;
   isGuided?: boolean;
   preview?: SlotPreview;
@@ -232,7 +235,7 @@ const Slot: React.FC<{
   pulseSignal?: number;
   /** Incremented when a letter successfully lands in this slot (triggers catch bounce) */
   triggerCatch?: number;
-}> = ({ onPress, index, slotCount = 0, compact = false, phase = 0, isGuided = false, preview, validityVisible = true, isHovered = false, pulseSignal = 0, triggerCatch = 0 }) => {
+}> = ({ onPress, index, slotCount = 0, compact = false, narrow = false, phase = 0, isGuided = false, preview, validityVisible = true, isHovered = false, pulseSignal = 0, triggerCatch = 0 }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
   const guideGlow = getGuideGlowConfig(phase);
@@ -533,6 +536,7 @@ const Slot: React.FC<{
           style={[
             styles.slot,
             compact && styles.slotCompact,
+            narrow && styles.slotNarrow,
             { borderColor: isGuided ? guideGlow.accent : phaseColors.slotBorderColor },
             isGuided && { borderWidth: 3, backgroundColor: guideGlow.slotFill },
           ]}
@@ -949,6 +953,7 @@ export const Row: React.FC<RowProps> = memo(({
               index={slotIndex}
               slotCount={letters.length + 1}
               compact
+              narrow={compactTiles}
               phase={phase}
               isGuided={
                 (guidanceActive && guidedSlotIndex === slotIndex) ||
@@ -1591,6 +1596,12 @@ const styles = StyleSheet.create({
       { perspective: 120 }, // Closer perspective for more pronounced effect
       { rotateX: '18deg' }, // More tilt to make top visibly wider than bottom
     ],
+  },
+  // Compact (6+ letter) rows: the drop slot gives back 4dp so the 8-slot
+  // transient row of a 6-letter board fits a 360dp phone at a readable scale.
+  // slotEstimation reads the same width through arcSlotCellWidth(compact).
+  slotNarrow: {
+    width: ARC_SLOT_RENDERED_WIDTH_COMPACT,
   },
   slotShimmer: {
     position: 'absolute',

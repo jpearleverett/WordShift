@@ -51,7 +51,8 @@ import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
-import { RewardReveal, countUpDisplayValue, getCountUpDurationMs } from '../ui/RewardReveal';
+import { RewardReveal } from '../ui/RewardReveal';
+import { AmberCountUpText } from './AmberCountUpText';
 import { SpringIn } from '../ui/SpringIn';
 import { HubRow } from '../ui/HubRow';
 import { UtilityMenu } from '../ui/UtilityMenu';
@@ -86,7 +87,7 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { AmberInline } from '../AmberInline';
-import { getChallengeIntroLines, getHouseCompletionText, getJournalIntroLines, getJournalSpotlightSteps, getDailyChallengeIntroLines, getGatedRoomIntroLines, getOfferingIntroLines, getHarvestHomeIntroLines, getHarvestNudgeLine, getUnbrokenWeaveIntroLines, getKeeperRecordLines, getReservedBuiltItselfLine, getHomeAmbientLine, getFoxPitNudgeLines, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt } from '../../services/phaseNarrative';
+import { getChallengeIntroLines, getHouseCompletionText, getJournalIntroLines, getJournalSpotlightSteps, getDailyChallengeIntroLines, getGatedRoomIntroLines, getOfferingIntroLines, getHarvestHomeIntroLines, getHarvestNudgeLine, getUnbrokenWeaveIntroLines, getKeeperRecordLines, getReservedBuiltItselfLine, getHomeAmbientLine, getFoxPitNudgeLines, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt, getHouseUpgradesPointerLabel } from '../../services/phaseNarrative';
 import { getStrongestDreadWord } from '../../services/localGenerator';
 import {
   ROOMS,
@@ -643,6 +644,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const screenInsets = useScreenInsets();
   const { width: screenWidth, height: readingHeight, fontScale } = useWindowDimensions();
+  // Narrow phones (< 340dp): the streak badge drops to its flame so the amber
+  // balance beside it never truncates (accessibility-devices-6).
+  const streakIconOnly = screenWidth < 340;
+  // Bottom-anchored sheets are drawn under the system navigation bar now that
+  // RN forces edge-to-edge on Modals (Android 15+): their last row keeps its
+  // authored breathing room OR clears the bar, whichever is larger
+  // (accessibility-devices-2; mirrors OfferingPitScreen / DifficultyMenu).
+  const dialogueSheetBottomPad = Math.max(34, screenInsets.bottom + 12);
+  const hubSheetBottomPad = Math.max(32, screenInsets.bottom + 12);
+  const shopSheetBottomPad = Math.max(40, screenInsets.bottom + 12);
   const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
   // Seeded from the last-rendered scene (see homeSceneSnapshot): HomeScreen
   // unmounts on every navigation away, so starting from null meant EVERY return
@@ -741,6 +752,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // back to the NEXT home visit (per-mount ref: HomeScreen unmounts on every
   // navigation away, so this naturally means "not in the same landing").
   const keeperRecordShownThisLandingRef = useRef(false);
+  // One automatic Fox intro per home landing (ftue-4). The one-time intros
+  // below (challenge, daily, pit nudge, journal spotlight, first gated room)
+  // share one guard set, so each used to fire the instant the previous card
+  // closed: a player who chained NEXT LEVEL through their first sessions met
+  // three of them back to back on the landing after the first forced harvest.
+  // The first eligible intro (in the existing declaration order) claims the
+  // landing; the rest keep their flags unset and take a later landing.
+  // HomeScreen unmounts on every navigation away, so a ref is per landing.
+  const landingIntroSpentRef = useRef(false);
   // Live mirror of "is any intro currently claiming the dialogue surface" — the
   // gated-room intro reads this AFTER a settle delay to yield to a just-unlocked
   // animal's own intro (which opens on a 300ms delay in useUnlockFlow), so the
@@ -764,10 +784,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // thread) and the gem pops scaled to the size of the gain instead of a
   // magnitude-blind fixed pop. Snaps (no climb/pop) on the first read, on a
   // spend (decrease), and under reduced motion / low-tier devices.
-  const [displayAmber, setDisplayAmber] = useState<number | null>(null);
-  const displayAmberRef = useRef(0);
-  const amberInitedRef = useRef(false);
-  const amberCountRafRef = useRef(0);
+  // The header number counts itself up inside AmberCountUpText (a memoized
+  // leaf), so the per-frame tick never re-renders HomeScreen or HouseWorld.
+  // This ref only remembers the last settled balance for the gem pop below.
+  const amberPulseFromRef = useRef<number | null>(null);
 
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
@@ -1355,16 +1375,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Challenge Mode intro (one-time, Fox-led, after 15 puzzles).
   useEffect(() => {
     if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
+    if (landingIntroSpentRef.current) return;
     if ((homePuzzleCount || 0) < 15) return;
 
     let cancelled = false;
     (async () => {
       const seen = await hasSeenChallengeIntro();
-      if (seen || cancelled || introSurfaceBusyRef.current) return;
+      if (seen || cancelled || introSurfaceBusyRef.current || landingIntroSpentRef.current) return;
 
       const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
       if (!fox) return;
 
+      landingIntroSpentRef.current = true;
       setIntroAnimal(fox);
       setIntroDialogueIndex(0);
       setIntroOverrideLines(getChallengeIntroLines(homePhase));
@@ -1379,16 +1401,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Celebrates the unlock so the new card isn't discovered silently.
   useEffect(() => {
     if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
+    if (landingIntroSpentRef.current) return;
     if (!isDailyChallengeUnlocked(homePuzzleCount, homePhase)) return;
 
     let cancelled = false;
     (async () => {
       const seen = await hasSeenDailyChallengeIntro();
-      if (seen || cancelled || introSurfaceBusyRef.current) return;
+      if (seen || cancelled || introSurfaceBusyRef.current || landingIntroSpentRef.current) return;
 
       const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
       if (!fox) return;
 
+      landingIntroSpentRef.current = true;
       setIntroAnimal(fox);
       setIntroDialogueIndex(0);
       setIntroOverrideLines(getDailyChallengeIntroLines(homePhase));
@@ -1402,12 +1426,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Pit transition Fox nudge (one-time per pending transition)
   useEffect(() => {
     if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
+    if (landingIntroSpentRef.current) return;
     if (!pitPhaseReady) return;
 
     let cancelled = false;
     (async () => {
       const seen = await hasSeenPitNudge();
-      if (seen || cancelled || introSurfaceBusyRef.current) return;
+      if (seen || cancelled || introSurfaceBusyRef.current || landingIntroSpentRef.current) return;
 
       const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
       if (!fox) return;
@@ -1415,6 +1440,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // Determine which phase transition is pending (currentPhase + 1)
       const targetPhase = Math.min(4, homePhase + 1) as 1 | 2 | 3 | 4;
 
+      landingIntroSpentRef.current = true;
       setIntroAnimal(fox);
       setIntroDialogueIndex(0);
       setIntroOverrideLines(getFoxPitNudgeLines(targetPhase));
@@ -1425,18 +1451,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => { cancelled = true; };
   }, [pitPhaseReady, homePhase, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, animals, hasHomeProgress]);
 
-  // Journal intro (one-time, Fox-led spotlight, when journal becomes available)
+  // Journal intro (one-time, Fox-led spotlight, when journal becomes available).
+  // The spotlight card carries its own preview of the journal's sections and
+  // Ember's lines point at the book icon; it no longer opens the journal
+  // modal by itself (ftue-4). The player opens it from the icon, or from the
+  // spotlight's final "Open the Journal" tap.
   useEffect(() => {
     if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
+    if (landingIntroSpentRef.current) return;
     if (!shouldShowJournalButton || journalSpotlightActive) return;
 
     let cancelled = false;
     (async () => {
       const seen = await hasSeenJournalIntro();
-      if (seen || cancelled || introSurfaceBusyRef.current) return;
+      if (seen || cancelled || introSurfaceBusyRef.current || landingIntroSpentRef.current) return;
 
       const lines = getJournalIntroLines(homePhase);
-      setShowJournalModal(true);
+      landingIntroSpentRef.current = true;
       setJournalSpotlightLines(lines);
       setJournalSpotlightIndex(0);
       setJournalSpotlightActive(true);
@@ -1470,20 +1501,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // unlock modal (the intro renders on top, so dismissing reveals Reserve/Skip).
   useEffect(() => {
     if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
+    if (landingIntroSpentRef.current) return;
     const nu = unlockFlow.nextUnlock;
     if (!nu || nu.type !== 'room' || nu.minPuzzles === undefined) return;
     if ((homePuzzleCount || 0) >= nu.minPuzzles) return; // gate already open — no wall
 
     let cancelled = false;
     const timer = setTimeout(() => {
-      if (cancelled || introSurfaceBusyRef.current) return;
+      if (cancelled || introSurfaceBusyRef.current || landingIntroSpentRef.current) return;
       (async () => {
         const seen = await hasSeenGatedUnlockIntro();
-        if (seen || cancelled || introSurfaceBusyRef.current) return;
+        if (seen || cancelled || introSurfaceBusyRef.current || landingIntroSpentRef.current) return;
 
         const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
         if (!fox) return;
 
+        landingIntroSpentRef.current = true;
         setIntroAnimal(fox);
         setIntroDialogueIndex(0);
         setIntroOverrideLines(getGatedRoomIntroLines(homePhase, nu.name));
@@ -1851,57 +1884,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [showIntroDialogue, introDialogueSlide, homePhase]);
 
-  // Count the header amber up to its new total and pop the gem, scaling the pop
-  // to the SIZE of the gain (a small win taps, a windfall bursts) instead of a
-  // fixed magnitude-blind 1.2. The number ticks on the JS thread (rAF), the gem
-  // scales on the native driver. Snaps (no climb/pop) on the first read, on a
-  // spend, and under reduced motion / low-tier devices.
+  // Pop the gem when the balance climbs, scaling the pop to the SIZE of the
+  // gain (a small win taps, a windfall bursts) instead of a fixed
+  // magnitude-blind 1.2. The number itself counts up inside AmberCountUpText
+  // (one Text re-rendering per frame, not the whole home screen); the gem
+  // scales on the native driver here. Holds still (no pop) on the first read,
+  // on a spend, and under reduced motion / low-tier devices.
   useEffect(() => {
     if (!hasHomeProgress) return;
     if (homeAmber === undefined) return;
     const to = homeAmber;
-    const from = displayAmberRef.current;
+    const from = amberPulseFromRef.current;
+    amberPulseFromRef.current = to;
     const reduced = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
 
-    if (amberCountRafRef.current) {
-      cancelAnimationFrame(amberCountRafRef.current);
-      amberCountRafRef.current = 0;
-    }
-
-    // First read, a spend, or reduced motion: snap the number, hold the gem.
-    if (!amberInitedRef.current || reduced || to <= from) {
-      amberInitedRef.current = true;
-      displayAmberRef.current = to;
-      setDisplayAmber(to);
+    if (from === null || reduced || to <= from) {
       amberPulse.setValue(1);
       return;
     }
 
     const gain = to - from;
-
-    // Count-up (rAF, JS thread) using the shared RewardReveal tick math.
-    const duration = getCountUpDurationMs(gain, homePhase);
-    if (duration <= 0) {
-      displayAmberRef.current = to;
-      setDisplayAmber(to);
-    } else {
-      const startedAt = Date.now();
-      const tick = () => {
-        const f = Math.min(1, (Date.now() - startedAt) / duration);
-        const v = countUpDisplayValue(f, to, from);
-        displayAmberRef.current = v;
-        setDisplayAmber(v);
-        if (f < 1) {
-          amberCountRafRef.current = requestAnimationFrame(tick);
-        } else {
-          amberCountRafRef.current = 0;
-        }
-      };
-      amberCountRafRef.current = requestAnimationFrame(tick);
-    }
-
-    // Pop the gem, scaled to the gain. The currency's excitement still cools
-    // with the house (a smaller ceiling at Phase 4+).
+    // The currency's excitement still cools with the house (a smaller ceiling
+    // at Phase 4+).
     const basePeakDelta = homePhase >= 4 ? 0.12 : 0.2;
     const magnitude = Math.min(1, Math.max(0.25, gain / 60));
     const peak = 1 + basePeakDelta * magnitude;
@@ -1910,13 +1914,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       Animated.timing(amberPulse, { toValue: peak, duration: 150, useNativeDriver: true }),
       Animated.timing(amberPulse, { toValue: 1, duration: 150, useNativeDriver: true }),
     ]).start();
-
-    return () => {
-      if (amberCountRafRef.current) {
-        cancelAnimationFrame(amberCountRafRef.current);
-        amberCountRafRef.current = 0;
-      }
-    };
   }, [homeAmber, hasHomeProgress, homePhase, amberPulse]);
 
   // Highlight pulse for the PLAY button when Fox nudges the player onward.
@@ -2367,9 +2364,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
                   <Image source={AMBER_ICON} style={styles.amberIconImage} />
                 </Animated.View>
-                <Text style={styles.amberCount} numberOfLines={1}>
-                  {displayAmber ?? progress.amber}
-                </Text>
+                <AmberCountUpText value={progress.amber} phase={progress.currentPhase} style={styles.amberCount} />
                 {!isOnboarding && !quietLanding && <AmberSparkle phase={progress.currentPhase} />}
               </View>
             </TouchableOpacity>
@@ -2379,9 +2374,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel={`${progress.currentStreak} day streak${isStreakAtRisk ? ', at risk' : ''}`}
               >
                 <Image source={FLAME_ICON} style={styles.streakBadgeIcon} />
-                <Text style={[styles.streakBadgeCount, isStreakAtRisk && styles.streakAtRiskCount]}>
-                  {progress.currentStreak}
-                </Text>
+                {/* Below 340dp the header budget leaves the amber pill (the
+                    only shrinkable item) too little room once a streak badge
+                    is up, and the balance truncated to an ellipsis. The flame
+                    alone keeps the streak visible; the count still rides the
+                    accessibility label above. */}
+                {!streakIconOnly && (
+                  <Text style={[styles.streakBadgeCount, isStreakAtRisk && styles.streakAtRiskCount]}>
+                    {progress.currentStreak}
+                  </Text>
+                )}
               </View>
             )}
           </View>
@@ -2839,7 +2841,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </View>
 
                 {/* Text column - 70% width */}
-                <View style={styles.dialogueTextCol}>
+                <View style={[styles.dialogueTextCol, { paddingBottom: dialogueSheetBottomPad }]}>
                   {/* The answer the player just gave stays on the card,
                       above the reply it drew (cleared when the reply is left). */}
                   {dialogueFlow.choiceEcho ? (
@@ -2866,6 +2868,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     />
                     <DialogueBody text={dialogueFlow.revealedText} style={[styles.dialogueText, { color: panelSt.body }]} />
                   </TouchableOpacity>
+                  {/* One-time pointer under the FIRST reveal (ftue-6): the
+                      bubble has always been tappable to land the line at
+                      once, but nothing ever said so. The hook decides when it
+                      shows and retires it the moment that reveal ends. */}
+                  {dialogueFlow.revealSkipHint ? (
+                    <Text style={[styles.dialogueRevealSkipHint, { color: panelSt.muted }]} accessibilityLiveRegion="polite">
+                      {dialogueFlow.revealSkipHint}
+                    </Text>
+                  ) : null}
 
                   {dialogueFlow.dialogueSaveError ? (
                     <AppText textRole="body" accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: panelSt.body, marginTop: 12 }}>
@@ -2961,7 +2972,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <SpringIn
             phase={progress?.currentPhase ?? 0}
             claimTouches
-            style={[styles.compactHubModal, { maxHeight: '90%', width: '100%', maxWidth: 440 }]}
+            style={[styles.compactHubModal, { maxHeight: '90%', width: '100%', maxWidth: 440, paddingBottom: hubSheetBottomPad }]}
           >
             <NineSliceFrame
               skin={pixelSkin.panel}
@@ -3107,7 +3118,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <SpringIn
             phase={progress?.currentPhase ?? 0}
             claimTouches
-            style={styles.shopModal}
+            style={[styles.shopModal, { paddingBottom: shopSheetBottomPad }]}
           >
             <NineSliceFrame
               skin={pixelSkin.panel}
@@ -3248,7 +3259,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Open the Shop for room upgrades"
               >
                 <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.secondary }]}>
-                  Room Upgrades: in the Shop
+                  {getHouseUpgradesPointerLabel(progress.currentPhase)}
                 </Text>
               </BevelRowButton>
             )}
@@ -3291,7 +3302,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           />
           <SpringIn
             phase={progress?.currentPhase ?? 0}
-            style={[styles.shopModal, styles.questModal]}
+            style={[styles.shopModal, styles.questModal, { paddingBottom: shopSheetBottomPad }]}
           >
             <NineSliceFrame
               skin={pixelSkin.panel}
@@ -3478,7 +3489,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <SpringIn
             phase={progress?.currentPhase ?? 0}
             claimTouches
-            style={styles.shopModal}
+            style={[styles.shopModal, { paddingBottom: shopSheetBottomPad }]}
           >
             <NineSliceFrame
               skin={pixelSkin.panel}
@@ -3611,6 +3622,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </>
                   );
                 })()}
+
+                {/* Once the House Upgrades open (Phase 2), the locked-room
+                    card is where a player holding idle amber is standing, so
+                    it points at the recurring sink too (product-retention-3). */}
+                {areUpgradesAvailable(progress.currentPhase) && onOpenShop && (
+                  <BevelRowButton
+                    phase={progress.currentPhase}
+                    hostDark={dtHostDark}
+                    variant="secondary"
+                    style={styles.largeAction}
+                    onPress={() => {
+                      unlockFlow.setShowRoomUnlock(null);
+                      onOpenShop();
+                    }}
+                    accessibilityLabel="Open the Shop for house upgrades"
+                  >
+                    <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.secondary }]}>
+                      {getHouseUpgradesPointerLabel(progress.currentPhase)}
+                    </Text>
+                  </BevelRowButton>
+                )}
 
                 <CandyButton
                   label="Close"
@@ -3868,7 +3900,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </View>
 
                 {/* Text column - 70% width */}
-                <View style={styles.dialogueTextCol}>
+                <View style={[styles.dialogueTextCol, { paddingBottom: dialogueSheetBottomPad }]}>
                   <View style={styles.dialogueBubble}>
                     <NineSliceFrame
                       skin={pixelSkin.card}
@@ -4175,8 +4207,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     onPress={journalSpotlightIndex < journalSpotlightLines.length - 1
                       ? () => setJournalSpotlightIndex(prev => prev + 1)
                       : async () => {
+                          // The player's own tap opens the journal (the
+                          // spotlight no longer auto-opens it underneath).
                           await markJournalIntroSeen();
                           setJournalSpotlightActive(false);
+                          setShowJournalModal(true);
                         }
                     }
                     soundKind="dialogue"
@@ -4624,6 +4659,14 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
     // and its own cardPadX). It shrinks by exactly what dialogueModal's panel
     // clearance took, so the narrative text column keeps its pre-token width.
     paddingHorizontal: 10,
+  },
+  dialogueRevealSkipHint: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontStyle: 'italic',
+    fontSize: FONT_SIZE.caption,
+    textAlign: 'center',
+    marginTop: 6,
+    opacity: 0.85,
   },
   // Portrait nameplate: sits under the sprite, centered in the alcove.
   dialogueAnimalName: {

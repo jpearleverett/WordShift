@@ -270,24 +270,47 @@ export function DraggableTile({
 
   const shadowColor = getDragShadowColor(phase);
 
+  // RN's View accepts an Android-only `onClick` (the `topClick` event a
+  // `focusable` view dispatches on an accessibility or keyboard activation)
+  // that the TypeScript typings do not declare, so it is spread in typed
+  // loosely rather than cast at the JSX attribute.
+  const accessibilityClickProps: Record<string, unknown> = {
+    onClick: () => { if (enabledRef.current) onTapRef.current(); },
+  };
+
   return (
     <View style={styles.wrapper}>
-      {/* Source tile (dims during drag) */}
+      {/* Source tile (dims during drag). This wrapper is the ONE accessibility
+          node for a draggable letter (accessibility-devices-3). It is
+          `focusable` with an `onClick` so an assistive-tech activation on
+          Android (TalkBack sends ACTION_CLICK to a role=button node, which a
+          bare PanResponder view never receives) selects the letter exactly like
+          a tap; iOS VoiceOver synthesizes a touch at the element's centre, which
+          the PanResponder already reads as a tap. The LetterTile content below
+          is hidden from the tree so the letter is announced once, not twice
+          (the second, hint-less "Letter X" stop was the inert one). */}
       <Animated.View
         style={{ opacity: sourceOpacity }}
         accessible={true}
+        focusable={true}
+        {...accessibilityClickProps}
         accessibilityRole="button"
         accessibilityLabel={letterChar ? `Letter ${letterChar}` : 'Letter'}
         accessibilityHint="Double tap to pick up this letter, then choose a drop slot"
         accessibilityState={{ disabled: !enabled }}
         {...panResponder.panHandlers}
       >
-        {children}
+        <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          {children}
+        </View>
       </Animated.View>
 
-      {/* Floating drag tile (follows finger) */}
+      {/* Floating drag tile (follows finger). Never an accessibility stop: it
+          is a visual copy of the letter above. */}
       <Animated.View
         pointerEvents="none"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
         style={[
           styles.floatingTile,
           {

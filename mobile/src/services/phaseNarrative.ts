@@ -3035,6 +3035,28 @@ export function getSwiftVictoryHintMessage(phase: number): string {
   return 'If the celebrations ever feel long, the house can keep them short and sweet. You will find that choice in Settings.';
 }
 
+// The same setting, offered where the player is actually waiting on the
+// fanfare: a quiet one-line affordance in the VictoryModal footer once past
+// SWIFT_VICTORY_MIN_PUZZLES (product-retention-9). `enabled` is the CURRENT
+// state, so the label reads as the change the tap makes.
+export function getSwiftVictoriesToggleLabel(phase: number, enabled: boolean): string {
+  if (phase >= 4) return enabled ? 'Let the fanfare return' : 'Set the fanfare aside';
+  if (phase >= 2) return enabled ? 'Celebrate in full again' : 'Celebrate more softly';
+  return enabled ? 'Full celebrations again' : 'Quicker celebrations';
+}
+
+// One-line receipt after the tap, so the change is acknowledged on the win it
+// was made on (the strip itself only changes from the NEXT routine win).
+export function getSwiftVictoriesToggledMessage(phase: number, enabled: boolean): string {
+  if (phase >= 4) {
+    return enabled ? 'The house will keep the next ones brief.' : 'The house will mark the next ones in full.';
+  }
+  if (phase >= 2) {
+    return enabled ? 'The house will celebrate the next ones softly.' : 'The house will celebrate the next ones in full.';
+  }
+  return enabled ? 'The next ones will be short and sweet.' : 'The next ones get the full celebration.';
+}
+
 // ============================================================================
 // FINAL BOARD — the start-of-board line for the last arrangement. Quiet and
 // heavy; no fourth wall, no fanfare, no instruction.
@@ -4418,6 +4440,15 @@ export function getShopTitle(phase: number): string {
   if (phase >= 4) return 'Vestments';
   if (phase >= 2) return 'Adornments';
   return 'Tile Shop';
+}
+
+// Pointer row from the house's unlock cards to the Shop's House Upgrades
+// section (Phase 2+, when the room decorations open). Names the recurring
+// amber sink where a player holding idle amber is standing.
+export function getHouseUpgradesPointerLabel(phase: number): string {
+  if (phase >= 4) return 'Deepen the rooms: in the Shop';
+  if (phase >= 3) return 'Room Upgrades: in the Shop';
+  return 'House Upgrades: in the Shop';
 }
 
 export function getShopSubtitle(phase: number): string {

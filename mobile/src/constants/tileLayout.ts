@@ -8,9 +8,15 @@
  * dependency.
  */
 
-// Row container spacing
-export const ROW_HORIZONTAL_MARGIN = 12;
-export const ROW_PADDING = 8;
+// Row container spacing. 4 + 4 (was 12 + 8): the 40dp the two used to take
+// out of a 360dp phone was the single largest lever on the board scale. With
+// the compact slot cell and the 1dp compact tile margin below, a 6-letter
+// board (whose widest transient row is 7 compact letters + 8 slots = 394dp)
+// now scales to ~0.87 on 360dp (tiles ~37x45dp) instead of 0.73 (~30x38dp),
+// a 5-letter board fits 360dp at exactly 1, and a 4-letter board scales 0.905
+// (was 0.842). Pinned by dragDrop.test.ts (computeBoardScale floors).
+export const ROW_HORIZONTAL_MARGIN = 4;
+export const ROW_PADDING = 4;
 
 // Arc slot width (narrow slots keep letters close together)
 export const SLOT_WIDTH = 14;
@@ -39,11 +45,30 @@ export const ARC_SLOT_OUTER_MARGIN_H = 2; // Row.tsx `slotOuter` marginHorizonta
 export const ARC_SLOT_CELL_W =
   ARC_SLOT_RENDERED_WIDTH + (ARC_SLOT_OUTER_MARGIN_H + ARC_SLOT_MARGIN_H) * 2;
 
+// Compact rows (6+ letter words, Row.tsx `compactTiles`) render a NARROWER
+// drop slot (Row.tsx `slotNarrow`): the 6-letter tier is structurally the
+// ceiling, and its 8-slot transient row was paying 4dp of slot width per slot
+// it did not need. The wrapper margins are unchanged, so the cell is 16dp.
+// Every geometry consumer (Row, slotEstimation, the arc<->standard glide)
+// asks `arcSlotCellWidth(compact)` rather than reading ARC_SLOT_CELL_W, so a
+// compact row can never be rendered at one slot width and dragged at another.
+export const ARC_SLOT_RENDERED_WIDTH_COMPACT = SLOT_WIDTH;
+export const ARC_SLOT_CELL_W_COMPACT =
+  ARC_SLOT_RENDERED_WIDTH_COMPACT + (ARC_SLOT_OUTER_MARGIN_H + ARC_SLOT_MARGIN_H) * 2;
+
+/** The full horizontal cell one arc drop slot occupies, standard or compact. */
+export function arcSlotCellWidth(compact: boolean): number {
+  return compact ? ARC_SLOT_CELL_W_COMPACT : ARC_SLOT_CELL_W;
+}
+
 // Tile horizontal footprint (standard vs compact for 6+ letter words)
 export const STANDARD_TILE_W = 52;
 export const STANDARD_TILE_MARGIN_H = 3;
 export const COMPACT_TILE_W = 42;
-export const COMPACT_TILE_MARGIN_H = 2;
+// 1dp (was 2): seven compact tiles on the 6-letter transient row give back
+// 14dp here, which is what lifts the 360dp scale over the 0.85 floor. The
+// tiles still never touch (2dp between neighbours).
+export const COMPACT_TILE_MARGIN_H = 1;
 
 // ─── Arc <-> standard letter positions ───────────────────────────────────────
 // The target row lays its letters out INTERLEAVED with drop slots
@@ -71,7 +96,7 @@ export function arcLetterCenterOffset(
   compact: boolean,
 ): number {
   const letterW = tileFootprint(compact) + ARC_LETTER_MARGIN_H * 2;
-  const slotW = ARC_SLOT_CELL_W;
+  const slotW = arcSlotCellWidth(compact);
   const total = (letterCount + 1) * slotW + letterCount * letterW;
   const center = (index + 1) * slotW + index * letterW + letterW / 2;
   return center - total / 2;

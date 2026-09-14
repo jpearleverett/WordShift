@@ -13,6 +13,7 @@ import { FONT_SIZE } from '../../theme/typeScale';
 import { NineSliceFrame } from './NineSlice';
 import { PixelPlaque } from './PixelPlaque';
 import { SpringIn } from './SpringIn';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { HubRow } from './HubRow';
 import { SacrificeModal } from './SacrificeModal';
 import { RulesModal } from '../puzzle/RulesModal';
@@ -89,6 +90,12 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
   // renders dark-on-dark; panelSt is the same mapping for direct token reads.
   const st = getSurfaceTheme(phase);
   const dtHostDark = phase >= 2;
+  // The sheet is drawn under the system navigation bar now that RN forces
+  // edge-to-edge on Modals (Android 15+): the last row keeps its authored
+  // breathing room OR clears the bar, whichever is larger (mirrors
+  // OfferingPitScreen / DifficultyMenu; accessibility-devices-2).
+  const screenInsets = useScreenInsets();
+  const sheetBottomPad = Math.max(32, screenInsets.bottom + 12);
   const panelSt = getSurfaceTheme(phase === 2 ? 3 : phase === 3 ? 4 : phase);
   const pixelSkin = getPixelSkin(phase, dtHostDark);
 
@@ -111,7 +118,7 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
           <SpringIn
             phase={phase}
             claimTouches
-            style={styles.compactHubModal}
+            style={[styles.compactHubModal, { paddingBottom: sheetBottomPad }]}
           >
             <NineSliceFrame
               skin={pixelSkin.panel}

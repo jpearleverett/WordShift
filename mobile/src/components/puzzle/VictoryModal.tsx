@@ -13,15 +13,15 @@ import {
 } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
-import { getVictoryTitle, getVictoryFeedback, getPhaseChangeNarrative, getRitualEchoHeader, getRitualEchoFooter, getWordsOfferedText, getPitHarvestLabel, getPitMandatoryText, getPitMandatoryCTA, getAutoCollectCaption, getMandatoryHarvestText, getMandatoryHarvestCTA, getNextStreakMilestoneText, getFlawlessHonorific, getUnbrokenWeaveRankUpLine, getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel, getResonanceBonusLabel, isSilentVictoryBeat } from '../../services/phaseNarrative';
+import { getVictoryTitle, getVictoryFeedback, getPhaseChangeNarrative, getRitualEchoHeader, getRitualEchoFooter, getWordsOfferedText, getPitHarvestLabel, getPitMandatoryText, getPitMandatoryCTA, getAutoCollectCaption, getMandatoryHarvestText, getMandatoryHarvestCTA, getNextStreakMilestoneText, getFlawlessHonorific, getUnbrokenWeaveRankUpLine, getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel, getResonanceBonusLabel, isSilentVictoryBeat, getSwiftVictoriesToggleLabel, getSwiftVictoriesToggledMessage } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
 import { AMBER_REWARDS, AUTO_COLLECT_PUZZLE_LIMIT } from '../../constants/gameBalance';
-import { isRoutineVictory } from '../../hooks/useVictoryFlow';
+import { isRoutineVictory, SWIFT_VICTORY_MIN_PUZZLES } from '../../hooks/useVictoryFlow';
 import type { AmberBreakdown } from '../../hooks/useGamePersistence';
 import { hapticSuccess } from '../../services/haptics';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
-import { getSettingsSync } from '../../services/settings';
+import { getSettingsSync, updateSetting } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
 import { getBeatPercentText, getStandingsGatheringText, DailyRank } from '../../services/leaderboard';
@@ -297,6 +297,34 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   const hushedBeat =
     victoryData?.finalBoard === true ||
     isSilentVictoryBeat(victoryData?.puzzlesSolved ?? 0);
+
+  // Quicker celebrations (product-retention-9): the Swift Victories setting
+  // used to be advertised once, as a passing board toast, and lived only in
+  // Settings; the player who finds the fanfare long is standing right here.
+  // A quiet one-line affordance in the footer flips the same setting once the
+  // compact strip is actually available (SWIFT_VICTORY_MIN_PUZZLES). Never on
+  // the hushed beats or the completion coda, which perform their own silence.
+  // Keyed on `visible`: the modal stays mounted across wins and the setting
+  // can change in Settings in between, so each open re-reads it and drops the
+  // previous win's receipt (the adjust-state-on-prop-change pattern, not an
+  // effect, so no cascading render).
+  const [swiftState, setSwiftState] = useState<{ forVisible: boolean; on: boolean; receipt: string | null }>(
+    () => ({ forVisible: visible, on: getSettingsSync().swiftVictories === true, receipt: null }),
+  );
+  if (swiftState.forVisible !== visible) {
+    setSwiftState({ forVisible: visible, on: getSettingsSync().swiftVictories === true, receipt: null });
+  }
+  const swiftOn = swiftState.on;
+  const swiftReceipt = swiftState.receipt;
+  const swiftAffordanceVisible =
+    (victoryData?.puzzlesSolved ?? 0) >= SWIFT_VICTORY_MIN_PUZZLES &&
+    !hushedBeat &&
+    !completionCoda;
+  const handleToggleSwift = useCallback(() => {
+    const next = !swiftOn;
+    setSwiftState({ forVisible: visible, on: next, receipt: getSwiftVictoriesToggledMessage(phase, next) });
+    updateSetting('swiftVictories', next).catch(() => {});
+  }, [swiftOn, phase, visible]);
 
   // Ritual echo chain + de-duplicated feedback register: the performance
   // feedback line and the ritual-echo footer occupy the same emotional slot,
@@ -1474,6 +1502,23 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 style={styles.victorySecondaryButton}
               />
             </View>
+
+            {swiftAffordanceVisible && (
+              <TouchableOpacity
+                onPress={handleToggleSwift}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+                style={styles.swiftAffordance}
+                accessibilityRole="button"
+                accessibilityState={{ checked: swiftOn }}
+                accessibilityLabel={swiftReceipt ?? getSwiftVictoriesToggleLabel(phase, swiftOn)}
+                testID="swift-victories-affordance"
+              >
+                <Text style={[styles.swiftAffordanceText, { color: phaseTheme.modalSecondaryTextColor }]}>
+                  {swiftReceipt ?? getSwiftVictoriesToggleLabel(phase, swiftOn)}
+                </Text>
+              </TouchableOpacity>
+            )}
             </>
             )}
             </Animated.View>
@@ -1901,6 +1946,21 @@ const styles = StyleSheet.create({
   },
   victorySecondaryButton: {
     flex: 1,
+  },
+  // Quiet footer affordance for the Swift Victories setting: plain text,
+  // never a third bevel competing with NEXT LEVEL.
+  swiftAffordance: {
+    alignSelf: 'center',
+    marginTop: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  swiftAffordanceText: {
+    fontFamily: BODY_FONT_ITALIC,
+    fontStyle: 'italic',
+    fontSize: FONT_SIZE.caption,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   btn3dWrapper: {
     alignItems: 'center',
