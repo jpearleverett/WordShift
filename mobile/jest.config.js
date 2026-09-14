@@ -8,6 +8,10 @@ module.exports = {
   // the worst failure mode a test config has.
   testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  // Runs inside every suite: cancels eventLogger's debounce timer in afterAll
+  // so no suite's timer can fire after its own teardown under --runInBand
+  // (Jest then exits 1 with every test green; see the file's docblock).
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/helpers/jestSetup.ts'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       tsconfig: {

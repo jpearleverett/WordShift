@@ -69,6 +69,7 @@ export interface StoredEvent extends GameEvent {
 // In-memory buffer — flushed to storage periodically
 let eventBuffer: StoredEvent[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let flushTimerClear: typeof clearTimeout = clearTimeout;
 let storageQueue: Promise<unknown> = Promise.resolve();
 const eventSession = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
 let eventSequence = 0;
@@ -150,8 +151,32 @@ export function logEvent(event: GameEvent): void {
       flushEvents();
       flushTimer = null;
     }, 5000);
+    // Pair the clearer with the setTimeout that armed it: Jest fake timers
+    // swap both globals together, so a timer armed under one implementation
+    // must be cleared by the same one or it silently survives.
+    flushTimerClear = clearTimeout;
     // In Node (tests), don't let the debounce timer hold the process open.
     (flushTimer as { unref?: () => void }).unref?.();
+  }
+}
+
+/**
+ * Test hook: drop the armed debounce timer so it cannot outlive the suite that
+ * armed it. Jest's in-band runner (CI: `--runInBand`) keeps ONE process alive
+ * across every suite, so a 5 s timer armed by a suite that never mocked this
+ * module fires during a LATER suite, after its own environment is torn down;
+ * the flush's deferred `require('./telemetry')` then trips Jest's
+ * import-after-teardown guard, which sets the process exit code to 1 while
+ * every test stays green (CI run 442 on main: 209 suites passed, exit 1). A
+ * multi-worker run cannot show it, since each worker's exit code is discarded.
+ * The global Jest setup (`src/__tests__/helpers/jestSetup.ts`) calls this in
+ * `afterAll` for every suite. Buffered events stay in memory; storage is not
+ * touched.
+ */
+export function cancelPendingFlushForTests(): void {
+  if (flushTimer) {
+    flushTimerClear(flushTimer);
+    flushTimer = null;
   }
 }
 
@@ -160,6 +185,11 @@ export function logEvent(event: GameEvent): void {
  */
 async function flushEvents(): Promise<void> {
   if (eventBuffer.length === 0) { await storageQueue.catch(() => {}); return; }
+  // Resolve the uploader BEFORE the storage await. flushEvents only ever starts
+  // from a synchronous caller (the debounce timer, getEvents), so the deferred
+  // require runs inside that caller's tick instead of a later one, where under
+  // Jest it could land after the suite's environment is torn down.
+  const telemetry = loadTelemetry();
   const eventsToFlush = eventBuffer;
   const generation = bufferGeneration;
   eventBuffer = [];
@@ -173,11 +203,19 @@ async function flushEvents(): Promise<void> {
     console.warn('Failed to flush events:', error);
     return;
   }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
-    const { syncTelemetry } = require('./telemetry') as typeof import('./telemetry');
-    void syncTelemetry().catch(() => {});
-  } catch { /* Non-critical diagnostics transport. */ }
+  if (telemetry) void telemetry.syncTelemetry().catch(() => {});
+}
+
+let telemetryModule: typeof import('./telemetry') | null = null;
+/** Deferred, cached on success only so a failed load is retried next flush. */
+function loadTelemetry(): typeof import('./telemetry') | null {
+  if (!telemetryModule) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
+      telemetryModule = require('./telemetry') as typeof import('./telemetry');
+    } catch { return null; /* Non-critical diagnostics transport. */ }
+  }
+  return telemetryModule;
 }
 
 export async function getEvents(): Promise<StoredEvent[]> {
@@ -245,7 +283,7 @@ export async function clearEvents(): Promise<void> {
     // install date is device meta, deliberately not removed on reset.
     installDateCache = null;
     if (flushTimer) {
-      clearTimeout(flushTimer);
+      flushTimerClear(flushTimer);
       flushTimer = null;
     }
     await queued(() => AsyncStorage.removeItem(STORAGE_KEY));

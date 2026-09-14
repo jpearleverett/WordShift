@@ -69,6 +69,31 @@ The footer now says `Talk to <name>` and opens the same gift/introduction/conver
 
 Local validation passed **4,789 tests in 197 suites**, the **11 reverse-composition script tests**, TypeScript, zero-warning lint, story integrity, vocabulary/branching and bank-route audits, and the daily cohort check. The **three shortcut browser journeys** passed. CI uses Node-24-based v6 checkout/setup/upload actions while retaining Node 22 for the application; browser evidence uploads only after the browser step runs. ESLint excludes generated browser reports and traces. App version 1.3.5 / Android version code 99 are unchanged.
 
+## September 14 launch-readiness merge and the in-band CI exit code
+
+PR 439 merged the launch-readiness branch into `main` at `687a08d`. Its
+[CI run 442](https://github.com/jpearleverett/WordShift/actions/runs/34876474354)
+passed TypeScript and zero-warning lint and reported **209 suites / 4,997 tests
+passed**, yet the Test step exited 1. No test failed: four suites
+(`ceremonyPlayback`, `useVictoryDouble`, `billingPurchaseSafety`, `adsConsent`)
+reach `logEvent` without mocking `eventLogger`, which arms its 5 s debounce
+timer; under `--runInBand` one process outlives every suite, the timer fires
+during a later suite, and the flush's deferred `require('./telemetry')` trips
+Jest's import-after-teardown guard, which sets `process.exitCode = 1`. A
+multi-worker run discards each worker's exit code, which is why the same suite
+was green locally. Reproduced locally in CI's mode before the fix (exit 1, the
+same four leaks).
+
+The fix: a global Jest setup (`src/__tests__/helpers/jestSetup.ts`,
+`setupFilesAfterEnv`) cancels the timer after every suite through the new
+`cancelPendingFlushForTests`; the timer's clearer is captured when it is armed
+so a suite that switches to fake timers cannot mismatch it; and `flushEvents`
+resolves the telemetry module synchronously at flush start (cached on success
+only) so the deferred require can no longer run in a later tick. Local
+validation in CI's mode (`npm test -- --no-coverage --ci --runInBand`):
+**209 suites / 4,997 tests, exit 0, zero teardown imports**, plus TypeScript and
+zero-warning lint. App version 1.3.5 / code 99 unchanged; nothing native moved.
+
 ## Launch readiness review (2026-09-14)
 
 [`LAUNCH_READINESS_REVIEW_2026-09-14.md`](LAUNCH_READINESS_REVIEW_2026-09-14.md)
