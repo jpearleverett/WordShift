@@ -7,8 +7,11 @@
  * suite) one process outlives every suite, so the timer fires during a later
  * suite, after the arming suite's environment is torn down, and the flush's
  * deferred require trips Jest's import-after-teardown guard: every test green,
- * exit code 1 (CI run 442 on main). Cancelling the timer after each suite makes
- * that impossible, whichever suite armed it.
+ * exit code 1 (CI run 442 on main). Cancelling the timer after each suite closes
+ * this for every suite that arms it in its live module registry. A suite that
+ * resets or isolates the registry AFTER arming is not reached (the require
+ * below resolves in the current registry only): mock eventLogger or call
+ * clearEvents() there yourself.
  */
 afterAll(() => {
   let mod: { cancelPendingFlushForTests?: unknown } | undefined;

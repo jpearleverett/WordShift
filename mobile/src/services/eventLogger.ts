@@ -148,7 +148,8 @@ export function logEvent(event: GameEvent): void {
   // Debounce flush — write at most every 5 seconds
   if (!flushTimer) {
     flushTimer = setTimeout(() => {
-      flushEvents();
+      // No handler upstream: a flush must never surface as an unhandled rejection.
+      void flushEvents().catch(() => {});
       flushTimer = null;
     }, 5000);
     // Pair the clearer with the setTimeout that armed it: Jest fake timers
@@ -203,16 +204,25 @@ async function flushEvents(): Promise<void> {
     console.warn('Failed to flush events:', error);
     return;
   }
-  if (telemetry) void telemetry.syncTelemetry().catch(() => {});
+  try {
+    if (telemetry) void telemetry.syncTelemetry().catch(() => {});
+  } catch { /* Non-critical diagnostics transport. */ }
 }
 
 let telemetryModule: typeof import('./telemetry') | null = null;
-/** Deferred, cached on success only so a failed load is retried next flush. */
+/**
+ * Deferred, cached only once it exposes an uploader, so a failed load is retried
+ * on the next flush. The shape check matters under Jest: a require after the
+ * environment is torn down returns an EMPTY placeholder instead of throwing,
+ * and caching it would turn every later flush into a TypeError.
+ */
 function loadTelemetry(): typeof import('./telemetry') | null {
   if (!telemetryModule) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
-      telemetryModule = require('./telemetry') as typeof import('./telemetry');
+      const loaded = require('./telemetry') as Partial<typeof import('./telemetry')> | undefined;
+      if (typeof loaded?.syncTelemetry !== 'function') return null;
+      telemetryModule = loaded as typeof import('./telemetry');
     } catch { return null; /* Non-critical diagnostics transport. */ }
   }
   return telemetryModule;

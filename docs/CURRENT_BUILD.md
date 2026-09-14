@@ -1,10 +1,10 @@
 # Current build and documentation
 
-Updated **September 13, 2026** for the sequential-conversation follow-up to `main` at `f1f7cd5`. The earlier CI audit remains tied to [`6f96ebb583f591f46c9c023be6462d99d816a8e7`](https://github.com/jpearleverett/WordShift/commit/6f96ebb583f591f46c9c023be6462d99d816a8e7). This page distinguishes current implementation from recorded validation; it does not certify an uploaded AAB, a Play rollout, or hosted service configuration.
+Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main` at `687a08d` (the launch-readiness merge, PR 439). The earlier CI audit remains tied to [`6f96ebb583f591f46c9c023be6462d99d816a8e7`](https://github.com/jpearleverett/WordShift/commit/6f96ebb583f591f46c9c023be6462d99d816a8e7). This page distinguishes current implementation from recorded validation; it does not certify an uploaded AAB, a Play rollout, or hosted service configuration.
 
 ## Build identity
 
-Current source builds on main `f1f7cd5`, retaining its compact next-unlock sign, attunement layout fix and house-upgrade gifts. App version **1.3.5** and Android version code **99** remain unchanged. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source builds on main `687a08d` (PR 439, the launch-readiness fixes) plus the in-band CI exit-code fix, retaining the compact next-unlock sign, attunement layout fix and house-upgrade gifts. App version **1.3.5** and Android version code **99** remain unchanged. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
