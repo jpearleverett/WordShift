@@ -5292,3 +5292,37 @@ export function getShopSeeItInRoomLabel(
   }
   return { label: `See it in ${where}`, accessibilityLabel: `See it in ${where}` };
 }
+
+// ============================================================================
+// BOOT HOLD — the branded card that opens the app. It renders BEFORE any save
+// is readable, so it has no phase and keys on the failed boot stage instead:
+// a failure while checking the cloud backup can be routed around (the local
+// save is untouched), while a local recovery that throws stays closed.
+// ============================================================================
+
+export type BootFailureKind = 'cloud' | 'local';
+
+export function getBootFailureCopy(kind: BootFailureKind): {
+  message: string;
+  retry: string;
+  continueWithoutCloud: string;
+  contactSupport: string;
+} {
+  const retry = 'Try again';
+  const continueWithoutCloud = 'Continue without the cloud backup';
+  const contactSupport = 'Contact support';
+  if (kind === 'cloud') {
+    return {
+      message: 'Your cloud backup could not be checked. Try again, or continue without it for now. The progress saved on this device is safe.',
+      retry,
+      continueWithoutCloud,
+      contactSupport,
+    };
+  }
+  return {
+    message: 'Your save could not be opened safely. Free some device storage if it is full, then try again. If it keeps failing, contact support and your support ID will be attached.',
+    retry,
+    continueWithoutCloud,
+    contactSupport,
+  };
+}
