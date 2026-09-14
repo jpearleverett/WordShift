@@ -191,6 +191,7 @@ must then return `42501`, and `rpc/bump_words_offered` must still answer the
 two-argument body.
 
 ```bash
+# Run from the repository root (the two node -e lines read ./mobile/app.json).
 KEY=$(node -e 'console.log(require("./mobile/app.json").expo.extra.supabaseAnonKey)')
 URL=$(node -e 'console.log(require("./mobile/app.json").expo.extra.supabaseUrl)')/rest/v1
 probe() { curl -sS -m 20 -o /dev/stdout -w " HTTP %{http_code}\n" -X POST "$URL/rpc/$1" \
@@ -203,6 +204,7 @@ probe support_preview '{"p_support_id":"probe"}'      # expect 42501
 probe prune_expired_events '{"p_batch_size":1}'       # expect 42501
 probe get_save '{"p_owner":"probe"}'                  # expect 42501
 probe submit_daily_score '{"p_owner":"probe","p_date":"2026-09-14","p_time_ms":0,"p_stars":0,"p_hints":0}'  # [] before rate_limits_v1 (owner under the 8-char floor, nothing inserted), 42501 after
+probe daily_rank '{"p_date":"2026-09-14","p_owner":"probe"}'      # legacy read RPC: answers before rate_limits_v1, 42501 after
 for t in saves events daily_scores_v2 daily_counters support_install_links rate_limits; do
   curl -sS -m 20 -o /dev/stdout -w " HTTP %{http_code}\n" "$URL/$t?select=*&limit=1" -H "apikey: $KEY"   # expect 42501
 done

@@ -1,7 +1,7 @@
 # WordShift — Press & Creator Kit
 
-Source review: September 13, 2026, `main` at `6f96ebb`. The configured app
-version is **1.3.4**, Android version code **98**; this does not identify the
+Source review: September 14, 2026 (launch-readiness branch). The configured app
+version is **1.3.5**, Android version code **99**; this does not identify the
 binary currently installed by a reviewer. See [current build status](CURRENT_BUILD.md).
 
 > A cozy word puzzle that is secretly something else. This kit tells you what,

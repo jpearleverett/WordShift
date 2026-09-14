@@ -51,7 +51,11 @@ verify the latest binary, backend deployment or public release.
   a longer session on low/mid/high-end Android where available; record device,
   thermal/frame/memory observations rather than extrapolating from a July build.
 - [ ] **Ad and consent matrix.** Keep `adsUseTestIds: true` through internal and
-  closed testing. Verify UMP required/not-required/error paths and Settings →
+  closed testing: with the channel-derived flag that means running this matrix
+  on an `internal-testing`-profile build (its channel keeps Google test units,
+  so tapping ads is safe); the `production`-profile candidate serves live units,
+  so on that build only confirm ads become available and never tap one, or
+  register the test phones as AdMob test devices first. Verify UMP required/not-required/error paths and Settings →
   Privacy Options; an error alone never permits ad requests. Test interstitial,
   rewarded and Stats banner placements using a tester without restored ad-free
   entitlements, as well as paid-player suppression. Collect Now is ad-exempt.
@@ -72,7 +76,9 @@ verify the latest binary, backend deployment or public release.
   the two-argument body, and a signed build must still post a Daily rank.
 - [ ] **Remaining backend evidence.** From an operator connection: actual event
   rows from the signed build, the `wordshift-event-retention` cron job and a
-  successful run, two-device conflict handling, verified support
+  successful run (the job is NOT created by `apply_upgrade.sql`: enable Supabase
+  Cron on the project, then run `docs/supabase/schedule_event_retention.sql` as
+  postgres and keep its job/run/oldest-row query output), two-device conflict handling, verified support
   recovery/deletion, the project plan tier plus disk/usage alerts (the events
   table shares the disk with saves), Sentry alert rules and a symbolicated
   event from the exact signed release. Follow [backend setup](BACKEND_SETUP.md).
