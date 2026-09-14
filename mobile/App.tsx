@@ -1821,6 +1821,17 @@ function MainApp() {
       : { bottom: Math.max(30, screenInsets.bottom) + 104, left: 8, right: 8 };
   }, [puzzle.rows.length, puzzle.activeRowIndex, screenInsets.top, screenInsets.bottom]);
 
+  // The pit lays its onboarding words out under Ember's standing prompt card.
+  // The card's height depends on how its authored line wraps, so it reports its
+  // own bottom edge here instead of the pit assuming a fraction of the screen
+  // (which cleared the card on a tall phone and buried the band under it on a
+  // short one). Rounded and compared before storing: onLayout can fire on
+  // sub-pixel churn, and an unconditional set would re-render every frame.
+  const [pitPromptBottom, setPitPromptBottom] = useState<number | undefined>(undefined);
+  const handlePitPromptMeasured = useCallback((bottom: number) => {
+    setPitPromptBottom(previous => (previous === Math.round(bottom) ? previous : Math.round(bottom)));
+  }, []);
+
   const maybeShowSetupSelectorIntro = useCallback(async () => {
     if (onboardingFlow.isOnboarding) return;
     const seen = await hasSeenSetupSelectorIntro();
@@ -4990,6 +5001,7 @@ function MainApp() {
             }}
             isOnboarding={onboardingFlow.isOnboarding}
             onboardingStep={onboardingFlow.onboardingStep}
+            onboardingPromptBottom={pitPromptBottom}
             completedPuzzles={persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0}
             onOnboardingOfferComplete={onboardingActions.handlePitOnboardingOfferComplete}
           />
@@ -5021,6 +5033,10 @@ function MainApp() {
               showSkip={true}
               onSkip={onboardingActions.handleSkipOnboarding}
               position="top"
+              // The pit lays its tutorial words out under this card, and the
+              // card's height depends on how its line wraps, so it reports its
+              // own bottom edge rather than the pit guessing one.
+              onMeasureBottom={handlePitPromptMeasured}
             />
           )}
         </View>

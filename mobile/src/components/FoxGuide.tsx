@@ -130,6 +130,13 @@ interface FoxGuideProps {
   speaking?: boolean;
   /** Visual variant: 'compact' for floating card, 'dialogue' for HomeScreen-matching dialogue box */
   variant?: 'compact' | 'dialogue';
+  /**
+   * Reports the card's bottom edge in screen coordinates whenever it is laid
+   * out, so a host can keep its own content clear of a card whose height is
+   * content-dependent. Resolved from the card's own top anchor plus its
+   * measured height; a bottom-anchored card falls back to the measured y.
+   */
+  onMeasureBottom?: (bottom: number) => void;
 }
 
 /**
@@ -156,6 +163,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   onSkip,
   speaking = true,
   variant = 'compact',
+  onMeasureBottom,
 }) => {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const styles = useMemo(() => createStyles(SCREEN_WIDTH, SCREEN_HEIGHT), [SCREEN_WIDTH, SCREEN_HEIGHT]);
@@ -305,6 +313,14 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
           transform: [{ translateY: Animated.multiply(slideAnim, isTop ? -1 : 1) }],
         },
       ]}
+      onLayout={onMeasureBottom ? (event => {
+        // The card is absolutely positioned, so its own resolved top plus the
+        // measured height is the bottom edge in screen coordinates. The slide-in
+        // rides a transform and never moves layout, so this settles once.
+        const { y, height } = event.nativeEvent.layout;
+        const anchoredTop = (resolvedPositionStyle as { top?: number }).top;
+        onMeasureBottom((typeof anchoredTop === 'number' ? anchoredTop : y) + height);
+      }) : undefined}
       // Let puzzle/home interactions pass through when Fox is informational only.
       pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
       accessibilityRole={isCompact ? 'alert' : undefined}

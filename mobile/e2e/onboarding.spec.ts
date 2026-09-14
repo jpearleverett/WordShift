@@ -53,6 +53,35 @@ async function solveOpenerBoard(page: Page) {
   }
 }
 
+/**
+ * 'clear', or the first occlusion found among the pit's floating words: the
+ * prompt card covering one, or two words overlapping. Polled, so the words'
+ * spring entrance is simply retried past rather than measured mid-flight.
+ */
+async function describeWordOcclusion(page: Page): Promise<string> {
+  const prompt = await page.getByRole('alert').first().boundingBox();
+  if (!prompt) return 'no prompt card';
+  const labelled = await page.getByRole('button', { name: /^Word: [A-Z]+, tap to offer$/ }).all();
+  const boxes: { label: string; x: number; y: number; width: number; height: number }[] = [];
+  for (const word of labelled) {
+    const box = await word.boundingBox();
+    if (!box) return 'a word has no box';
+    boxes.push({ label: (await word.getAttribute('aria-label')) ?? '?', ...box });
+  }
+  for (const box of boxes) {
+    if (box.y < prompt.y + prompt.height) return `${box.label} sits under the prompt card`;
+  }
+  for (let a = 0; a < boxes.length; a++) {
+    for (let b = a + 1; b < boxes.length; b++) {
+      const [first, second] = [boxes[a], boxes[b]];
+      const overlapping = first.x < second.x + second.width && second.x < first.x + first.width
+        && first.y < second.y + second.height && second.y < first.y + first.height;
+      if (overlapping) return `${first.label} overlaps ${second.label}`;
+    }
+  }
+  return 'clear';
+}
+
 async function tapFoxCard(page: Page, buttonLabel: string) {
   const button = page.getByRole('button', { name: buttonLabel, exact: true });
   await expect(button).toBeVisible();
@@ -112,6 +141,12 @@ test('a fresh install is walked from the cold-open board to a complete onboardin
   // the step advances only once the player has offered every one of them.
   const words = page.getByRole('button', { name: /^Word: [A-Z]+, tap to offer$/ });
   await expect.poll(() => words.count()).toBeGreaterThan(0);
+  // Every word has to be individually tappable here: the step has no Offer All
+  // and no continue button until all of them are gone, so a word under Ember's
+  // standing card or under another word strands the player on the stall rescue.
+  // Pinned as geometry rather than left to a 30 s click timeout, which reports
+  // the symptom and not the cause.
+  await expect.poll(() => describeWordOcclusion(page)).toBe('clear');
   const amberBefore = (await readHomeProgress(page)).amber ?? 0;
   for (let offered = 0; offered < 12; offered++) {
     const remaining = await words.count();
