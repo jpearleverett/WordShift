@@ -4,16 +4,16 @@ Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main`
 
 ## Build identity
 
-Current source builds on main `687a08d` (PR 439, the launch-readiness fixes) plus the in-band CI exit-code fix, retaining the compact next-unlock sign, attunement layout fix and house-upgrade gifts. App version **1.3.5** and Android version code **99** remain unchanged. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source builds on main `70a1883`, which carries the launch-readiness fixes (PR 439), the in-band CI exit-code fix (PR 440/441) and the release-candidate version bump. App version is **1.3.6** and Android version code **100**, raised together on 2026-09-14: `expo-device` is a new native module, so the next Play artifact is a new binary and its OTA runtime moves with it. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
-| App version | `1.3.5` | `mobile/app.json` |
-| Android package / version code | `com.wordshift.app` / `99` | `mobile/app.json` |
+| App version | `1.3.6` | `mobile/app.json` |
+| Android package / version code | `com.wordshift.app` / `100` | `mobile/app.json` |
 | iOS bundle / build number | `com.wordshift.app` / `3` | `mobile/app.json` |
 | Expo / React Native | SDK 57; lockfile resolves Expo `57.0.20`, RN `0.86.3` | `mobile/package-lock.json` |
 | Version management | Local; increase Android version code for each new Play upload | `mobile/eas.json` |
-| Resolved OTA runtime | `1.3.5-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
+| Resolved OTA runtime | `1.3.6-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
 | Android release optimization | R8 minification, resource shrinking, optimized ProGuard defaults and optimized resource shrinking enabled; PNG crunch disabled | `mobile/app.json`, `mobile/plugins/withAndroidOptimization.js` |
 
 `mobile/package.json` still has npm package version `1.3.1`; that field is tooling metadata, not the Expo app version or Android version code. Do not infer the installed app version from it. The current React Native Gradle plugin resolves AGP 8.12.0; the optimization configuration does not require an AGP 9 migration.
@@ -103,6 +103,38 @@ banks, dictionary and board selection were untouched. The stamp was regenerated
 to `daily_v2_c2dbbd283e5cd45b`; the served daily board is identical, only the
 leaderboard partition name moves, and no build carrying the previous v2 stamp
 has shipped (the closed test ran 1.2.2 / code 88, before v2 cohorts existed).
+
+## September 14 release candidate (1.3.6 / 100) and its verification environment
+
+`main` at `70a1883` raises app version 1.3.5 to **1.3.6** and Android version code
+99 to **100**, the identity the first internal-testing build carries.
+[CI run 447](https://github.com/jpearleverett/WordShift/actions/runs/34886674485)
+passed on that commit: TypeScript, zero-warning lint, **210 suites / 4,998 tests**
+in-band, the resolved-production-Expo-config step, the reverse top-up regressions,
+the story-corpus, vocabulary/branching, bank-route and daily-cohort audits, and
+**37 browser journeys**. Raising the app version moves the resolved OTA runtime to
+`1.3.6-<channel>`; nothing at 1.3.5 ever shipped and no update was ever published,
+so no install is orphaned, but a future `eas update` and any rollback must name
+`1.3.6-production`. The commands in [OTA instructions](OTA_UPDATES.md) were updated
+with it. Green CI remains a JavaScript gate, not a native release acceptance test.
+
+**The pre-build checks cannot all run on a phone.** Running them under Termux on
+Android reported three failures and two unsupported commands, none of them repository
+defects: `npm run typecheck` aborts with a JavaScript heap OOM against roughly a 1 GB
+ceiling; `skyGeometry` and `shopIconGeometry` cannot load `sharp`, which has no
+android-arm64 runtime (it is a devDependency that never enters the app bundle, and
+those two suites are its only consumers); and Playwright refuses the platform outright,
+so neither `playwright install` nor `npm run test:e2e` can run. Run these on a computer
+or read them off the CI run for the same commit.
+
+One real defect did surface from that run and is fixed: `scripts/tools/gatedCheckpointCount.mjs`
+printed its count with `console.log(<number>)`, which `util.inspect` wraps in ANSI
+colour when colour is forced (an interactive Jest run propagates `FORCE_COLOR`). All
+three gated drivers read that stdout into shell arithmetic
+(`count=$(count_accepted)` then `$((new_count - count))`), where an escape code is
+`syntax error: operand expected`, so bank regeneration would have died confusingly in
+any coloured environment. The count is now printed as a string and
+`gatedTooling.test.ts` pins it under `FORCE_COLOR=1`.
 
 ## Launch readiness review (2026-09-14)
 

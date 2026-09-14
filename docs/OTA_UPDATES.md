@@ -3,24 +3,27 @@
 Reviewed against main `6f96ebb` on 2026-09-13; production publish, verification and
 rollback runbook added 2026-09-14. See [current build](CURRENT_BUILD.md),
 [build and upload guide](BUILD_AND_UPLOAD.md) and [release gates](LAUNCH_CHECKLIST.md).
-The repository currently configures app **1.3.5**, Android code **99** and iOS build
-**3**; this is source configuration, not confirmation of an uploaded artifact.
+The repository currently configures app **1.3.6**, Android code **100** and iOS build
+**3**; this is source configuration, not confirmation of an uploaded artifact. The
+version moved from 1.3.5 on 2026-09-14 for the first production candidate, so every
+resolved runtime below moved with it: an update published against a `1.3.5-*`
+runtime now reaches nobody.
 
 `mobile/app.config.js` resolves the runtime to **app version + release channel**,
 overriding the base JSON's `appVersion` policy. With the current configuration:
 
 | Build profile | Update channel | Resolved runtime | Artifact/use |
 |---|---|---|---|
-| internal-testing | internal-testing | `1.3.5-internal-testing` | Signed Play internal-test AAB |
-| production | production | `1.3.5-production` | Separately validated public-release binary |
-| preview | preview | `1.3.5-preview` | Preview APK |
-| development | development | `1.3.5-development` | Development client |
+| internal-testing | internal-testing | `1.3.6-internal-testing` | Signed Play internal-test AAB |
+| production | production | `1.3.6-production` | Separately validated public-release binary |
+| preview | preview | `1.3.6-preview` | Preview APK |
+| development | development | `1.3.6-development` | Development client |
 
 Each EAS Build profile sets `WORDSHIFT_RELEASE_CHANNEL`. Local config evaluation
 falls back to `internal-testing` when it is unset. Always set it explicitly when
 publishing updates; the environment variable and `--channel` must agree. A bare
 `eas update --channel production` from a shell without the variable publishes the
-`1.3.5-internal-testing` runtime into the production channel: no production
+`1.3.6-internal-testing` runtime into the production channel: no production
 install ever receives it, while the console reports a successful publish.
 
 `app.config.js` also derives `extra.adsUseTestIds` from the channel: the production
@@ -57,7 +60,7 @@ Only JavaScript/asset changes ship this way; anything native needs a new binary
 (above). Every command runs from `mobile/` on the reviewed commit.
 
 1. **Resolve and check the production configuration.** The first command must print
-   `runtimeVersion: '1.3.5-production'`, `adsUseTestIds: false` and an empty
+   `runtimeVersion: '1.3.6-production'`, `adsUseTestIds: false` and an empty
    `creatorCode`; the second is the one-command release gate.
 
    ```bash
@@ -73,7 +76,7 @@ Only JavaScript/asset changes ship this way; anything native needs a new binary
    ```
 
 3. **Verify what was published.** The newest group in the list must carry runtime
-   `1.3.5-production` (an `-internal-testing` runtime here means step 2 ran without
+   `1.3.6-production` (an `-internal-testing` runtime here means step 2 ran without
    the variable; republish correctly, then roll the wrong group back if it is the
    newest). Record the group ID from this output.
 
@@ -96,7 +99,7 @@ it back. Two options, both delivered on the players' next launch:
   state; the embedded bundle is the reviewed release itself):
 
   ```bash
-  npx eas-cli@latest update:roll-back-to-embedded --channel production --runtime-version 1.3.5-production --message "Roll back: <reason>"
+  npx eas-cli@latest update:roll-back-to-embedded --channel production --runtime-version 1.3.6-production --message "Roll back: <reason>"
   ```
 
 - **Republish a known-good earlier group** (when a previous OTA fix must stay live

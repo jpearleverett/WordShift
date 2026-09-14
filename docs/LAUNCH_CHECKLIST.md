@@ -10,11 +10,11 @@ verify the latest binary, backend deployment or public release.
 
 - [x] **Production access granted.** The owner completed the 12-tester/14-day
   closed test and confirmed access on 2026-08-31.
-- [ ] **Identify the exact release artifact.** Source currently configures app
-  **1.3.5**, Android **99**, with local version management and no automatic
-  increment. Compare the next code with Play Console before uploading: an
-  internal-track upload may already have consumed 99, in which case bump to 100
-  for the production candidate. Record commit, EAS build ID, version/code,
+- [ ] **Identify the exact release artifact.** Source configures app **1.3.6**,
+  Android **100** (raised from 1.3.5/99 on 2026-09-14), with local version
+  management and no automatic increment. Compare the next code with Play Console
+  before uploading, and raise it again for each further upload: the internal-testing
+  and production candidates are separate uploads and cannot share a code. Record commit, EAS build ID, version/code,
   runtime, track and device. `package.json`'s 1.3.1 is package metadata, not the native app version.
 - [ ] **Run the release checks on that commit.** From `mobile/`: `npm ci`,
   `npm run typecheck`, `npm run lint -- --max-warnings 0`,
@@ -97,7 +97,7 @@ verify the latest binary, backend deployment or public release.
   upload, keep `creatorCode` empty, run
   `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage --testPathPattern=productionConfig`,
   and confirm `WORDSHIFT_RELEASE_CHANNEL=production npx expo config --type public`
-  shows `adsUseTestIds: false` and runtime `1.3.5-production`. Follow
+  shows `adsUseTestIds: false` and runtime `1.3.6-production`. Follow
   [OTA instructions](OTA_UPDATES.md) for compatible updates.
   The Play release notes for this build must carry the legal line: "Privacy
   Policy and Terms updated (effective September 14, 2026): clarified purchase
