@@ -679,6 +679,104 @@ export function getHintFallback(phase: DialoguePhase): string {
   return HINT_FALLBACK[phase];
 }
 
+// ============================================================================
+// HINT / UNDO REFUSALS AND RECEIPTS. These used to be literal strings inside
+// usePuzzleGame, spoken in the Phase-0 register at every phase, and the
+// no-hints refusal named Challenge Mode to a player who had only armed the
+// Blind Offering (both run under the shared 'challenge' no-hints umbrella).
+// ============================================================================
+
+// The no-hints umbrella refusal. Blind-only players never enabled Challenge,
+// so the copy names the trial they actually chose.
+const HINT_REFUSED_CHALLENGE: Record<DialoguePhase, string> = {
+  0: 'No hints in Challenge Mode!',
+  1: 'No hints in Challenge Mode. This one is all yours.',
+  2: 'Challenge Mode keeps its hints to itself.',
+  3: 'Challenge Mode allows no hints. The arrangement watches you choose.',
+  4: 'There are no hints here. Challenge Mode gives nothing away.',
+  5: 'Challenge Mode offers no hints. The pattern waits on you.',
+};
+
+const HINT_REFUSED_BLIND: Record<DialoguePhase, string> = {
+  0: 'No hints in the Blind Offering! The chain is yours to judge.',
+  1: 'No hints in the Blind Offering. Trust your words.',
+  2: 'The Blind Offering keeps its hints to itself. Judge the chain yourself.',
+  3: 'The Blind Offering allows no hints. The arrangement is judged unseen.',
+  4: 'There are no hints in the dark. The Blind Offering is judged whole.',
+  5: 'The Blind Offering offers no hints. Judge the chain, then give it.',
+};
+
+/**
+ * Refusal when HINT is tapped under the no-hints umbrella. `blind` names the
+ * Blind Offering; otherwise Challenge Mode (Blind + Challenge stacked is
+ * still refused for the Challenge rule the player armed on top).
+ */
+export function getHintRefusedMessage(phase: DialoguePhase, blind: boolean): string {
+  return blind ? HINT_REFUSED_BLIND[phase] : HINT_REFUSED_CHALLENGE[phase];
+}
+
+// A hint search that found no provably-finishable move. Free (nothing is
+// spent), so the copy always says so. `canUndo` is whether a committed move
+// exists to take back: a fresh board must never be told to undo moves the
+// player has not made.
+const HINT_NO_SAFE_ROUTE_UNDO: Record<DialoguePhase, string> = {
+  0: 'Try undoing a move to find another route. No hint was spent.',
+  1: 'This path may not finish. Try undoing a move. No hint was spent.',
+  2: 'The pattern sees no sure way on from here. Undo a move. No hint was spent.',
+  3: 'No sure route remains from here. Take a move back. No hint was spent.',
+  4: 'The arrangement finds no way on from here. Undo. No hint was spent.',
+  5: 'The threads lead nowhere sure from here. Unwind a move. No hint was spent.',
+};
+
+const HINT_NO_SAFE_ROUTE_FRESH: Record<DialoguePhase, string> = {
+  0: 'No sure route jumps out yet. Try a move of your own! No hint was spent.',
+  1: 'No sure route shows itself yet. Make a move and ask again. No hint was spent.',
+  2: 'The pattern has not found a sure way in yet. Begin, then ask. No hint was spent.',
+  3: 'No sure route shows from the start. Begin, then ask again. No hint was spent.',
+  4: 'The arrangement offers no opening yet. Begin. No hint was spent.',
+  5: 'The threads have not settled yet. Begin, then ask again. No hint was spent.',
+};
+
+export function getHintNoSafeRouteMessage(phase: DialoguePhase, canUndo: boolean): string {
+  return canUndo ? HINT_NO_SAFE_ROUTE_UNDO[phase] : HINT_NO_SAFE_ROUTE_FRESH[phase];
+}
+
+// UNDO tapped with the Challenge budget spent (the budget is Challenge's
+// rule even when stacked on Blind, so the name is right in both cases).
+const UNDO_REFUSED_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'No undos remaining in Challenge Mode!',
+  1: 'No undos left in Challenge Mode. Play it through.',
+  2: 'Challenge Mode has no undos left. The pattern keeps what you gave.',
+  3: 'Challenge Mode has no undos left. What is placed stays placed.',
+  4: 'No undos remain. The arrangement keeps every word you gave it.',
+  5: 'Challenge Mode has no undos left. The pattern holds what it was given.',
+};
+
+export function getUndoRefusedMessage(phase: DialoguePhase): string {
+  return UNDO_REFUSED_MESSAGES[phase];
+}
+
+// A committed undo (the letter returns to its row).
+const UNDO_MESSAGES: Record<DialoguePhase, string> = {
+  0: "Let's try again!",
+  1: 'Back a step. Try again.',
+  2: 'The letter returns. Try another way.',
+  3: 'Taken back. The arrangement waits.',
+  4: 'Undone. The arrangement remembers.',
+  5: 'Unwound. The pattern waits.',
+};
+
+export function getUndoMessage(phase: DialoguePhase): string {
+  return UNDO_MESSAGES[phase];
+}
+
+// Structural guard when a drop would leave a row the wrong length (normally
+// unreachable; kept phase-aware so the guard can never break register).
+export function getWordLengthMessage(expectedLength: number, phase: DialoguePhase): string {
+  if (phase >= 3) return `That row needs ${expectedLength} letters.`;
+  return `Need ${expectedLength} letters!`;
+}
+
 // Shown when the player taps HINT with an empty hint balance.
 const OUT_OF_HINTS_MESSAGES: Record<DialoguePhase, string> = {
   0: "You're out of hints! Watch a quick clip or grab more to keep going.",
@@ -4598,6 +4696,42 @@ export function getShopStoreBridgeText(phase: number): { title: string; subtitle
   if (phase >= 4) return { title: 'The pattern asks more than you hold?', subtitle: 'The Store provides.' };
   if (phase >= 2) return { title: 'Short on amber?', subtitle: 'The Store carries more.' };
   return { title: 'Need more amber?', subtitle: 'Amber packs are available in the Store.' };
+}
+
+/**
+ * Calm notice when the STORE itself could not take an order: billing not
+ * connected or still waking up, the product not visible to this account, or
+ * another checkout still open. Nothing was attempted, so this never sends the
+ * player to a purchase history looking for a purchase that never happened.
+ */
+export function getStoreUnavailableMessage(phase: number): string {
+  if (phase >= 5) return 'The store is resting for a moment. Try again shortly.';
+  if (phase >= 4) return 'The store cannot take your offering just now. Try again in a moment.';
+  if (phase >= 2) return 'The store is not answering right now. Try again in a moment.';
+  return 'The store is not available right now. Try again in a moment.';
+}
+
+/** Price pill label while the store's own localized prices are still arriving. */
+export const STORE_PRICE_PLACEHOLDER = '...';
+
+/** Screen-reader note for a price pill that has no localized price yet. */
+export function getStorePriceLoadingLabel(phase: number): string {
+  if (phase >= 4) return 'Prices are still arriving';
+  return 'Loading prices';
+}
+
+/**
+ * The Supporter row's renewal disclosure. Deliberately the same at every
+ * phase: it states what the subscription does and where it is cancelled.
+ */
+export function getSupporterRenewalNote(storeName: string): string {
+  return `Renews monthly at the price shown until cancelled in ${storeName}.`;
+}
+
+/** Link label an active Supporter taps to manage or cancel the subscription. */
+export function getManageSubscriptionLabel(phase: number): string {
+  if (phase >= 4) return 'Manage your subscription';
+  return 'Manage subscription';
 }
 
 /** Title/subtitle for the very first daily-login reward claim. */

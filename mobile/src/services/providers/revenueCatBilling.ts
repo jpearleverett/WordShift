@@ -131,10 +131,26 @@ function bareProductId(identifier: string): string {
   return typeof identifier === 'string' ? identifier.split(':')[0] : identifier;
 }
 
+/**
+ * How far before the checkout started a receipt may be dated and still count
+ * as the purchase just made (device clock vs store time). Only consulted when
+ * the post-purchase customer info shows nothing new for the product.
+ */
+const CHECKOUT_RECEIPT_SKEW_MS = 5 * 60_000;
+
 export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): BillingProvider {
   let Purchases: any | null = null;
   let ready = false;
   let historyReady: Promise<void> | null = null;
+  /**
+   * Every receipt-history id this session has already seen (init fetch,
+   * listener updates, restore). A checkout diffs the post-purchase customer
+   * info against a snapshot of this set to find the RevenueCat transaction id
+   * of the purchase it just made — see `linkedReceiptIds`.
+   */
+  const knownReceiptIds = new Set<string>();
+  /** customerInfo.managementURL from the latest customer info, when reported. */
+  let lastManagementUrl: string | null = null;
 
   function transactionsFrom(customerInfo: any): StorePurchaseTransaction[] {
     return (customerInfo?.nonSubscriptionTransactions ?? []).map((transaction: any) => ({
@@ -144,7 +160,47 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
     }));
   }
 
+  /** Remember what a customer info reported (receipt ids + management URL). */
+  function noteCustomerInfo(customerInfo: any): void {
+    for (const transaction of transactionsFrom(customerInfo)) {
+      if (typeof transaction.transactionId === 'string') knownReceiptIds.add(transaction.transactionId);
+    }
+    const url = customerInfo?.managementURL;
+    if (typeof url === 'string' && url.length > 0) lastManagementUrl = url;
+  }
+
+  /**
+   * The receipt-history ids that describe the purchase just made. On Google
+   * Play the checkout result's `transaction.transactionIdentifier` is the Play
+   * ORDER id, while `customerInfo.nonSubscriptionTransactions[]` (the recovery
+   * surface) lists the same purchase under RevenueCat's own transaction id, so
+   * iap.ts must be told both or the listener/cold-start recovery re-credits
+   * every consumable. `purchaseToken` is NOT emitted on the customer-info
+   * surface (TransactionMapper.kt maps only id/product/date), so the link is
+   * found by diffing this product's entries against the pre-checkout snapshot;
+   * when nothing new appears there (a lagging customer info), the newest
+   * entry for the product is used only if it dates from around this checkout.
+   */
+  function linkedReceiptIds(
+    customerInfo: any,
+    productId: ProductId,
+    before: ReadonlySet<string>,
+    checkoutStartedAt: number,
+    orderId: string | undefined,
+  ): string[] {
+    const entries = transactionsFrom(customerInfo)
+      .filter(entry => entry.productId === productId && typeof entry.transactionId === 'string');
+    const newest = (list: StorePurchaseTransaction[]) => list.reduce<StorePurchaseTransaction | null>((best, entry) =>
+      best === null || (Number.isFinite(entry.purchasedAt) && entry.purchasedAt >= best.purchasedAt) ? entry : best, null);
+    const fresh = newest(entries.filter(entry => !before.has(entry.transactionId)));
+    const recent = newest(entries.filter(entry =>
+      Number.isFinite(entry.purchasedAt) && entry.purchasedAt >= checkoutStartedAt - CHECKOUT_RECEIPT_SKEW_MS));
+    const match = fresh ?? recent;
+    return match && match.transactionId !== orderId ? [match.transactionId] : [];
+  }
+
   async function syncCompletedPurchases(customerInfo: any): Promise<void> {
+    noteCustomerInfo(customerInfo);
     await historyReady;
     await reconcileStorePurchaseHistory(transactionsFrom(customerInfo));
   }
@@ -158,23 +214,31 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
   }
 
   /**
-   * Preserve permanent purchases and sparse/offline responses. A subscription
-   * is removed only when its explicit SDK record says it is inactive; merely
-   * cancelling renewal while the paid period remains active keeps its benefits.
+   * Preserve permanent purchases and sparse/offline responses. A locally held
+   * entitlement is removed only when the store's explicit record for it
+   * (`entitlements.all[key]`) says it is inactive AND it is absent from the
+   * active set: an expired subscription, or a refunded/revoked one-time
+   * purchase (Patron, Remove Ads, the Keeper's Collection). Merely cancelling
+   * renewal while the paid period remains active keeps its benefits, and a
+   * response that simply omits a key (sparse, offline, partial) never revokes.
+   * Only ever called with a customer info the SDK actually returned (init
+   * fetch, listener update), never with an error fallback.
    * Never throws (fire-and-forget callers must not be able to reject).
    */
   async function grantFromCustomerInfo(customerInfo: any): Promise<void> {
     try {
       const ents = entitlementsFrom(customerInfo);
-      const supporterExpired = !ents.includes(ENTITLEMENTS.SUPPORTER) &&
-        customerInfo?.entitlements?.all?.[ENTITLEMENTS.SUPPORTER]?.isActive === false;
-      if (ents.length > 0 || supporterExpired) {
+      const all = customerInfo?.entitlements?.all;
+      const explicitlyInactive = (key: string) =>
+        !ents.includes(key) && all !== null && typeof all === 'object' && all[key]?.isActive === false;
+      const revoked = (await getGrantedEntitlements()).filter(explicitlyInactive);
+      if (ents.length > 0 || revoked.length > 0) {
         const save = async () => {
           try {
             await runStorageTransaction('billing_entitlement_sync', async () => {
               invalidateEntitlementsCache();
-              if (supporterExpired) {
-                await setEntitlements((await getGrantedEntitlements()).filter(key => key !== ENTITLEMENTS.SUPPORTER));
+              if (revoked.length > 0) {
+                await setEntitlements((await getGrantedEntitlements()).filter(key => !explicitlyInactive(key)));
               }
               await grantEntitlements(ents);
             });
@@ -246,6 +310,7 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
       historyReady = (async () => {
         await mod.invalidateCustomerInfoCache?.();
         const customerInfo = await mod.getCustomerInfo();
+        noteCustomerInfo(customerInfo);
         await initializeStorePurchaseHistory(transactionsFrom(customerInfo));
         void grantFromCustomerInfo(customerInfo);
         void reconcileStorePurchaseHistory(transactionsFrom(customerInfo))
@@ -297,6 +362,7 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
         try { await historyReady; } catch {
           await Purchases.invalidateCustomerInfoCache?.();
           const customerInfo = await Purchases.getCustomerInfo();
+          noteCustomerInfo(customerInfo);
           await initializeStorePurchaseHistory(transactionsFrom(customerInfo));
           historyReady = Promise.resolve();
         }
@@ -319,13 +385,23 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
         if (!product) {
           return { success: false, productId, error: 'product_not_found' };
         }
+        // Snapshot BEFORE the sheet opens: the customer-info listener can fire
+        // with the new receipt while the purchase promise is still pending, and
+        // that must still read as "new since checkout began".
+        const receiptsBefore = new Set(knownReceiptIds);
+        const checkoutStartedAt = Date.now();
         const { customerInfo, transaction } = await Purchases.purchaseStoreProduct(product);
+        const orderId: string | undefined = transaction?.transactionIdentifier ?? undefined;
+        const linked = linkedReceiptIds(customerInfo, productId, receiptsBefore, checkoutStartedAt, orderId);
+        noteCustomerInfo(customerInfo);
         return {
           success: true,
           productId,
           entitlements: entitlementsFrom(customerInfo),
           // Store transaction id → pending-grant ledger dedupe key (iap.ts).
-          transactionId: transaction?.transactionIdentifier ?? undefined,
+          transactionId: orderId,
+          // The receipt-history name(s) of this same purchase (see iap.ts).
+          ...(linked.length > 0 ? { linkedTransactionIds: linked } : {}),
         };
       } catch (error: any) {
         if (String(error?.code) === String(Purchases?.PURCHASES_ERROR_CODE?.PAYMENT_PENDING_ERROR ?? '20')) {
@@ -349,6 +425,24 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
         console.warn('[IAP] RevenueCat restore failed:', error);
         return { entitlements: [], error: 'restore_failed' };
       }
+    },
+
+    /**
+     * customerInfo.managementURL (Google Play / App Store subscription
+     * management for this account), from the latest customer info seen or a
+     * fresh SDK-cached read. Null when unknown; iap.ts falls back to the
+     * platform's subscriptions page.
+     */
+    async getSubscriptionManagementUrl(): Promise<string | null> {
+      if (lastManagementUrl) return lastManagementUrl;
+      if (!ready || !Purchases) return null;
+      try {
+        const customerInfo = await Purchases.getCustomerInfo();
+        noteCustomerInfo(customerInfo);
+      } catch (error) {
+        console.warn('[IAP] RevenueCat management URL lookup failed:', error);
+      }
+      return lastManagementUrl;
     },
   };
 }

@@ -4,6 +4,7 @@ import {
   purchaseProduct, purchaseConsumable, purchaseStarterPack, restorePurchases,
   initializeStorePurchaseHistory, reconcileStorePurchaseHistory,
   reconcilePendingConsumableGrants, settleConsumableGrant, StorePurchaseTransaction, subscribeBillingChanges,
+  RECEIPT_MATCH_WINDOW_MS,
 } from '../services/iap';
 import {
   ENTITLEMENTS, clearEntitlements, grantEntitlements, hasEntitlement,
@@ -124,20 +125,69 @@ test('old spent receipts become the baseline; only new confirmed transactions ar
   expect(await reconcilePendingConsumableGrants()).toEqual([]);
 });
 
+// On Google Play the checkout result names a purchase by its Play ORDER id
+// while the receipt history (customerInfo) names the same purchase by
+// RevenueCat's transaction id, so these recovery tests deliberately use
+// DIFFERENT strings on the two surfaces, linked through linkedTransactionIds.
 test('receipt arriving before purchase promise keeps original doubled reward and settles once', async () => {
   await initializeStorePurchaseHistory([]);
   const paid = deferred<PurchaseResult>();
   install(() => paid.promise);
   const checkout = purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
-  const callback = reconcileStorePurchaseHistory([receipt('same-transaction')]);
+  const callback = reconcileStorePurchaseHistory([receipt('rc-receipt-1')]);
   await tick();
   expect(await getAmberBalance()).toBe(0);
-  paid.resolve({ success: true, transactionId: 'same-transaction' });
+  paid.resolve({ success: true, transactionId: 'GPA.order-1', linkedTransactionIds: ['rc-receipt-1'] });
   const result = await checkout;
   await callback;
   expect(result.firstPurchaseDoubled).toBe(true);
+  expect(result.grantId).toBe('GPA.order-1');
   expect((await settleConsumableGrant(result.grantId!)).applied).toBe(false);
   expect(await getAmberBalance()).toBe(result.reward!.amount);
+  // Both names of the purchase are now applied, so neither can pay again.
+  expect(JSON.parse(await NativeStorage.getItem('wordshift_applied_iap_grants') ?? '[]')).toEqual(
+    expect.arrayContaining(['GPA.order-1', 'rc-receipt-1']));
+  await reconcileStorePurchaseHistory([receipt('rc-receipt-1')]);
+  expect(await getAmberBalance()).toBe(result.reward!.amount);
+});
+
+test('a settled checkout is not re-credited by its receipt under the other id, in-session or on relaunch', async () => {
+  await initializeStorePurchaseHistory([]);
+  install(async () => ({ success: true, transactionId: 'GPA.order-2', linkedTransactionIds: ['rc-receipt-2'] }));
+  const result = await purchaseConsumable(PRODUCT_IDS.HINTS_SMALL);
+  const startingHints = (await getHintBalance()) - 0;
+  await settleConsumableGrant(result.grantId!);
+  const credited = await getHintBalance();
+  expect(credited).toBe(startingHints + HINT_PACK_GRANTS.small);
+  // The SDK listener fires with the receipt-history id...
+  await reconcileStorePurchaseHistory([receipt('rc-receipt-2', PRODUCT_IDS.HINTS_SMALL, Date.now())]);
+  expect(await getHintBalance()).toBe(credited);
+  // ...and so does the next launch's history reconcile, after a cache drop.
+  invalidateHintsCache(); invalidateEntitlementsCache();
+  await initializeStorePurchaseHistory([receipt('rc-receipt-2', PRODUCT_IDS.HINTS_SMALL, Date.now())]);
+  await reconcileStorePurchaseHistory([receipt('rc-receipt-2', PRODUCT_IDS.HINTS_SMALL, Date.now())]);
+  expect(await getHintBalance()).toBe(credited);
+  expect(await reconcilePendingConsumableGrants()).toEqual([]);
+});
+
+test('without a linked id, a receipt for the same product at the same moment is still covered', async () => {
+  await initializeStorePurchaseHistory([]);
+  // A lagging customer info gave the checkout nothing to link. The receipt then
+  // arrives seconds later under RevenueCat's id, dated at the purchase.
+  install(async () => ({ success: true, transactionId: 'GPA.order-3' }));
+  const result = await purchaseConsumable(PRODUCT_IDS.AMBER_MEDIUM);
+  const purchasedAt = Date.now();
+  await reconcileStorePurchaseHistory([receipt('rc-receipt-3', PRODUCT_IDS.AMBER_MEDIUM, purchasedAt)]);
+  // Before the caller settles: the pending grant covers it (no second grant).
+  expect((await reconcilePendingConsumableGrants()).map(g => g.grantId)).toEqual(['GPA.order-3']);
+  await settleConsumableGrant(result.grantId!);
+  const credited = await getAmberBalance();
+  // After the caller settles: the session's own checkout record covers it.
+  await reconcileStorePurchaseHistory([receipt('rc-receipt-3', PRODUCT_IDS.AMBER_MEDIUM, purchasedAt + 5_000)]);
+  expect(await getAmberBalance()).toBe(credited);
+  // A receipt outside the window is a genuinely different purchase.
+  await reconcileStorePurchaseHistory([receipt('rc-receipt-4', PRODUCT_IDS.AMBER_MEDIUM, purchasedAt + RECEIPT_MATCH_WINDOW_MS + 1)]);
+  expect(await getAmberBalance()).toBe(credited + AMBER_PACK_GRANTS.medium);
 });
 
 test('all consumable products and both starter halves recover with one first-amber bonus', async () => {
@@ -157,10 +207,10 @@ test('all consumable products and both starter halves recover with one first-amb
 test('starter receipt recovery completes bundle interrupted between two credits', async () => {
   await initializeStorePurchaseHistory([]);
   const startingHints = await getHintBalance();
-  install(async () => ({ success: true, transactionId: 'starter-paid' }));
+  install(async () => ({ success: true, transactionId: 'GPA.starter', linkedTransactionIds: ['rc-starter'] }));
   const purchase = await purchaseStarterPack();
   await settleConsumableGrant(purchase.grantIds!.amber!);
-  await reconcileStorePurchaseHistory([receipt('starter-paid', PRODUCT_IDS.STARTER_PACK)]);
+  await reconcileStorePurchaseHistory([receipt('rc-starter', PRODUCT_IDS.STARTER_PACK)]);
   expect(await getAmberBalance()).toBe(STARTER_PACK_GRANTS.amber);
   expect(await getHintBalance()).toBe(startingHints + STARTER_PACK_GRANTS.hints);
   expect(await reconcilePendingConsumableGrants()).toEqual([]);

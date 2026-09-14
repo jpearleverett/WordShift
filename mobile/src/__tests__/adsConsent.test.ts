@@ -114,6 +114,7 @@ import {
   showPrivacyOptions,
   isAdsReady,
   subscribeAdsReady,
+  showRewarded,
 } from '../services/ads';
 
 const admob = jest.requireMock('react-native-google-mobile-ads');
@@ -226,6 +227,56 @@ describe('AdMob adapter — UMP consent ordering', () => {
     expect(admob.__state.calls.includes('sdk.initialize')).toBe(permission);
     expect(admob.__state.calls.includes('interstitial.load')).toBe(permission);
     expect(admob.__state.calls.includes('rewarded.load')).toBe(permission);
+  });
+
+  it('retries a consent update that failed with no stored answer at the next ad exposure', async () => {
+    // Offline cold start on a fresh install: the update fails and UMP has no
+    // previous-session permission to fall back on.
+    admob.__state.gatherError = true;
+    admob.__state.canRequestAds = false;
+    const a = createAdMobAdProvider({ interstitialId: 'ca-x/1', rewardedId: 'ca-x/2' });
+    setAdProvider(a);
+    await a.initialize();
+    await flushBackgroundChain();
+    expect(a.isReady()).toBe(false);
+    expect(admob.__state.calls.filter((c: string) => c === 'consent.gather')).toHaveLength(1);
+
+    // Still offline at the first exposure: asks again, still nothing served.
+    expect((await showRewarded('victory_double')).completed).toBe(false);
+    expect(admob.__state.calls.filter((c: string) => c === 'consent.gather')).toHaveLength(2);
+    expect(admob.__state.calls.includes('sdk.initialize')).toBe(false);
+
+    // Back online: the next exposure's retry succeeds and ads come up.
+    admob.__state.gatherError = false;
+    admob.__state.canRequestAds = true;
+    await showRewarded('victory_double');
+    await flushBackgroundChain();
+    expect(admob.__state.calls.filter((c: string) => c === 'consent.gather')).toHaveLength(3);
+    expect(a.isReady()).toBe(true);
+    expect(admob.__state.calls).toContain('sdk.initialize');
+  });
+
+  it('a completed refusal is final for the session: exposures never re-ask', async () => {
+    admob.__state.canRequestAds = false;
+    const a = createAdMobAdProvider({ interstitialId: 'ca-x/1', rewardedId: 'ca-x/2' });
+    setAdProvider(a);
+    await a.initialize();
+    await flushBackgroundChain();
+    await showRewarded('victory_double');
+    await showRewarded('victory_double');
+    expect(admob.__state.calls.filter((c: string) => c === 'consent.gather')).toHaveLength(1);
+    expect(a.isReady()).toBe(false);
+  });
+
+  it('a failed update that still has a previous-session permission is not re-asked', async () => {
+    admob.__state.gatherError = true;
+    admob.__state.canRequestAds = true;
+    const a = createAdMobAdProvider({ interstitialId: 'ca-x/1', rewardedId: 'ca-x/2' });
+    await a.initialize();
+    await flushBackgroundChain();
+    expect(a.isReady()).toBe(true);
+    await a.requestConsentIfNeeded();
+    expect(admob.__state.calls.filter((c: string) => c === 'consent.gather')).toHaveLength(1);
   });
 
   it('fails closed when the current consent info cannot be read', async () => {

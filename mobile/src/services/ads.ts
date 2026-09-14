@@ -151,7 +151,21 @@ export function setAdProvider(newProvider: AdProvider): void {
  * first ad on whichever path fires first.
  */
 export async function ensureAdConsent(): Promise<void> {
-  if (consentAndAttRequested) return;
+  if (consentAndAttRequested) {
+    // Consent can fail to resolve at boot (an offline cold start). While the
+    // provider still is not ready, let each ad exposure ask again: a provider
+    // whose consent already settled treats this as a cheap no-op, and one whose
+    // update failed without a stored answer retries it (googleAdMobAds.ts).
+    // ATT stays once per session; the OS never re-prompts anyway.
+    if (!provider.isReady()) {
+      try {
+        await provider.requestConsentIfNeeded();
+      } catch {
+        /* non-fatal */
+      }
+    }
+    return;
+  }
   consentAndAttRequested = true;
   // Consent (UMP) first, then iOS ATT. Errors must not block gameplay; the
   // provider independently keeps ads disabled until UMP permits requests.

@@ -196,11 +196,40 @@ export interface PurchaseResult {
    * a consumable grant is deduped against the exact store transaction.
    */
   transactionId?: string;
+  /**
+   * OTHER ids the store's receipt history uses for this SAME purchase. On
+   * Google Play, RevenueCat's checkout result carries the Play order id while
+   * its customerInfo.nonSubscriptionTransactions (the receipt-recovery surface
+   * fed to `reconcileStorePurchaseHistory`) lists the same purchase under
+   * RevenueCat's own transaction id. Every id here is recorded as already
+   * covered in the same durable write as the grant, so recovery can never
+   * re-credit a purchase the checkout path already delivered.
+   */
+  linkedTransactionIds?: string[];
   /** True when the user dismissed the native purchase sheet. */
   cancelled?: boolean;
   /** The store is waiting for payment approval; no reward is granted yet. */
   pending?: boolean;
   error?: string;
+}
+
+/**
+ * Provider failures that mean the STORE could not take an order at all (nothing
+ * was attempted, so there is no purchase to look for in a store history):
+ * billing not connected / not yet configured, the product not visible to this
+ * account, or another checkout still owning the flow. The UI shows a calm
+ * "not available right now" for these and reserves the unconfirmed-purchase
+ * copy for a failure AFTER the native sheet.
+ */
+export const STORE_UNAVAILABLE_ERRORS: ReadonlySet<string> = new Set([
+  'billing_unavailable',
+  'product_not_found',
+  'purchase_in_progress',
+]);
+
+/** True when a purchase-result error means the store never took the order. */
+export function isStoreUnavailableError(error: string | undefined): boolean {
+  return error !== undefined && STORE_UNAVAILABLE_ERRORS.has(error);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +242,12 @@ export interface BillingProvider {
   purchase(productId: ProductId): Promise<PurchaseResult>;
   /** Returns the authoritative set of entitlement keys the store reports as owned. */
   restorePurchases(): Promise<{ entitlements: EntitlementKey[]; error?: string }>;
+  /**
+   * Where the player manages (cancels) their subscription, when the store
+   * reports one (RevenueCat: customerInfo.managementURL). Optional; absent or
+   * null falls back to the platform's subscriptions page.
+   */
+  getSubscriptionManagementUrl?(): Promise<string | null>;
   isReady(): boolean;
   getName(): string;
 }
@@ -381,6 +416,13 @@ export interface PendingConsumableGrant {
   purchasedAt: number;
   /** True when this grant's amber amount includes the one-time first-purchase 2x. */
   firstPurchaseDoubled?: boolean;
+  /**
+   * Receipt-history ids that name this same purchase (see
+   * PurchaseResult.linkedTransactionIds). Recovery resolves a receipt to the
+   * grant that owns it by grantId OR any linked id, and settling the grant
+   * records every id as applied, so neither surface can re-credit it.
+   */
+  linkedIds?: string[];
 }
 
 const PENDING_GRANTS_KEY = 'wordshift_pending_iap_grants';
@@ -396,9 +438,11 @@ async function loadPendingGrants(): Promise<PendingConsumableGrant[]> {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) {
-        return parsed.filter(
-          (g) => g && typeof g.grantId === 'string' && g.reward && typeof g.reward.amount === 'number',
-        );
+        return parsed
+          .filter((g) => g && typeof g.grantId === 'string' && g.reward && typeof g.reward.amount === 'number')
+          .map((g) => Array.isArray(g.linkedIds)
+            ? { ...g, linkedIds: g.linkedIds.filter((id: unknown) => typeof id === 'string') }
+            : g);
       }
     }
   } catch (error) {
@@ -421,15 +465,56 @@ interface GrantIntent {
   productId: ProductId;
   reward: ConsumableReward;
   transactionId?: string;
+  /**
+   * Receipt-history ids that describe this same purchase under another name
+   * (see PurchaseResult.linkedTransactionIds; for the starter pack each id
+   * already carries its `:amber` / `:hints` suffix). Stored on the pending
+   * grant in the SAME transaction, so receipt recovery resolves those ids to
+   * this grant before it settles and finds them applied after.
+   */
+  linkedTransactionIds?: string[];
   firstPurchaseDoubled: boolean;
 }
 
+/**
+ * A recovered receipt is also treated as covered when a grant for the same
+ * product was recorded within this window of its store purchase time. This is
+ * the belt-and-braces behind the linked ids above: if the checkout result's
+ * customer info lagged behind the purchase and no linked id could be captured,
+ * the receipt still cannot re-credit a purchase this device already granted.
+ * Sixty seconds tolerates the sheet-to-persist delay plus modest clock skew
+ * between the device clock (grant time) and the store's purchase time, while
+ * staying far below any plausible repeat purchase of the same pack.
+ */
+export const RECEIPT_MATCH_WINDOW_MS = 60_000;
+
+interface CheckoutReceipt { productId: ProductId; purchasedAt: number }
+/**
+ * Checkout grants persisted THIS session (product + time only). Settled grants
+ * leave the pending ledger, so once the caller has credited a purchase the
+ * time-window guard needs this in-memory record to recognise its late receipt
+ * (the SDK's customer-info listener fires seconds after every checkout).
+ */
+const sessionCheckoutReceipts: CheckoutReceipt[] = [];
+const SESSION_CHECKOUT_RECEIPT_CAP = 32;
+
+function receiptCoveredByGrant(transaction: StorePurchaseTransaction, pending: PendingConsumableGrant[]): boolean {
+  const matches = (grant: CheckoutReceipt) => grant.productId === transaction.productId &&
+    Math.abs(grant.purchasedAt - transaction.purchasedAt) <= RECEIPT_MATCH_WINDOW_MS;
+  return pending.some(matches) || sessionCheckoutReceipts.some(matches);
+}
+
 async function persistPendingConsumableGrants(entries: GrantIntent[]): Promise<string[]> {
-  const intents = entries.map(entry => ({
-    grantId: entry.transactionId ?? `${entry.productId}:${Date.now()}:${++grantIdSeq}:${Math.random().toString(36).slice(2,8)}`,
-    productId: entry.productId, reward: entry.reward, purchasedAt: Date.now(),
-    ...(entry.firstPurchaseDoubled ? {firstPurchaseDoubled:true} : {}),
-  }));
+  const intents: PendingConsumableGrant[] = entries.map(entry => {
+    const grantId = entry.transactionId ?? `${entry.productId}:${Date.now()}:${++grantIdSeq}:${Math.random().toString(36).slice(2,8)}`;
+    const linkedIds = (entry.linkedTransactionIds ?? [])
+      .filter(id => typeof id === 'string' && id.length > 0 && id !== grantId);
+    return {
+      grantId, productId: entry.productId, reward: entry.reward, purchasedAt: Date.now(),
+      ...(entry.firstPurchaseDoubled ? {firstPurchaseDoubled:true} : {}),
+      ...(linkedIds.length > 0 ? {linkedIds} : {}),
+    };
+  });
   // Retry storage only; never call the store purchase API a second time.
   await saveWithPlayerRetry(async () => { try { await runStorageTransaction('paid_grant_intent', async () => {
     const grants = await loadPendingGrants();
@@ -441,6 +526,12 @@ async function persistPendingConsumableGrants(entries: GrantIntent[]): Promise<s
     if (entries.some(entry=>entry.firstPurchaseDoubled)) await markAmberPurchaseMade();
     if (entries.some(entry=>entry.productId===PRODUCT_IDS.STARTER_PACK)) await grantEntitlements([ENTITLEMENTS.STARTER_PACK]);
   }); } catch(error) { invalidateEntitlementsCache(); throw error; } }, PAID_SAVE_COPY);
+  for (const intent of intents) {
+    sessionCheckoutReceipts.push({ productId: intent.productId, purchasedAt: intent.purchasedAt });
+  }
+  if (sessionCheckoutReceipts.length > SESSION_CHECKOUT_RECEIPT_CAP) {
+    sessionCheckoutReceipts.splice(0, sessionCheckoutReceipts.length - SESSION_CHECKOUT_RECEIPT_CAP);
+  }
   return intents.map(intent=>intent.grantId);
 }
 
@@ -467,6 +558,7 @@ export async function settleConsumableGrant(grantId: string): Promise<{ amberBal
         else if (grant.reward.kind==='hints') await addHintsInTransaction(grant.reward.amount, `iap_${grant.productId}`);
         else throw new Error('Invalid paid reward kind');
         applied.add(grantId);
+        for (const linked of grant.linkedIds ?? []) applied.add(linked);
         await AsyncStorage.setItem(APPLIED_GRANTS_KEY, JSON.stringify([...applied]));
       }
       await savePendingGrants(grants.filter(item=>item.grantId!==grantId));
@@ -542,6 +634,7 @@ async function purchaseConsumableUnlocked(productId: ProductId): Promise<Consuma
       productId,
       reward: grantedReward,
       transactionId: result.transactionId,
+      linkedTransactionIds: result.linkedTransactionIds,
       firstPurchaseDoubled: doubled,
     });
     if (doubled) {
@@ -587,11 +680,14 @@ async function purchaseStarterPackUnlocked(): Promise<StarterPackPurchaseResult>
   if (result.success) {
     // Both currency intents become durable together before the entitlement.
     const txBase = result.transactionId;
+    // The receipt-history alias covers both halves of the bundle too.
+    const linked = (kind: 'amber' | 'hints') =>
+      (result.linkedTransactionIds ?? []).map(id => `${id}:${kind}`);
     const [amberGrantId, hintsGrantId] = await persistPendingConsumableGrants([
       {productId,reward:{kind:'amber',amount:STARTER_PACK_GRANTS.amber},
-        transactionId:txBase ? `${txBase}:amber` : undefined,firstPurchaseDoubled:false},
+        transactionId:txBase ? `${txBase}:amber` : undefined,linkedTransactionIds:linked('amber'),firstPurchaseDoubled:false},
       {productId,reward:{kind:'hints',amount:STARTER_PACK_GRANTS.hints},
-        transactionId:txBase ? `${txBase}:hints` : undefined,firstPurchaseDoubled:false},
+        transactionId:txBase ? `${txBase}:hints` : undefined,linkedTransactionIds:linked('hints'),firstPurchaseDoubled:false},
     ]);
     return {
       success: true,
@@ -629,6 +725,26 @@ export async function restorePurchases(): Promise<{ entitlements: EntitlementKey
     notifyBillingChanges({ entitlements: entitlements.filter(key => key !== ENTITLEMENTS.STARTER_PACK) });
     return { entitlements };
   } finally { release(); }
+}
+
+/** Platform subscriptions pages, used when the store reports no management URL. */
+export const PLAY_SUBSCRIPTIONS_URL = 'https://play.google.com/store/account/subscriptions';
+export const APP_STORE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
+
+/**
+ * Where an active subscriber manages (cancels) their subscription. Prefers the
+ * store-reported management URL (RevenueCat customerInfo.managementURL); the
+ * caller supplies the platform's subscriptions page as the fallback so this
+ * module stays free of react-native imports.
+ */
+export async function getSubscriptionManagementUrl(fallbackUrl: string): Promise<string> {
+  try {
+    const url = await provider.getSubscriptionManagementUrl?.();
+    if (typeof url === 'string' && /^https?:\/\//.test(url)) return url;
+  } catch (error) {
+    console.warn('[IAP] management URL lookup failed:', error);
+  }
+  return fallbackUrl;
 }
 
 /** Process-wide, synchronous lock: remounts and two taps in one React frame
@@ -720,10 +836,18 @@ export function reconcileStorePurchaseHistory(transactions: StorePurchaseTransac
         ? [`${transaction.transactionId}:amber`, `${transaction.transactionId}:hints`]
         : [transaction.transactionId];
       if (ids.every(id => snapshot.applied.has(id))) continue;
-      if (!ids.some(id => snapshot.pending.some(grant => grant.grantId === id))) {
+      // A checkout grant may hold this receipt under its OWN id (the Play
+      // order id) with the receipt id linked: settle that grant, never a copy.
+      const settleIds = ids.map(id =>
+        snapshot.pending.find(grant => grant.grantId === id || grant.linkedIds?.includes(id))?.grantId ?? id);
+      if (!settleIds.some(id => snapshot.pending.some(grant => grant.grantId === id))) {
+        // Same product, same moment as a grant this device already recorded
+        // under another id (a lagging customer info left no linked id to
+        // match): the checkout path owns its delivery, so never re-grant it.
+        if (receiptCoveredByGrant(transaction, snapshot.pending)) continue;
         await saveWithPlayerRetry(() => persistRecoveredStorePurchase(transaction), PAID_SAVE_COPY);
       }
-      for (const id of ids) await saveWithPlayerRetry(() => settleConsumableGrant(id), PAID_SAVE_COPY);
+      for (const id of settleIds) await saveWithPlayerRetry(() => settleConsumableGrant(id), PAID_SAVE_COPY);
     }
     } finally { release(); }
   });

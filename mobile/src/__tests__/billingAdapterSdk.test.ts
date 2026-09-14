@@ -473,3 +473,186 @@ describe('RevenueCat adapter — explicit subscription expiry', () => {
     expect(await hasEntitlement(ENTITLEMENTS.SUPPORTER)).toBe(true);
   });
 });
+
+
+describe('RevenueCat adapter — one purchase, two ids (Play order id vs RevenueCat transaction id)', () => {
+  // On Google Play purchaseStoreProduct's transaction.transactionIdentifier is
+  // the Play ORDER id (StoreTransactionMapper.kt), while the same purchase
+  // appears in customerInfo.nonSubscriptionTransactions under RevenueCat's own
+  // transaction id (TransactionMapper.kt). The receipt-recovery path keys on
+  // the latter, so the two surfaces must be linked or every consumable pays
+  // twice: once at checkout, again when the customer-info listener fires (and
+  // again on every cold start until then).
+  const ORDER_ID = 'GPA.3312-1234-5678-90123';
+  const RC_ID = 'rc_txn_9f8e7d6c';
+
+  async function buyThroughStore(productId: string, purchaseDate: string) {
+    const { setBillingProvider, purchaseConsumable, settleConsumableGrant } = await import('../services/iap');
+    rc.__state.products = [storeProduct(productId)];
+    rc.__state.transactionId = ORDER_ID;
+    const p = await initProvider();
+    setBillingProvider(p);
+    await flushBackgroundChain(); // baseline captured from an EMPTY history
+    // The post-purchase customer info (and every later listener update) lists
+    // the purchase under RevenueCat's id, never under the Play order id.
+    rc.__state.transactions = [{ transactionIdentifier: RC_ID, productIdentifier: productId, purchaseDate }];
+    const result = await purchaseConsumable(productId);
+    expect(result.success).toBe(true);
+    await settleConsumableGrant(result.grantId!);
+    return p;
+  }
+
+  it('checkout returns the RevenueCat receipt id linked to the order id', async () => {
+    rc.__state.products = [storeProduct(PRODUCT_IDS.AMBER_SMALL)];
+    rc.__state.transactionId = ORDER_ID;
+    const p = await initProvider();
+    await flushBackgroundChain();
+    rc.__state.transactions = [{ transactionIdentifier: RC_ID, productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date().toISOString() }];
+    const result = await p.purchase(PRODUCT_IDS.AMBER_SMALL);
+    expect(result).toMatchObject({ success: true, transactionId: ORDER_ID, linkedTransactionIds: [RC_ID] });
+  });
+
+  it('ignores receipts that were already known before checkout began', async () => {
+    rc.__state.products = [storeProduct(PRODUCT_IDS.AMBER_SMALL)];
+    rc.__state.transactionId = ORDER_ID;
+    // An OLD receipt for the same product is in the history before checkout...
+    rc.__state.transactions = [{ transactionIdentifier: 'rc_old_receipt', productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: '2026-01-01T00:00:00Z' }];
+    const p = await initProvider();
+    await flushBackgroundChain();
+    // ...and the post-purchase customer info shows nothing new yet (lag).
+    const result = await p.purchase(PRODUCT_IDS.AMBER_SMALL);
+    expect(result.transactionId).toBe(ORDER_ID);
+    expect(result.linkedTransactionIds).toBeUndefined();
+  });
+
+  it('amber pack: the listener update and the next cold start credit nothing more', async () => {
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    const { AMBER_PACK_GRANTS, FIRST_PURCHASE_AMBER_MULTIPLIER } = await import('../constants/gameBalance');
+    await buyThroughStore(PRODUCT_IDS.AMBER_SMALL, new Date().toISOString());
+    const afterCheckout = await getAmberBalance();
+    expect(afterCheckout).toBe(AMBER_PACK_GRANTS.small * FIRST_PURCHASE_AMBER_MULTIPLIER);
+
+    // The SDK fires its customer-info update after every purchase.
+    const info = { entitlements: { active: {} }, nonSubscriptionTransactions: rc.__state.transactions };
+    rc.__state.listeners[0](info);
+    await flushBackgroundChain();
+    await flushBackgroundChain();
+    expect(await getAmberBalance()).toBe(afterCheckout);
+
+    // And the next launch reconciles the whole history again.
+    await initProvider();
+    await flushBackgroundChain();
+    await flushBackgroundChain();
+    expect(await getAmberBalance()).toBe(afterCheckout);
+    expect(callsOf('purchaseStoreProduct')).toHaveLength(1);
+  });
+
+  it('starter pack: both halves stay credited exactly once across the listener and a relaunch', async () => {
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    const { getHintBalance } = await import('../services/hints');
+    const { setBillingProvider, purchaseStarterPack, settleConsumableGrant } = await import('../services/iap');
+    const { STARTER_PACK_GRANTS } = await import('../constants/gameBalance');
+    rc.__state.products = [storeProduct(PRODUCT_IDS.STARTER_PACK)];
+    rc.__state.transactionId = ORDER_ID;
+    const p = await initProvider();
+    setBillingProvider(p);
+    await flushBackgroundChain();
+    const hintsBefore = await getHintBalance();
+    rc.__state.transactions = [{ transactionIdentifier: RC_ID, productIdentifier: PRODUCT_IDS.STARTER_PACK, purchaseDate: new Date().toISOString() }];
+    const result = await purchaseStarterPack();
+    expect(result.success).toBe(true);
+    await settleConsumableGrant(result.grantIds!.amber!);
+    await settleConsumableGrant(result.grantIds!.hints!);
+    expect(await getAmberBalance()).toBe(STARTER_PACK_GRANTS.amber);
+    expect(await getHintBalance()).toBe(hintsBefore + STARTER_PACK_GRANTS.hints);
+
+    rc.__state.listeners[0]({ entitlements: { active: { starter_pack: { isActive: true } } }, nonSubscriptionTransactions: rc.__state.transactions });
+    await flushBackgroundChain();
+    await flushBackgroundChain();
+    await initProvider();
+    await flushBackgroundChain();
+    await flushBackgroundChain();
+    expect(await getAmberBalance()).toBe(STARTER_PACK_GRANTS.amber);
+    expect(await getHintBalance()).toBe(hintsBefore + STARTER_PACK_GRANTS.hints);
+  });
+
+  it('a receipt for the same product minutes later is still a NEW purchase', async () => {
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    const { AMBER_PACK_GRANTS, FIRST_PURCHASE_AMBER_MULTIPLIER } = await import('../constants/gameBalance');
+    await buyThroughStore(PRODUCT_IDS.AMBER_SMALL, new Date().toISOString());
+    const afterCheckout = await getAmberBalance();
+    // A later purchase completed while the app was closed (a distinct receipt,
+    // well outside the linked-grant window) must still be recovered.
+    rc.__state.transactions = [
+      ...rc.__state.transactions,
+      { transactionIdentifier: 'rc_txn_later', productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date(Date.now() + 10 * 60_000).toISOString() },
+    ];
+    await initProvider();
+    await flushBackgroundChain();
+    await flushBackgroundChain();
+    expect(await getAmberBalance()).toBe(afterCheckout + AMBER_PACK_GRANTS.small);
+    expect(afterCheckout).toBe(AMBER_PACK_GRANTS.small * FIRST_PURCHASE_AMBER_MULTIPLIER);
+  });
+});
+
+
+describe('RevenueCat adapter — refunded or revoked one-time purchases', () => {
+  it('drops a Patron purchase the store now reports as explicitly inactive', async () => {
+    await grantEntitlements([ENTITLEMENTS.PATRON, ENTITLEMENTS.COSMETIC_BUNDLE]);
+    await initProvider();
+    await flushBackgroundChain();
+    // A Play refund: RevenueCat keeps the entitlement in `all` with isActive
+    // false and removes it from `active`. The untouched bundle stays.
+    rc.__state.listeners[0]({
+      entitlements: { active: { [ENTITLEMENTS.COSMETIC_BUNDLE]: { isActive: true } }, all: { [ENTITLEMENTS.PATRON]: { isActive: false }, [ENTITLEMENTS.COSMETIC_BUNDLE]: { isActive: true } } },
+      nonSubscriptionTransactions: [],
+    });
+    await flushBackgroundChain();
+    expect(await hasEntitlement(ENTITLEMENTS.PATRON)).toBe(false);
+    expect(await hasEntitlement(ENTITLEMENTS.COSMETIC_BUNDLE)).toBe(true);
+  });
+
+  it('never revokes a purchase the response merely omits (sparse guard kept)', async () => {
+    await grantEntitlements([ENTITLEMENTS.PATRON, ENTITLEMENTS.ADFREE]);
+    await initProvider();
+    await flushBackgroundChain();
+    rc.__state.listeners[0]({ entitlements: { active: {}, all: {} }, nonSubscriptionTransactions: [] });
+    await flushBackgroundChain();
+    rc.__state.listeners[0]({ entitlements: { active: {} }, nonSubscriptionTransactions: [] });
+    await flushBackgroundChain();
+    expect(await hasEntitlement(ENTITLEMENTS.PATRON)).toBe(true);
+    expect(await hasEntitlement(ENTITLEMENTS.ADFREE)).toBe(true);
+  });
+
+  it('a purchase listed as active is never revoked by a stale inactive record', async () => {
+    await grantEntitlements([ENTITLEMENTS.ADFREE]);
+    await initProvider();
+    await flushBackgroundChain();
+    rc.__state.listeners[0]({
+      entitlements: { active: { [ENTITLEMENTS.ADFREE]: { isActive: true } }, all: { [ENTITLEMENTS.ADFREE]: { isActive: false } } },
+      nonSubscriptionTransactions: [],
+    });
+    await flushBackgroundChain();
+    expect(await hasEntitlement(ENTITLEMENTS.ADFREE)).toBe(true);
+  });
+});
+
+
+describe('RevenueCat adapter — subscription management URL', () => {
+  it('reports customerInfo.managementURL once a customer info carried one', async () => {
+    const p = await initProvider();
+    await flushBackgroundChain();
+    expect(await p.getSubscriptionManagementUrl!()).toBeNull();
+    rc.__state.listeners[0]({ entitlements: { active: {} }, nonSubscriptionTransactions: [], managementURL: 'https://play.google.com/store/account/subscriptions?sku=x&package=y' });
+    await flushBackgroundChain();
+    expect(await p.getSubscriptionManagementUrl!()).toBe('https://play.google.com/store/account/subscriptions?sku=x&package=y');
+  });
+
+  it('iap.ts falls back to the platform subscriptions page when the store has none', async () => {
+    const { setBillingProvider, getSubscriptionManagementUrl, PLAY_SUBSCRIPTIONS_URL } = await import('../services/iap');
+    const p = await initProvider();
+    setBillingProvider(p);
+    await flushBackgroundChain();
+    expect(await getSubscriptionManagementUrl(PLAY_SUBSCRIPTIONS_URL)).toBe(PLAY_SUBSCRIPTIONS_URL);
+  });
+});
