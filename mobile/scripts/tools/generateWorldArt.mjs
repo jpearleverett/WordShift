@@ -1,5 +1,5 @@
 // World/UI art generator: shadow figure, clouds, ground, roof, foundation,
-// tree, star + amber icons, and the Play Store feature graphic.
+// tree, star + amber icons. The Play Store feature graphic is built elsewhere.
 // Pure Node (zlib only), supersampled 2x for anti-aliasing.
 // Run: node scripts/tools/generateWorldArt.mjs
 import zlib from 'zlib';
@@ -59,14 +59,6 @@ function gauss(cv, cx, cy, rx, ry, color, alphaMax) {
       if (a > 0.004) blend(cv, x, y, r, g, b, a);
     }
 }
-function rect(cv, x0, y0, x1, y1, color, alpha = 1, gradTo = null) {
-  const [r, g, b] = hex(color); const grad = gradTo ? hex(gradTo) : null;
-  for (let y = Math.max(0, ~~y0); y <= Math.min(cv.h - 1, ~~y1); y++) {
-    const t = (y - y0) / Math.max(1, y1 - y0);
-    const rr = grad ? r + (grad[0] - r) * t : r, gg = grad ? g + (grad[1] - g) * t : g, bb = grad ? b + (grad[2] - b) * t : b;
-    for (let x = Math.max(0, ~~x0); x <= Math.min(cv.w - 1, ~~x1); x++) blend(cv, x, y, rr, gg, bb, alpha);
-  }
-}
 function triangle(cv, ax, ay, bx, by, cxx, cyy, color, alpha = 1, gradTo = null) {
   const [r, g, b] = hex(color); const grad = gradTo ? hex(gradTo) : null;
   const minX = ~~Math.min(ax, bx, cxx), maxX = Math.ceil(Math.max(ax, bx, cxx));
@@ -81,19 +73,6 @@ function triangle(cv, ax, ay, bx, by, cxx, cyy, color, alpha = 1, gradTo = null)
       const w1 = edge(bx, by, cxx, cyy, x + 0.5, y + 0.5) / area;
       const w2 = edge(cxx, cyy, ax, ay, x + 0.5, y + 0.5) / area;
       if (w0 >= 0 && w1 >= 0 && w2 >= 0) blend(cv, x, y, rr, gg, bb, alpha);
-    }
-  }
-}
-function roundRect(cv, cx, cy, hw, hh, rad, color, alpha = 1, gradTo = null) {
-  const [r, g, b] = hex(color); const grad = gradTo ? hex(gradTo) : null;
-  for (let y = Math.max(0, ~~(cy - hh - 2)); y <= Math.min(cv.h - 1, ~~(cy + hh + 2)); y++) {
-    const t = (y - (cy - hh)) / (2 * hh);
-    const rr = grad ? r + (grad[0] - r) * t : r, gg = grad ? g + (grad[1] - g) * t : g, bb = grad ? b + (grad[2] - b) * t : b;
-    for (let x = Math.max(0, ~~(cx - hw - 2)); x <= Math.min(cv.w - 1, ~~(cx + hw + 2)); x++) {
-      const qx = Math.abs(x + 0.5 - cx) - (hw - rad), qy = Math.abs(y + 0.5 - cy) - (hh - rad);
-      const d = Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - rad;
-      const a = Math.max(0, Math.min(1, 0.5 - d));
-      if (a > 0) blend(cv, x, y, rr, gg, bb, a * alpha);
     }
   }
 }
@@ -136,7 +115,6 @@ const ENV = path.resolve(import.meta.dirname, '../../assets/environment');
 const UI = path.resolve(import.meta.dirname, '../../assets/ui');
 fs.mkdirSync(UI, { recursive: true });
 fs.mkdirSync(ENV, { recursive: true });
-const seeded = (s => () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)(42);
 
 // === 1. shadow_figure.png — the unnamed entity (600x1200) ===================
 {
@@ -173,88 +151,15 @@ for (const [name, puffs] of [
   savePNG(path.join(ENV, name), W, H, down2(cv, W, H));
 }
 
-// === 3. ground.png — grassy hill strip (1024x300) ============================
-{
-  const W = 1024, H = 300, cv = C(W * 2, H * 2);
-  // gently curved top edge
-  for (let x = 0; x < cv.w; x++) {
-    const top = 70 + Math.sin((x / cv.w) * Math.PI) * -28 + Math.sin(x * 0.011) * 6;
-    rect(cv, x, top, x, cv.h, '#7BC86C', 1, '#4E9A52');
-    rect(cv, x, top, x, top + 14, '#92DA80', 0.9); // sunlit lip
-  }
-  // scattered grass tufts + flowers (candy palette)
-  for (let i = 0; i < 90; i++) {
-    const x = seeded() * cv.w, y = 120 + seeded() * (cv.h - 160);
-    ellipse(cv, x, y, 9 + seeded() * 12, 4 + seeded() * 5, seeded() < 0.5 ? '#5FAE5C' : '#8FD97E', 0.5, 6);
-  }
-  for (let i = 0; i < 22; i++) {
-    const x = seeded() * cv.w, y = 150 + seeded() * (cv.h - 220);
-    const col = ['#FF8FB8', '#FFD166', '#A78BFA', '#FFFFFF'][~~(seeded() * 4)];
-    ellipse(cv, x, y, 7, 7, col, 0.95, 3);
-    ellipse(cv, x, y, 3, 3, '#FFE9A8', 1, 2);
-  }
-  savePNG(path.join(ENV, 'ground.png'), W, H, down2(cv, W, H));
-}
-
-// === 4. roof.png — gabled candy roof with chimney (1024x420) =================
-{
-  const W = 1024, H = 420, cv = C(W * 2, H * 2);
-  const w = cv.w, h = cv.h, peakX = w / 2, peakY = 36, baseY = h - 60;
-  // chimney seated on the left slope (drawn first so the gable buries its base)
-  const chimX = w * 0.30;
-  roundRect(cv, chimX, peakY + 230, 52, 190, 14, '#9A6B8F', 1, '#7A4E72');
-  roundRect(cv, chimX, peakY + 130, 66, 26, 10, '#B58AA8');
-  // main gable
-  triangle(cv, peakX, peakY, -40, baseY, w + 40, baseY, '#B0568A', 1, '#8A3E6E');
-  // shingle scallops, row by row (overlapping, clipped by the slope)
-  for (let row = 0; row < 7; row++) {
-    const y = peakY + 90 + row * 92;
-    const halfWidth = ((y - peakY) / (baseY - peakY)) * (w / 2 + 40);
-    const shade = row % 2 ? '#A04C7E' : '#AA5284';
-    for (let x = peakX - halfWidth - 60; x < peakX + halfWidth + 60; x += 66) {
-      const slopeLimit = ((y - 26 - peakY) / (baseY - peakY)) * (w / 2 + 40);
-      if (Math.abs(x - peakX) > slopeLimit + 50) continue;
-      ellipse(cv, x + (row % 2 ? 33 : 0), y, 44, 30, shade, 1, 4);
-    }
-  }
-  // ridge highlight + eaves board
-  triangle(cv, peakX, peakY, peakX - 130, peakY + 170, peakX + 130, peakY + 170, '#D77FAE', 0.45);
-  rect(cv, -40, baseY, w + 40, baseY + 44, '#7A3560', 1, '#5E2849');
-  rect(cv, -40, baseY, w + 40, baseY + 10, '#C66FA0', 0.8);
-  savePNG(path.join(ENV, 'roof.png'), W, H, down2(cv, W, H));
-}
-
-// === 5. foundation.png — stone base strip (1024x160) =========================
-{
-  const W = 1024, H = 160, cv = C(W * 2, H * 2);
-  rect(cv, 0, 16, cv.w, cv.h, '#8D86A8', 1, '#6B6488');
-  rect(cv, 0, 16, cv.w, 30, '#A8A2C2', 0.9);
-  // staggered stones
-  for (let row = 0; row < 3; row++) {
-    for (let x = (row % 2) * 70; x < cv.w; x += 140) {
-      roundRect(cv, x + 60, 70 + row * 84, 58, 32, 14, row % 2 ? '#9C95B5' : '#948DAD', 0.9);
-      roundRect(cv, x + 60, 62 + row * 84, 54, 12, 8, '#B5AECB', 0.35);
-    }
-  }
-  savePNG(path.join(ENV, 'foundation.png'), W, H, down2(cv, W, H));
-}
-
-// === 6. tree.png — round candy tree (480x640) ================================
-{
-  const W = 480, H = 640, cv = C(W * 2, H * 2);
-  const cx = W;
-  roundRect(cv, cx, H * 2 - 170, 34, 150, 16, '#9C6B4F', 1, '#7A4E36'); // trunk
-  triangle(cv, cx - 80, H * 2 - 40, cx + 80, H * 2 - 40, cx, H * 2 - 130, '#7A4E36', 0.5); // root flare
-  for (const [fx, fy, fr, col] of [
-    [0, -0.62, 0.62, '#5FB75D'], [-0.5, -0.42, 0.46, '#54A854'], [0.5, -0.42, 0.46, '#54A854'],
-    [-0.28, -0.74, 0.4, '#6FC668'], [0.28, -0.74, 0.4, '#6FC668'],
-  ]) gauss(cv, cx + fx * 300, H * 2 + fy * H * 2 * 0.5, fr * 300, fr * 280, col, 1);
-  for (let i = 0; i < 12; i++) { // glints + blossoms
-    const a = seeded() * Math.PI * 2, d = seeded() * 250;
-    ellipse(cv, cx + Math.cos(a) * d, H * 2 * 0.42 + Math.sin(a) * d * 0.6, 9, 9, seeded() < 0.4 ? '#FF8FB8' : '#A8E89C', 0.85, 4);
-  }
-  savePNG(path.join(ENV, 'tree.png'), W, H, down2(cv, W, H));
-}
+// Blocks 3-6 (ground.png, roof.png, foundation.png, tree.png) are DELETED, not
+// disabled. They were destructive: `npm run generate:assets` overwrote the
+// hand-processed painted roof (792x283, 281 KB, from processRawWorldArt.mjs)
+// with a 1024x420 procedural candy roof, and re-created ground/tree/foundation,
+// three files deleted for bundle hygiene, inside the bundled assets/environment
+// directory. The house art has not come from this script for a long time: see
+// processRawWorldArt.mjs (roof, per-phase foundations, wall, pit entrance) and
+// generatePixelWorld.mjs (clouds). Only shadow_figure.png below is still this
+// script's own shipped output.
 
 // === 7. star icons (256x256) =================================================
 function starPts(cx, cy, rOut, rIn, rot = -Math.PI / 2) {
@@ -298,35 +203,9 @@ function starPts(cx, cy, rOut, rIn, rot = -Math.PI / 2) {
   savePNG(path.join(UI, 'amber.png'), W, W, down2(cv, W, W));
 }
 
-// === 9. feature graphic (1024x500, opaque) ===================================
-{
-  const W = 1024, H = 500, cv = C(W * 2, H * 2);
-  rect(cv, 0, 0, cv.w, cv.h, '#7C8BF0', 1, '#4E58B8');
-  gauss(cv, cv.w * 0.32, cv.h * 0.3, 700, 500, '#FFFFFF', 0.10);
-  // scattered floating tiles, deliberately echoing the icon
-  const tiles = [
-    [0.18, 0.46, 150, '#FF8FB8', '#E84B8A', 'W'], [0.38, 0.34, 110, '#5EEAD4', '#14B8A6', null],
-    [0.55, 0.56, 130, '#FFE08A', '#F0B429', null], [0.74, 0.36, 150, '#A78BFA', '#7C5CD6', null],
-    [0.88, 0.62, 100, '#FF8FB8', '#E84B8A', null],
-  ];
-  for (const [fx, fy, s, c1, c2, glyph] of tiles) {
-    const cx = cv.w * fx, cy = cv.h * fy;
-    roundRect(cv, cx, cy + s * 0.07, s, s, s * 0.22, '#1A1A2E', 0.25);
-    roundRect(cv, cx, cy, s, s, s * 0.22, c1, 1, c2);
-    roundRect(cv, cx, cy - s * 0.58, s * 0.86, s * 0.3, s * 0.14, '#FFFFFF', 0.3);
-    if (glyph === 'W') {
-      const wT = cy - s * 0.34, wB = cy + s * 0.42, wH = s * 0.56;
-      const segs = [[cx - wH, wT, cx - wH * 0.5, wB], [cx - wH * 0.5, wB, cx, wT + s * 0.2], [cx, wT + s * 0.2, cx + wH * 0.5, wB], [cx + wH * 0.5, wB, cx + wH, wT]];
-      for (const [ax, ay, bx, by] of segs) {
-        const steps = 40;
-        for (let i = 0; i <= steps; i++) ellipse(cv, ax + ((bx - ax) * i) / steps, ay + ((by - ay) * i) / steps, s * 0.085, s * 0.085, '#FFFFFF', 1, 3);
-      }
-    }
-  }
-  // faint shadow-figure silhouette on the right edge — the hook, barely there
-  gauss(cv, cv.w * 0.94, cv.h * 0.5, 160, 420, '#0A0518', 0.35);
-  for (const ex of [cv.w * 0.94 - 26, cv.w * 0.94 + 26]) gauss(cv, ex, cv.h * 0.34, 12, 8, '#E0244A', 0.7);
-  // sparkles
-  for (let i = 0; i < 26; i++) ellipse(cv, seeded() * cv.w, seeded() * cv.h, 4 + seeded() * 6, 4 + seeded() * 6, '#FFFFFF', 0.5 + seeded() * 0.4, 3);
-  savePNG(path.resolve(import.meta.dirname, '../../../docs/feature-graphic.png'), W, H, down2(cv, W, H));
-}
+// The Play Store feature graphic is NOT generated here any more. This script
+// used to write docs/feature-graphic.png (flat gradient + candy tiles), which
+// clobbered the painted launch artwork on every `npm run generate:assets`. The
+// shipped 1024x500 is built by scripts/store/buildLaunch.mjs into
+// assets/Play_store/launch-2026-09/upload/feature-graphic-1024x500.png and
+// mirrored at docs/feature-graphic.png for the listing upload.

@@ -97,6 +97,14 @@ verify the latest binary, backend deployment or public release.
   -> App icon. The in-app launcher icon is a separate surface that ships in the
   binary, and it deliberately carries no letter tile (see the Asset System
   section of `CLAUDE.md`).
+- [ ] **Upload the 1024x500 feature graphic BY HAND.** `docs/feature-graphic.png`
+  (Ember by the hearth under the wooden wordmark and the tagline "A little
+  wordplay. / A world to uncover."), a byte-identical mirror of
+  `mobile/assets/Play_store/launch-2026-09/upload/feature-graphic-1024x500.png`,
+  1024x500 RGB with no alpha. Same place as the icon: Play Console -> Main store
+  listing -> Graphics -> Feature graphic. It does not come from the build either;
+  `npm run generate:assets` used to overwrite this path with a placeholder
+  gradient and no longer writes it at all.
 
 - [ ] **Production configuration cut.** Do NOT edit `expo.extra.adsUseTestIds`
   or `ci.yml`: `app.config.js` derives the shipped flag from

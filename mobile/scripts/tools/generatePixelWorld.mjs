@@ -1,5 +1,5 @@
-// Pixel-art world set: clouds, tree, ground. (Roof, foundation, pit entrance,
-// and wall are AI-generated — see assets/raw/ + processRawWorldArt.mjs.)
+// Pixel-art world set: clouds only. (Roof, foundation, pit entrance, wall, tree
+// and ground are not generated here - see the note at the bottom of this file.)
 // Drawn on a small logical grid with hard edges and limited palettes, then
 // nearest-neighbor upscaled — matches the pixel-art room interiors.
 // Run: node scripts/tools/generatePixelWorld.mjs
@@ -37,14 +37,11 @@ const hex = c => c ? [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), 
 const G = (w, h) => ({ w, h, px: new Array(w * h).fill(null) });
 const put = (g, x, y, c) => { if (x >= 0 && y >= 0 && x < g.w && y < g.h) g.px[(y | 0) * g.w + (x | 0)] = c; };
 const get = (g, x, y) => (x >= 0 && y >= 0 && x < g.w && y < g.h) ? g.px[(y | 0) * g.w + (x | 0)] : null;
-function box(g, x0, y0, x1, y1, c) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(g, x, y, c); }
 function disc(g, cx, cy, rx, ry, c) {
   for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++)
     for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++)
       if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) put(g, x, y, c);
 }
-// deterministic PRNG
-const rng = (s => () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff)(7);
 function upscale(g, scale) {
   const out = Buffer.alloc(g.w * scale * g.h * scale * 4);
   for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
@@ -93,68 +90,14 @@ function cloud(puffs, file) {
 cloud([[18, 22, 11, 8], [33, 17, 13, 10], [48, 21, 12, 9], [59, 25, 8, 5], [9, 25, 7, 4]], 'cloud_1.png');
 cloud([[14, 23, 9, 6], [28, 18, 12, 9], [44, 22, 11, 7], [55, 25, 6, 4]], 'cloud_2.png');
 
-// === tree (56x76 grid, x6 = 336x456) =========================================
-{
-  const g = G(56, 76);
-  const T1 = '#7A4E36', T2 = '#5E3A26', G1 = '#7FCB6F', G2 = '#5CAB54', G3 = '#3F8742', G4 = '#9ADE86';
-  // trunk with bark notches
-  box(g, 25, 48, 30, 73, T1);
-  box(g, 23, 70, 32, 73, T1);
-  for (let y = 50; y < 72; y += 5) { put(g, 26, y, T2); put(g, 29, y + 2, T2); }
-  box(g, 24, 48, 24, 60, T2); // left bark shadow
-  // canopy: stacked discs, dark -> mid -> light for depth
-  disc(g, 28, 30, 21, 18, G3);
-  disc(g, 18, 26, 13, 11, G2); disc(g, 38, 28, 13, 11, G2); disc(g, 28, 17, 14, 11, G2);
-  disc(g, 24, 22, 10, 8, G1); disc(g, 34, 20, 9, 7, G1); disc(g, 17, 30, 8, 6, G1);
-  // pixel-cluster highlights + blossoms
-  for (let i = 0; i < 26; i++) {
-    const x = 10 + (rng() * 36) | 0, y = 10 + (rng() * 30) | 0;
-    if (get(g, x, y)) { put(g, x, y, G4); put(g, x + 1, y, G4); }
-  }
-  for (const [x, y] of [[15, 24], [33, 14], [40, 31], [22, 35], [30, 25]]) {
-    if (get(g, x, y)) { put(g, x, y, '#FF9EC2'); put(g, x + 1, y, '#FFC9DE'); }
-  }
-  // bottom canopy shadow row
-  for (let x = 0; x < g.w; x++) for (let y = 75; y >= 0; y--) {
-    if (get(g, x, y) && [G1, G2, G4].includes(get(g, x, y)) && !get(g, x, y + 1)) { put(g, x, y, G3); break; }
-  }
-  save(g, 6, 'tree.png');
-}
-
-// === ground (256x60 grid, x4 = 1024x240) =====================================
-{
-  const g = G(256, 60);
-  const TOP = '#90D87C', MID = '#6FBE63', LOW = '#4F9A4F', DARK = '#3E7E42', LIP = '#A8E794';
-  // gently stepped hill silhouette
-  for (let x = 0; x < g.w; x++) {
-    const t = x / g.w;
-    const topY = Math.round(12 - Math.sin(t * Math.PI) * 7 + Math.sin(x * 0.07) * 1.2);
-    for (let y = topY; y < g.h; y++) {
-      const d = y - topY;
-      put(g, x, y, d < 2 ? LIP : d < 8 ? TOP : d < 20 ? MID : d < 36 ? LOW : DARK);
-    }
-  }
-  // grass blade notches along the lip
-  for (let x = 2; x < g.w; x += 3 + ((rng() * 3) | 0)) {
-    for (let y = 0; y < g.h; y++) if (get(g, x, y)) { put(g, x, y - 1, LIP); if (rng() < 0.4) put(g, x, y - 2, TOP); break; }
-  }
-  // tufts + pixel flowers
-  for (let i = 0; i < 70; i++) {
-    const x = (rng() * g.w) | 0, y = 14 + (rng() * 34) | 0;
-    if (get(g, x, y)) { const c = rng() < 0.5 ? LIP : TOP; put(g, x, y, c); put(g, x + 1, y, c); }
-  }
-  for (let i = 0; i < 18; i++) {
-    const x = 4 + (rng() * (g.w - 8)) | 0, y = 18 + (rng() * 30) | 0;
-    if (!get(g, x, y)) continue;
-    const col = ['#FF9EC2', '#FFD166', '#C9B2FF', '#FFFFFF'][(rng() * 4) | 0];
-    put(g, x, y, col); put(g, x - 1, y, col); put(g, x + 1, y, col); put(g, x, y - 1, col); put(g, x, y + 1, col);
-    put(g, x, y, '#FFF3C2');
-  }
-  save(g, 4, 'ground.png');
-}
-
-// === roof / foundation / pit entrance / wall ================================
-// These four are no longer generated here: they were replaced by AI-generated
-// pixel art (sources in assets/raw/, processed into assets/environment/ by
-// scripts/tools/processRawWorldArt.mjs). Regenerating them procedurally would
-// clobber the shipped art. Only clouds/tree/ground remain procedural.
+// === roof / foundation / pit entrance / wall / tree / ground ===============
+// None of these are generated here any more. Roof, the per-phase foundations,
+// the pit entrance and the wall were replaced by AI-generated pixel art
+// (sources in assets/raw/, processed into assets/environment/ by
+// scripts/tools/processRawWorldArt.mjs); regenerating them procedurally would
+// clobber the shipped art. tree.png and ground.png were DELETED from the repo
+// for bundle hygiene (zero src references, and assets/environment/** ships in
+// the binary) yet this script kept re-creating them on every
+// `npm run generate:assets`, so their blocks are gone too. Only the clouds
+// above remain procedural. generateWorldArt.mjs carries the matching note for
+// the roof/foundation blocks it used to clobber the same way.

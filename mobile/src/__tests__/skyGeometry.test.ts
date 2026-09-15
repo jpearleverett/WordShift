@@ -34,6 +34,16 @@ const HOUSE_WORLD = fs.readFileSync(
 
 const SKIES = ['sky_day', 'sky_afternoon', 'sky_dusk', 'sky_storm', 'sky_shadow', 'sky_peace'];
 
+/** Read a PNG's dimensions straight out of its IHDR (no image lib needed). */
+function pngDimensions(file: string): { width: number; height: number } {
+  const fd = fs.openSync(file, 'r');
+  const buf = Buffer.alloc(24);
+  fs.readSync(fd, buf, 0, 24, 0);
+  fs.closeSync(fd);
+  if (buf.toString('ascii', 12, 16) !== 'IHDR') throw new Error(`${file}: not a PNG`);
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
 /**
  * Read a WebP's dimensions from its header (no image lib needed). The skies
  * ship as WebP (the ~15MB->~1.5MB install-size win); sharp writes them as the
@@ -115,6 +125,33 @@ describe('HouseWorld sky anchoring', () => {
     expect(HOUSE_WORLD).toMatch(/sky_peace\.webp/);
     expect(HOUSE_WORLD).toMatch(/foundation_5\.png/);
     expect(fs.existsSync(path.join(ENV_DIR, 'foundation_5.png'))).toBe(true);
+  });
+
+  test('the painted roof art matches the aspect HouseWorld hardcodes for it', () => {
+    // ROOF_RENDER_HEIGHT is ROOF_WIDTH * (283 / 792) with the dimensions typed
+    // in by hand, so nothing linked that literal to the file. Both procedural
+    // world-art generators used to overwrite this exact PNG with a 1024x420
+    // candy roof on every `npm run generate:assets`, which no test noticed and
+    // which renders the painted art at the wrong aspect. Those blocks are gone
+    // (see the notes at the end of generateWorldArt.mjs and
+    // generatePixelWorld.mjs); this pins the file so a regeneration can never
+    // silently reshape it again.
+    const { width, height } = pngDimensions(path.join(ENV_DIR, 'roof.png'));
+    expect({ width, height }).toEqual({ width: 792, height: 283 });
+    const literal = HOUSE_WORLD.match(/ROOF_WIDTH \* \((\d+) \/ (\d+)\)/);
+    expect(literal).not.toBeNull();
+    expect([Number(literal![1]), Number(literal![2])]).toEqual([height, width]);
+  });
+
+  test('the world-art files deleted for bundle hygiene stay deleted', () => {
+    // assets/environment/** ships in the binary. ground.png and tree.png have
+    // zero src references (the skies are full landscapes with their own grass
+    // and trees) and the single foundation.png was replaced by the per-phase
+    // foundation_0..5 set, but the generators kept re-creating all three on
+    // every `npm run generate:assets`.
+    for (const gone of ['ground.png', 'tree.png', 'foundation.png']) {
+      expect(fs.existsSync(path.join(ENV_DIR, gone))).toBe(false);
+    }
   });
 
   test('the pan hard-floors at the pit end (art never lifts off the container bottom)', () => {
