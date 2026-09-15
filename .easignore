@@ -96,6 +96,7 @@ dist-ssr
 
 # Authoring originals, Play listing materials, and review/documentation files.
 # Runtime assets (including music and story art), source, scripts, and plugins stay.
+/mobile/.audit-reports/
 /mobile/assets/raw/
 /mobile/assets/Play_store/
 /docs/

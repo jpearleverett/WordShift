@@ -2,7 +2,7 @@
 
 > Updated September 13, 2026 for the sequential-conversation follow-up to `main` at `f1f7cd5`. The compact next-unlock sign, attunement layout fix and delivered house-upgrade gifts remain included. Build configuration, source changes and validation limits: [current build](CURRENT_BUILD.md). Earlier CI and original implementation validation remain historical evidence, not a test report for the latest Android bundle.
 
-This implementation follows [the editorial review](STORY_EDITORIAL_REVIEW.md). It preserves the word puzzle, thirteen residents, growing pixel house and gradual tonal descent, while giving that descent an observable cost and the player an answer that survives the ending.
+This implementation preserves the word puzzle, thirteen residents, growing pixel house and gradual tonal descent, while giving that descent an observable cost and the player an answer that survives the ending.
 
 ## Private canon
 
@@ -94,20 +94,16 @@ Fox retains ten individual walk frames. Eleven other residents have eight-frame 
 
 Distinct bell and answering cues occur with the actual ensemble actions, rather than implying those actions in retrospective text. Essential audio cues do not replace readable dialogue.
 
-## Original implementation visual review (historical)
+## Original implementation visual review (retired)
 
-| View | Screenshot |
-| --- | --- |
-| Painted puzzle tokens and controls | [Puzzle](visual-review/painted-puzzle.png) |
-| Warm rooms after the arrival | [House](visual-review/house-after.png) |
-| First essential conversation | [A cup by the fire](visual-review/first-memory.png) |
-| CLOSED arrival | [Private room](visual-review/closed-arrival.png) |
-| CLOSER arrival | [Moonlit road](visual-review/closer-arrival.png) |
-| CLOSER aftermath | [The road at dawn](visual-review/closer-aftermath.png) |
-| Saved story journal | [Things We Kept](visual-review/story-journal.png) |
-| Small screen with enlarged browser text | [Scrollable conversation](visual-review/small-screen-large-text.png) |
-
-These are actual web renders. They contain late-game spoilers. The house and utility views use seeded progress to inspect specific states.
+The eight `visual-review/` web renders that recorded the original implementation
+(painted puzzle, warm rooms after the arrival, the first essential conversation,
+both CLOSED and CLOSER arrivals, the CLOSER aftermath, the story journal and a
+small screen at enlarged text) were deleted on 2026-09-15 along with the rest of
+the September evidence set. They were seeded-progress captures of states this
+document already describes in prose, and they carried late-game spoilers in a
+directory served from the Pages root. Git history holds them; re-capture from a
+seeded save if a visual record is ever needed again.
 
 ## Original implementation validation (historical)
 

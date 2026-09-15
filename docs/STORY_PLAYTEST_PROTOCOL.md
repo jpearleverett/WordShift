@@ -1,6 +1,6 @@
 # Story clarity and delivery pilot
 
-This is a prepared protocol for the revised story and its delivery, reviewed September 13, 2026 against `main` at `6f96ebb`. The repository contains **no completed participant report for this protocol**; the owner’s earlier 12-tester/14-day Play closed test does not establish that this particular pilot was run. Historical audit references: F22/F23/F28/F29/F33. See [current build](CURRENT_BUILD.md) for release evidence. Five unfamiliar readers provide an early clarity signal, not statistical retention evidence. Keep answers in de-identified notes; never collect recovery credentials, production saves or telemetry transcripts.
+This is a prepared protocol for the revised story and its delivery, reviewed September 13, 2026 against `main` at `6f96ebb`. The repository contains **no completed participant report for this protocol**; the owner’s earlier 12-tester/14-day Play closed test does not establish that this particular pilot was run. (The F22/F23/F28/F29/F33 audit numbering this protocol grew out of lived in the September review docs, retired 2026-09-15; the findings themselves are resolved and folded into CLAUDE.md.) See [current build](CURRENT_BUILD.md) for release evidence. Five unfamiliar readers provide an early clarity signal, not statistical retention evidence. Keep answers in de-identified notes; never collect recovery credentials, production saves or telemetry transcripts.
 
 ## Prepare
 
@@ -70,7 +70,7 @@ Separate outcomes into:
 - **Clarity problem:** repeated independent misunderstanding. Change the smallest line, scene placement or interaction that addresses it, then retest with new readers.
 - **Preference:** a single reader's desired tone, music or branch. Preserve it as a signal; do not rewrite the whole game from one preference.
 
-Finish with a dated pilot note listing sample, routes, scores, defects and proposed changes. If fewer than five sessions run, report that exact count. Add a separate signed Android 20-minute listening pass for Skip/mute/background and fatigue, plus the native checks in the current [launch checklist](LAUNCH_CHECKLIST.md) (the older [1.3.0 validation record](RELEASE_VALIDATION_1_3_0.md) remains historical reference); this reader protocol does not replace those checks.
+Finish with a dated pilot note listing sample, routes, scores, defects and proposed changes. If fewer than five sessions run, report that exact count. Add a separate signed Android 20-minute listening pass for Skip/mute/background and fatigue, plus the native checks in the current [launch checklist](LAUNCH_CHECKLIST.md); this reader protocol does not replace those checks.
 
 
 ## Optional blind vocabulary check

@@ -10,14 +10,14 @@ theme: jekyll-theme-minimal
 # listing, so never exclude or rename them.
 #
 # Everything below is internal and was previously live to anyone who guessed or
-# search-indexed the URL. The design audit and its ledger describe the cult
-# reveal, the shadow figure, and the whole phase arc in detail — publishing
-# them next to the link players tap from Settings spoils the entire game. The
-# press kit carries the creator-kit fast-forward instructions (era=reveal), the
-# checklists list unfinished work, and renders/ holds dark-phase screenshots.
+# search-indexed the URL. These docs describe the cult reveal, the shadow figure
+# and the whole phase arc in detail — publishing them next to the link players
+# tap from Settings spoils the entire game. The press kit carries the
+# creator-kit fast-forward instructions (era=reveal), the checklists list
+# unfinished work, and review-2026-09-06/ holds dark-phase screenshots.
+#
+# ADD EVERY NEW INTERNAL DOC HERE. An un-excluded file publishes silently.
 exclude:
-  - AAA_DESIGN_AUDIT.md
-  - AAA_IMPLEMENTATION_LEDGER.md
   - BACKEND_SETUP.md
   - COMPLETION_CHECKLIST.md
   - GROWTH_STRATEGY.md
@@ -25,29 +25,19 @@ exclude:
   - MONETIZATION_SETUP.md
   - OTA_UPDATES.md
   - PRESS_KIT.md
-  - PUZZLE_REGENERATION_PLAN.md
   - STORE_LISTING.md
-  - renders/
   - supabase/
   - ANALYTICS_DELIVERY.md
-  - GAME_REVIEW_AND_IMPROVEMENT_PLAN_2026-09-05.md
-  - IMPLEMENTATION_STATUS_2026-09-05.md
-  - RELEASE_VALIDATION_1_3_0.md
   - SAVE_INTEGRITY_UPGRADE.md
   - STORY_AND_VISUAL_IMPLEMENTATION.md
-  - STORY_EDITORIAL_REVIEW.md
   - STORY_PLAYTEST_PROTOCOL.md
   - SUPPORT_AND_RETENTION_RUNBOOK.md
   - VOCABULARY_AUDIT_2026-09-05.md
   - reports/
-  - review-2026-09-05/
-  - visual-review/
   - device-evidence/
   - VOCABULARY_EDITORIAL_DECISIONS_2026-09-06.md
   - PUZZLE_BANK_TOP_UP_2026-09-06.md
-  - COMPLETION_HANDOFF_2026-09-06.md
   - review-2026-09-06/
-  - STORY_EDITORIAL_REVIEW_2026-09-06.md
   - CURRENT_BUILD.md
   - BUILD_AND_UPLOAD.md
   - LAUNCH_READINESS_REVIEW_2026-09-14.md

@@ -12,7 +12,7 @@ Working copy for the App Store / Google Play listings. The hook of the game is
 the tonal bait-and-switch — the listing must *hint* at the darkness without
 spoiling the reveal, while the age rating must declare it honestly.
 
-> Earlier September update: previous uploaded screenshots are historical. The [signed-build validation brief](RELEASE_VALIDATION_1_3_0.md#current-store-capture-brief) remains useful for device checks. The current Android campaign is linked above. No listing upload is part of this code change.
+> Earlier September update: previous uploaded screenshots are historical. The device-check steps that brief carried now live in the [launch checklist](LAUNCH_CHECKLIST.md). The current Android campaign is linked above. No listing upload is part of this code change.
 
 ## Identity
 

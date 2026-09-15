@@ -2,7 +2,7 @@
 
 A word puzzle game where players shift letters between words to form valid English words. Painted tokens and a warm animal cottage gradually descend into cosmic horror: the words sustain an unnamed presence, whose affection can preserve comfort by correcting change and dissent. The cast knows different parts of the invitation. The player learns its cost and chooses a boundary that survives the arrival.
 
-See [Story and visual implementation](docs/STORY_AND_VISUAL_IMPLEMENTATION.md) for the current canon, essential conversations, final-board routes, persistence guarantees and reviewed screenshots. This supersedes historical descriptions below that imply a uniformly omniscient cast or automatic serenity after the arrival.
+See [Story and visual implementation](docs/STORY_AND_VISUAL_IMPLEMENTATION.md) for the current canon, essential conversations, final-board routes and persistence guarantees. (Its `visual-review/` screenshot set was retired on 2026-09-15 with the rest of the September evidence; the prose is the canon.) This supersedes historical descriptions below that imply a uniformly omniscient cast or automatic serenity after the arrival.
 
 ## Current Reference (2026-09-13)
 
