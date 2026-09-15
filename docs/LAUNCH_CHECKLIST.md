@@ -88,6 +88,16 @@ verify the latest binary, backend deployment or public release.
   current captures and show the shipped +25% Challenge reward, current counts
   and spoiler-safe UI. Earlier uploaded July/August images were stale; the
   presence of replacements in Git does not update Play Console.
+- [ ] **Upload the 512x512 Play listing icon BY HAND.** `docs/store-icon-512.png`
+  (Ember close-up in the green sweater holding a wooden W tile; a clean RGBA
+  re-encode of `mobile/assets/Play_store/launch-2026-09/upload/store-icon-512.png`,
+  512x512, fully opaque, no baked rounded corners and no baked drop shadow, since
+  Play applies its own rounding and shadow). This asset does NOT come from the
+  build and no CI step touches it: Play Console -> Main store listing -> Graphics
+  -> App icon. The in-app launcher icon is a separate surface that ships in the
+  binary, and it deliberately carries no letter tile (see the Asset System
+  section of `CLAUDE.md`).
+
 - [ ] **Production configuration cut.** Do NOT edit `expo.extra.adsUseTestIds`
   or `ci.yml`: `app.config.js` derives the shipped flag from
   `WORDSHIFT_RELEASE_CHANNEL`, so `eas build --profile production` resolves live

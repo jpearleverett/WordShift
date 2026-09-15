@@ -58,3 +58,7 @@ test-results/
 # Splash-mark design prototypes (throwaway; the shipped generator is
 # scripts/tools/generateSplash.mjs)
 .splash-lab/
+
+# Icon design lab (scratch concepts) and its blind-review sheets
+.icon-lab/
+scripts/tools/.icon-review/

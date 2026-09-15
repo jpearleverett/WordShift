@@ -46,7 +46,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFF0F5"
+        "backgroundColor": "#F3E2BF"
       },
       "package": "com.wordshift.app",
       "versionCode": 100,

@@ -115,7 +115,14 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 
 ## Asset checklist
 
-- [x] App icon 1024×1024 — `mobile/assets/icon.png`
+- [x] App icon, in-app 1024×1024 — `mobile/assets/icon.png` (iOS/expo icon, ships
+  in the binary). The Android launcher icon is a different file,
+  `mobile/assets/adaptive-icon.png` (Ember's head on `#F3E2BF` parchment, filling
+  the adaptive-icon 66dp safe circle); both are written by
+  `mobile/scripts/tools/processAppIcon.mjs`.
+- [ ] App icon, Play listing 512×512 — `docs/store-icon-512.png`. **Manual upload**
+  in Play Console → Main store listing → Graphics; it does not come from the
+  build. Carries the wooden W tile, which the launcher mark deliberately does not.
 - [ ] Compare the September 7 campaign's eight web-captured phone images with the latest signed Android build. Refresh changed dialogue/choice and room surfaces as needed. The July 13 uploads and September 6 listing-access result below are historical; current Console state was not reverified by this documentation review.
 - [x] Feature graphic 1024×500 (Play), generated — `docs/feature-graphic.png`
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)

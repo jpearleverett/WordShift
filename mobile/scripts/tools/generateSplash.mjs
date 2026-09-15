@@ -78,10 +78,10 @@ const ASSET = (p) => path.join(MOBILE, 'assets', p);
 // --------------------------------------------------------------- palette ---
 // Lifted from scripts/tools/shopIcons/_draw.mjs so the launch art is drawn in
 // the same hand as the rest of the game's generated icons.
-const INK = [0x3b, 0x24, 0x16];        // warm near-black contour, never #000
-const GLOW_LIT = [0xff, 0xc8, 0x45];   // AMB.hi, where the house light falls
-const GLOW_SHADE = [0x8a, 0x4e, 0x18]; // between WOOD.dark and AMB.lo
-const BG = [0xf3, 0xe2, 0xbf];         // PARCH.base, review sheet only
+export const INK = [0x3b, 0x24, 0x16];        // warm near-black contour, never #000
+export const GLOW_LIT = [0xff, 0xc8, 0x45];   // AMB.hi, where the house light falls
+export const GLOW_SHADE = [0x8a, 0x4e, 0x18]; // between WOOD.dark and AMB.lo
+export const BG = [0xf3, 0xe2, 0xbf];         // PARCH.base, review sheet only
 
 // -------------------------------------------------------------- geometry ---
 const IMAGE_WIDTH_DP = 200;  // app.json plugins["expo-splash-screen"].android.imageWidth
@@ -107,9 +107,9 @@ const WORDMARK_BOX_DP = 234;         // declared width; wordmark.png is exactly 
 const WORDMARK_TOP_DP = 94;          // top of the wordmark's DECLARED box, below centre
 
 // ----------------------------------------------------------- png helpers ---
-const load = (p) => PNG.sync.read(fs.readFileSync(p));
+export const load = (p) => PNG.sync.read(fs.readFileSync(p));
 
-function save(file, w, h, rgba) {
+export function save(file, w, h, rgba) {
   const png = new PNG({ width: w, height: h });
   rgba.copy(png.data);
   // colorType 6 (RGBA) through pngjs emits IHDR/IDAT/IEND and nothing else,
@@ -121,7 +121,7 @@ function save(file, w, h, rgba) {
 }
 
 /** Bilinear sample of a straight-alpha RGBA source. Out of range -> transparent. */
-function sample(src, u, v) {
+export function sample(src, u, v) {
   const { width: w, height: h, data } = src;
   if (u < 0 || v < 0 || u > w - 1 || v > h - 1) return [0, 0, 0, 0];
   const x0 = Math.floor(u), y0 = Math.floor(v);
@@ -163,7 +163,7 @@ function isFoxDarkColour(r, g, b) {
 }
 
 /** Chebyshev distance to the nearest set pixel, capped at `cap` (cheap BFS). */
-function distanceTo(seed, W, H, cap) {
+export function distanceTo(seed, W, H, cap) {
   const dist = new Int32Array(W * H).fill(cap + 1);
   let frontier = [];
   for (let i = 0; i < W * H; i++) if (seed[i]) { dist[i] = 0; frontier.push(i); }
@@ -184,7 +184,7 @@ function distanceTo(seed, W, H, cap) {
 }
 
 /** Erode (grow = -1) or dilate (grow = +1) a binary mask by one 3x3 step. */
-function morphStep(mask, W, H, grow) {
+export function morphStep(mask, W, H, grow) {
   const next = mask.slice();
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
@@ -205,8 +205,8 @@ function morphStep(mask, W, H, grow) {
   return next;
 }
 
-function extractHead() {
-  const src = load(ASSET('icon.png'));
+export function extractHead(srcPath = ASSET('icon.png')) {
+  const src = load(srcPath);
   const { width: W, height: H, data } = src;
   const n = W * H;
 
@@ -347,7 +347,7 @@ function extractHead() {
  * radius-driving extreme pixel is at her upper left, so a naive upward nudge
  * pushes maxSubjectRadius straight past the pinned 0.48.
  */
-function placementCircle(W, head, bbox) {
+export function placementCircle(W, head, bbox) {
   const pts = [];
   for (let y = bbox[1]; y <= bbox[3]; y++) for (let x = bbox[0]; x <= bbox[2]; x++) {
     const i = y * W + x;
@@ -374,9 +374,25 @@ function placementCircle(W, head, bbox) {
  * pinned radius bound is exact rather than hopeful -- no feathered glow pixel
  * can creep past it, and the test counts a pixel at alpha 1/255 at full weight.
  */
-function renderEmber(size, headData, circle) {
+export function renderEmber(size, headData, circle, budget = {}) {
+  // Defaults are the splash numbers, so calling this with three arguments is
+  // byte-identical to before. A caller with a DIFFERENT mask (the adaptive
+  // icon's 66/108 circle, a full-bleed store square) passes its own budget
+  // rather than re-implementing the compositor.
+  const {
+    foxR = FOX_R,
+    contourPx = CONTOUR_PX,
+    glowPad = GLOW_PAD,
+    clipR = foxR + contourPx + glowPad,
+    // The shaded half of the directional bloom. A caller delivering the mark at
+    // a much SMALLER size needs this carried deeper: at 48px the bloom is about
+    // one pixel wide, so it has to read as contact shade in that one pixel or
+    // her cream muzzle has nothing but the contour holding it off a cream
+    // ground. Default unchanged, so the splash's own output is byte-identical.
+    glowShade = GLOW_SHADE,
+  } = budget;
   const { W: SW, H: SH, head, col } = headData;
-  const scale = FOX_R / circle.r;
+  const scale = foxR / circle.r;
   const cx = size / 2, cy = size / 2;
   const colSrc = { width: SW, height: SH, data: col };
 
@@ -444,7 +460,7 @@ function renderEmber(size, headData, circle) {
     for (let x = 0; x < size; x++) {
       const i = y * size + x;
       const rad = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
-      const clip = Math.max(0, Math.min(1, CLIP_R - rad + 0.5));
+      const clip = Math.max(0, Math.min(1, clipR - rad + 0.5));
       if (clip <= 0) continue;
 
       const d = dist[i];
@@ -458,18 +474,18 @@ function renderEmber(size, headData, circle) {
       // muzzle and chin are cream and score barely 1.09:1 against the cream
       // ground, so the lower third of her face needs warm light behind the
       // contour or it starts to dissolve at the smallest delivery size.
-      if (d < CONTOUR_PX + GLOW_PAD + 1) {
-        const g = Math.max(0, d - CONTOUR_PX);
-        const t = g / GLOW_PAD;
-        const fall = Math.exp(-g / (GLOW_PAD * 0.55)) * Math.max(0, 1 - t * t * t);
+      if (d < contourPx + glowPad + 1) {
+        const g = Math.max(0, d - contourPx);
+        const t = g / glowPad;
+        const fall = Math.exp(-g / (glowPad * 0.55)) * Math.max(0, 1 - t * t * t);
         // 0 toward the upper-left light, 1 toward the shaded lower right
-        const nx = (x + 0.5 - cx) / FOX_R, ny = (y + 0.5 - cy) / FOX_R;
+        const nx = (x + 0.5 - cx) / foxR, ny = (y + 0.5 - cy) / foxR;
         const len = Math.max(1e-6, Math.hypot(nx, ny));
         const k = Math.max(0, Math.min(1, (1 - (-nx - ny) / (len * Math.SQRT2)) / 2));
         const tone = [
-          GLOW_LIT[0] + (GLOW_SHADE[0] - GLOW_LIT[0]) * k,
-          GLOW_LIT[1] + (GLOW_SHADE[1] - GLOW_LIT[1]) * k,
-          GLOW_LIT[2] + (GLOW_SHADE[2] - GLOW_LIT[2]) * k,
+          GLOW_LIT[0] + (glowShade[0] - GLOW_LIT[0]) * k,
+          GLOW_LIT[1] + (glowShade[1] - GLOW_LIT[1]) * k,
+          GLOW_LIT[2] + (glowShade[2] - GLOW_LIT[2]) * k,
         ];
         const a = (0.62 + 0.46 * k) * fall;
         if (a > 0.004) put(i, tone, a * clip);
@@ -477,8 +493,8 @@ function renderEmber(size, headData, circle) {
       // The house contour: thick, warm-dark, so the silhouette survives at
       // 144dp on parchment and on ash alike. Her own painted contour is dark
       // over only part of her perimeter (her jaw met her sweater, not sky).
-      if (d > 0 && d < CONTOUR_PX + 1) {
-        const a = Math.max(0, Math.min(1, CONTOUR_PX + 0.5 - d));
+      if (d > 0 && d < contourPx + 1) {
+        const a = Math.max(0, Math.min(1, contourPx + 0.5 - d));
         if (a > 0.004) put(i, INK, a * clip);
       }
 
@@ -491,7 +507,7 @@ function renderEmber(size, headData, circle) {
 
 // -------------------------------------------------------------- resample ---
 /** Area-average resample of a square straight-alpha RGBA buffer. */
-function resample(buf, sw, dw) {
+export function resample(buf, sw, dw) {
   const out = Buffer.alloc(dw * dw * 4);
   const k = sw / dw;
   for (let y = 0; y < dw; y++) for (let x = 0; x < dw; x++) {
@@ -517,7 +533,7 @@ function resample(buf, sw, dw) {
 }
 
 /** Scale an arbitrary RGBA source into a w*h box by bilinear sampling. */
-function scaled(src, w, h) {
+export function scaled(src, w, h) {
   const out = Buffer.alloc(w * h * 4);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const c = sample(src, (x / (w - 1)) * (src.width - 1), (y / (h - 1)) * (src.height - 1));
@@ -527,7 +543,7 @@ function scaled(src, w, h) {
   return out;
 }
 
-function blit(dst, dw, dh, src, sw, sh, dx, dy) {
+export function blit(dst, dw, dh, src, sw, sh, dx, dy) {
   for (let y = 0; y < sh; y++) {
     const ty = dy + y; if (ty < 0 || ty >= dh) continue;
     for (let x = 0; x < sw; x++) {
@@ -544,7 +560,7 @@ function blit(dst, dw, dh, src, sw, sh, dx, dy) {
 }
 
 /** The metric androidLaunchAssets.test.ts pins: ANY pixel with alpha != 0. */
-function maxSubjectRadius(buf, size) {
+export function maxSubjectRadius(buf, size) {
   let m = 0;
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     if (buf[(y * size + x) * 4 + 3] === 0) continue;
@@ -555,7 +571,7 @@ function maxSubjectRadius(buf, size) {
 }
 
 /** Centre of her SOLID body, which is what the eye balances, not the alpha bbox. */
-function solidCentre(buf, size) {
+export function solidCentre(buf, size) {
   let x0 = size, y0 = size, x1 = -1, y1 = -1;
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     if (buf[(y * size + x) * 4 + 3] < 128) continue;
@@ -670,4 +686,6 @@ function writeReviewSheet(mark, dir) {
   }
 }
 
-main();
+// Only generate when invoked directly: importing this module for its matte
+// (extractHead / placementCircle / the png helpers) must not rewrite assets.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
