@@ -809,7 +809,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
   if (restoreRecoveryRequired) {
     return <Modal visible animationType="none" onRequestClose={() => {}}>
-      <View style={{ flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#FFF0F5' }}>
+      <View style={{ flex: 1, padding: 24, justifyContent: 'center', backgroundColor: '#F3E2BF' }}>
         <Text style={{ color: '#443126', fontSize: 20, marginBottom: 12 }}>Finishing your restored save</Text>
         <Text style={{ color: '#443126', fontSize: 16, marginBottom: 20 }}>Your backup was received, but the device could not finish writing it. Free some device storage if it is full, then retry.</Text>
         <CandyButton label={restoreBusy ? 'Finishing…' : 'Retry restore'} phase={phase} disabled={restoreBusy} onPress={async () => {
@@ -828,7 +828,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
   if (restoreBusy) {
     return <Modal visible animationType="none" onRequestClose={() => {}}>
-      <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF0F5' }} accessibilityViewIsModal>
+      <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3E2BF' }} accessibilityViewIsModal>
         <ActivityIndicator size="large" color="#76533A" />
         <Text accessibilityLiveRegion="polite" style={{ color: '#443126', fontSize: 18, marginTop: 20 }}>Restoring your progress…</Text>
       </View>

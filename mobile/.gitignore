@@ -54,3 +54,7 @@ src/data/.pre_gated_*.ts.bak
 # Rendered journey evidence (CI artifacts)
 playwright-report/
 test-results/
+
+# Splash-mark design prototypes (throwaway; the shipped generator is
+# scripts/tools/generateSplash.mjs)
+.splash-lab/

@@ -14,7 +14,14 @@
  *    whole subject inside the 66/108 safe circle (the audit measured 32.7% of
  *    the old subject outside it), and the icon-only splash image must fit the
  *    192dp circle of the system splash icon container at the configured
- *    imageWidth. Both PNGs must be the clean RGBA PNGs AAPT2 accepts.
+ *    imageWidth. All three launch PNGs must be the clean RGBA PNGs AAPT2
+ *    accepts.
+ *
+ * 3. The launch handoff itself. The native splash is baked into the binary at
+ *    prebuild and the JS boot hold is OTA-able, so nothing but a test keeps
+ *    them agreeing: the same mark file, at the same dp, on the same background
+ *    hex. When they drifted the player saw the app icon twice, at two sizes,
+ *    over a pale pink that appears nowhere in the game.
  */
 import { execFileSync } from 'child_process';
 import fs from 'fs';
@@ -129,6 +136,9 @@ const SPLASH_ICON_CIRCLE_DP = 192;     // Android 12+ splash icon container (no 
 describe('Android icon masks', () => {
   const adaptive = appJson.android.adaptiveIcon as { foregroundImage: string; backgroundColor: string };
   const splash = appJson.plugins.find((plugin: unknown) => Array.isArray(plugin) && plugin[0] === 'expo-splash-screen')[1] as {
+    image: string;
+    imageWidth: number;
+    backgroundColor: string;
     android: { image: string; imageWidth: number };
   };
 
@@ -151,12 +161,68 @@ describe('Android icon masks', () => {
     expect(png.data[3]).toBe(0);
   });
 
-  test.each(['assets/adaptive-icon.png', 'assets/splash-icon-android.png'])('%s is a clean RGBA PNG AAPT2 accepts', (relative) => {
+  test.each(['assets/adaptive-icon.png', 'assets/splash-icon-android.png', 'assets/splash.png'])('%s is a clean RGBA PNG AAPT2 accepts', (relative) => {
     const types = pngChunkTypes(relative);
     expect(types[0]).toBe('IHDR');
     expect(types[types.length - 1]).toBe('IEND');
     expect(new Set(types)).toEqual(new Set(['IHDR', 'IDAT', 'IEND']));
     const png = readPng(relative);
     expect(png.data.length).toBe(png.width * png.height * 4);
+  });
+
+  test('the iOS storyboard image is transparent, so only one place owns the launch colour', () => {
+    // splash.png used to bake the background in, which meant this file's hex
+    // and app.json's had to agree exactly or `contain` letterboxing showed a
+    // seam. The storyboard paints SplashScreenBackground behind it instead.
+    expect(splash.image).toBe('./assets/splash.png');
+    expect(readPng('assets/splash.png').data[3]).toBe(0);
+  });
+
+  test('iOS renders the mark at the same size Android and the boot screen do', () => {
+    // getIosSplashConfig falls through to `imageWidth ?? 100`, so leaving the
+    // ROOT imageWidth unset silently shipped a 100pt thumbnail that then jumped
+    // 3.3x into the JS boot hold. 400pt over the 1600px master puts the mark
+    // box at 200pt, matching android.imageWidth and BOOT_MARK_DP.
+    expect(splash.imageWidth).toBe(400);
+    expect(splash.android.imageWidth).toBe(200);
+  });
+});
+
+describe('the native splash hands over to the JS boot hold without a jump', () => {
+  const APP_TSX = fs.readFileSync(path.join(MOBILE_ROOT, 'App.tsx'), 'utf8');
+  const splash = appJson.plugins.find((plugin: unknown) => Array.isArray(plugin) && plugin[0] === 'expo-splash-screen')[1] as {
+    backgroundColor: string;
+    android: { image: string; imageWidth: number };
+  };
+  const bootHold = APP_TSX.slice(APP_TSX.indexOf('function BootHold('), APP_TSX.indexOf('function resetAfterRootRenderError'));
+  const bootStyles = APP_TSX.slice(APP_TSX.indexOf('const bootStyles = StyleSheet.create'));
+
+  test('the boot screen paints the splash background colour', () => {
+    // A mismatch here is a full-screen colour cut on the first frame the player
+    // ever sees. app.json owns the hex; bootStyles.container must echo it.
+    expect(splash.backgroundColor).toBe('#F3E2BF');
+    expect(bootStyles).toMatch(/container: \{[^}]*backgroundColor: '#F3E2BF'/s);
+  });
+
+  test('the boot screen renders the SAME mark file at the SAME dp as the system splash', () => {
+    expect(bootHold).toContain("require('./assets/splash-icon-android.png')");
+    expect(bootHold).not.toContain("require('./assets/icon.png')");
+    expect(APP_TSX).toMatch(new RegExp(`const BOOT_MARK_DP = ${splash.android.imageWidth};`));
+    expect(bootStyles).toMatch(/mark: \{\s*width: BOOT_MARK_DP,\s*height: BOOT_MARK_DP,\s*\}/);
+  });
+
+  test('the boot-failure card keeps its retry, cloud escape and support route', () => {
+    expect(bootHold).toMatch(/accessibilityLabel="Retry opening save"/);
+    expect(bootHold).toMatch(/accessibilityRole="link"/);
+    expect(bootHold).toMatch(/accessibilityLabel="WordShift"/);
+    // The loading branch is two absolute layers pinned to the window centre.
+    // The failure branch must stay a flowing centred column with its own
+    // smaller mark: there is no scroll view here, so an absolutely centred
+    // 200dp mark would sit ON the card and the card itself would push the
+    // support link off a short screen.
+    const failedBranch = bootHold.slice(bootHold.indexOf('if (failed) {'), bootHold.indexOf('// Two absolute layers'));
+    expect(failedBranch).toContain('BOOT_FAILED_MARK_DP');
+    expect(failedBranch).toContain('bootStyles.failedCard');
+    expect(failedBranch).not.toContain('bootStyles.markLayer');
   });
 });
