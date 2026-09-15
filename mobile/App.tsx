@@ -6304,16 +6304,36 @@ function MainApp() {
 
 /** Bootstrap owns restore/migration ordering; local recovery failures are retryable. */
 /**
- * The branded boot hold (F97/F119/F127): the fox icon card + wooden wordmark +
- * quiet spinner on the splash cream, sized RELATIVE TO THE WINDOW so it mirrors
- * the native splash's `contain` math (square 1600 art master) on every device
- * instead of a fixed 152/244px that jumped on the splash->JS handoff. Shared by
- * the App bootstrap gate and MainApp's onboarding-hydration gate so all three
- * holds (native splash, bootstrap, hydration) read as ONE continuous frame.
- * On Android 12+ the native splash is the icon-only `splash-icon-android.png`
- * at 200dp (no wordmark), so the continuous-frame claim holds on iOS; Android
- * shows the card resize and the wordmark arriving at the handoff.
+ * The branded boot hold, shared by the App bootstrap gate and MainApp's
+ * onboarding-hydration gate.
+ *
+ * It renders THE SAME FILE the native splash renders, at THE SAME dp, in THE
+ * SAME place: `splash-icon-android.png` (Ember's face) in a 200dp box pinned to
+ * the window centre. The native splash is 200dp on every device regardless of
+ * screen width, so the old window-relative `min(w,h) * 740/1600` sizing could
+ * never match it - it was 166dp on a 360dp phone against the native 144dp card,
+ * and on iOS the storyboard was rendering at an unset-imageWidth 100pt, so the
+ * icon appeared twice and jumped 15-26% (Android) or 3.3x (iOS) between the two
+ * frames. Now Ember does not move or resize across the handoff at all: the
+ * wordmark and the amber loader ARRIVE beneath her, which makes the boot screen
+ * a progression rather than the same picture twice.
+ *
+ * The dp offsets below are a contract with scripts/tools/generateSplash.mjs,
+ * which bakes the identical numbers into assets/splash.png (at 4px per point,
+ * a 1600px master against the root imageWidth of 400). Both are measured from
+ * the CENTRE, never as "a gap under the mark box": a gap constant is how the
+ * two surfaces silently drifted 18pt apart. Change one, change the other.
  */
+const BOOT_MARK_DP = 200;          // = expo-splash-screen android.imageWidth
+const BOOT_WORDMARK_DP = 234;      // declared width; assets/ui/wordmark.png is exactly 4:1
+const BOOT_WORDMARK_TOP_DP = 94;   // top of the wordmark's declared box, below centre
+const BOOT_LOADER_GAP_DP = 24;
+// The failure card is ~300dp of message, two buttons, a support link and the
+// support id, and BootHold has no ScrollView: at the full 200dp mark the column
+// overflows a 320x568dp screen and clips the support link away on the one
+// screen a player reaches when their save could not be opened. The quiet mark
+// is for that branch only; it is not a handoff frame, so it need not match.
+const BOOT_FAILED_MARK_DP = 140;
 // The support mailto names the NATIVE build (the installed versionName), the
 // same identity Settings > About reports, so a report from a boot that never
 // opened still says which build it came from.
@@ -6331,7 +6351,6 @@ function BootHold({
   onContinueWithoutCloud?: () => void;
   failureKind?: 'cloud' | 'local';
 }) {
-  const { width, height } = useWindowDimensions();
   // The support ID is a storage read; when the save itself is what failed the
   // read may fail too, in which case the mail simply opens without it.
   const [supportIdentifier, setSupportIdentifier] = useState<string | null>(null);
@@ -6347,27 +6366,24 @@ function BootHold({
     Linking.openURL(getSupportMailto(BOOT_APP_VERSION, supportIdentifier ?? undefined)).catch(() => {});
   }, [supportIdentifier]);
   const copy = getBootFailureCopy(onContinueWithoutCloud ? 'cloud' : failureKind);
-  const m = Math.min(width, height);
-  const iconSize = Math.round(m * (740 / 1600));
-  const wordmarkWidth = Math.round(m * (810 / 1600));
-  const gap = Math.round(m * (64 / 1600));
-  return (
-    <View style={bootStyles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
-      <View style={[bootStyles.iconCard, { width: iconSize, height: iconSize, borderRadius: Math.round(iconSize * 0.18), marginBottom: gap }]}>
+  if (failed) {
+    // A flowing, group-centred column: the card must be allowed to push the
+    // mark up rather than overflow off the bottom (there is no ScrollView here,
+    // and the support link is the last thing a stuck player needs to reach).
+    return (
+      <View style={bootStyles.container}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
         <Image
-          source={require('./assets/icon.png')}
-          style={bootStyles.iconImage}
-          resizeMode="cover"
+          source={require('./assets/splash-icon-android.png')}
+          style={{ width: BOOT_FAILED_MARK_DP, height: BOOT_FAILED_MARK_DP, marginBottom: 8 }}
+          resizeMode="contain"
           accessibilityLabel="WordShift"
         />
-      </View>
-      <Image
-        source={require('./assets/ui/wordmark.png')}
-        style={{ width: wordmarkWidth, height: Math.round(wordmarkWidth * 0.25) }}
-        resizeMode="contain"
-      />
-      {failed ? (
+        <Image
+          source={require('./assets/ui/wordmark.png')}
+          style={bootStyles.wordmark}
+          resizeMode="contain"
+        />
         <View style={bootStyles.failedCard}>
           <Text style={bootStyles.failedMessage}>
             {copy.message}
@@ -6387,7 +6403,30 @@ function BootHold({
             <Text selectable style={bootStyles.failedSupportId}>Support ID: {supportIdentifier}</Text>
           ) : null}
         </View>
-      ) : <BrandedLoader size={30} style={{ marginTop: Math.round(gap * 1.4) }} />}
+      </View>
+    );
+  }
+  // Two absolute layers, so the mark holds the TRUE window centre (where the
+  // native splash left it) while the wordmark and loader hang beneath it.
+  return (
+    <View style={bootStyles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <View style={bootStyles.markLayer} pointerEvents="none">
+        <Image
+          source={require('./assets/splash-icon-android.png')}
+          style={bootStyles.mark}
+          resizeMode="contain"
+          accessibilityLabel="WordShift"
+        />
+      </View>
+      <View style={bootStyles.belowLayer} pointerEvents="none">
+        <Image
+          source={require('./assets/ui/wordmark.png')}
+          style={bootStyles.wordmark}
+          resizeMode="contain"
+        />
+        <BrandedLoader size={32} style={bootStyles.spinner} />
+      </View>
     </View>
   );
 }
@@ -6438,29 +6477,45 @@ function App() {
 const bootStyles = StyleSheet.create({
   container: {
     flex: 1,
-    // Matches the native splash background (#FFF0F5) so splash → boot is a
-    // seamless hold rather than a bright-pink-to-near-black hard cut on the
-    // first impression. The wooden wordmark reads well on both.
-    backgroundColor: '#FFF0F5',
+    // PARCH.base, the parchment fill of every cottage card. It is the same hex
+    // as the native splash background in app.json (and as the two branded holds
+    // in SettingsScreen), so splash → boot is a seamless hold rather than a
+    // colour cut on the very first impression. The old #FFF0F5 pale pink
+    // appeared nowhere else in the game.
+    backgroundColor: '#F3E2BF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Rounded fox card — width/height/borderRadius/marginBottom are supplied
-  // window-relative by BootHold (F127). No shadow: the native splash card is
-  // shadowless, so a boot shadow made the handoff visibly pop.
-  iconCard: {
-    overflow: 'hidden',
+  // The mark holds the true window centre, exactly where the native splash
+  // handed it over.
+  markLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  iconImage: {
-    width: '100%',
-    height: '100%',
+  mark: {
+    width: BOOT_MARK_DP,
+    height: BOOT_MARK_DP,
+  },
+  // Everything that ARRIVES after the handoff hangs off the same centre line.
+  belowLayer: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingTop: BOOT_WORDMARK_TOP_DP,
   },
   wordmark: {
-    width: 244,
-    height: 61,
+    width: BOOT_WORDMARK_DP,
+    height: BOOT_WORDMARK_DP * 0.25,
   },
   spinner: {
-    marginTop: 30,
+    marginTop: BOOT_LOADER_GAP_DP,
   },
   failedCard: {
     padding: 24,
@@ -6473,10 +6528,19 @@ const bootStyles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 16,
   },
+  // On the old pale-pink ground #DFC8AA and #EBDCC6 were legible button fills.
+  // On parchment they collapse to 1.27:1 and 1.06:1, i.e. the secondary button
+  // becomes the same value as the page and reads as an invisible rectangle on
+  // the one screen a player reaches when their save failed to open. The primary
+  // takes a light-oak fill (the #443126 label still reads 6.07:1 on it) and
+  // both take the house contour, so the secondary is an OUTLINED button rather
+  // than a ghost. Every text ink survives the ground change untouched.
   failedButton: {
     padding: 16,
-    backgroundColor: '#DFC8AA',
+    backgroundColor: '#E3AC6E',
     borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#3B2416',
     alignSelf: 'stretch',
     alignItems: 'center',
   },

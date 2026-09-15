@@ -115,9 +115,21 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 
 ## Asset checklist
 
-- [x] App icon 1024×1024 — `mobile/assets/icon.png`
+- [x] App icon, in-app 1024×1024 — `mobile/assets/icon.png` (iOS/expo icon, ships
+  in the binary). The Android launcher icon is a different file,
+  `mobile/assets/adaptive-icon.png` (Ember's head on `#F3E2BF` parchment, filling
+  the adaptive-icon 66dp safe circle); both are written by
+  `mobile/scripts/tools/processAppIcon.mjs`.
+- [ ] App icon, Play listing 512×512 — `docs/store-icon-512.png`. **Manual upload**
+  in Play Console → Main store listing → Graphics; it does not come from the
+  build. Carries the wooden W tile, which the launcher mark deliberately does not.
 - [ ] Compare the September 7 campaign's eight web-captured phone images with the latest signed Android build. Refresh changed dialogue/choice and room surfaces as needed. The July 13 uploads and September 6 listing-access result below are historical; current Console state was not reverified by this documentation review.
-- [x] Feature graphic 1024×500 (Play), generated — `docs/feature-graphic.png`
+- [ ] Feature graphic 1024×500 (Play) — `docs/feature-graphic.png`, a byte-identical
+  mirror of the launch pack's
+  `mobile/assets/Play_store/launch-2026-09/upload/feature-graphic-1024x500.png`
+  (built by `mobile/scripts/store/buildLaunch.mjs`). **Manual upload** in Play
+  Console → Main store listing → Graphics; it does not come from the build, and
+  `npm run generate:assets` no longer writes it.
 - [ ] iPhone 6.7" screenshots ×5 (needs device/simulator)
 - [ ] iPad 12.9" screenshots ×3 (supportsTablet is true)
 
@@ -170,8 +182,11 @@ since capture: Speed is now a stackable modifier rather than a style row, and a
 fourth modifier (Lexicon) was added. Recapture #5 whenever the screenshots next
 get touched.
 
-Final feature graphic: `docs/feature-graphic.png`
-Feature graphic alt text: Ember the fox beside the exact WordShift logo, candy tiles, glowing amber, and a sunny-to-dusk forest with subtle distant eyes.
+Final feature graphic: `docs/feature-graphic.png` (the painted den scene — Ember
+by the hearth under the wooden wordmark and the tagline "A little wordplay. / A
+world to uncover."). It replaced a procedurally drawn gradient-and-candy-tiles
+placeholder that carried no fox, no wordmark and no tagline.
+Feature graphic alt text: Ember the fox sits by a glowing hearth beside mugs and letter tiles, with a dim doorway behind her.
 
 Never show Phase 4+ content, robed sprites, or the revealed shadow figure in
 store assets — the reveal is the product.
