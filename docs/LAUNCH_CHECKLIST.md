@@ -79,17 +79,21 @@ verify the latest binary, backend deployment or public release.
   three-argument one (ambiguous overload, PostgREST 300) and re-grant the legacy
   daily RPCs. One item remains below: a signed build must still post a Daily
   rank end to end.
+- [x] **Event retention deployed and executing.** The
+  `wordshift-event-retention` cron job was created by the owner on 2026-09-15
+  (it is NOT created by `apply_upgrade.sql`: it needs Supabase Cron enabled plus
+  `docs/supabase/schedule_event_retention.sql` run as postgres) and has
+  completed a successful run. Keep the job/run row with the release record. Its
+  oldest-row query is what proves the window actually prunes, and that only
+  becomes meaningful once real event volume arrives, so re-check it after the
+  first days of live traffic rather than treating it as closed forever.
 - [ ] **Remaining backend evidence.** From an operator connection: actual event
   rows from the signed build, a **Daily rank posted end to end by a signed
   build** (the one part of the rate-limit migration a key-only probe cannot
-  prove), the `wordshift-event-retention` cron job's first successful run and
-  oldest-row output (the job itself was created by the owner on 2026-09-15;
-  note it is NOT created by `apply_upgrade.sql`, it needs Supabase Cron enabled
-  plus `docs/supabase/schedule_event_retention.sql` run as postgres), two-device
-  conflict handling, verified support recovery/deletion, the project plan tier
-  plus disk/usage alerts (the events table shares the disk with saves), Sentry
-  alert rules and a symbolicated event from the exact signed release. Follow
-  [backend setup](BACKEND_SETUP.md).
+  prove), two-device conflict handling, verified support recovery/deletion, the
+  project plan tier plus disk/usage alerts (the events table shares the disk
+  with saves), Sentry alert rules and a symbolicated event from the exact signed
+  release. Follow [backend setup](BACKEND_SETUP.md).
 - [ ] **Review the current store package.** Use the reviewed launch package in
   `mobile/assets/Play_store/launch-2026-09/`, its claims ledger and
   [store listing](STORE_LISTING.md). Confirm the files actually uploaded are the

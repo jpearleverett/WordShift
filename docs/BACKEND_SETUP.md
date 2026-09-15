@@ -189,11 +189,13 @@ A read-only probe with the publishable key from `mobile/app.json` (no
 | `POST events` with a not-null violation | `23502` | the legacy column-scoped INSERT grant is live (now bounded by `rate_limits_v1.sql`, applied 2026-09-15) |
 
 Not verifiable with the publishable key, still open on the checklist: actual
-event rows arriving, the Sentry alert rules and the project plan tier. The
-`wordshift-event-retention` cron job was created by the owner on 2026-09-15
-(`schedule_event_retention.sql` as postgres, with Supabase Cron enabled); its
-first successful run and oldest-row output are still worth keeping with the
-release record.
+event rows arriving from the signed build, the Sentry alert rules and the
+project plan tier. The `wordshift-event-retention` cron job was created by the
+owner on 2026-09-15 (`schedule_event_retention.sql` as postgres, with Supabase
+Cron enabled) and has since completed a successful run, so event retention is
+deployed and executing. Keep that job/run row with the release record; its
+oldest-row query is the check that the window is actually pruning once real
+event volume arrives.
 
 The post-apply probe was re-run by the owner on 2026-09-15 and reported
 passing: `rpc/submit_daily_score` and `rpc/daily_rank` answer `42501` (both are
