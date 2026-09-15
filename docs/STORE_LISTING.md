@@ -120,11 +120,13 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
   `mobile/assets/adaptive-icon.png` (Ember's head on `#F3E2BF` parchment, filling
   the adaptive-icon 66dp safe circle); both are written by
   `mobile/scripts/tools/processAppIcon.mjs`.
-- [ ] App icon, Play listing 512×512 — `docs/store-icon-512.png`. **Manual upload**
+- [x] App icon, Play listing 512×512 — uploaded by the owner on 2026-09-15.
+  `docs/store-icon-512.png`. **Manual upload**
   in Play Console → Main store listing → Graphics; it does not come from the
   build. Carries the wooden W tile, which the launcher mark deliberately does not.
-- [ ] Compare the September 7 campaign's eight web-captured phone images with the latest signed Android build. Refresh changed dialogue/choice and room surfaces as needed. The July 13 uploads and September 6 listing-access result below are historical; current Console state was not reverified by this documentation review.
-- [ ] Feature graphic 1024×500 (Play) — `docs/feature-graphic.png`, a byte-identical
+- [x] Compare the September 7 campaign's eight web-captured phone images with the latest signed Android build. Reviewed and uploaded by the owner on 2026-09-15. Refresh changed dialogue/choice and room surfaces as needed. The July 13 uploads and September 6 listing-access result below are historical; current Console state was not reverified by this documentation review.
+- [x] Feature graphic 1024×500 (Play) — uploaded by the owner on 2026-09-15.
+  `docs/feature-graphic.png`, a byte-identical
   mirror of the launch pack's
   `mobile/assets/Play_store/launch-2026-09/upload/feature-graphic-1024x500.png`
   (built by `mobile/scripts/store/buildLaunch.mjs`). **Manual upload** in Play

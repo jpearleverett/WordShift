@@ -94,13 +94,15 @@ verify the latest binary, backend deployment or public release.
   project plan tier plus disk/usage alerts (the events table shares the disk
   with saves), Sentry alert rules and a symbolicated event from the exact signed
   release. Follow [backend setup](BACKEND_SETUP.md).
-- [ ] **Review the current store package.** Use the reviewed launch package in
+- [x] **Review the current store package.** Done by the owner on 2026-09-15.
+  Use the reviewed launch package in
   `mobile/assets/Play_store/launch-2026-09/`, its claims ledger and
   [store listing](STORE_LISTING.md). Confirm the files actually uploaded are the
   current captures and show the shipped +25% Challenge reward, current counts
   and spoiler-safe UI. Earlier uploaded July/August images were stale; the
   presence of replacements in Git does not update Play Console.
-- [ ] **Upload the 512x512 Play listing icon BY HAND.** `docs/store-icon-512.png`
+- [x] **Upload the 512x512 Play listing icon BY HAND.** Uploaded by the owner on
+  2026-09-15. `docs/store-icon-512.png`
   (Ember close-up in the green sweater holding a wooden W tile; a clean RGBA
   re-encode of `mobile/assets/Play_store/launch-2026-09/upload/store-icon-512.png`,
   512x512, fully opaque, no baked rounded corners and no baked drop shadow, since
@@ -109,14 +111,16 @@ verify the latest binary, backend deployment or public release.
   -> App icon. The in-app launcher icon is a separate surface that ships in the
   binary, and it deliberately carries no letter tile (see the Asset System
   section of `CLAUDE.md`).
-- [ ] **Upload the 1024x500 feature graphic BY HAND.** `docs/feature-graphic.png`
+- [x] **Upload the 1024x500 feature graphic BY HAND.** Uploaded by the owner on
+  2026-09-15. `docs/feature-graphic.png`
   (Ember by the hearth under the wooden wordmark and the tagline "A little
   wordplay. / A world to uncover."), a byte-identical mirror of
   `mobile/assets/Play_store/launch-2026-09/upload/feature-graphic-1024x500.png`,
   1024x500 RGB with no alpha. Same place as the icon: Play Console -> Main store
   listing -> Graphics -> Feature graphic. It does not come from the build either;
   `npm run generate:assets` used to overwrite this path with a placeholder
-  gradient and no longer writes it at all.
+  gradient and no longer writes it at all. Both Graphics assets are manual, so
+  changing either file in Git does NOT update Play Console: re-upload by hand.
 
 - [ ] **Production configuration cut.** Do NOT edit `expo.extra.adsUseTestIds`
   or `ci.yml`: `app.config.js` derives the shipped flag from
