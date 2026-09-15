@@ -11,8 +11,10 @@ verify the latest binary, backend deployment or public release.
 - [x] **Production access granted.** The owner completed the 12-tester/14-day
   closed test and confirmed access on 2026-08-31.
 - [ ] **Identify the exact release artifact.** Source configures app **1.3.6**,
-  Android **100** (raised from 1.3.5/99 on 2026-09-14), with local version
-  management and no automatic increment. Compare the next code with Play Console
+  Android **101** (99 was 1.3.5; 100 was set on 2026-09-14; 101 is the
+  2026-09-15 `expo-device` native build, bumped locally by the owner and
+  committed the same day so a clean checkout cannot rebuild a consumed code),
+  with local version management and no automatic increment. Compare the next code with Play Console
   before uploading, and raise it again for each further upload: the internal-testing
   and production candidates are separate uploads and cannot share a code. Record commit, EAS build ID, version/code,
   runtime, track and device. `package.json`'s 1.3.1 is package metadata, not the native app version.
@@ -21,7 +23,16 @@ verify the latest binary, backend deployment or public release.
   `npm test -- --no-coverage`, `npm run test:e2e`, `npx expo install --check`
   and `npx expo-doctor`. Consult [current build](CURRENT_BUILD.md) for already
   recorded CI evidence; green JavaScript CI does not establish native release QA.
+- [x] **Play Console declarations.** Data safety, content rating (IARC), target
+  audience and the listing website field were all declared by the owner on
+  2026-09-15. Guidance they were answered against is in
+  [the launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-14.md). RTDN to
+  RevenueCat is an integration rather than a declaration and is still open below.
 - [ ] **Build the optimized signed AAB and test through Play internal testing.**
+  PARTIAL, 2026-09-15: the owner built the `expo-device` native binary (code 101)
+  and confirmed it installs and runs. That clears "does a minified binary start",
+  which was the open question expo-device raised. It does NOT clear the rest of
+  this item, which is what actually gates promotion.
   Release minification/resource shrinking and the optimized ProGuard default are
   enabled in source. The template/config tests do not prove a minified Android
   binary starts or that reflection-dependent SDKs work. Recheck cold start,

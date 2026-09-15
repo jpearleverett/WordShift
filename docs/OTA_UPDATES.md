@@ -3,7 +3,7 @@
 Reviewed against main `6f96ebb` on 2026-09-13; production publish, verification and
 rollback runbook added 2026-09-14. See [current build](CURRENT_BUILD.md),
 [build and upload guide](BUILD_AND_UPLOAD.md) and [release gates](LAUNCH_CHECKLIST.md).
-The repository currently configures app **1.3.6**, Android code **100** and iOS build
+The repository currently configures app **1.3.6**, Android code **101** and iOS build
 **3**; this is source configuration, not confirmation of an uploaded artifact. The
 version moved from 1.3.5 on 2026-09-14 for the first production candidate, so every
 resolved runtime below moved with it: an update published against a `1.3.5-*`

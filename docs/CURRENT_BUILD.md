@@ -4,7 +4,7 @@ Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main`
 
 ## Build identity
 
-Current source builds on main `70a1883`, which carries the launch-readiness fixes (PR 439), the in-band CI exit-code fix (PR 440/441) and the release-candidate version bump. App version is **1.3.6** and Android version code **100**, raised together on 2026-09-14: `expo-device` is a new native module, so the next Play artifact is a new binary and its OTA runtime moves with it. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source builds on main `70a1883`, which carries the launch-readiness fixes (PR 439), the in-band CI exit-code fix (PR 440/441) and the release-candidate version bump. App version is **1.3.6** and Android version code **101** (100 was set on 2026-09-14 with the 1.3.6 bump; 101 is the 2026-09-15 `expo-device` native build, bumped locally by the owner and committed the same day). `expo-device` is a new native module, so that artifact is a new binary and its OTA runtime moved with it; the owner confirmed it installs and runs, which is not the same as the device matrix. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
