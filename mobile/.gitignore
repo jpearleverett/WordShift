@@ -62,3 +62,8 @@ test-results/
 # Icon design lab (scratch concepts) and its blind-review sheets
 .icon-lab/
 scripts/tools/.icon-review/
+
+# Vocabulary/bank audit reports. Reproducible from the documented commands
+# (docs/VOCABULARY_AUDIT_2026-09-05.md, docs/reports/BANK_DELIVERY_VALIDATION_2026-09-05.md),
+# so they are regenerated on demand rather than committed as evidence.
+.audit-reports/

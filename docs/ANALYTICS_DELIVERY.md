@@ -45,8 +45,10 @@ for offline delivery and sessions crossing midnight. Use install-based cohorts
 for drop-off, rather than treating event-count ratios as unique-player conversion.
 The first observed event is not necessarily install day for upgraded players.
 Record build/runtime, collection window and eligible sample size with decisions.
-Hosted migration, production event arrival and retention remain operator release
-checks; local Jest queue tests and PostgreSQL rehearsal do not verify them.
+The hosted migration and the retention cron were applied by the owner on
+2026-09-15 and the cron has completed a successful run. Production event arrival
+from the signed build remains an operator release check; local Jest queue tests
+and PostgreSQL rehearsal do not verify it.
 
 ## Reading the current gameplay and store events
 

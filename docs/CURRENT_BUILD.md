@@ -4,7 +4,7 @@ Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main`
 
 ## Build identity
 
-Current source builds on main `70a1883`, which carries the launch-readiness fixes (PR 439), the in-band CI exit-code fix (PR 440/441) and the release-candidate version bump. App version is **1.3.6** and Android version code **100**, raised together on 2026-09-14: `expo-device` is a new native module, so the next Play artifact is a new binary and its OTA runtime moves with it. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source builds on main `70a1883`, which carries the launch-readiness fixes (PR 439), the in-band CI exit-code fix (PR 440/441) and the release-candidate version bump. App version is **1.3.6** and Android version code **101** (100 was set on 2026-09-14 with the 1.3.6 bump; 101 is the 2026-09-15 `expo-device` native build, bumped locally by the owner and committed the same day). `expo-device` is a new native module, so that artifact is a new binary and its OTA runtime moved with it; the owner confirmed it installs and runs, which is not the same as the device matrix. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
@@ -165,7 +165,8 @@ the next artifact, not the current one**, on three blockers:
 The review's medium and low findings that live in the repository were fixed
 the same day on the review branch (resolution table in the review document);
 the backend items are tracked in [backend setup](BACKEND_SETUP.md) (hosted v2
-migrations verified 2026-09-14; `rate_limits_v1.sql` still to apply). Native
+migrations verified 2026-09-14; `rate_limits_v1.sql` and the event-retention
+cron applied by the owner on 2026-09-15, post-apply probe reported passing). Native
 dependency change: **`expo-device` ~57.0.2** (installed-RAM device-tier signal,
 Android only) was added on 2026-09-14, so the next Play artifact must be a new
 native build; an OTA onto the current binary stays safe because the guarded
@@ -179,7 +180,7 @@ Use the [launch checklist](LAUNCH_CHECKLIST.md) to record results against the ac
 
 - Exercise cold start, fonts/art/audio, background/resume and ceremony interruption on the signed **minified** Android build, including a manifest permission check on the AAB (`bundletool dump manifest --bundle=<file>.aab | grep uses-permission`: no RECORD_AUDIO, SYSTEM_ALERT_WINDOW or external-storage entries), a TalkBack pass over a board (one stop per source letter, double-tap selects) and a three-button-navigation pass over the dialogue sheet and utility menu on Android 15.
 - Exercise a free-player account, test ads, paid checkout, pending/cancelled checkout, retry, restore, reset and reward interruption. Mocked SDK tests and browser journeys do not establish store-side behavior.
-- The hosted Supabase v2 migrations were verified deployed by a read-only probe on 2026-09-14 ([backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14)); still verify the retention cron run, event arrival, `rate_limits_v1.sql` once applied, RevenueCat products/entitlements, Sentry delivery and Play listing/consent configuration. Source configuration alone does not prove deployment.
+- The hosted Supabase v2 migrations were verified deployed by a read-only probe on 2026-09-14 ([backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14)); `rate_limits_v1.sql` and the retention cron were applied by the owner on 2026-09-15 with the post-apply probe reported passing, and the cron has completed a successful run; the Play listing graphics and phone screenshots were reviewed and uploaded by the owner on 2026-09-15; still verify event arrival from the signed build, RevenueCat products/entitlements, Sentry delivery, and the Play Console declarations and consent configuration (target audience, data safety and IARC are separate from the Graphics upload). Source configuration alone does not prove deployment.
 - Compare Play's per-device download/install estimates and DEX metrics after the new build. The reported **497 MB EAS source upload** is a separate measurement; its exact contents have not been inspected here.
 
 Android test ad IDs remain deliberately enabled in the checked-in configuration. The production ad cutover and public Play rollout are separate release actions. iOS monetization configuration remains incomplete.
@@ -195,6 +196,6 @@ Android test ad IDs remain deliberately enabled in the checked-in configuration.
 | Story, choices, ceremonies and visuals | [Story implementation](STORY_AND_VISUAL_IMPLEMENTATION.md), [story playtest](STORY_PLAYTEST_PROTOCOL.md), [presentation policy](../mobile/docs/STORY_PRESENTATION_POLICY.md), [typography ownership](../mobile/docs/TYPOGRAPHY_AND_ANIMATION_OWNERSHIP.md) |
 | Public copy and release art | [Store listing](STORE_LISTING.md), [press kit](PRESS_KIT.md), [launch asset package](../mobile/assets/Play_store/launch-2026-09/README.md) |
 
-The July audits, September 5–6 reviews/reports, and `RELEASE_VALIDATION_1_3_0.md` are **historical evidence**. Their original counts, screenshots, access checks and completion statements apply to the recorded snapshot. Current references above take precedence for build commands and behavior. Dated marketing renders likewise need comparison with the current signed candidate; editing their README does not regenerate the images or ZIP.
+The surviving September reports (`reports/`, `review-2026-09-06/`) are **historical evidence**. Their original counts, screenshots, access checks and completion statements apply to the recorded snapshot. Current references above take precedence for build commands and behavior. The July design audit and ledger, the September 5 review set, `RELEASE_VALIDATION_1_3_0.md` and the dated September status/handoff docs were deleted on 2026-09-15 once their findings had been folded into CLAUDE.md and the docs above; git history holds them. The marketing renders were compared against the current candidate and uploaded by the owner on 2026-09-15; editing their README does not regenerate the images, and the two Graphics assets are manual Play Console uploads, so changing them in Git never updates the live listing.
 
 Keep this page's audit date, commit, configuration and CI link together when updating it. Do not relabel historical evidence as a new device pass or mark an external deployment complete from source inspection alone.

@@ -29,10 +29,10 @@ Reverse and Double Shift gated generators use their own solvability and quality 
 From `mobile/`:
 
 ```sh
-node --max-old-space-size=180 scripts/tools/auditVocabulary.mjs ../docs/review-2026-09-05/vocabulary-bank-audit.json --branching
-node --max-old-space-size=180 scripts/tools/auditBankRoutes.mjs ../docs/review-2026-09-05/bank-route-audit.json
+node --max-old-space-size=180 scripts/tools/auditVocabulary.mjs .audit-reports/vocabulary-bank-audit.json --branching
+node --max-old-space-size=180 scripts/tools/auditBankRoutes.mjs .audit-reports/bank-route-audit.json
 ```
 
 Both commands use `qualifyFreshBankPuzzle`, the same pure delivery helper used by runtime bank selection. The full audit exits with an error for a delivered route, stored replay or preferred Reverse hint failure. Its JSON retains all 30 family counts, historical metadata defects, exclusions and results.
 
-Artifacts: [vocabulary and branch coverage](../review-2026-09-05/vocabulary-bank-audit.json), [complete replay and hint audit](../review-2026-09-05/bank-route-audit.json). Focused regressions cover the standard exclusion and a real Reverse anagram/locked-letter inconsistency, including refusal on failed or exhausted proof.
+Artifacts: the two reports the commands above write into the gitignored `mobile/.audit-reports/`. The 2026-09-05 copies were deleted on 2026-09-15; both are reproducible from this commit, so regenerate them rather than reading a stale snapshot. Focused regressions cover the standard exclusion and a real Reverse anagram/locked-letter inconsistency, including refusal on failed or exhausted proof.

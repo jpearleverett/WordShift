@@ -47,7 +47,12 @@ internal testing, where the native modules are present.
 ## 1. Supabase project
 
 > The original base schema was applied and verified on 2026-07-02. Files 2 to 7
-> were verified deployed on 2026-09-14 (probe below). File 8 is not yet applied.
+> were verified deployed on 2026-09-14 (probe below). File 8 (`rate_limits_v1.sql`)
+> was applied by the owner on 2026-09-15 via `apply_upgrade.sql`, who re-ran the
+> post-apply probe and reported it passing. **Never re-run `security_setup.sql`
+> now:** it would recreate the two-argument `bump_words_offered` beside the
+> three-argument one this file installs (an ambiguous overload PostgREST answers
+> with a 300) and re-grant the legacy daily RPCs.
 
 For a new project, apply the following as `postgres`, in order:
 
@@ -181,14 +186,26 @@ A read-only probe with the publishable key from `mobile/app.json` (no
 | `rpc/support_preview`, `rpc/support_delete_verified`, `rpc/prune_expired_events` | HTTP 401/`42501` | `support_operations.sql` + `event_retention.sql` applied, operator-only |
 | `rpc/get_save`, `rpc/get_save_timestamp`, `rpc/upsert_save` | `42501` | legacy save RPCs revoked |
 | `GET saves`, `events`, `daily_scores`, `daily_scores_v2`, `daily_counters`, `support_install_links`, `support_deletion_audit`, `analytics_daily_build_funnel` | `42501` | tables denied to `anon` |
-| `POST events` with a not-null violation | `23502` | the legacy column-scoped INSERT grant is live (bounded by `rate_limits_v1.sql` once applied) |
+| `POST events` with a not-null violation | `23502` | the legacy column-scoped INSERT grant is live (now bounded by `rate_limits_v1.sql`, applied 2026-09-15) |
 
 Not verifiable with the publishable key, still open on the checklist: actual
-event rows arriving, the `wordshift-event-retention` cron job and its last run,
-the Sentry alert rules and the project plan tier. Re-run the probe after
-applying `rate_limits_v1.sql`; `rpc/submit_daily_score` and `rpc/daily_rank`
-must then return `42501`, and `rpc/bump_words_offered` must still answer the
-two-argument body.
+event rows arriving from the signed build, the Sentry alert rules and the
+project plan tier. The `wordshift-event-retention` cron job was created by the
+owner on 2026-09-15 (`schedule_event_retention.sql` as postgres, with Supabase
+Cron enabled) and has since completed a successful run, so event retention is
+deployed and executing. Keep that job/run row with the release record; its
+oldest-row query is the check that the window is actually pruning once real
+event volume arrives.
+
+The post-apply probe was re-run by the owner on 2026-09-15 and reported
+passing: `rpc/submit_daily_score` and `rpc/daily_rank` answer `42501` (both are
+revoked and never re-granted by `rate_limits_v1.sql`), and
+`rpc/bump_words_offered` still answers the two-argument body, because the
+replacement signature takes `p_install_id text default null` and PostgREST
+fills the default. `submit_daily_score_v2`, `daily_rank_v2` and
+`aggregate_proof` are the four RPCs the client actually calls and all survive
+the migration. These results are owner-reported; this repository cannot verify
+hosted state from source.
 
 ```bash
 # Run from the repository root (the two node -e lines read ./mobile/app.json).
@@ -203,8 +220,8 @@ probe bump_words_offered '{"p_date":"2026-09-14","p_count":0}'
 probe support_preview '{"p_support_id":"probe"}'      # expect 42501
 probe prune_expired_events '{"p_batch_size":1}'       # expect 42501
 probe get_save '{"p_owner":"probe"}'                  # expect 42501
-probe submit_daily_score '{"p_owner":"probe","p_date":"2026-09-14","p_time_ms":0,"p_stars":0,"p_hints":0}'  # [] before rate_limits_v1 (owner under the 8-char floor, nothing inserted), 42501 after
-probe daily_rank '{"p_date":"2026-09-14","p_owner":"probe"}'      # legacy read RPC: answers before rate_limits_v1, 42501 after
+probe submit_daily_score '{"p_owner":"probe","p_date":"2026-09-14","p_time_ms":0,"p_stars":0,"p_hints":0}'  # 42501 now that rate_limits_v1 is applied (revoked, never re-granted)
+probe daily_rank '{"p_date":"2026-09-14","p_owner":"probe"}'      # legacy read RPC: 42501 now that rate_limits_v1 is applied
 for t in saves events daily_scores_v2 daily_counters support_install_links rate_limits; do
   curl -sS -m 20 -o /dev/stdout -w " HTTP %{http_code}\n" "$URL/$t?select=*&limit=1" -H "apikey: $KEY"   # expect 42501
 done

@@ -6,7 +6,7 @@ This record covers the follow-up to `1818609` on
 `feature/game-improvements-vocabulary-audit`. The source prepares WordShift
 1.3.0 / Android 94 / iOS 3. This is implementation and local validation evidence;
 the signed release checks remain in
-[the owner handoff](../COMPLETION_HANDOFF_2026-09-06.md).
+the owner handoff (deleted 2026-09-15; its open items now live in the [launch checklist](../LAUNCH_CHECKLIST.md) and [launch readiness review](../LAUNCH_READINESS_REVIEW_2026-09-14.md)).
 
 ## Environment and reproducibility
 
@@ -93,7 +93,7 @@ an explicit difficulty policy, not a claim that all players know every word.
 
 The complete story audit passes: all 13 residents and five base phases remain
 represented, and all 1,742 base speech IDs retain their original order. The
-[editorial review](../STORY_EDITORIAL_REVIEW_2026-09-06.md) records the authored
+editorial review (deleted 2026-09-15; the authored result is described in [story implementation](../STORY_AND_VISUAL_IMPLEMENTATION.md)) recorded the authored
 changes and distinguishes them from the remaining reader pilot.
 
 
@@ -167,4 +167,4 @@ All implementation and local checks are complete. The feature branch is
 `feature/game-improvements-vocabulary-audit`; the final push and hosted CI result
 are reported with delivery. This export is not a signed AAB, store submission,
 hosted migration or physical-device result. The exact remaining access and
-human/device work is in the [owner handoff](../COMPLETION_HANDOFF_2026-09-06.md).
+human/device work is in the [launch checklist](../LAUNCH_CHECKLIST.md).

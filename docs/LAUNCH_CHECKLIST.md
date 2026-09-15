@@ -11,8 +11,10 @@ verify the latest binary, backend deployment or public release.
 - [x] **Production access granted.** The owner completed the 12-tester/14-day
   closed test and confirmed access on 2026-08-31.
 - [ ] **Identify the exact release artifact.** Source configures app **1.3.6**,
-  Android **100** (raised from 1.3.5/99 on 2026-09-14), with local version
-  management and no automatic increment. Compare the next code with Play Console
+  Android **101** (99 was 1.3.5; 100 was set on 2026-09-14; 101 is the
+  2026-09-15 `expo-device` native build, bumped locally by the owner and
+  committed the same day so a clean checkout cannot rebuild a consumed code),
+  with local version management and no automatic increment. Compare the next code with Play Console
   before uploading, and raise it again for each further upload: the internal-testing
   and production candidates are separate uploads and cannot share a code. Record commit, EAS build ID, version/code,
   runtime, track and device. `package.json`'s 1.3.1 is package metadata, not the native app version.
@@ -21,7 +23,16 @@ verify the latest binary, backend deployment or public release.
   `npm test -- --no-coverage`, `npm run test:e2e`, `npx expo install --check`
   and `npx expo-doctor`. Consult [current build](CURRENT_BUILD.md) for already
   recorded CI evidence; green JavaScript CI does not establish native release QA.
+- [x] **Play Console declarations.** Data safety, content rating (IARC), target
+  audience and the listing website field were all declared by the owner on
+  2026-09-15. Guidance they were answered against is in
+  [the launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-14.md). RTDN to
+  RevenueCat is an integration rather than a declaration and is still open below.
 - [ ] **Build the optimized signed AAB and test through Play internal testing.**
+  PARTIAL, 2026-09-15: the owner built the `expo-device` native binary (code 101)
+  and confirmed it installs and runs. That clears "does a minified binary start",
+  which was the open question expo-device raised. It does NOT clear the rest of
+  this item, which is what actually gates promotion.
   Release minification/resource shrinking and the optimized ProGuard default are
   enabled in source. The template/config tests do not prove a minified Android
   binary starts or that reflection-dependent SDKs work. Recheck cold start,
@@ -68,27 +79,41 @@ verify the latest binary, backend deployment or public release.
   every table denied to `anon`. Commands and the result table are in
   [backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14). Do not
   re-run `security_setup.sql` alone: it would re-grant the legacy names.
-- [ ] **Apply `docs/supabase/rate_limits_v1.sql`** (request budgets, Daily
+- [x] **Apply `docs/supabase/rate_limits_v1.sql`** (request budgets, Daily
   plausibility floor and activity requirement, legacy daily RPC revocation,
   `purge_daily_cohort`). Rehearsed offline (`rehearse.mjs`, 78 checks) on
-  2026-09-14; not yet applied. Re-run the probe afterwards: `submit_daily_score`
-  and `daily_rank` must answer `42501`, `bump_words_offered` must still accept
-  the two-argument body, and a signed build must still post a Daily rank.
+  2026-09-14; applied by the owner on 2026-09-15 through `apply_upgrade.sql`,
+  who re-ran the probe and reported `submit_daily_score` and `daily_rank`
+  answering `42501` and `bump_words_offered` still accepting the two-argument
+  body. **Standing rule, now load-bearing: never re-run `security_setup.sql`.**
+  It would recreate the two-argument `bump_words_offered` beside the
+  three-argument one (ambiguous overload, PostgREST 300) and re-grant the legacy
+  daily RPCs. One item remains below: a signed build must still post a Daily
+  rank end to end.
+- [x] **Event retention deployed and executing.** The
+  `wordshift-event-retention` cron job was created by the owner on 2026-09-15
+  (it is NOT created by `apply_upgrade.sql`: it needs Supabase Cron enabled plus
+  `docs/supabase/schedule_event_retention.sql` run as postgres) and has
+  completed a successful run. Keep the job/run row with the release record. Its
+  oldest-row query is what proves the window actually prunes, and that only
+  becomes meaningful once real event volume arrives, so re-check it after the
+  first days of live traffic rather than treating it as closed forever.
 - [ ] **Remaining backend evidence.** From an operator connection: actual event
-  rows from the signed build, the `wordshift-event-retention` cron job and a
-  successful run (the job is NOT created by `apply_upgrade.sql`: enable Supabase
-  Cron on the project, then run `docs/supabase/schedule_event_retention.sql` as
-  postgres and keep its job/run/oldest-row query output), two-device conflict handling, verified support
-  recovery/deletion, the project plan tier plus disk/usage alerts (the events
-  table shares the disk with saves), Sentry alert rules and a symbolicated
-  event from the exact signed release. Follow [backend setup](BACKEND_SETUP.md).
-- [ ] **Review the current store package.** Use the reviewed launch package in
+  rows from the signed build, a **Daily rank posted end to end by a signed
+  build** (the one part of the rate-limit migration a key-only probe cannot
+  prove), two-device conflict handling, verified support recovery/deletion, the
+  project plan tier plus disk/usage alerts (the events table shares the disk
+  with saves), Sentry alert rules and a symbolicated event from the exact signed
+  release. Follow [backend setup](BACKEND_SETUP.md).
+- [x] **Review the current store package.** Done by the owner on 2026-09-15.
+  Use the reviewed launch package in
   `mobile/assets/Play_store/launch-2026-09/`, its claims ledger and
   [store listing](STORE_LISTING.md). Confirm the files actually uploaded are the
   current captures and show the shipped +25% Challenge reward, current counts
   and spoiler-safe UI. Earlier uploaded July/August images were stale; the
   presence of replacements in Git does not update Play Console.
-- [ ] **Upload the 512x512 Play listing icon BY HAND.** `docs/store-icon-512.png`
+- [x] **Upload the 512x512 Play listing icon BY HAND.** Uploaded by the owner on
+  2026-09-15. `docs/store-icon-512.png`
   (Ember close-up in the green sweater holding a wooden W tile; a clean RGBA
   re-encode of `mobile/assets/Play_store/launch-2026-09/upload/store-icon-512.png`,
   512x512, fully opaque, no baked rounded corners and no baked drop shadow, since
@@ -97,14 +122,16 @@ verify the latest binary, backend deployment or public release.
   -> App icon. The in-app launcher icon is a separate surface that ships in the
   binary, and it deliberately carries no letter tile (see the Asset System
   section of `CLAUDE.md`).
-- [ ] **Upload the 1024x500 feature graphic BY HAND.** `docs/feature-graphic.png`
+- [x] **Upload the 1024x500 feature graphic BY HAND.** Uploaded by the owner on
+  2026-09-15. `docs/feature-graphic.png`
   (Ember by the hearth under the wooden wordmark and the tagline "A little
   wordplay. / A world to uncover."), a byte-identical mirror of
   `mobile/assets/Play_store/launch-2026-09/upload/feature-graphic-1024x500.png`,
   1024x500 RGB with no alpha. Same place as the icon: Play Console -> Main store
   listing -> Graphics -> Feature graphic. It does not come from the build either;
   `npm run generate:assets` used to overwrite this path with a placeholder
-  gradient and no longer writes it at all.
+  gradient and no longer writes it at all. Both Graphics assets are manual, so
+  changing either file in Git does NOT update Play Console: re-upload by hand.
 
 - [ ] **Production configuration cut.** Do NOT edit `expo.extra.adsUseTestIds`
   or `ci.yml`: `app.config.js` derives the shipped flag from

@@ -1,5 +1,0 @@
-{
-  "name": "WordShift",
-  "description": "A word puzzle game where you shift letters between neighboring words in a chain — pick a letter from one word, drop it into the next, and both must still be valid English words. Four difficulties with 4-6 letter words, reverse/double/speed variants, and a cozy animal-house story that slowly becomes something else.",
-  "requestFramePermissions": []
-}
