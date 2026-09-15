@@ -68,20 +68,28 @@ verify the latest binary, backend deployment or public release.
   every table denied to `anon`. Commands and the result table are in
   [backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14). Do not
   re-run `security_setup.sql` alone: it would re-grant the legacy names.
-- [ ] **Apply `docs/supabase/rate_limits_v1.sql`** (request budgets, Daily
+- [x] **Apply `docs/supabase/rate_limits_v1.sql`** (request budgets, Daily
   plausibility floor and activity requirement, legacy daily RPC revocation,
   `purge_daily_cohort`). Rehearsed offline (`rehearse.mjs`, 78 checks) on
-  2026-09-14; not yet applied. Re-run the probe afterwards: `submit_daily_score`
-  and `daily_rank` must answer `42501`, `bump_words_offered` must still accept
-  the two-argument body, and a signed build must still post a Daily rank.
+  2026-09-14; applied by the owner on 2026-09-15 through `apply_upgrade.sql`,
+  who re-ran the probe and reported `submit_daily_score` and `daily_rank`
+  answering `42501` and `bump_words_offered` still accepting the two-argument
+  body. **Standing rule, now load-bearing: never re-run `security_setup.sql`.**
+  It would recreate the two-argument `bump_words_offered` beside the
+  three-argument one (ambiguous overload, PostgREST 300) and re-grant the legacy
+  daily RPCs. One item remains below: a signed build must still post a Daily
+  rank end to end.
 - [ ] **Remaining backend evidence.** From an operator connection: actual event
-  rows from the signed build, the `wordshift-event-retention` cron job and a
-  successful run (the job is NOT created by `apply_upgrade.sql`: enable Supabase
-  Cron on the project, then run `docs/supabase/schedule_event_retention.sql` as
-  postgres and keep its job/run/oldest-row query output), two-device conflict handling, verified support
-  recovery/deletion, the project plan tier plus disk/usage alerts (the events
-  table shares the disk with saves), Sentry alert rules and a symbolicated
-  event from the exact signed release. Follow [backend setup](BACKEND_SETUP.md).
+  rows from the signed build, a **Daily rank posted end to end by a signed
+  build** (the one part of the rate-limit migration a key-only probe cannot
+  prove), the `wordshift-event-retention` cron job's first successful run and
+  oldest-row output (the job itself was created by the owner on 2026-09-15;
+  note it is NOT created by `apply_upgrade.sql`, it needs Supabase Cron enabled
+  plus `docs/supabase/schedule_event_retention.sql` run as postgres), two-device
+  conflict handling, verified support recovery/deletion, the project plan tier
+  plus disk/usage alerts (the events table shares the disk with saves), Sentry
+  alert rules and a symbolicated event from the exact signed release. Follow
+  [backend setup](BACKEND_SETUP.md).
 - [ ] **Review the current store package.** Use the reviewed launch package in
   `mobile/assets/Play_store/launch-2026-09/`, its claims ledger and
   [store listing](STORE_LISTING.md). Confirm the files actually uploaded are the

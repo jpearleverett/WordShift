@@ -165,7 +165,8 @@ the next artifact, not the current one**, on three blockers:
 The review's medium and low findings that live in the repository were fixed
 the same day on the review branch (resolution table in the review document);
 the backend items are tracked in [backend setup](BACKEND_SETUP.md) (hosted v2
-migrations verified 2026-09-14; `rate_limits_v1.sql` still to apply). Native
+migrations verified 2026-09-14; `rate_limits_v1.sql` and the event-retention
+cron applied by the owner on 2026-09-15, post-apply probe reported passing). Native
 dependency change: **`expo-device` ~57.0.2** (installed-RAM device-tier signal,
 Android only) was added on 2026-09-14, so the next Play artifact must be a new
 native build; an OTA onto the current binary stays safe because the guarded
@@ -179,7 +180,7 @@ Use the [launch checklist](LAUNCH_CHECKLIST.md) to record results against the ac
 
 - Exercise cold start, fonts/art/audio, background/resume and ceremony interruption on the signed **minified** Android build, including a manifest permission check on the AAB (`bundletool dump manifest --bundle=<file>.aab | grep uses-permission`: no RECORD_AUDIO, SYSTEM_ALERT_WINDOW or external-storage entries), a TalkBack pass over a board (one stop per source letter, double-tap selects) and a three-button-navigation pass over the dialogue sheet and utility menu on Android 15.
 - Exercise a free-player account, test ads, paid checkout, pending/cancelled checkout, retry, restore, reset and reward interruption. Mocked SDK tests and browser journeys do not establish store-side behavior.
-- The hosted Supabase v2 migrations were verified deployed by a read-only probe on 2026-09-14 ([backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14)); still verify the retention cron run, event arrival, `rate_limits_v1.sql` once applied, RevenueCat products/entitlements, Sentry delivery and Play listing/consent configuration. Source configuration alone does not prove deployment.
+- The hosted Supabase v2 migrations were verified deployed by a read-only probe on 2026-09-14 ([backend setup](BACKEND_SETUP.md#hosted-state-verified-2026-09-14)); `rate_limits_v1.sql` and the retention cron were applied by the owner on 2026-09-15 with the post-apply probe reported passing; still verify the cron's first run, event arrival, RevenueCat products/entitlements, Sentry delivery and Play listing/consent configuration. Source configuration alone does not prove deployment.
 - Compare Play's per-device download/install estimates and DEX metrics after the new build. The reported **497 MB EAS source upload** is a separate measurement; its exact contents have not been inspected here.
 
 Android test ad IDs remain deliberately enabled in the checked-in configuration. The production ad cutover and public Play rollout are separate release actions. iOS monetization configuration remains incomplete.
