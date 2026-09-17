@@ -67,3 +67,8 @@ scripts/tools/.icon-review/
 # (docs/VOCABULARY_AUDIT_2026-09-05.md, docs/reports/BANK_DELIVERY_VALIDATION_2026-09-05.md),
 # so they are regenerated on demand rather than committed as evidence.
 .audit-reports/
+
+# Local store export cache and packaged delivery bundles
+/store-output/
+# Self-contained delivery preview is saved separately; relative preview is tracked.
+/assets/Play_store/launch-2026-09-v2/preview-standalone.html

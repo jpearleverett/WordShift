@@ -1,0 +1,47 @@
+{
+  "status": "template-awaiting-authentic-capture",
+  "canvas": [
+    1080,
+    1920
+  ],
+  "palette": {
+    "background": "#F7EDDA",
+    "heading": "#274C3E",
+    "support": "#586653",
+    "line": "#B39759",
+    "edge": "#D3C5A5"
+  },
+  "caption_region_fraction": 0.12916666666666668,
+  "heading": {
+    "width": 903,
+    "height": 77,
+    "font_size": 82,
+    "text": "Find your next challenge.",
+    "font": "../../fonts/EpundaSlab-Bold.ttf",
+    "left": 76,
+    "top": 75
+  },
+  "subtitle": {
+    "width": 595,
+    "height": 28,
+    "font_size": 38,
+    "text": "Reverse the chain. Shift two letters.",
+    "font": "../../fonts/Figtree-Regular.ttf",
+    "left": 78,
+    "top": 163
+  },
+  "capture": {
+    "file": "raw/05-next-challenge.png",
+    "maximum_rendered_size": [
+      900,
+      1616
+    ],
+    "horizontal_alignment": "center",
+    "top": 248,
+    "fit": "inside",
+    "crop": false,
+    "retouched": false
+  },
+  "capture_brief": "Real Double Shift board after its instructions are dismissed. Show two selected letters and a legal result. The caption names Reverse Shift too; this frame demonstrates Double Shift only.",
+  "note": "This is an editable layout template, not a completed or verified screenshot. The exporter requires the genuine current capture before producing a Play upload image."
+}

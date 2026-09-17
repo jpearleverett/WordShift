@@ -52,6 +52,13 @@ generation. Promotional artwork is kept separate from gameplay captures.
 - `preview.html`: visual review of available assets and outstanding captures.
 
 From `mobile/`, install the project dependencies with `npm ci` if necessary.
+Install Playwright Chromium with `npx playwright install chromium`, and make
+Python 3, ffmpeg and ffprobe available. `npm run store:refresh` runs the sequence
+below and creates a review bundle. It does not publish anything. The manual
+`Store asset review package` workflow provides the same process once that
+workflow is available in the repository's default branch; it was not dispatched
+during this task.
+
 The production scripts live in `scripts/store/`:
 
 1. Export the unchanged app with `npx expo export --platform web --output-dir store-output/web`.
@@ -61,7 +68,11 @@ The production scripts live in `scripts/store/`:
    the real footage and timing before final export. Follow its production guide.
 4. Run `node scripts/store/buildRefresh.mjs` to typeset the eight actual captures,
    feature graphic and variants. `--art-only` exports the finished art without
-   manufacturing missing gameplay images.
+   manufacturing missing gameplay images. For the alternate opener, inspect
+   both raw board captures, enter normalized crop bounds in
+   `source/layouts/opener-crops.json`, and set `reviewed: true` after checking
+   that both panels show the intended real rows. `--skip-missing` prepares
+   available images while that review remains pending.
 5. Review every output against the current signed Android build and use
    `python3 scripts/store/packageRefresh.py` for the complete package. Its partial
    mode is a work-in-progress review bundle, not an upload-complete campaign.

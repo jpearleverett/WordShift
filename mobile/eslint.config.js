@@ -10,6 +10,8 @@ module.exports = defineConfig([
       // Playwright evidence includes generated third-party viewer bundles.
       'playwright-report/**',
       'test-results/**',
+      // Store capture exports include the generated application bundle.
+      'store-output/**',
       // Generated puzzle data is validated by route, vocabulary and diversity
       // audits. Cover every bank family here, including all Lexicon banks.
       'src/data/*Bank*.ts',

@@ -1,0 +1,18 @@
+{
+  "status": "template-awaiting-authentic-before-and-after-captures",
+  "canvas": [
+    1080,
+    1920
+  ],
+  "headline": "Move a letter. Make two words.",
+  "subtitle": "PLAY becomes PAY. PANT becomes PLANT.",
+  "captures": [
+    "raw/01-one-letter.png",
+    "raw/01-one-letter-result.png"
+  ],
+  "panels": [
+    "Clearly labelled BEFORE THE MOVE crop of the genuine two-row board",
+    "Clearly labelled AFTER THE MOVE crop of the same board after the legal L insertion"
+  ],
+  "note": "Inspect both raw captures and set normalized crop bounds in opener-crops.json before exporting. No synthetic tiles or reconstructed UI."
+}
