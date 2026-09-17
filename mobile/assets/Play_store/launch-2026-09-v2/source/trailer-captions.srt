@@ -1,0 +1,36 @@
+1
+00:00:00,000 --> 00:00:04,000
+One letter. Two new words.
+Both results must be valid words.
+
+2
+00:00:04,000 --> 00:00:08,000
+Turn words into a home.
+
+3
+00:00:08,000 --> 00:00:13,000
+Meet 13 unlikely friends.
+
+4
+00:00:13,000 --> 00:00:18,000
+A little place to return to.
+
+5
+00:00:18,000 --> 00:00:20,500
+A new challenge.
+
+6
+00:00:20,500 --> 00:00:23,000
+A different twist.
+
+7
+00:00:23,000 --> 00:00:25,000
+A cozy game. Mostly.
+
+8
+00:00:25,000 --> 00:00:27,000
+What changes after dark?
+
+9
+00:00:27,000 --> 00:00:30,000
+A little wordplay. A world to uncover.
