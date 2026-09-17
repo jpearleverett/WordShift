@@ -1,6 +1,6 @@
 import { useLayoutEffect, useEffect, useRef } from 'react';
 import { GameState } from '../types';
-import { savePuzzleState, SavedPuzzleState } from '../services/puzzleSaveState';
+import { savePuzzleState, savePuzzleClock, SavedPuzzleState } from '../services/puzzleSaveState';
 import { AUTOSAVE_DEBOUNCE_MS } from '../constants/timing';
 
 export interface AutosaveDeps {
@@ -85,6 +85,7 @@ export function useAutosave(deps: AutosaveDeps): void {
         ) {
           return;
         }
+        const remaining = depsRef.current.speedTimeRemaining;
         const saveData: Partial<SavedPuzzleState> = {
           rows: deps.rows,
           activeRowIndex: deps.activeRowIndex,
@@ -124,10 +125,10 @@ export function useAutosave(deps: AutosaveDeps): void {
           dailyDate: deps.isPlayingDaily ? deps.dailyDate ?? null : null,
           isSharedChallenge: deps.isSharedChallenge,
           isFinalBoard: deps.isFinalBoard,
-          speedTimerExpireAt: deps.speedTimeRemaining != null
-            ? Date.now() + deps.speedTimeRemaining * 1000
+          speedTimerExpireAt: remaining != null
+            ? Date.now() + remaining * 1000
             : null,
-          speedTimeRemainingSec: deps.speedTimeRemaining,
+          speedTimeRemainingSec: remaining,
           savedAt: Date.now(),
         };
         savePuzzleState(saveData as SavedPuzzleState).catch(() => {});
@@ -178,8 +179,17 @@ export function useAutosave(deps: AutosaveDeps): void {
     deps.currentPhase,
     deps.lastFormedWord,
     deps.doubleShiftPhase,
-    deps.speedTimeRemaining,
     deps.isSharedChallenge,
     deps.isFinalBoard,
   ]);
+
+  // The remaining clock must survive a foreground force-kill. Keep its per-tick
+  // durability, but write only a compact record instead of the whole board.
+  const boardId = deps.rows[0]?.id as string | undefined;
+  useEffect(() => {
+    if (deps.gameState !== GameState.PLAYING || deps.currentScreen !== 'puzzle' ||
+        deps.isProcessingVictory || !deps.speedMode || deps.speedTimeRemaining == null) return;
+    savePuzzleClock(deps.speedTimeRemaining, deps.isPlayingDaily ? 'daily' : 'normal', boardId).catch(() => {});
+  }, [deps.gameState, deps.currentScreen, deps.isProcessingVictory, deps.speedMode,
+    deps.speedTimeRemaining, deps.isPlayingDaily, boardId]);
 }

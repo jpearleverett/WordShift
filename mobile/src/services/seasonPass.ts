@@ -169,8 +169,8 @@ async function loadState(puzzlesSolved: number): Promise<SeasonPassState> {
       await persist(cache);
     }
   }
-  // Roll over on a new local month.
-  if (cache.seasonId !== seasonId) {
+  // A timezone or clock correction must not erase an already paid season.
+  if (cache.seasonId < seasonId) {
     cache = getDefault(seasonId, puzzlesSolved);
     await persist(cache);
   }

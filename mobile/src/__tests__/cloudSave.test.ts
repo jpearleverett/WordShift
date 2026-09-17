@@ -20,7 +20,7 @@ import {
   CloudSaveData,
   SYNC_KEY_PREFIXES,
 } from '../services/cloudSave';
-import { loadProgress } from '../services/amberCurrency';
+import { loadProgress, invalidateProgressCache } from '../services/amberCurrency';
 import { loadWeeklyQuests, clearWeeklyQuests } from '../services/weeklyQuests';
 import { initHints, getHintBalance, clearHints } from '../services/hints';
 import {
@@ -342,7 +342,9 @@ describe('cloudSave', () => {
     });
 
     it('invalidates cached service state after overwriting local data', async () => {
-      await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify({ amber: 100 }));
+      const progress = { ...(await loadProgress()), amber: 100 };
+      await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(progress));
+      invalidateProgressCache();
       expect((await loadProgress()).amber).toBe(100);
 
       const cloudData: CloudSaveData = {
@@ -350,7 +352,7 @@ describe('cloudSave', () => {
         timestamp: Date.now(),
         deviceId: 'test',
         data: {
-          'wordshift_home_progress': JSON.stringify({ amber: 999 }),
+          'wordshift_home_progress': JSON.stringify({ ...progress, amber: 999 }),
         },
       };
 

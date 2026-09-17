@@ -63,7 +63,7 @@ async function openFinishedVesperVisit(page: Page, options: { intro?: boolean; g
   // line; it is drained through the same Next control the player uses.
   const shortcut = page.getByRole('button', { name: 'Talk to Ember', exact: true });
   for (let index = 0; index < 12; index++) {
-    const bubble = page.getByRole('button', { name: 'Show full line', exact: true });
+    const bubble = page.getByTestId('resident-dialogue-bubble');
     await expect(bubble).toBeVisible();
     if (await shortcut.count()) return shortcut;
     const text = await bubble.textContent();
@@ -76,7 +76,7 @@ async function openFinishedVesperVisit(page: Page, options: { intro?: boolean; g
 test('the conversation footer opens the named friend and leaves their first line unread', async ({ page }) => {
   const shortcut = await openFinishedVesperVisit(page);
   await shortcut.click();
-  const bubble = page.getByRole('button', { name: 'Show full line', exact: true });
+  const bubble = page.getByTestId('resident-dialogue-bubble');
   for (let index = 0; index < 12; index++) {
     await expect(bubble).toBeVisible();
     const text = await bubble.textContent();

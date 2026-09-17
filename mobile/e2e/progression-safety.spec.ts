@@ -22,22 +22,22 @@ test.beforeEach(async ({ page, context }) => {
   });
 });
 
-async function openInterruptedCeremony(page: Page) {
+async function seedCeremonySave(page: Page, pendingWard = false) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible({ timeout: 120_000 });
   await expect.poll(() => page.evaluate(() =>
     JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle') || '{}').solution?.length ?? 0,
   )).toBeGreaterThan(0);
-  // Start from the game's own initialized save. This represents a committed
-  // phase boundary followed by process death before its ceremony was delivered.
-  await page.evaluate(id => {
+  // Start from the game's own initialized save. Cover both an unconfirmed
+  // ward and a committed phase whose cinematic was interrupted by process death.
+  await page.evaluate(({ id, ward }) => {
     const progress = JSON.parse(localStorage.getItem('wordshift_home_progress')!);
     Object.assign(progress, {
-      amber: 300, totalAmberEarned: 500, currentPhase: 2, phaseProgress: 55, puzzlesSolved: 32,
+      amber: 300, totalAmberEarned: 500, currentPhase: ward ? 1 : 2, phaseProgress: 55, puzzlesSolved: 32,
       unlockedAnimals: ['fox'], unlockedRooms: ['cozy_den'], introsSeen: ['fox'],
-      lastDialogueRead: { fox: 32 }, pendingPhaseTransition: null,
+      lastDialogueRead: { fox: 32 }, pendingPhaseTransition: ward ? 2 : null,
       pendingVariantTutorials: [], seenVariantTutorials: ['reverse', 'double_shift'],
-      pendingCeremonies: [{ id, kind: 'phase', phase: 2, cycle: 0, previousPhase: 1 }],
+      pendingCeremonies: ward ? [] : [{ id, kind: 'phase', phase: 2, cycle: 0, previousPhase: 1 }],
       cycleCount: 0, houseCompleted: false, houseCompletionCelebrated: false,
       finalPuzzleCompleted: false, postRevelation: false,
     });
@@ -55,7 +55,13 @@ async function openInterruptedCeremony(page: Page) {
     }
     localStorage.setItem('wordshift_first_win_glitch', 'true');
     localStorage.setItem('wordshift_preview_graduation_seen_v2', 'true');
-  }, pendingId);
+    localStorage.setItem('wordshift_share_prompts', JSON.stringify({ sharePromptShown: true }));
+    localStorage.setItem('wordshift_word_harvest', JSON.stringify({ pendingBatches: [], totalWordsOffered: 0 }));
+  }, { id: pendingId, ward: pendingWard });
+}
+
+async function openInterruptedCeremony(page: Page) {
+  await seedCeremonySave(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('phase-transition-reading')).toContainText(passages[0]);
 }
@@ -114,6 +120,65 @@ test('rapid Continue input advances one passage and the final acknowledgement du
     await next.click();
   }
   await expect(page.getByTestId('phase-transition-next')).toHaveCount(0);
+  await expect.poll(() => pendingIds(page)).toEqual([]);
+  await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
+});
+
+
+test('a successful pit ward ceremony leaves the same pit navigation usable', async ({ page }) => {
+  await seedCeremonySave(page, true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: /^Enter the Offering Pit/ }).click();
+  // This starts before confirmation, with no durable cinematic queued. The
+  // pit's real ward ignition must commit the phase and create that receipt.
+  await expect(page.getByTestId('phase-transition-reading')).toContainText(passages[0], { timeout: 40_000 });
+  expect(await pendingIds(page)).toEqual([pendingId]);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('wordshift_home_progress')!).currentPhase)).toBe(2);
+  for (const passage of passages) {
+    await expect(page.getByTestId('phase-transition-reading')).toContainText(passage);
+    await page.getByTestId('phase-transition-next').click();
+  }
+  await expect(page.getByTestId('phase-transition-next')).toHaveCount(0);
+  await expect.poll(() => pendingIds(page)).toEqual([]);
+  // No reload or intermediate navigation: the successful cinematic leaves
+  // OfferingPitScreen mounted, which is where the old busy ref stayed stuck.
+  await page.getByRole('button', { name: 'Open utility menu', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Open statistics', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Close utility menu', exact: true }).click({ position: { x: 12, y: 12 } });
+  await page.getByRole('button', { name: 'Return home', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
+});
+
+test('a ceremony read failure during boot exposes Retry save and resumes its saved scene', async ({ page }) => {
+  await seedCeremonySave(page);
+  // Target the fresh ceremony-queue read, after general bootstrap storage has
+  // succeeded. A blanket storage failure would test a different boot gate.
+  await page.addInitScript(() => {
+    sessionStorage.setItem('wordshift_e2e_fail_ceremony_read', 'true');
+    const nativeGetItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (key: string) {
+      if (this === localStorage && key === 'wordshift_home_progress' &&
+          sessionStorage.getItem('wordshift_e2e_fail_ceremony_read') === 'true' &&
+          new Error().stack?.includes('loadFreshCeremonyProgress')) {
+        sessionStorage.setItem('wordshift_e2e_ceremony_read_failed', 'true');
+        throw new DOMException('Simulated ceremony read failure', 'UnknownError');
+      }
+      return nativeGetItem.call(this, key);
+    };
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByText('Your next scene is waiting', { exact: true })).toBeVisible();
+  const retry = page.getByRole('button', { name: 'Retry save', exact: true });
+  await expect(retry).toBeVisible();
+  await expect(retry).toBeEnabled();
+  expect(await page.evaluate(() => sessionStorage.getItem('wordshift_e2e_ceremony_read_failed'))).toBe('true');
+  expect(await pendingIds(page)).toEqual([pendingId]);
+  await page.evaluate(() => sessionStorage.removeItem('wordshift_e2e_fail_ceremony_read'));
+  await retry.click();
+  await expect(retry).toHaveCount(0);
+  await expect(page.getByTestId('phase-transition-reading')).toContainText(passages[0]);
+  await page.getByRole('button', { name: 'Skip transition', exact: true }).click();
+  await page.getByRole('button', { name: 'Skip scene', exact: true }).click();
   await expect.poll(() => pendingIds(page)).toEqual([]);
   await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
 });

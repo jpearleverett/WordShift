@@ -12,8 +12,24 @@ const stateStore: Map<number, unknown> = new Map();
 let stateIndex = 0;
 const refStore: Map<number, { current: unknown }> = new Map();
 let refIndex = 0;
+let memoIndex = 0;
+const memoStore = new Map<number, { deps: unknown[]; value: unknown }>();
+const setterStore = new Map<number, (value: unknown) => void>();
+function memoValue(factory: () => unknown, deps: unknown[]): unknown {
+  const index = memoIndex++;
+  const previous = memoStore.get(index);
+  if (previous && deps.length === previous.deps.length && deps.every((value, i) => Object.is(value, previous.deps[i]))) {
+    return previous.value;
+  }
+  const value = factory();
+  memoStore.set(index, { deps, value });
+  return value;
+}
 
 function resetHookState() {
+  memoStore.clear();
+  setterStore.clear();
+  memoIndex = 0;
   stateStore.clear();
   refStore.clear();
   stateIndex = 0;
@@ -22,6 +38,7 @@ function resetHookState() {
 }
 
 function rewindHookIndices() {
+  memoIndex = 0;
   stateIndex = 0;
   refIndex = 0;
 }
@@ -42,7 +59,8 @@ jest.mock('react', () => ({
         stateStore.set(idx, valOrFn);
       }
     };
-    return [value, setter];
+    if (!setterStore.has(idx)) setterStore.set(idx, setter);
+    return [value, setterStore.get(idx)];
   },
   useEffect: (fn: () => void, _deps: unknown[]) => {
     effectCallbacks.push(fn);
@@ -54,8 +72,8 @@ jest.mock('react', () => ({
     }
     return refStore.get(idx)!;
   },
-  useCallback: (fn: Function, _deps: unknown[]) => fn,
-  useMemo: (fn: Function, _deps: unknown[]) => fn(),
+  useCallback: (fn: Function, deps: unknown[]) => memoValue(() => fn, deps),
+  useMemo: (fn: () => unknown, deps: unknown[]) => memoValue(fn, deps),
 }));
 
 // --- Mock dependencies ---
@@ -338,6 +356,14 @@ describe('usePuzzleGame', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  test('retains state, action and spent-letter identities on an unrelated parent render', () => {
+    const [state, actions] = callHook();
+    const [nextState, nextActions] = callHook();
+    expect(nextState).toBe(state);
+    expect(nextActions).toBe(actions);
+    expect(nextState.spentLetters).toBe(state.spentLetters);
   });
 
   describe('interrupted board generation', () => {
@@ -1868,23 +1894,16 @@ describe('usePuzzleGame', () => {
       expect(bank.getGuaranteedExtendedStandardFallback).not.toHaveBeenCalled();
     });
 
-    test('attempts a deterministic extension for a post-100 generated standard fallback', async () => {
+    test('serves a fair extension for a post-100 generated standard fallback', async () => {
       const amber = require('../services/amberCurrency');
       const extension = require('../services/puzzleExtension');
+      const generator = require('../services/localGenerator');
       (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 101 });
+      (generator.generateLocalPuzzle as jest.Mock).mockResolvedValueOnce({
+        words: ['LIME', 'TIME', 'TIED', 'TEND'], hint: 'base', solution: [], wordLength: 4,
+      });
       (extension.extendStandardPuzzle as jest.Mock).mockImplementationOnce(config => ({
-        ...config,
-        words: [...config.words, 'WXYZ'],
-        solution: [
-          ...(config.solution ?? []),
-          {
-            stepIndex: config.words.length - 1,
-            sourceWord: 'TEND',
-            targetWord: 'WXYZ',
-            letterToMove: 'T',
-            explanation: 'test extension',
-          },
-        ],
+        ...config, words: [...config.words, 'DENT'], hint: 'Fair generated extension',
       }));
 
       resetHookState();
@@ -1894,6 +1913,7 @@ describe('usePuzzleGame', () => {
       const [state] = callHook();
       expect(extension.extendStandardPuzzle).toHaveBeenCalledTimes(1);
       expect(state.rows).toHaveLength(5);
+      expect(state.hint).toBe('Fair generated extension');
     });
 
     test('uses the guaranteed bank fallback when a post-100 generated standard board cannot extend', async () => {
@@ -1956,6 +1976,66 @@ describe('usePuzzleGame', () => {
       expect(bank.selectPreGeneratedPuzzle).toHaveBeenCalled();
       expect(state.isEchoPuzzle).toBe(false);
       expect(state.rows).toHaveLength(5);
+    });
+
+    test('keeps an echo board short when speed is armed', async () => {
+      const amber = require('../services/amberCurrency');
+      const extension = require('../services/puzzleExtension');
+      const generator = require('../services/localGenerator');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 100 });
+      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['LIME']);
+      (generator.generateLocalPuzzle as jest.Mock).mockResolvedValueOnce({
+        words: ['LIME', 'TIME', 'TIED', 'TEND'], hint: 'Echo', solution: [], wordLength: 4,
+      });
+      let [, actions] = callHook();
+      actions.setCurrentPhase(3);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard', false, false, false, false, true);
+      const [state] = callHook();
+      expect(state.isEchoPuzzle).toBe(true);
+      expect(state.rows).toHaveLength(4);
+      expect(extension.extendStandardPuzzle).not.toHaveBeenCalled();
+    });
+
+    test('rejects an echo extension whose featured words violate vocabulary policy', async () => {
+      const amber = require('../services/amberCurrency');
+      const bank = require('../services/puzzleBank');
+      const extension = require('../services/puzzleExtension');
+      (amber.getFullProgress as jest.Mock).mockResolvedValueOnce({ puzzlesSolved: 100 });
+      (amber.getRitualWords as jest.Mock).mockResolvedValueOnce(['LIME']);
+      (extension.extendStandardPuzzle as jest.Mock).mockImplementationOnce(config => ({
+        ...config, words: [...config.words, 'GRIDES'], solution: [],
+      }));
+      (bank.selectPreGeneratedPuzzle as jest.Mock).mockResolvedValueOnce({
+        words: ['SUIT', 'SITE', 'WHAT', 'HERE', 'LIME'], hint: 'Fair bank', solution: [], wordLength: 4,
+      });
+      let [, actions] = callHook();
+      actions.setCurrentPhase(3);
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard');
+      const [state] = callHook();
+      expect(state.isEchoPuzzle).toBe(false);
+      expect(state.rows.some(row => row.originalWord === 'GRIDES')).toBe(false);
+      expect(bank.selectPreGeneratedPuzzle).toHaveBeenCalled();
+    });
+
+    test('restoring an old board never changes the live world phase or enables an early weave', () => {
+      let [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED', 'TEND']);
+      let [state] = callHook();
+      const saved = { ...state, isPlayingDaily: false, savedAt: Date.now(), currentPhase: 5,
+        unbrokenWeaveMode: true } as unknown as import('../services/puzzleSaveState').SavedPuzzleState;
+      actions.setCurrentPhase(0);
+      [, actions] = callHook();
+      actions.restorePuzzleState(saved, true);
+      [state, actions] = callHook();
+      expect(state.currentPhase).toBe(0);
+      expect(state.unbrokenWeaveMode).toBe(false);
+      actions.setCurrentPhase(3);
+      [, actions] = callHook();
+      actions.restorePuzzleState({ ...saved, currentPhase: 2 });
+      [state] = callHook();
+      expect(state.currentPhase).toBe(3);
     });
 
     test('remembers the selected style even when the served board falls back', async () => {
@@ -3876,6 +3956,8 @@ describe('usePuzzleGame', () => {
         },
       ];
       let [, actions] = callHook();
+      actions.setCurrentPhase(5);
+      [, actions] = callHook();
       actions.restorePuzzleState({
         rows,
         activeRowIndex: 0,
@@ -3909,7 +3991,7 @@ describe('usePuzzleGame', () => {
         unbrokenWeaveMode: true,
         spentLetters: ['A'],
         savedAt: Date.now(),
-      } as import('../services/puzzleSaveState').SavedPuzzleState);
+      } as import('../services/puzzleSaveState').SavedPuzzleState, true);
       [, actions] = callHook();
       actions.handleHint();
 
@@ -3989,7 +4071,7 @@ describe('usePuzzleGame', () => {
         savedAt: Date.now(),
       };
 
-      actions.restorePuzzleState(baseSaved as import('../services/puzzleSaveState').SavedPuzzleState);
+      actions.restorePuzzleState(baseSaved as import('../services/puzzleSaveState').SavedPuzzleState, true);
       [state, actions] = callHook();
       expect(state.unbrokenWeaveMode).toBe(true);
       expect(state.spentLetters).toEqual(['A']);

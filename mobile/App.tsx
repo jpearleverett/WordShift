@@ -12,7 +12,7 @@ import * as Application from 'expo-application';
 import { getSupportIdentifier } from './src/services/supportIdentity';
 import { getSupportMailto } from './src/constants/links';
 import { useGlobalOverlays } from './src/hooks/useGlobalOverlays';
-import React, { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
 import {
   View,
   Text,
@@ -72,6 +72,7 @@ import {
   awardBonusAmber,
   spendAmber,
   getCurrentPhase,
+  isPostRevelation,
   hasSeenSetupSelectorIntro,
   markSetupSelectorIntroSeen,
   hasSeenMandatoryHarvest,
@@ -165,10 +166,13 @@ import {
   getHouseAskLine,
   getHouseAskFulfilledMessage,
   getCosmeticFirstShowingLine,
-  consumeFirstImperfectStarsReceipt,
+  peekFirstImperfectStarsReceipt,
+  markFirstImperfectStarsReceiptShown,
+  getStoryPreparationRetryCopy,
+  getDailyPreparationRetryCopy,
   getBootFailureCopy,
 } from './src/services/phaseNarrative';
-import { consumeCosmeticFirstShowing } from './src/services/cosmeticReceipts';
+import { consumeCosmeticFirstShowing, peekCosmeticFirstShowing, markCosmeticFirstShowingShown } from './src/services/cosmeticReceipts';
 import {
   getUnbrokenWeaveMastery,
   recordSolveTime,
@@ -207,7 +211,7 @@ import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PU
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
 import { getCumulativeStats } from './src/services/starRating';
 import { isStorageTransactionActive, subscribeStorageTransaction, StorageRecoveryRequiredError } from './src/services/persistenceStorage';
-import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
+import { markPendingChanges, uploadToCloud, refreshRestoredServiceCaches } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
@@ -221,6 +225,7 @@ import { offerBatch, settleBatchCredit } from './src/services/wordHarvest';
 import * as Updates from 'expo-updates';
 import { isCreatorKitEnabled, validateCreatorCode, applyCreatorSnapshot, isCreatorEra } from './src/services/creatorKit';
 import {
+  hasVariantModifier,
   getNewlyUnlockedVariants,
   getUnlockedVariants,
   getSpeedTimeLimit,
@@ -519,7 +524,9 @@ function MainApp() {
   // money receipts outrank informational lines, which outrank nudges,
   // regardless of arrival order (several enqueuers are fire-and-forget
   // promises). Cleared on new-board starts and victory-exit navigation.
-  const victoryToastQueueRef = useRef<{ message: string; rank: number }[]>([]);
+  const victoryToastQueueRef = useRef<{ message: string; rank: number; onShown?: () => Promise<void> }[]>([]);
+  const victoryToastGenerationRef = useRef(0);
+  const victoryReceiptAcknowledgmentRef = useRef<(() => Promise<void>) | undefined>(undefined);
   const victoryToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showNextVictoryToast = useCallback(function showNext() {
     const next = victoryToastQueueRef.current.shift();
@@ -531,18 +538,20 @@ function MainApp() {
     // Route into the in-modal receipt slot (VictoryModal), NOT the board Toast
     // which renders under the modal overlay and would be invisible during the
     // victory window.
+    victoryReceiptAcknowledgmentRef.current = next.onShown;
     setVictoryReceipt(next.message);
     victoryToastTimerRef.current = setTimeout(showNext, VICTORY_TOAST_DURATION_MS);
   }, []);
   const enqueueVictoryToast = useCallback((
     message: string,
-    priority: 'receipt' | 'info' | 'nudge' = 'info'
+    priority: 'receipt' | 'info' | 'nudge' = 'info',
+    onShown?: () => Promise<void>,
   ) => {
     const rank = priority === 'receipt' ? 0 : priority === 'info' ? 1 : 2;
     const queue = victoryToastQueueRef.current;
     let insertAt = queue.length;
     while (insertAt > 0 && queue[insertAt - 1].rank > rank) insertAt--;
-    queue.splice(insertAt, 0, { message, rank });
+    queue.splice(insertAt, 0, { message, rank, onShown });
     if (victoryToastTimerRef.current === null) {
       victoryToastTimerRef.current = setTimeout(
         showNextVictoryToast,
@@ -551,6 +560,8 @@ function MainApp() {
     }
   }, [showNextVictoryToast]);
   const clearVictoryToastQueue = useCallback(() => {
+    victoryToastGenerationRef.current += 1;
+    victoryReceiptAcknowledgmentRef.current = undefined;
     victoryToastQueueRef.current = [];
     if (victoryToastTimerRef.current !== null) {
       clearTimeout(victoryToastTimerRef.current);
@@ -1100,7 +1111,7 @@ function MainApp() {
     onSpeedTimeUp,
     puzzle.showDifficultyMenu || puzzle.showRules,
   );
-  const { startSpeedTimer, stopSpeedTimer } = speedTimerActions;
+  const { startSpeedTimer, stopSpeedTimer, setSpeedTimerOverlayPaused } = speedTimerActions;
 
   // Countdown tick. The drain envelope ramps rather than staying flat until the
   // wire: a gentle 'soft' pre-tick from 10..6s (no sound, faint haptic, tiny
@@ -1659,7 +1670,7 @@ function MainApp() {
     // each day" actually has a yesterday. Every other launch task runs.
     if (!onboardingSessionRef.current) {
       try {
-        const grant = await claimDailyLoginReward();
+        const grant = await saveWithPlayerRetry(claimDailyLoginReward);
         if (grant) {
           persistenceActions.refreshStats();
           // Presentation is deferred: the modal only shows on a quiet home
@@ -1979,8 +1990,7 @@ function MainApp() {
     }
     clearVictoryTimeouts();
     clearVictoryToastQueue();
-    // The completed puzzle's autosave must never be resumable from Play
-    clearPuzzleState().catch(() => {});
+    // recordVictory already cleared the completed board's own save slot.
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
@@ -2061,7 +2071,7 @@ function MainApp() {
         // Restored boards never carry (or roll) a house ask — the ask does
         // not survive autosave (dropped silently; deliberate simplification).
         houseAskRestoreSuppressRef.current = true;
-        puzzleActions.restorePuzzleState(saved);
+        puzzleActions.restorePuzzleState(saved, await isPostRevelation());
         // Restore speed timer from the saved remaining seconds so a kill/
         // relaunch resumes the countdown instead of expiring it. Legacy
         // saves without the field fall back to the absolute expiry timestamp.
@@ -2090,19 +2100,24 @@ function MainApp() {
     try {
       await prepareStory();
       runStory(() => startPuzzleFromHome(difficulty));
-    } catch {
-      puzzleActions.setMessage('The conversation could not be opened. Try Play again.');
+    } catch (error) {
+      reportError(error instanceof Error ? error : String(error), { source: 'home_play_story' });
+      const copy = getStoryPreparationRetryCopy(persistence.currentPhase);
+      showGameAlert(copy.title, copy.message, [
+        { text: copy.retryLabel, onPress: () => { void handlePlayPuzzle(difficulty); } },
+        { text: copy.cancelLabel, style: 'cancel' },
+      ]);
     } finally { storyExitPreparing.current = false; }
-  }, [activeStory, prepareStory, runStory, startPuzzleFromHome, puzzleActions]);
+  }, [activeStory, prepareStory, runStory, startPuzzleFromHome, persistence.currentPhase]);
 
   // Return to home screen
   const handleGoHome = useCallback(() => {
     hapticLight();
     puzzlesSinceHomeVisit.current = 0;
-    setIsPlayingDaily(false);
-    resetSpeedRun();
     clearVictoryToastQueue();
     transitionTo('home', () => {
+      setIsPlayingDaily(false);
+      resetSpeedRun();
       if (puzzle.unbrokenWeaveMode) {
         clearPuzzleState().catch(() => {});
         puzzleActions.clearBoard();
@@ -2126,6 +2141,7 @@ function MainApp() {
     // The home screen's paint-ahead scene describes the save we are replacing,
     // so drop it here or the rebuilt session's first home frame would show the
     // OLD house for a beat before loadAllData corrects it.
+    await saveWithPlayerRetry(refreshRestoredServiceCaches);
     resetHomeSceneSnapshot();
     resetStory();
     storyExitPreparing.current = false;
@@ -2323,15 +2339,15 @@ function MainApp() {
     clearVictoryMusicHush(true);
     persistenceActions.refreshStats();
     orchestrationActions.setCompletionCoda(null);
-    setIsPlayingDaily(true);
-    resetSpeedRun();
     clearVictoryToastQueue();
     transitionTo('puzzle', async () => {
       if (!isCurrent()) return;
       puzzleActions.setGameState(GameState.LOADING);
+      setIsPlayingDaily(true);
+      resetSpeedRun();
       puzzleActions.setMessage(getLoadingMessage(persistence.currentPhase));
       try {
-        const saved = await loadPuzzleState();
+        const saved = await loadPuzzleState('daily');
         if (!isCurrent()) return;
         if (saved?.isPlayingDaily && saved.gameState === 'PLAYING' && saved.dailyDate
           && [0, 1].includes(daysAgoLocal(saved.dailyDate))) {
@@ -2362,7 +2378,7 @@ function MainApp() {
         // (6-letter, 5-row) isn't a wall. Only fires after the board actually
         // started; null on every call after the one-time grant.
         try {
-          const mercyHints = await grantFirstDailyMercy();
+          const mercyHints = await saveWithPlayerRetry(grantFirstDailyMercy);
           if (!isCurrent()) return;
           if (mercyHints !== null) {
             puzzleActions.refreshHintBalance();
@@ -2382,13 +2398,16 @@ function MainApp() {
         maybeShowSetupSelectorIntro().catch(() => {});
       } catch {
         if (!isCurrent()) return;
-        // Daily generation failed — fall back to a standard HARD puzzle so the
-        // player is never stranded on a loading screen.
-        setIsPlayingDaily(false);
-        await puzzleActions.startNewGame('HARD', 'standard', 'standard', false, false, undefined, false);
+        // A failed daily must not replace the player's preserved normal board.
+        puzzleActions.setGameState(GameState.IDLE);
+        const copy = getDailyPreparationRetryCopy(persistence.currentPhase);
+        showGameAlert(copy.title, copy.message, [
+          { text: copy.retryLabel, onPress: () => startDailyBoard(isCurrent) },
+          { text: copy.cancelLabel, style: 'cancel', onPress: handleGoHome },
+        ]);
       }
     });
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue, clearVictoryMusicHush, resetSpeedRun]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro, clearVictoryToastQueue, clearVictoryMusicHush, resetSpeedRun, handleGoHome]);
 
   // Start the Daily Challenge (seeded; difficulty follows the week ramp).
   const handleStartDaily = useCallback((_difficulty: Difficulty, isCurrent: () => boolean = () => true) => {
@@ -2786,7 +2805,7 @@ function MainApp() {
         },
       ));
       // Clear the in-memory autosave cache after the transaction removed its key.
-      await clearPuzzleState();
+      await clearPuzzleState(isPlayingDaily ? 'daily' : 'normal');
 
       // Aggregate social proof: contribute this puzzle's words to the global
       // daily count (spoiler-safe, anonymous). No-op until the backend is on.
@@ -3093,12 +3112,15 @@ function MainApp() {
       // single end-of-chain judgment charges its own invalid attempt, the
       // finale is hushed, and the opener keeps its own voice.
       if (!wasFinalBoard && !(result.blind ?? false) && !onboardingFlow.isOnboarding) {
-        consumeFirstImperfectStarsReceipt(persistence.currentPhase, {
+        const receiptGeneration = victoryToastGenerationRef.current;
+        peekFirstImperfectStarsReceipt(persistence.currentPhase, {
           stars: victory.earnedStars,
           hintsUsed: result.hintsUsed,
           invalidAttempts: result.invalidAttempts,
         }).then(line => {
-          if (line) enqueueVictoryToast(line, 'receipt');
+          if (line && receiptGeneration === victoryToastGenerationRef.current) {
+            enqueueVictoryToast(line, 'receipt', markFirstImperfectStarsReceiptShown);
+          }
         }).catch(() => {});
       }
 
@@ -3142,8 +3164,12 @@ function MainApp() {
       // fires the confetti below (never the silent beat, never the finale).
       if (!wasFinalBoard && !isSilentVictoryBeat(completedTotal)) {
         const receiptPhase = persistence.currentPhase;
-        consumeCosmeticFirstShowing('confetti').then(name => {
-          if (name) enqueueVictoryToast(getCosmeticFirstShowingLine(receiptPhase, name), 'receipt');
+        const receiptGeneration = victoryToastGenerationRef.current;
+        peekCosmeticFirstShowing('confetti').then(receipt => {
+          if (receipt && receiptGeneration === victoryToastGenerationRef.current) {
+            enqueueVictoryToast(getCosmeticFirstShowingLine(receiptPhase, receipt.name), 'receipt',
+              () => markCosmeticFirstShowingShown(receipt.id));
+          }
         }).catch(() => {});
       }
 
@@ -3521,15 +3547,15 @@ function MainApp() {
   const { width: boardWindowWidth } = useWindowDimensions();
   const boardFirstRowId = puzzle.rows.length > 0 ? puzzle.rows[0].id : null;
   const boardBaseWordLen = useMemo(
-    () => (puzzle.rows.length > 0 ? Math.max(...puzzle.rows.map((r) => r.words.length)) : 4),
+    () => (puzzle.rows.length > 0 ? Math.max(...puzzle.rows.map((r) => r.originalWord.length)) : 4),
     // Capture at board change only; rows are all at base length the instant a
     // new board mounts, so this is the stable base (never the mid-move max).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [boardFirstRowId],
   );
   const boardScale = useMemo(
-    () => computeBoardScale(boardWindowWidth, boardBaseWordLen),
-    [boardWindowWidth, boardBaseWordLen],
+    () => computeBoardScale(boardWindowWidth, boardBaseWordLen, hasVariantModifier(puzzle.currentVariant, 'double_shift'), hasVariantModifier(puzzle.currentVariant, 'reverse')),
+    [boardWindowWidth, boardBaseWordLen, puzzle.currentVariant],
   );
   const boardScaleRef = useRef(1);
   boardScaleRef.current = boardScale;
@@ -4018,14 +4044,17 @@ function MainApp() {
     const done = () => { outOfHintsAlertRef.current = false; };
     const capReached = await isRewardedCapReached().catch(() => false);
     const buttons: { text: string; style?: 'cancel'; onPress?: () => void }[] = [];
-    if (!capReached) {
+    const clipAvailable = !capReached && isAdsReady();
+    if (clipAvailable) {
       buttons.push({ text: 'Watch a clip (+1)', onPress: () => { done(); handleClaimRewardedHint(); } });
     }
     buttons.push({ text: 'Get hints', onPress: () => { done(); setShowStoreModal(true); } });
     buttons.push({ text: 'Not now', style: 'cancel', onPress: done });
     showGameAlert(
       'Out of hints',
-      'Watch a short clip for a free hint, or grab a hint pack in the store.',
+      clipAvailable
+        ? 'Watch a short clip for a free hint, or grab a hint pack in the store.'
+        : 'Hint packs are available in the store.',
       buttons,
     );
   }, [handleClaimRewardedHint]);
@@ -4338,10 +4367,15 @@ function MainApp() {
       storyWillPresent = await prepareStory();
     }
     catch {
-      puzzleActions.setMessage('The conversation could not be opened. Try again.');
+      const copy = getStoryPreparationRetryCopy(persistence.currentPhase);
+      showGameAlert(copy.title, copy.message, [
+        { text: copy.retryLabel, onPress: () => { void handleNextLevel(); } },
+        { text: copy.cancelLabel, style: 'cancel' },
+      ]);
       return;
     } finally { storyExitPreparing.current = false; }
     hapticLight();
+    const completedDaily = isPlayingDaily;
     setIsPlayingDaily(false);
     setSpeedRescueUsed(false);
     // Reads victoryData — must run before the exit flow resets it.
@@ -4353,13 +4387,13 @@ function MainApp() {
     const introWillPresent =
       queuedPostVictoryIntrosRef.current.length > 0 || postVictoryIntro !== null;
     startVictoryExitFlow(() => {
-      clearPuzzleState().catch(() => {});
-      puzzleActions.handleNextLevel();
+      if (completedDaily) startPuzzleFromHome();
+      else puzzleActions.handleNextLevel();
     });
     Promise.resolve(adShown)
       .then((shown) => runVictoryExitNudges(shown === true, introWillPresent || storyWillPresent))
       .catch(() => {});
-  }, [awaitVictoryDouble, activeStory, prepareStory, puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro]);
+  }, [awaitVictoryDouble, activeStory, prepareStory, puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, maybeShowSwiftVictoryHint, postVictoryIntro, isPlayingDaily, startPuzzleFromHome, persistence.currentPhase]);
 
   // The cold-open Continue reveals the empty home and Fox invitation. Legacy
   // guided-puzzle resumes keep their old puzzle-screen completion beat.
@@ -4399,7 +4433,11 @@ function MainApp() {
       storyWillPresent = await prepareStory();
     }
     catch {
-      puzzleActions.setMessage('The conversation could not be opened. Try again.');
+      const copy = getStoryPreparationRetryCopy(persistence.currentPhase);
+      showGameAlert(copy.title, copy.message, [
+        { text: copy.retryLabel, onPress: () => { void handleReturnHome(); } },
+        { text: copy.cancelLabel, style: 'cancel' },
+      ]);
       return;
     } finally { storyExitPreparing.current = false; }
     hapticLight();
@@ -4418,7 +4456,7 @@ function MainApp() {
     Promise.resolve(adShown)
       .then((shown) => runVictoryExitNudges(shown === true, introWillPresent || storyWillPresent))
       .catch(() => {});
-  }, [awaitVictoryDouble, activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, postVictoryIntro]);
+  }, [awaitVictoryDouble, activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial, postVictoryIntro, persistence.currentPhase]);
 
   // The pit route (Collect Now) is deliberately EXEMPT from interstitials:
   // the player is on their way to collect amber they already earned, and an
@@ -4434,7 +4472,11 @@ function MainApp() {
       await prepareStory();
     }
     catch {
-      puzzleActions.setMessage('The conversation could not be opened. Try again.');
+      const copy = getStoryPreparationRetryCopy(persistence.currentPhase);
+      showGameAlert(copy.title, copy.message, [
+        { text: copy.retryLabel, onPress: () => { void handleGoToPit(); } },
+        { text: copy.cancelLabel, style: 'cancel' },
+      ]);
       return;
     } finally { storyExitPreparing.current = false; }
     hapticLight();
@@ -4448,15 +4490,17 @@ function MainApp() {
       puzzleActions.clearBoard();
       transitionTo('pit');
     });
-  }, [awaitVictoryDouble, activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow]);
+  }, [awaitVictoryDouble, activeStory, prepareStory, puzzleActions, transitionTo, startVictoryExitFlow, persistence.currentPhase]);
 
   // Android hardware back button: sub-screens navigate home; home exits the app.
   // Swallowed during onboarding so back can't break the guided flow.
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (isStorageTransactionActive() || sessionTransitionRef.current || navigationBusy ||
-          phaseTransitionEvent !== null || ceremonyWaiting || !ceremonyReady ||
+          ceremonyWaiting || !ceremonyReady ||
           (currentScreen === 'pit' && pitNavigationGuardRef.current?.())) return true;
+      // Let the visible cinematic's own Back handler open/cancel Skip.
+      if (phaseTransitionEvent !== null) return false;
       if (onboardingFlow.isOnboarding) {
         // On the very first interactive screen (the cold-open opener, nothing
         // committed yet), back should EXIT the app like any first screen — a
@@ -4498,25 +4542,14 @@ function MainApp() {
         return true;
       }
       if (currentScreen !== 'home') {
-        // Mirror the in-UI home button: reset transient puzzle UI state
-        // (mid-puzzle progress itself is preserved by autosave).
-        transitionTo('home', () => {
-          if (currentScreen === 'puzzle') {
-            if (puzzle.unbrokenWeaveMode) {
-              clearPuzzleState().catch(() => {});
-              puzzleActions.clearBoard();
-            } else {
-              puzzleActions.setGameState(GameState.IDLE);
-            }
-            puzzleActions.setShowConfetti(false);
-          }
-        });
+        if (currentScreen === 'puzzle') handleGoHome();
+        else transitionTo('home');
         return true;
       }
       return false;
     });
     return () => subscription.remove();
-  }, [currentScreen, transitionTo, navigationBusy, phaseTransitionEvent, ceremonyWaiting, ceremonyReady, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, postVictoryIntro, handleGoToPit, handleReturnHome]);
+  }, [currentScreen, transitionTo, navigationBusy, phaseTransitionEvent, ceremonyWaiting, ceremonyReady, onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzleActions, puzzle.gameState, puzzle.history.length, puzzle.unbrokenWeaveMode, victoryFlow.victoryData, persistence.pendingPhaseTransition, postVictoryIntro, handleGoToPit, handleReturnHome, handleGoHome]);
 
   // Speed rescue: a completed rewarded view revives a timed-out speed run with
   // extra seconds. The hook flips GAME_OVER → PLAYING; the speed-timer effect
@@ -4846,7 +4879,18 @@ function MainApp() {
     dailyLogin: dailyLoginGrant !== null,
     victory: victoryModalVisible,
     timeUp: currentScreen === 'puzzle' && puzzle.gameState === GameState.GAME_OVER,
-  }, { dailyLogin: dailyLoginGrantVisible, ceremony: phaseTransitionEvent !== null && !ceremonyWaiting });
+  }, { dailyLogin: dailyLoginGrantVisible, ceremony: phaseTransitionEvent !== null && !ceremonyWaiting && !(currentScreen === 'home' && homeOverlayActive) });
+  useLayoutEffect(() => {
+    setSpeedTimerOverlayPaused(overlayOwner !== null || currentScreen !== 'puzzle');
+  }, [overlayOwner, currentScreen, setSpeedTimerOverlayPaused]);
+  useEffect(() => {
+    if (overlayOwner !== 'victory' || !victoryReceipt) return;
+    const acknowledge = victoryReceiptAcknowledgmentRef.current;
+    victoryReceiptAcknowledgmentRef.current = undefined;
+    if (acknowledge) void acknowledge().catch(error => {
+      reportError(error instanceof Error ? error : String(error), { source: 'victory_receipt' });
+    });
+  }, [overlayOwner, victoryReceipt]);
   const [presentedPhaseEvent, setPresentedPhaseEvent] = useState<PhaseTransitionEvent | null>(null);
   if (phaseTransitionEvent === null && presentedPhaseEvent !== null) setPresentedPhaseEvent(null);
   else if (overlayOwner === 'ceremony' && presentedPhaseEvent !== phaseTransitionEvent) setPresentedPhaseEvent(phaseTransitionEvent);
@@ -4873,12 +4917,18 @@ function MainApp() {
   // never paints 'home' for a frame first (the F141 home flash) — the same
   // branded card simply stays up one beat longer, then the real destination
   // appears directly.
-  if (!onboardingFlow.onboardingReady || bootRouting || (!ceremonyReady && !alertPending)) {
+  const bootHeld = !onboardingFlow.onboardingReady || bootRouting || !ceremonyReady;
+  if (bootHeld) {
     // The SAME window-relative branded hold as the bootstrap gate, so the
     // native-splash -> bootstrap-gate -> MainApp-hydration holds read as ONE
     // continuous branded moment instead of blinking through the old near-black
     // (#1A1A2E, a Phase-4 color) card — or a differently-sized icon — on launch.
-    return <BootHold failed={initialRoute.status === 'failed'} onRetry={initialRoute.retry} failureKind="local" />;
+    return (
+      <View style={{ flex: 1 }}>
+        <BootHold failed={initialRoute.status === 'failed'} onRetry={initialRoute.retry} failureKind="local" />
+        <GameAlertModal key="game-alert-host" phase={persistence.currentPhase} onPendingChange={setAlertPending} />
+      </View>
+    );
   }
 
   // Helper: render the active screen content
@@ -6292,7 +6342,7 @@ function MainApp() {
       {overlayOwner === 'practice' && practiceLesson && <PracticeModal visible lessonId={practiceLesson} phase={persistence.currentPhase} onClose={() => setPracticeLesson(null)} />}
       {/* Cottage-skinned Alert.alert replacement — mounted last so it layers
           over every screen and modal (see services/gameAlert). */}
-      <GameAlertModal phase={persistence.currentPhase} suspended={overlayOwner !== 'alert'} onPendingChange={setAlertPending} />
+      <GameAlertModal key="game-alert-host" phase={persistence.currentPhase} suspended={overlayOwner !== 'alert'} onPendingChange={setAlertPending} />
       <Modal visible={overlayOwner === 'saving'} transparent animationType="none" onRequestClose={() => {}}>
         <View style={{ flex: 1, backgroundColor: 'rgba(30,20,26,0.18)', alignItems: 'center', justifyContent: 'center' }} accessibilityViewIsModal accessibilityLabel="Saving progress">
           <BrandedLoader size={30} />
@@ -6437,7 +6487,7 @@ function BootHold({
 // a crashing board, so the root boundary drops it (durable progress, receipts
 // and the ceremony queue are untouched) and MainApp remounts from storage.
 function resetAfterRootRenderError(): void {
-  clearPuzzleState().catch(() => {});
+  void Promise.all([clearPuzzleState(), clearPuzzleState('daily')]).catch(() => {});
   resetHomeSceneSnapshot();
 }
 

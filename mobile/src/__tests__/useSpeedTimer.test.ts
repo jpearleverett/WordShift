@@ -247,3 +247,37 @@ test('a transient inactive state never touches a ticking clock', () => {
   expect(state.speedTimeRemaining).toBe(6);
   expect(SPEED_TIMER_INTERVAL_MS).toBeLessThanOrEqual(1000);
 });
+
+test('global overlays pause a live clock and compose with rules and background holds', () => {
+  let [, actions] = render(false);
+  actions.startSpeedTimer(30);
+  tick(8);
+  actions.setSpeedTimerOverlayPaused(true);
+  render(false);
+  tick(60);
+  expect(render(false)[0].speedTimeRemaining).toBe(22);
+  expect(onTimeUp).not.toHaveBeenCalled();
+  render(true);
+  actions.setSpeedTimerOverlayPaused(false);
+  tick(10);
+  expect(render(true)[0].speedTimeRemaining).toBe(22);
+  appState('background');
+  render(false);
+  tick(10);
+  expect(render(false)[0].speedTimeRemaining).toBe(22);
+  appState('active');
+  tick(3);
+  expect(render(false)[0].speedTimeRemaining).toBe(19);
+});
+
+test('a board started beneath a global overlay waits for that overlay to close', () => {
+  const [, actions] = render(false);
+  actions.setSpeedTimerOverlayPaused(true);
+  actions.startSpeedTimer(12);
+  tick(20);
+  expect(render(false)[0].speedTimeRemaining).toBe(12);
+  expect(onTimeUp).not.toHaveBeenCalled();
+  actions.setSpeedTimerOverlayPaused(false);
+  tick(12);
+  expect(onTimeUp).toHaveBeenCalledTimes(1);
+});

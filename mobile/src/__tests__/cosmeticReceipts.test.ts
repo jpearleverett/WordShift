@@ -10,6 +10,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   resolveFirstShowing,
   consumeCosmeticFirstShowing,
+  peekCosmeticFirstShowing,
+  markCosmeticFirstShowingShown,
   clearCosmeticReceipts,
   receiptKeyFor,
 } from '../services/cosmeticReceipts';
@@ -51,7 +53,33 @@ describe('consumeCosmeticFirstShowing', () => {
     expect(await AsyncStorage.getItem(receiptKeyFor('spark_hearth'))).toBe('1');
   });
 
-  test('the default equipped yields nothing, and categories are independent', async () => {
+  test('a queued receipt stays available until its captured cosmetic is actually shown', async () => {
+    await recordAmberCosmeticPurchase('spark_hearth');
+    await recordAmberCosmeticPurchase('spark_pollen');
+    await equipCosmetic('spark_hearth');
+    const receipt = await peekCosmeticFirstShowing('spark');
+    expect(receipt).toEqual({ id: 'spark_hearth', name: 'Hearth Sparks' });
+    expect(await AsyncStorage.getItem(receiptKeyFor('spark_hearth'))).toBeNull();
+    expect(await peekCosmeticFirstShowing('spark')).toEqual(receipt);
+    await equipCosmetic('spark_pollen');
+    await markCosmeticFirstShowingShown(receipt!.id);
+    expect(await peekCosmeticFirstShowing('spark')).toEqual({ id: 'spark_pollen', name: 'Pollen' });
+    await equipCosmetic('spark_hearth');
+    expect(await peekCosmeticFirstShowing('spark')).toBeNull();
+  });
+
+  test('a failed acknowledgement does not poison the in-memory seen flag', async () => {
+    await recordAmberCosmeticPurchase('spark_hearth');
+    await equipCosmetic('spark_hearth');
+    await peekCosmeticFirstShowing('spark');
+    jest.mocked(AsyncStorage.setItem).mockRejectedValueOnce(new Error('storage unavailable'));
+    await expect(markCosmeticFirstShowingShown('spark_hearth')).rejects.toThrow('storage unavailable');
+    expect(await peekCosmeticFirstShowing('spark')).toEqual({ id: 'spark_hearth', name: 'Hearth Sparks' });
+    await markCosmeticFirstShowingShown('spark_hearth');
+    expect(await peekCosmeticFirstShowing('spark')).toBeNull();
+  });
+
+  test('the default equipped yields nothing, and categories are independent' , async () => {
     expect(await consumeCosmeticFirstShowing('spark')).toBeNull();
     await recordAmberCosmeticPurchase('confetti_gold');
     await equipCosmetic('confetti_gold');

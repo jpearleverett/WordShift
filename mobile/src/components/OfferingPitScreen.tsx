@@ -289,6 +289,7 @@ interface FlyingWord {
   bobPeriod: number;
   bobPhaseOffset: number; // 0-1 random phase shift for sine wave
   isDevoured: boolean;
+  floatStartedAt?: number;
   floatLoopX: Animated.CompositeAnimation | null;
   floatLoopY: Animated.CompositeAnimation | null;
 }
@@ -709,6 +710,38 @@ const ShockwaveRingView = React.memo(({ ring }: { ring: ShockwaveRing }) => {
 });
 ShockwaveRingView.displayName = 'ShockwaveRingView';
 
+interface ParticleLayerHandle<P> {
+  add: (particles: P[], cap?: { threshold: number; retain: number }) => void;
+  remove: (id: string) => void;
+}
+
+/** Particle completion must not redraw the pit or its balance/word controls. */
+function createParticleLayer<P extends { id: string }>(
+  name: string,
+  renderParticle: (particle: P) => React.ReactNode,
+) {
+  const Layer = React.memo(React.forwardRef<ParticleLayerHandle<P>, object>((_props, ref) => {
+    const [particles, setParticles] = useState<P[]>([]);
+    React.useImperativeHandle(ref, () => ({
+      add: (next, cap) => setParticles(previous => {
+        const retained = cap && previous.length >= cap.threshold ? previous.slice(-cap.retain) : previous;
+        return [...retained, ...next];
+      }),
+      remove: id => setParticles(previous => previous.filter(particle => particle.id !== id)),
+    }), []);
+    return <>{particles.map(renderParticle)}</>;
+  }));
+  Layer.displayName = name;
+  return Layer;
+}
+
+const TrailParticleLayer = createParticleLayer('TrailParticleLayer', (p: TrailParticle) => <TrailParticleView key={p.id} p={p} />);
+const ImpactParticleLayer = createParticleLayer('ImpactParticleLayer', (p: ImpactParticle) => <ImpactParticleView key={p.id} p={p} />);
+const AmberParticleLayer = createParticleLayer('AmberParticleLayer', (p: AmberParticle) => <AmberParticleView key={p.id} p={p} />);
+const RimParticleLayer = createParticleLayer('RimParticleLayer', (p: RimParticle) => <RimParticleView key={p.id} p={p} />);
+const ShockwaveLayer = createParticleLayer('ShockwaveLayer', (ring: ShockwaveRing) => <ShockwaveRingView key={ring.id} ring={ring} />);
+
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -993,11 +1026,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
   const [harvestState, setHarvestState] = useState<HarvestState | null>(null);
   const [flyingWords, setFlyingWords] = useState<FlyingWord[]>([]);
-  const [trailParticles, setTrailParticles] = useState<TrailParticle[]>([]);
-  const [impactParticles, setImpactParticles] = useState<ImpactParticle[]>([]);
-  const [amberParticles, setAmberParticles] = useState<AmberParticle[]>([]);
-  const [rimParticles, setRimParticles] = useState<RimParticle[]>([]);
-  const [shockwaveRings, setShockwaveRings] = useState<ShockwaveRing[]>([]);
+  const trailLayerRef = useRef<ParticleLayerHandle<TrailParticle>>(null);
+  const impactLayerRef = useRef<ParticleLayerHandle<ImpactParticle>>(null);
+  const amberLayerRef = useRef<ParticleLayerHandle<AmberParticle>>(null);
+  const rimLayerRef = useRef<ParticleLayerHandle<RimParticle>>(null);
+  const shockwaveLayerRef = useRef<ParticleLayerHandle<ShockwaveRing>>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isOffering, setIsOffering] = useState(false);
   const [displayBalance, setDisplayBalance] = useState(amberBalance);
@@ -1038,7 +1071,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // Felt response for "deepen the pattern": a native-driven bloom on the depth
   // reading when the level rises (reduced-motion pins to no motion).
   const [tendPulse] = useState(() => new Animated.Value(0));
-  const tendPulseScale = tendPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] });
+  const tendPulseScale = useMemo(() => tendPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.16] }), [tendPulse]);
 
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
   const batchWordCounts = useRef<Map<string, number>>(new Map());
@@ -1124,6 +1157,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Ward mark ceremony state machine ----
   type CeremonyStatus = 'idle' | 'igniting' | 'erupting' | 'text' | 'complete';
   const [ceremonyStatus, setCeremonyStatus] = useState<CeremonyStatus>('idle');
+  const ceremonyTargetRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (ceremonyStatus === 'complete' && pendingPhaseTransition !== ceremonyTargetRef.current) {
+      // The root cinematic leaves the pit mounted. Rearm after it adopts the
+      // committed transition, without restarting against a stale pending prop.
+      setCeremonyStatus('idle');
+    }
+  }, [ceremonyStatus, pendingPhaseTransition]);
   const [ceremonyIgniteStep, setCeremonyIgniteStep] = useState(-1);
   const [ceremonyTextIndex, setCeremonyTextIndex] = useState(-1);
   // Tap-to-advance: the pending "advance to next line" action, so a tap can
@@ -1215,14 +1256,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     return () => { loop.stop(); wardPulseLoop.current = null; };
   }, [pendingPhaseTransition, reducedMotion, ceremonyStatus, wardPulseProgress]);
 
-  const wardPulseOpacity = wardPulseProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.6, 1.0],
-  });
-  const wardPulseScale = wardPulseProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1.0, 1.15],
-  });
+  const { wardPulseOpacity, wardPulseScale } = useMemo(() => ({
+    wardPulseOpacity: wardPulseProgress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.0] }),
+    wardPulseScale: wardPulseProgress.interpolate({ inputRange: [0, 1], outputRange: [1.0, 1.15] }),
+  }), [wardPulseProgress]);
 
   // Start ward ignition ceremony — defined via ref pattern because
   // flashPitSurge and spawnShockwave are useCallbacks declared later.
@@ -1320,51 +1357,54 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // Derive breathing opacity and scale from progress + phase. The Phase-5
   // Tending Level deepens the pit: a small boost to the inner/core glow so the
   // pit visibly grows warmer/deeper as the player tends (caps via the sqrt curve).
-  const breathOpacityRange = BREATH_OPACITY[phase] ?? BREATH_OPACITY[0];
-  const breathScaleRange = BREATH_SCALE[phase] ?? BREATH_SCALE[0];
-  const tendDeepening = getTendingIntensity(tendingLevel);
-  const tendGlowMul = 1 + tendDeepening * 0.5; // up to +50% inner/core glow
+  const { breathOpacityOuter, breathOpacityMiddle, breathOpacityInner, breathOpacityCore, breathScale } = useMemo(() => {
+    const breathOpacityRange = BREATH_OPACITY[phase] ?? BREATH_OPACITY[0];
+    const breathScaleRange = BREATH_SCALE[phase] ?? BREATH_SCALE[0];
+    const tendDeepening = getTendingIntensity(tendingLevel);
+    const tendGlowMul = 1 + tendDeepening * 0.5; // up to +50% inner/core glow
 
-  // Per-layer opacity interpolations for concentric glow (outer→inner: 0.4x, 0.7x, 1.0x, 2.5x of base)
-  // Each layer is multiplied by glowIntensity so the glow dims when no words are present
-  const breathOpacityOuter = Animated.multiply(
-    pitBreathProgress.interpolate({
+    // Per-layer opacity interpolations for concentric glow (outer→inner: 0.4x, 0.7x, 1.0x, 2.5x of base)
+    // Each layer is multiplied by glowIntensity so the glow dims when no words are present
+    const breathOpacityOuter = Animated.multiply(
+      pitBreathProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [breathOpacityRange[0] * 0.4, breathOpacityRange[1] * 0.4],
+      }),
+      glowIntensity,
+    );
+    const breathOpacityMiddle = Animated.multiply(
+      pitBreathProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [breathOpacityRange[0] * 0.7, breathOpacityRange[1] * 0.7],
+      }),
+      glowIntensity,
+    );
+    const breathOpacityInner = Animated.multiply(
+      pitBreathProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [
+          Math.min(breathOpacityRange[0] * tendGlowMul, 0.85),
+          Math.min(breathOpacityRange[1] * tendGlowMul, 0.95),
+        ],
+      }),
+      glowIntensity,
+    );
+    const breathOpacityCore = Animated.multiply(
+      pitBreathProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [
+          Math.min(breathOpacityRange[0] * 2.5 * tendGlowMul, 0.8),
+          Math.min(breathOpacityRange[1] * 2.5 * tendGlowMul, 0.92),
+        ],
+      }),
+      glowIntensity,
+    );
+    const breathScale = pitBreathProgress.interpolate({
       inputRange: [0, 1],
-      outputRange: [breathOpacityRange[0] * 0.4, breathOpacityRange[1] * 0.4],
-    }),
-    glowIntensity,
-  );
-  const breathOpacityMiddle = Animated.multiply(
-    pitBreathProgress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [breathOpacityRange[0] * 0.7, breathOpacityRange[1] * 0.7],
-    }),
-    glowIntensity,
-  );
-  const breathOpacityInner = Animated.multiply(
-    pitBreathProgress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [
-        Math.min(breathOpacityRange[0] * tendGlowMul, 0.85),
-        Math.min(breathOpacityRange[1] * tendGlowMul, 0.95),
-      ],
-    }),
-    glowIntensity,
-  );
-  const breathOpacityCore = Animated.multiply(
-    pitBreathProgress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [
-        Math.min(breathOpacityRange[0] * 2.5 * tendGlowMul, 0.8),
-        Math.min(breathOpacityRange[1] * 2.5 * tendGlowMul, 0.92),
-      ],
-    }),
-    glowIntensity,
-  );
-  const breathScale = pitBreathProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [breathScaleRange[0], breathScaleRange[1]],
-  });
+      outputRange: [breathScaleRange[0], breathScaleRange[1]],
+    });
+    return { breathOpacityOuter, breathOpacityMiddle, breathOpacityInner, breathOpacityCore, breathScale };
+  }, [phase, tendingLevel, pitBreathProgress, glowIntensity]);
 
   // ---- Ambient rim particles (embers rising from pit edge) ----
   useEffect(() => {
@@ -1395,11 +1435,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         color,
       };
 
-      setRimParticles(prev => {
-        // Cap total rim particles
-        const capped = prev.length >= maxRim * 2 ? prev.slice(-maxRim) : prev;
-        return [...capped, p];
-      });
+      rimLayerRef.current?.add([p], { threshold: maxRim * 2, retain: maxRim });
 
       Animated.parallel([
         Animated.timing(p.y, {
@@ -1423,17 +1459,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           Animated.timing(p.scale, { toValue: 0, duration: duration * 0.5, useNativeDriver: true }),
         ]),
       ]).start(() => {
-        if (mountedRef.current) setRimParticles(prev => prev.filter(rp => rp.id !== p.id));
+        rimLayerRef.current?.remove(p.id);
       });
     };
 
     // Stagger initial spawns
-    for (let i = 0; i < maxRim; i++) {
-      setTimeout(() => spawnRimParticle(), i * (spawnInterval / maxRim));
-    }
-
+    const initialSpawns = Array.from({ length: maxRim }, (_, i) =>
+      setTimeout(spawnRimParticle, i * (spawnInterval / maxRim)));
     const interval = setInterval(spawnRimParticle, spawnInterval);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); initialSpawns.forEach(clearTimeout); };
   }, [phase, reducedMotion, simplify, tendingLevel, SCREEN_WIDTH, SCREEN_HEIGHT, PIT_CENTER.x, PIT_CENTER.y, PIT_OVAL.radiusX, PIT_OVAL.radiusY]);
 
   // ---- Load harvest state ----
@@ -1503,6 +1537,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Smooth float loop using single linear progress → interpolated sine ----
   const startFloatLoop = useCallback((fw: FlyingWord) => {
     if (reducedMotion || simplify || fw.isDevoured) return;
+
+    // Native looping values do not synchronize __getValue() back to JS.
+    // The same linear periods plus a monotonic start time give the current
+    // position without per-frame native-to-JS listener traffic.
+    fw.floatStartedAt = performance.now();
 
     // X drift: single linear timing 0→1 looped, interpolated to sine in render
     const loopX = Animated.loop(
@@ -1733,11 +1772,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           Animated.timing(p.y, { toValue: PIT_CENTER.y + (Math.random() - 0.5) * 20, duration: duration * 0.75, easing: Easing.in(Easing.quad), useNativeDriver: true }),
           Animated.timing(p.scale, { toValue: 0, duration: duration * 0.75, useNativeDriver: true }),
           Animated.timing(p.opacity, { toValue: 0, duration: duration * 0.5, delay: duration * 0.3, useNativeDriver: true }),
-        ]).start(() => { if (mountedRef.current) setTrailParticles(prev => prev.filter(tp => tp.id !== p.id)); });
+        ]).start(() => { trailLayerRef.current?.remove(p.id); });
       }, delay);
       trailTimeoutsRef.current.push(tid);
     }
-    setTrailParticles(prev => [...prev, ...newParticles]);
+    trailLayerRef.current?.add(newParticles);
   }, [reducedMotion, phase, PIT_CENTER.x, PIT_CENTER.y]);
 
   // ---- Spawn impact burst (radial ring at pit center) ----
@@ -1769,9 +1808,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           Animated.delay(250),
           Animated.timing(p.opacity, { toValue: 0, duration: 150, useNativeDriver: true }),
         ]),
-      ]).start(() => { if (mountedRef.current) setImpactParticles(prev => prev.filter(ip => ip.id !== p.id)); });
+      ]).start(() => { impactLayerRef.current?.remove(p.id); });
     }
-    setImpactParticles(prev => [...prev, ...newParticles]);
+    impactLayerRef.current?.add(newParticles);
   }, [reducedMotion, phase, PIT_CENTER.x, PIT_CENTER.y]);
 
   // ---- Spawn shockwave ring (expanding ripple from pit center) ----
@@ -1784,11 +1823,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       opacity: new Animated.Value(0.6),
       color: colors.glow,
     };
-    setShockwaveRings(prev => {
-      // Limit max concurrent shockwaves
-      const trimmed = prev.length >= 3 ? prev.slice(-2) : prev;
-      return [...trimmed, ring];
-    });
+    shockwaveLayerRef.current?.add([ring], { threshold: 3, retain: 2 });
     Animated.parallel([
       Animated.timing(ring.scale, {
         toValue: 1,
@@ -1803,7 +1838,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         useNativeDriver: true,
       }),
     ]).start(() => {
-      if (mountedRef.current) setShockwaveRings(prev => prev.filter(r => r.id !== ring.id));
+      shockwaveLayerRef.current?.remove(ring.id);
     });
   }, [phase, reducedMotion, simplify]);
 
@@ -1812,6 +1847,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     startCeremonyRef.current = () => {
       if (!mountedRef.current || ceremonyBusyRef.current || ceremonyStatus !== 'idle' || pendingPhaseTransition == null || !ceremonyClock.isActive()) return;
       ceremonyBusyRef.current = true;
+      ceremonyTargetRef.current = pendingPhaseTransition;
       setCeremonyStatus('igniting');
       setCeremonyIgniteStep(0);
       setShowUtilityModal(false);
@@ -1878,33 +1914,36 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             ceremonyAdvanceRef.current = null;
             if (!mountedRef.current) return;
             confirming = true;
-            const result = await saveWithPlayerRetry(confirmPhaseTransition, {
-              title: 'The ceremony is waiting',
-              message: 'We could not save this change to your village. Free some device space if needed, then retry. Your offering is safe.',
-            });
-            // The parent owns the durable cinematic queue. A forced unmount
-            // during this save must still hand it the committed transition.
-            if (result) {
-              if (mountedRef.current) {
+            try {
+              const result = await saveWithPlayerRetry(confirmPhaseTransition, {
+                title: 'The ceremony is waiting',
+                message: 'We could not save this change to your village. Free some device space if needed, then retry. Your offering is safe.',
+              });
+              // The parent owns the durable cinematic queue. A forced unmount
+              // during this save must still hand it the committed transition.
+              if (result) {
+                if (mountedRef.current) {
+                  Animated.timing(ceremonyOverlayOpacity, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: true,
+                  }).start();
+                  setCeremonyStatus('complete');
+                }
+                onPhaseTransitionConfirmed?.(result.newPhase);
+              } else if (mountedRef.current) {
+                // Recovery: fade out overlay and reset to idle so user can retry
                 Animated.timing(ceremonyOverlayOpacity, {
                   toValue: 0,
                   duration: 300,
                   useNativeDriver: true,
                 }).start();
-                setCeremonyStatus('complete');
+                setCeremonyStatus('idle');
               }
-              onPhaseTransitionConfirmed?.(result.newPhase);
-            } else if (mountedRef.current) {
-              // Recovery: fade out overlay and reset to idle so user can retry
-              Animated.timing(ceremonyOverlayOpacity, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }).start();
+              onPhaseTransitionReady?.();
+            } finally {
               ceremonyBusyRef.current = false;
-              setCeremonyStatus('idle');
             }
-            onPhaseTransitionReady?.();
           };
 
           // Self-rescheduling line runner: each line auto-advances after 2.5s,
@@ -1976,11 +2015,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             Animated.timing(p.opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
           ]),
           Animated.spring(p.scale, { toValue: 1.0 + Math.random() * 0.4, friction: 4, useNativeDriver: true }),
-        ]).start(() => { if (mountedRef.current) setAmberParticles(prev => prev.filter(ap => ap.id !== p.id)); });
+        ]).start(() => { amberLayerRef.current?.remove(p.id); });
       }, delay);
       amberRiseTimeoutsRef.current.push(tid);
     }
-    setAmberParticles(prev => [...prev, ...newParticles]);
+    amberLayerRef.current?.add(newParticles);
   }, [reducedMotion, PIT_CENTER.x, PIT_CENTER.y]);
 
   // ---- Result toast ----
@@ -2013,7 +2052,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const handleDeepenPattern = useCallback(async () => {
     if (tendingBusyRef.current || !tendingNext) return;
     const cost = tendingNext.cost;
-    if (displayBalance < cost) {
+    if (amberBalanceRef.current < cost) {
       showResultToast('Not enough amber to deepen the pattern yet.');
       return;
     }
@@ -2026,10 +2065,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       });
       if (!result.success) {
         if (mountedRef.current) {
-          setDisplayBalance(result.newBalance);
-          onAmberChange?.(result.newBalance);
+          // Nothing was spent. Keep the partially offered words and both
+          // visual counters intact; snapping only the total mimics a charge.
           await refreshTending();
-          showResultToast(result.error === 'changed' ? 'The shrine has changed. Check the updated offering and try again.' : 'The pattern could not accept that offering right now.');
+          showResultToast(result.error === 'insufficient'
+            ? 'Not enough amber to deepen the pattern yet.'
+            : result.error === 'changed'
+              ? 'The shrine has changed. Check the updated offering and try again.'
+              : 'The pattern could not accept that offering right now.');
         }
         return;
       }
@@ -2098,7 +2141,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       tendingBusyRef.current = false;
       if (mountedRef.current) setTendingBusy(false);
     }
-  }, [tendingNext, displayBalance, onAmberChange, phase, refreshTending, showResultToast, reducedMotion, flashPitSurge, spawnShockwave, tendPulse]);
+  }, [tendingNext, onAmberChange, phase, refreshTending, showResultToast, reducedMotion, flashPitSurge, spawnShockwave, tendPulse]);
 
   // ---- Batch completion ----
   const tryFinalizeBatch = useCallback(async (batchId: string) => {
@@ -2218,8 +2261,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Compute approximate current position from progress + phase offset ----
   const getCurrentPos = useCallback((fw: FlyingWord): { x: number; y: number } => {
     const TWO_PI = 2 * Math.PI;
-    const driftT = (fw.driftProgress as any).__getValue?.() ?? 0;
-    const bobT = (fw.bobProgress as any).__getValue?.() ?? 0;
+    const elapsed = fw.floatStartedAt == null ? 0 : Math.max(0, performance.now() - fw.floatStartedAt);
+    const driftT = (elapsed % fw.driftPeriod) / fw.driftPeriod;
+    const bobT = (elapsed % fw.bobPeriod) / fw.bobPeriod;
     return {
       x: fw.baseX + fw.driftAmplitude * Math.sin(TWO_PI * (driftT + fw.driftPhaseOffset)),
       y: fw.baseY + -fw.bobAmplitude * Math.sin(TWO_PI * (bobT + fw.bobPhaseOffset)),
@@ -2722,10 +2766,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         />
 
         {/* Ambient rim particles — embers rising from pit edge */}
-        {rimParticles.map(p => <RimParticleView key={p.id} p={p} />)}
+        <RimParticleLayer ref={rimLayerRef} />
 
         {/* Shockwave rings — expanding ripple on word impact */}
-        {shockwaveRings.map(ring => <ShockwaveRingView key={ring.id} ring={ring} />)}
+        <ShockwaveLayer ref={shockwaveLayerRef} />
 
         {/* Ward ring — the circle the marks are set into.
             The only ring here used to be the pit's own 1px edge line at ~15%
@@ -2946,9 +2990,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
       >
         {/* Particle layers */}
-        {trailParticles.map(p => <TrailParticleView key={p.id} p={p} />)}
-        {impactParticles.map(p => <ImpactParticleView key={p.id} p={p} />)}
-        {amberParticles.map(p => <AmberParticleView key={p.id} p={p} />)}
+        <TrailParticleLayer ref={trailLayerRef} />
+        <ImpactParticleLayer ref={impactLayerRef} />
+        <AmberParticleLayer ref={amberLayerRef} />
 
         {/* Floating word chips — taps disabled during onboarding except during pit_offering step */}
         {flyingWords.map(fw => (
@@ -3089,18 +3133,18 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                   <TouchableOpacity
                     style={[
                       styles.tendingButton,
-                      (tendingBusy || displayBalance < tendingNext.cost) && styles.tendingButtonDisabled,
+                      (tendingBusy || amberBalance < tendingNext.cost) && styles.tendingButtonDisabled,
                     ]}
-                    disabled={tendingBusy || displayBalance < tendingNext.cost}
+                    disabled={tendingBusy || amberBalance < tendingNext.cost}
                     onPress={handleDeepenPattern}
                     accessibilityLabel={`${tendingNext.contentComplete ? 'Contribute amber' : getTendingButtonLabel()} for ${tendingNext.cost} amber`}
                     accessibilityRole="button"
-                    accessibilityState={{ disabled: tendingBusy || displayBalance < tendingNext.cost }}
+                    accessibilityState={{ disabled: tendingBusy || amberBalance < tendingNext.cost }}
                   >
                     <ThreeSliceStrip skin={pitSkin.buttons.primary.lg.up} capDp={BTN_CAP_DP} />
                     <Text style={[styles.tendingButtonText, { color: pitSkin.ink.primary }]}>{tendingNext.contentComplete ? 'Contribute amber' : getTendingButtonLabel()}</Text>
                   </TouchableOpacity>
-                  {displayBalance < tendingNext.cost && (
+                  {amberBalance < tendingNext.cost && (
                     <Text style={[styles.tendingInsufficient, { color: pitSurface.muted }]}>
                       {tendingNext.contentComplete ? 'There is nothing more to unlock here. You can return to your puzzles whenever you like.' : 'Earn more amber to deepen the pattern further.'}
                     </Text>

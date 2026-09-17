@@ -22,12 +22,9 @@ import {
 // Compact threshold: target rows with wordLength >= 6 use compact tiles (Row.tsx)
 const COMPACT_THRESHOLD = 6;
 
-// Board scale-to-fit (F139/F140). Below this device width the fixed arc geometry
-// can overflow a narrow screen (a 5-letter row's content is ~356px, wider than a
-// 360dp screen's ~320px inner width), clipping the outer slots/previews. At/above
-// the tablet width the fixed board is marooned in a small central column. A
-// single uniform board scale, applied to the render AND fed back into the slot
-// math here, keeps drag drops aligned with what the player sees.
+// A uniform board scale fits the widest rendered fan/run and is shared with
+// drag geometry. Large screens scale up modestly; narrow screens preserve all
+// outer insertion slots, including the noncompact five-letter fan.
 const TABLET_MIN_WIDTH = 600;
 const TABLET_MAX_SCALE = 1.2;
 
@@ -52,28 +49,38 @@ function naturalContentWidth(letterCount: number): number {
 }
 
 /**
- * The uniform board scale for a device width and the board's base word length.
- * A standard move grows the target row by one letter, so the widest state a row
- * reaches is `baseWordLength + 1` letters; the scale is derived from that so no
- * transient row ever overflows.
- *
- *  - Narrow screens where the widest row would overflow: scale < 1 (fit down).
- *  - Tablets/large aspect: a modest scale up (capped) so the board uses the room.
- *  - Ordinary phones where it already fits: exactly 1 (byte-identical rendering
- *    and drag math, so the common case is never perturbed).
+ * Fit the states Row actually renders. A target fans BEFORE insertion, while
+ * a completed row is a plain tile run. Each state chooses compact tiles from
+ * its own live length; a five-letter fan is wider than a six-letter fan.
+ * Double Shift also fans after its first drop and grows the plain run by two.
+ * Reverse fans over the first row after descent has shortened it by one.
+ * `availableWidth` includes the game area's 8dp padding on each side.
  */
-export function computeBoardScale(availableWidth: number, baseWordLength: number): number {
-  const widestLetters = Math.max(1, baseWordLength) + 1;
-  const natural = naturalContentWidth(widestLetters);
-  const rowInnerW = availableWidth - ROW_HORIZONTAL_MARGIN * 2 - ROW_PADDING * 2;
+export function computeBoardScale(
+  availableWidth: number,
+  baseWordLength: number,
+  doubleShift = false,
+  reverse = false,
+): number {
+  const base = Math.max(1, baseWordLength);
+  const plainLength = base + (doubleShift ? 2 : 1);
+  const plainCompact = plainLength >= COMPACT_THRESHOLD;
+  const plainWidth = plainLength * (plainCompact
+    ? COMPACT_TILE_W + COMPACT_TILE_MARGIN_H * 2
+    : STANDARD_TILE_W + STANDARD_TILE_MARGIN_H * 2);
+  const natural = Math.max(
+    naturalContentWidth(base),
+    doubleShift ? naturalContentWidth(base + 1) : 0,
+    reverse ? naturalContentWidth(Math.max(1, base - 1)) : 0,
+    plainWidth,
+  );
+  const rowInnerW = availableWidth - 16 - ROW_HORIZONTAL_MARGIN * 2 - ROW_PADDING * 2;
   if (natural <= 0 || rowInnerW <= 0) return 1;
-  if (natural > rowInnerW) {
-    return rowInnerW / natural; // fit down
-  }
+  if (natural > rowInnerW) return rowInnerW / natural;
   if (availableWidth >= TABLET_MIN_WIDTH) {
-    return Math.min(TABLET_MAX_SCALE, rowInnerW / natural); // modest scale up
+    return Math.min(TABLET_MAX_SCALE, rowInnerW / natural);
   }
-  return 1; // ordinary phone, already fits
+  return 1;
 }
 
 /**

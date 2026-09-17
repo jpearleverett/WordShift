@@ -352,9 +352,12 @@ function canActivateGatedState(
  * Seeded PRNG from a string seed.
  */
 function makeSeededRandom(seedStr: string): () => number {
-  let seed = seedStr.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  // Order matters: digit permutations such as Sep 01 / Sep 10 are different
+  // periods. Existing persisted quests remain until their normal rollover.
+  let seed = 0;
+  for (const char of seedStr) seed = (Math.imul(seed, 31) + char.charCodeAt(0)) | 0;
   return () => {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff;
     return (seed >> 16) / 32768;
   };
 }

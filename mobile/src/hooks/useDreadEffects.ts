@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Animated, Easing } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium } from '../services/haptics';
@@ -135,7 +135,11 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
     }
   }, [dreadPulseOpacity, screenShakeRef]);
 
-  const state: DreadEffectsState = { dreadPulseOpacity, screenShakeRef };
-  const actions: DreadEffectsActions = { triggerDreadPulse };
+  const state = useMemo<DreadEffectsState>(() => ({
+    dreadPulseOpacity, screenShakeRef,
+  }), [dreadPulseOpacity, screenShakeRef]);
+  const actions = useMemo<DreadEffectsActions>(() => ({
+    triggerDreadPulse,
+  }), [triggerDreadPulse]);
   return [state, actions];
 }

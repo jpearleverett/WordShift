@@ -38,7 +38,8 @@ jest.mock('@react-native-async-storage/async-storage', () => {
 // Mock amber crediting — return a deterministic "new balance" of 1000 + amount.
 const awardBonusAmber = jest.fn((amount: number, _source: string) => Promise.resolve(1000 + amount));
 jest.mock('../services/amberCurrency', () => ({
-  awardBonusAmber: (amount: number, source: string) => awardBonusAmber(amount, source),
+  awardBonusAmberInTransaction: (amount: number, source: string) => awardBonusAmber(amount, source),
+  invalidateProgressCache: jest.fn(),
 }));
 
 async function seedState(daysAgo: number, cycleDay: number): Promise<void> {

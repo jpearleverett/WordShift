@@ -1,5 +1,5 @@
 import { useCountUp } from '../../hooks/useCountUp';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,9 @@ import { CandyButton } from './CandyButton';
 import { SpringIn } from './SpringIn';
 import { countUpDisplayValue, getCountUpDurationMs } from './RewardReveal';
 import { AmberInline } from '../AmberInline';
-import { spendAmber } from '../../services/amberCurrency';
+import { saveWithPlayerRetry } from '../../services/saveRetry';
 import {
-  performSacrifice,
+  commitSacrifice,
   getSacrificeStats,
   getSacrificeAmounts,
   getSacrificePrompt,
@@ -29,7 +29,6 @@ import {
   getArrangementHoldsLine,
 } from '../../services/sacrifice';
 import { recordWhisper } from '../../services/whisperGallery';
-import { updateQuestProgress } from '../../services/weeklyQuests';
 import { hapticHeavy, hapticMedium } from '../../services/haptics';
 import { playUiSound } from '../../services/uiSound';
 import { getSettingsSync } from '../../services/settings';
@@ -71,6 +70,8 @@ export const SacrificeModal: React.FC<SacrificeModalProps> = ({
   const [offerStreak, setOfferStreak] = useState(0);
   const [offeringTierUp, setOfferingTierUp] = useState<string | null>(null);
   const [confirmEverything, setConfirmEverything] = useState(false);
+  const [offeringBusy, setOfferingBusy] = useState(false);
+  const offeringBusyRef = useRef(false);
   // Candle flare on each offering (native driver, reduced-motion aware).
   const [sacrificePulse] = useState(() => new Animated.Value(0));
 
@@ -116,52 +117,61 @@ export const SacrificeModal: React.FC<SacrificeModalProps> = ({
   // devotion streak (which escalates the arrangement's response) and flares the
   // candle, so the player can fall into a rhythm instead of reopening a form.
   const handleOffer = useCallback(async (amount: number, everything: boolean) => {
-    if (amount <= 0) return;
-    const spendResult = await spendAmber(amount, 'sacrifice');
-    if (!spendResult.success) return;
-    const nextStreak = offerStreak + 1;
-    const result = await performSacrifice(amount, phase, {
-      sessionStreak: nextStreak,
-      everything,
-    });
-    onAmberChange?.(spendResult.newBalance);
-    setSacrificeMessage(result.message);
-    setOfferStreak(nextStreak);
-    setOfferingTotal(result.total);
-    setOfferingCount(result.count);
-    setOfferingTierUp(result.tierUp ? result.tierUp.title : null);
-    setConfirmEverything(false);
-    // Feedback ramps with the weight of the offering: a fervent in-session
-    // streak, a milestone, a devotion tier-up, or giving everything all land as
-    // a heavier haptic and a flare that HOLDS at its peak before settling,
-    // where an ordinary offering gets the medium tap and a quick flare. Every
-    // offering now also has a voice — the arrangement swallowing it (the pit
-    // devour cue) instead of the old silence.
-    const intenseOffering = everything || result.isMilestone || !!result.tierUp || nextStreak >= 6;
-    if (intenseOffering) hapticHeavy(); else hapticMedium();
-    playUiSound('devour');
-    const rm = getSettingsSync().reducedMotion;
-    if (!rm) {
-      sacrificePulse.setValue(0);
-      Animated.sequence([
-        Animated.timing(sacrificePulse, { toValue: 1, duration: intenseOffering ? 180 : 160, useNativeDriver: true }),
-        ...(intenseOffering ? [Animated.delay(200)] : []),
-        Animated.timing(sacrificePulse, { toValue: 0, duration: intenseOffering ? 640 : 520, useNativeDriver: true }),
-      ]).start();
+    if (amount <= 0 || offeringBusyRef.current) return;
+    offeringBusyRef.current = true;
+    setOfferingBusy(true);
+    try {
+      const nextStreak = offerStreak + 1;
+      const claimId = `sacrifice_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const result = await saveWithPlayerRetry(() => commitSacrifice(claimId, amount, phase, {
+        sessionStreak: nextStreak,
+        everything,
+      }), {
+        title: 'Your offering is waiting',
+        message: 'We could not save your offering. Free some device storage if it is full, then retry. Your amber will only be spent once.',
+      });
+      onAmberChange?.(result.newBalance);
+      if (!result.success) return;
+      setSacrificeMessage(result.message);
+      setOfferStreak(nextStreak);
+      setOfferingTotal(result.total);
+      setOfferingCount(result.count);
+      setOfferingTierUp(result.tierUp ? result.tierUp.title : null);
+      setConfirmEverything(false);
+      // Feedback ramps with the weight of the offering: a fervent in-session
+      // streak, a milestone, a devotion tier-up, or giving everything all land as
+      // a heavier haptic and a flare that HOLDS at its peak before settling,
+      // where an ordinary offering gets the medium tap and a quick flare. Every
+      // offering now also has a voice — the arrangement swallowing it (the pit
+      // devour cue) instead of the old silence.
+      const intenseOffering = everything || result.isMilestone || !!result.tierUp || nextStreak >= 6;
+      if (intenseOffering) hapticHeavy(); else hapticMedium();
+      playUiSound('devour');
+      const rm = getSettingsSync().reducedMotion;
+      if (!rm) {
+        sacrificePulse.setValue(0);
+        Animated.sequence([
+          Animated.timing(sacrificePulse, { toValue: 1, duration: intenseOffering ? 180 : 160, useNativeDriver: true }),
+          ...(intenseOffering ? [Animated.delay(200)] : []),
+          Animated.timing(sacrificePulse, { toValue: 0, duration: intenseOffering ? 640 : 520, useNativeDriver: true }),
+        ]).start();
+      }
+      // Milestone offerings become permanent collectibles in the Whisper Gallery,
+      // attributed to Ember (the flame-oracle who introduced the rite; the
+      // arrangement keeps no gallery of its own).
+      if (result.isMilestone) {
+        recordWhisper({
+          animalType: 'fox',
+          animalName: 'Ember',
+          text: result.message,
+          phase,
+          type: 'keepsake',
+        }).catch(() => {});
+      }
+    } finally {
+      offeringBusyRef.current = false;
+      setOfferingBusy(false);
     }
-    // Milestone offerings become permanent collectibles in the Whisper Gallery,
-    // attributed to Ember (the flame-oracle who introduced the rite; the
-    // arrangement keeps no gallery of its own).
-    if (result.isMilestone) {
-      recordWhisper({
-        animalType: 'fox',
-        animalName: 'Ember',
-        text: result.message,
-        phase,
-        type: 'whisper',
-      }).catch(() => {});
-    }
-    updateQuestProgress({ amberSacrificed: amount }, phase).catch(() => {});
   }, [phase, offerStreak, onAmberChange, sacrificePulse]);
 
   return (
@@ -170,7 +180,7 @@ export const SacrificeModal: React.FC<SacrificeModalProps> = ({
       transparent
       statusBarTranslucent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={() => { if (!offeringBusyRef.current) onClose(); }}
     >
       <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
         <SpringIn
@@ -265,6 +275,8 @@ export const SacrificeModal: React.FC<SacrificeModalProps> = ({
                 key={amount}
                 style={[styles.sacrificeAmountBtn, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}
                 onPress={() => handleOffer(amount, false)}
+                disabled={offeringBusy}
+                accessibilityState={{ disabled: offeringBusy }}
                 accessibilityLabel={`Offer ${amount} amber`}
                 accessibilityRole="button"
               >
@@ -285,6 +297,8 @@ export const SacrificeModal: React.FC<SacrificeModalProps> = ({
           {amber > 0 && (
             <TouchableOpacity
               style={[styles.offeringEverythingBtn, { borderColor: panelSt.sectionBorder }]}
+              disabled={offeringBusy}
+              accessibilityState={{ disabled: offeringBusy }}
               onPress={() => {
                 if (confirmEverything) handleOffer(amber, true);
                 else setConfirmEverything(true);
@@ -305,6 +319,7 @@ export const SacrificeModal: React.FC<SacrificeModalProps> = ({
             hostDark={dtHostDark}
             style={styles.closeAction}
             onPress={onClose}
+            disabled={offeringBusy}
           />
           </ScrollView>
         </SpringIn>

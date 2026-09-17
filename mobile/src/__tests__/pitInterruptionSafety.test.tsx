@@ -7,6 +7,7 @@ type Hooks = {
   effect: (callback: Effect, deps?: readonly unknown[]) => void;
 };
 let mockHooks: Hooks;
+let mockReducedMotion = true;
 let mockBack: (() => boolean) | undefined;
 let mockAppState: ((state: string) => void) | undefined;
 jest.mock('react', () => ({
@@ -38,7 +39,7 @@ jest.mock('react-native', () => {
   };
 });
 jest.mock('../hooks/useScreenInsets', () => ({ useScreenInsets: () => ({ top: 20, bottom: 20 }) }));
-jest.mock('../services/settings', () => ({ getSettingsSync: () => ({ reducedMotion: true }) }));
+jest.mock('../services/settings', () => ({ getSettingsSync: () => ({ reducedMotion: mockReducedMotion }) }));
 jest.mock('../services/deviceTier', () => ({ getDeviceTier: () => 'high', shouldSimplifyAnimations: () => true }));
 jest.mock('../services/haptics', () => ({ hapticLight: jest.fn(), hapticMedium: jest.fn(), hapticHeavy: jest.fn() }));
 jest.mock('../services/uiSound', () => ({ playUiSound: jest.fn(), stopCeremonyMusic: jest.fn() }));
@@ -60,6 +61,7 @@ jest.mock('../components/ui/UtilityMenu', () => ({ UtilityMenu: 'UtilityMenu' })
 jest.mock('../components/AmberInline', () => ({ AmberInline: 'AmberInline', AmberValue: 'AmberValue' }));
 jest.mock('../components/ui/NineSlice', () => ({ NineSliceFrame: 'NineSliceFrame', ThreeSliceStrip: 'ThreeSliceStrip' }));
 
+import { Animated } from 'react-native';
 import { OfferingPitScreen, createPitCeremonyClock } from '../components/OfferingPitScreen';
 import { confirmPhaseTransition } from '../services/amberCurrency';
 import { getHarvestState, offerAllBatches, settleBatchCredit, HarvestState } from '../services/wordHarvest';
@@ -148,6 +150,7 @@ function mount(overrides: Partial<Props> = {}) {
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  mockReducedMotion = true;
   jest.mocked(getHarvestState).mockResolvedValue(emptyHarvest);
   jest.mocked(confirmPhaseTransition).mockResolvedValue({ newPhase: 1, previousPhase: 0 });
 });
@@ -290,4 +293,98 @@ test('tending cannot double-purchase or close the modal before its durable resul
   expect(find(harness.render(), node => node.type === 'Modal')?.props?.visible).toBe(true);
   purchase.resolve({ success: true, newBalance: 980, level: 1, milestone: null, totalAmberTended: 20, amountSpent: 20, recovered: false }); await flush();
   expect(mockBack!()).toBe(false); harness.dispose();
+});
+
+
+test('a successful ceremony releases the retained pit and rearms the next phase only after acknowledgement', async () => {
+  const harness = mount(); await flush();
+  press(byLabel(harness.render(), 'Activate the ward marks'));
+  harness.render(); jest.advanceTimersByTime(20000); await flush();
+  expect(confirmPhaseTransition).toHaveBeenCalledTimes(1);
+  harness.render(); jest.advanceTimersByTime(20000); await flush();
+  expect(confirmPhaseTransition).toHaveBeenCalledTimes(1);
+  const tree = harness.render({ phase: 1, pendingPhaseTransition: null });
+  expect(mockBack!()).toBe(false);
+  press(byLabel(tree, 'Return home'));
+  press(byLabel(tree, '1000 amber. Tap to open the store'));
+  expect(harness.props.onClose).toHaveBeenCalledTimes(1);
+  expect(harness.props.onOpenStore).toHaveBeenCalledTimes(1);
+  jest.mocked(confirmPhaseTransition).mockResolvedValueOnce({ previousPhase: 1, newPhase: 2 });
+  harness.render({ pendingPhaseTransition: 2 });
+  jest.advanceTimersByTime(20000); await flush();
+  expect(confirmPhaseTransition).toHaveBeenCalledTimes(2);
+  expect(harness.props.onPhaseTransitionConfirmed).toHaveBeenLastCalledWith(2);
+  harness.render({ phase: 2, pendingPhaseTransition: null });
+  expect(mockBack!()).toBe(false);
+  harness.dispose();
+});
+
+test('partially devoured amber cannot enable a tending purchase before the batch is credited', async () => {
+  jest.mocked(getHarvestState).mockResolvedValue({ ...emptyHarvest, pendingBatches: [{ id: 'batch', words: ['CAT', 'DOG', 'OWL', 'FOX'], amberValue: 40 }] } as unknown as HarvestState);
+  const harness = mount({ phase: 5, pendingPhaseTransition: null, amberBalance: 15 }); await flush();
+  let tree = harness.render();
+  const chip = find(tree, node => !!node.props?.fw)!;
+  (chip.props!.onTap as (word: unknown) => void)(chip.props!.fw);
+  tree = harness.render();
+  byLabel(tree, '25 amber. Tap to open the store');
+  press(find(tree, node => typeof node.props?.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Tend the pattern,'))!);
+  await flush(); tree = harness.render();
+  const deepen = find(tree, node => node.props?.accessibilityLabel === 'Deepen the pattern for 20 amber')!;
+  expect(deepen).toBeDefined();
+  expect(deepen.props?.disabled).toBe(true);
+  press(deepen);
+  expect(commitTendPurchase).not.toHaveBeenCalled();
+  byLabel(harness.render(), '25 amber. Tap to open the store');
+  harness.dispose();
+});
+
+test('a refused tending purchase preserves optimistic amber and reports insufficient funds', async () => {
+  jest.mocked(getHarvestState).mockResolvedValue({ ...emptyHarvest, pendingBatches: [{ id: 'batch', words: ['CAT', 'DOG'], amberValue: 20 }] } as unknown as HarvestState);
+  jest.mocked(commitTendPurchase).mockResolvedValueOnce({ success: false, error: 'insufficient', newBalance: 1000 });
+  const harness = mount({ phase: 5, pendingPhaseTransition: null }); await flush();
+  let tree = harness.render();
+  const chip = find(tree, node => !!node.props?.fw)!;
+  (chip.props!.onTap as (word: unknown) => void)(chip.props!.fw);
+  tree = harness.render();
+  press(find(tree, node => typeof node.props?.accessibilityLabel === 'string' && node.props.accessibilityLabel.startsWith('Tend the pattern,'))!);
+  await flush(); tree = harness.render();
+  press(byLabel(tree, 'Deepen the pattern for 20 amber'));
+  await flush(); tree = harness.render();
+  byLabel(tree, '1010 amber. Tap to open the store');
+  expect(find(tree, node => node.props?.children === 'Not enough amber to deepen the pattern yet.')).toBeDefined();
+  harness.dispose();
+});
+
+
+test('devouring a floating word starts at its current native-loop position', async () => {
+  mockReducedMotion = false;
+  jest.mocked(getHarvestState).mockResolvedValue({ ...emptyHarvest, pendingBatches: [{ id: 'batch', words: ['CAT', 'DOG'], amberValue: 20 }] } as unknown as HarvestState);
+  const harness = mount({ pendingPhaseTransition: null }); await flush();
+  const chip = find(harness.render(), node => !!node.props?.fw)!;
+  const fw = chip.props!.fw as {
+    baseX: number; baseY: number; driftAmplitude: number; bobAmplitude: number;
+    driftPeriod: number; bobPeriod: number; driftPhaseOffset: number; bobPhaseOffset: number;
+    floatStartedAt: number; spiralRangeX: number[]; spiralRangeY: number[];
+  };
+  Object.assign(fw, { baseX: 50, baseY: 60, driftAmplitude: 20, bobAmplitude: 10,
+    driftPeriod: 4000, bobPeriod: 2000, driftPhaseOffset: 0, bobPhaseOffset: 0,
+    floatStartedAt: performance.now() - 1000 });
+  (chip.props!.onTap as (word: unknown) => void)(fw);
+  expect(fw.spiralRangeX[0]).toBeCloseTo(70);
+  expect(fw.spiralRangeY[0]).toBeCloseTo(60);
+  harness.dispose();
+});
+
+test('balance and modal rerenders reuse the pit glow animation graphs', async () => {
+  const harness = mount({ pendingPhaseTransition: null }); await flush();
+  let tree = harness.render();
+  const graphCount = jest.mocked(Animated.multiply).mock.calls.length;
+  harness.render({ amberBalance: 1100 });
+  tree = harness.render();
+  press(byLabel(tree, 'Open utility menu'));
+  harness.render();
+  expect(jest.mocked(Animated.multiply).mock.calls.length).toBe(graphCount);
+  harness.render({ phase: 1 });
+  expect(jest.mocked(Animated.multiply).mock.calls.length).toBe(graphCount + 4);
+  harness.dispose();
 });

@@ -9,6 +9,8 @@ export interface SpeedTimerState {
 export interface SpeedTimerActions {
   /** Start countdown from the given number of seconds. */
   startSpeedTimer: (seconds: number) => void;
+  /** Hold the clock while the global overlay scheduler owns the screen. */
+  setSpeedTimerOverlayPaused: (paused: boolean) => void;
   /** Stop the timer and clear the remaining-time display. */
   stopSpeedTimer: () => void;
 }
@@ -50,6 +52,7 @@ export function useSpeedTimer(
   // resumes only when both have lifted.
   const pausedRef = useRef<boolean>(paused);
   const backgroundedRef = useRef<boolean>(false);
+  const overlayPausedRef = useRef(false);
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -89,7 +92,7 @@ export function useSpeedTimer(
   // the clock expired while held.
   const resumeTicking = useCallback(() => {
     if (!runningRef.current || intervalRef.current !== null) return;
-    if (pausedRef.current || backgroundedRef.current) return;
+    if (pausedRef.current || overlayPausedRef.current || backgroundedRef.current) return;
     if (limitRef.current > 0) {
       setSpeedTimeRemaining(limitRef.current);
       beginTicking();
@@ -107,7 +110,7 @@ export function useSpeedTimer(
     limitRef.current = seconds;
     runningRef.current = true;
     setSpeedTimeRemaining(seconds);
-    if (pausedRef.current || backgroundedRef.current) return; // ticks on resume
+    if (pausedRef.current || overlayPausedRef.current || backgroundedRef.current) return; // ticks on resume
     beginTicking();
   }, [beginTicking, clearTimer]);
 
@@ -116,6 +119,12 @@ export function useSpeedTimer(
     clearTimer();
     setSpeedTimeRemaining(null);
   }, [clearTimer]);
+
+  const setSpeedTimerOverlayPaused = useCallback((held: boolean) => {
+    overlayPausedRef.current = held;
+    if (held) suspendTicking();
+    else resumeTicking();
+  }, [suspendTicking, resumeTicking]);
 
   // In-app hold (setup menu / rules sheet over a live board).
   useEffect(() => {
@@ -150,6 +159,6 @@ export function useSpeedTimer(
   }, [clearTimer]);
 
   const state: SpeedTimerState = { speedTimeRemaining };
-  const actions: SpeedTimerActions = { startSpeedTimer, stopSpeedTimer };
+  const actions: SpeedTimerActions = { startSpeedTimer, stopSpeedTimer, setSpeedTimerOverlayPaused };
   return [state, actions];
 }

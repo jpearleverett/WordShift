@@ -28,13 +28,13 @@ import { recordResonantChoices, recordUnbrokenWeaveVictory } from './masteryReco
 import { RESONANT_MOVE_AMBER, RESONANT_BOARD_CAP_AMBER , FINALE_ARM_MIN_PUZZLES } from '../constants/gameBalance';
 
 import type { VictoryData, AmberBreakdown } from '../hooks/useGamePersistence';
-import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
+import AsyncStorage, { runStorageTransaction, StorageRecoveryRequiredError } from './persistenceStorage';
 import NativeStorage from '@react-native-async-storage/async-storage';
-import { invalidateRestoredServiceCaches } from './cloudSave';
+import { invalidateRestoredServiceCaches, refreshRestoredServiceCaches } from './cloudSave';
 import { recordSeasonPuzzleCompletion } from './seasonPass';
 import { getLocalDateString, parseLocalDate } from './dateUtils';
 import { recordStoryBoundary } from './storySpine';
-import { loadDailyProgress, recordDailyCompletion, checkDailyStreakMilestone } from './dailyChallenge';
+import { loadDailyProgress, recordDailyCompletion, claimDailyStreakMilestoneInTransaction } from './dailyChallenge';
 import { isEventDay, getEventDailyBonusAmber } from './liveEvents';
 
 export interface VictoryInput {
@@ -308,7 +308,8 @@ async function computeVictory(input: VictoryInput): Promise<VictoryData> {
             } else if (!(await isFinaleArmed())) {
               const dwellBefore = await getPhase4DwellCount();
               const dwell = await recordPhase4Dwell();
-              if (canArmFinale(dwell, amberResult.puzzlesSolved)) await armFinale();
+              const cycleStartPuzzles = (await getFullProgress()).cycleStartPuzzles ?? 0;
+              if (canArmFinale(dwell, amberResult.puzzlesSolved, cycleStartPuzzles)) await armFinale();
               endgame = { kind: 'dwell', houseComplete, dwellBefore, dwell };
             }
           } else if (!(await isPostRevelation())) {
@@ -326,7 +327,7 @@ async function computeVictory(input: VictoryInput): Promise<VictoryData> {
         const boardDate = input.dailyDate ?? input.completedDate;
         const progress = await recordDailyCompletion(stars, hintsUsed, invalidAttempts, boardDate, input.completedDate, input.dailyBoardVersion);
         const credited = progress.totalCompleted > beforeTotal;
-        const milestone = credited ? checkDailyStreakMilestone(progress.currentStreak, beforeStreak, effectivePhase) : null;
+        const milestone = credited ? await claimDailyStreakMilestoneInTransaction(beforeStreak, effectivePhase) : null;
         if (milestone) amberResult.newBalance = await awardBonusAmberInTransaction(milestone.amber, 'daily_streak_milestone');
         const eventBonus = credited && isEventDay(boardDate)
           ? getEventDailyBonusAmber(amberBreakdown.base + amberBreakdown.starBonus + amberBreakdown.streakBonus + amberBreakdown.challengeBonus) : 0;
@@ -404,6 +405,7 @@ function validateInput(value: unknown): value is VictoryInput {
 /** The pending intent is durable before computation; only the commit makes
  * rewards/stats visible in storage. Replaying an interrupted intent uses the
  * same completion ID and returns the persisted receipt instead of double-paying. */
+let victoryCachesNeedRefresh = false;
 export async function persistVictory(input: VictoryInput): Promise<VictoryData> {
   if (!validateInput(input)) throw new Error('Invalid puzzle completion');
   try {
@@ -421,12 +423,25 @@ export async function persistVictory(input: VictoryInput): Promise<VictoryData> 
       await AsyncStorage.setItem(VICTORY_RECEIPT_KEY, JSON.stringify({ id: input.completionId, result }));
       await AsyncStorage.removeItem(PENDING_VICTORY_KEY);
       // A restored PLAYING snapshot must never re-award this completed board.
-      await AsyncStorage.removeItem('wordshift_in_progress_puzzle');
+      const saveKey = input.isDaily ? 'wordshift_in_progress_daily' : 'wordshift_in_progress_puzzle';
+      await AsyncStorage.removeItem(saveKey);
+      await AsyncStorage.removeItem(`${saveKey}_clock`);
       return result;
     });
+    if (victoryCachesNeedRefresh) {
+      await refreshRestoredServiceCaches();
+      victoryCachesNeedRefresh = false;
+    }
     return result;
   } catch (error) {
-    invalidateRestoredServiceCaches();
+    victoryCachesNeedRefresh = true;
+    if (error instanceof StorageRecoveryRequiredError) {
+      // Keep the failed commit pending until the player's retry. That retry
+      // warms the mirrors even when it returns an already committed receipt.
+      invalidateRestoredServiceCaches();
+    } else {
+      await refreshRestoredServiceCaches().catch(() => {});
+    }
     throw error;
   }
 }

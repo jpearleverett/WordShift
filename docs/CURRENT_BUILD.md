@@ -1,5 +1,9 @@
 # Current build and documentation
 
+## September 17 assessment fixes
+
+The follow-up to `main` at `c9f5835` addresses the September 16 audit. See the [complete resolution map and validation](ASSESSMENT_RESOLUTION_2026-09-17.md). Earlier dated test totals below retain their original scope. Source version remains 1.3.6 / Android 101; this change is not a new Play upload.
+
 Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main` at `687a08d` (the launch-readiness merge, PR 439). The earlier CI audit remains tied to [`6f96ebb583f591f46c9c023be6462d99d816a8e7`](https://github.com/jpearleverett/WordShift/commit/6f96ebb583f591f46c9c023be6462d99d816a8e7). This page distinguishes current implementation from recorded validation; it does not certify an uploaded AAB, a Play rollout, or hosted service configuration.
 
 ## Build identity
@@ -9,7 +13,7 @@ Current source builds on main `70a1883`, which carries the launch-readiness fixe
 | Setting | Checked-in value | Source |
 |---|---|---|
 | App version | `1.3.6` | `mobile/app.json` |
-| Android package / version code | `com.wordshift.app` / `100` | `mobile/app.json` |
+| Android package / version code | `com.wordshift.app` / `101` | `mobile/app.json` |
 | iOS bundle / build number | `com.wordshift.app` / `3` | `mobile/app.json` |
 | Expo / React Native | SDK 57; lockfile resolves Expo `57.0.20`, RN `0.86.3` | `mobile/package-lock.json` |
 | Version management | Local; increase Android version code for each new Play upload | `mobile/eas.json` |

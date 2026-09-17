@@ -18,6 +18,38 @@ describe('generation vocabulary context', () => {
     expect(getInsertionIndex(5)).toBe(common);
   });
 
+  it.each([4, 5, 6])('builds the exact exhaustive insertion multiset for %i-letter bases', length => {
+    const sets = getGenerationWordSets();
+    const expected: string[] = [];
+    for (const base of sets[length]) {
+      for (let position = 0; position <= base.length; position++) {
+        for (let code = 65; code <= 90; code++) {
+          const letter = String.fromCharCode(code);
+          const result = base.slice(0, position) + letter + base.slice(position);
+          if (sets[length + 1].has(result)) expected.push(`${letter}:${base}:${result}:${position}`);
+        }
+      }
+    }
+    const actual = [...getInsertionIndex(length)].flatMap(([letter, targets]) =>
+      targets.map(target => `${letter}:${target.baseWord}:${target.result}:${target.position}`));
+    expect(actual.sort()).toEqual(expected.sort());
+  });
+
+  it('defers each vocabulary build until its first accessor call', () => {
+    jest.isolateModules(() => {
+      const policy = require('../services/puzzleVocabulary');
+      const spy = jest.spyOn(policy, 'isFairPuzzleWord');
+      const vocabulary = require('../services/generatorVocabulary');
+      expect(spy).not.toHaveBeenCalled();
+      const first = vocabulary.getGenerationWordSets();
+      expect(spy).toHaveBeenCalled();
+      spy.mockClear();
+      expect(vocabulary.getGenerationWordSets()).toBe(first);
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+  });
+
   it('keeps overlapping searches isolated across asynchronous yields', async () => {
     let release!: () => void;
     const hold = new Promise<void>(resolve => { release = resolve; });

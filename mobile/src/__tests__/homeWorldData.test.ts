@@ -817,10 +817,22 @@ describe('skip the wait (pay premium, unlock now)', () => {
       await unlockUpTo('unlock_star_loft');
       const p = await loadProgress();
       p.currentPhase = 3; // past the trio guard, so the purse is the only blocker
+      await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(p));
       await reserveNextUnlock('unlock_star_loft');
       (await loadProgress()).amber = 0;
       expect(await getReservedSpeedUpState('unlock_star_loft')).toBe('need_amber');
       expect(getReservedSpeedUpNeedAmberText(225)).toContain('225');
+    });
+
+    test('a reserved room whose level opened still names its weighted house gate', async () => {
+      const p = await loadProgress();
+      p.reservedUnlockId = 'unlock_star_loft';
+      p.puzzlesSolved = 90;
+      p.phaseProgress = PHASE_THRESHOLDS[3] - 1;
+      p.currentPhase = 2;
+      expect(await getReservedSpeedUpState('unlock_star_loft')).toBe('not_yet');
+      p.phaseProgress = PHASE_THRESHOLDS[3];
+      expect(await getReservedSpeedUpState('unlock_star_loft')).toBe('none');
     });
 
     test('locked-room copy names the real blocker, never a guess at the purse', () => {

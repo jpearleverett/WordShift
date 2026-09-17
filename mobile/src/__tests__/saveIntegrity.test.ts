@@ -3,7 +3,8 @@ import NativeStorage from '@react-native-async-storage/async-storage';
 import { collectLocalSaveData, invalidateRestoredServiceCaches, restoreFromCloudData } from '../services/cloudSave';
 import { recoverPendingStorageTransaction, STORAGE_COMMIT_KEY } from '../services/persistenceStorage';
 import { recordDurableVictory, recoverPendingVictory, createVictoryInput, PENDING_VICTORY_KEY } from '../services/victoryPersistence';
-import { loadProgress } from '../services/amberCurrency';
+import { loadProgress, invalidateProgressCache } from '../services/amberCurrency';
+import { HomeWorldProgress } from '../types/homeWorld';
 import { getCumulativeStats } from '../services/starRating';
 import { getHarvestState } from '../services/wordHarvest';
 import { loadStoryState } from '../services/storySpine';
@@ -12,10 +13,14 @@ import { runMigrations } from '../services/dataMigration';
 jest.mock('@react-native-async-storage/async-storage', () => require('./helpers/mockAsyncStorage').createMockAsyncStorage());
 const originalRead = (NativeStorage.getItem as jest.Mock).getMockImplementation()!;
 const originalWrite = (NativeStorage.setItem as jest.Mock).getMockImplementation()!;
+let defaultProgress: HomeWorldProgress;
+const progressRecord = (amber: number) => JSON.stringify({ ...defaultProgress, amber });
 beforeEach(async () => {
   (NativeStorage.getItem as jest.Mock).mockImplementation(originalRead);
   (NativeStorage.setItem as jest.Mock).mockImplementation(originalWrite);
   await NativeStorage.clear(); invalidateRestoredServiceCaches();
+  defaultProgress = await loadProgress();
+  invalidateProgressCache();
 });
 const input = (id = 'board-1') => createVictoryInput({ completionId: id,
   difficulty: 'EASY', hintsUsed: 0, invalidAttempts: 0, gameMode: 'standard',
@@ -39,15 +44,12 @@ test.each([
 });
 
 test('one failed local read aborts backup collection', async () => {
-  (NativeStorage.getItem as jest.Mock).mockImplementation(async key => {
-    if (key === 'wordshift_home_progress') throw new Error('read failed');
-    return originalRead(key);
-  });
+  (NativeStorage.multiGet as jest.Mock).mockRejectedValueOnce(new Error('read failed'));
   await expect(collectLocalSaveData()).rejects.toThrow('read failed');
 });
 
 test('an interrupted restore finishes completely before services rehydrate', async () => {
-  await NativeStorage.setItem('wordshift_home_progress', '{"amber":10}');
+  await NativeStorage.setItem('wordshift_home_progress', progressRecord(10));
   await NativeStorage.setItem('wordshift_in_progress_puzzle', '{"old":true}');
   let failed = false;
   (NativeStorage.setItem as jest.Mock).mockImplementation(async (key, value) => {
@@ -55,7 +57,7 @@ test('an interrupted restore finishes completely before services rehydrate', asy
     return originalWrite(key, value);
   });
   await expect(restoreFromCloudData({ version: 1, timestamp: 20, deviceId: 'other', data: {
-    wordshift_schema_version: '6', wordshift_home_progress: '{"amber":100}',
+    wordshift_schema_version: '6', wordshift_home_progress: progressRecord(100),
   }})).rejects.toThrow('need recovery');
   expect(await NativeStorage.getItem(STORAGE_COMMIT_KEY)).not.toBeNull();
   await recoverPendingStorageTransaction(); invalidateRestoredServiceCaches();
@@ -124,6 +126,7 @@ test('final word boundary and final-board completion persist together', async ()
 
 test('daily milestones and original solve-day streak survive a later recovery exactly once', async () => {
   await NativeStorage.setItem('wordshift_home_progress', JSON.stringify({
+    ...defaultProgress,
     amber:0, puzzlesSolved:10, phaseProgress:10, currentPhase:0,
     currentStreak:2, lastPlayDate:'2026-06-19', completedDifficulties:['EASY'],
   }));
@@ -209,7 +212,7 @@ test('cancelling a restore during staging preserves every old key', async () => 
 
 test('an ambient reward waits for restore and credits the new save', async () => {
   const {awardBonusAmber} = await import('../services/amberCurrency');
-  await NativeStorage.setItem('wordshift_home_progress', '{"amber":25}');
+  await NativeStorage.setItem('wordshift_home_progress', progressRecord(25));
   await loadProgress();
   let release!:()=>void;
   let reached!:()=>void;
@@ -220,7 +223,7 @@ test('an ambient reward waits for restore and credits the new save', async () =>
     return originalWrite(key,value);
   });
   const restore = restoreFromCloudData({version:1,timestamp:1,deviceId:'other',data:{
-    wordshift_home_progress:'{"amber":100}',wordshift_schema_version:'6',
+    wordshift_home_progress:progressRecord(100),wordshift_schema_version:'6',
   }});
   await ready;
   const reward = awardBonusAmber(5,'test_async_reward');
@@ -265,7 +268,7 @@ test('manual restore waits for an earlier upload acknowledgement before fetching
   const started = new Promise<void>(resolve=>{begin=resolve;});
   const held = new Promise<void>(resolve=>{finish=resolve;});
   const download = jest.fn(async()=>({version:1,timestamp:1,deviceId:'other',revision:3,
-    data:{wordshift_home_progress:'{"amber":777}',wordshift_schema_version:'6'},
+    data:{wordshift_home_progress:progressRecord(777),wordshift_schema_version:'6'},
   }));
   cloud.setCloudProvider({getName:()=> 'test',isReady:async()=>true,upload:async()=>false,
     download,hasNewerSave:async()=>false,

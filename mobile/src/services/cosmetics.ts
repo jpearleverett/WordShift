@@ -17,7 +17,7 @@
 
 import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { getFullProgress, invalidateProgressCache, spendAmber } from './amberCurrency';
-import { hasEntitlementSync, ENTITLEMENTS } from './entitlements';
+import { hasEntitlementSync, loadEntitlements, ENTITLEMENTS } from './entitlements';
 import { setEquippedTileTheme } from '../theme/colors';
 
 const STORAGE_KEY = 'wordshift_cosmetics';
@@ -271,8 +271,22 @@ function getDefault(): CosmeticState {
 
 /** Mirror the equipped selection synchronously and push the tile theme to colors. */
 function syncEquippedFrom(state: CosmeticState): void {
-  syncEquipped = { ...state.equipped };
-  setEquippedTileTheme(state.equipped.tile_theme ?? null);
+  syncEquipped = {};
+  for (const [category, id] of Object.entries(state.equipped)) {
+    const item = getCosmetic(id);
+    if (!item || item.category !== category) continue;
+    const source = item.acquisition;
+    const owned = source.kind === 'entitlement' ? hasEntitlementSync(source.entitlement)
+      : source.kind === 'iap' ? hasEntitlementSync(source.productId) : id in state.owned;
+    if (owned) syncEquipped[item.category] = id;
+  }
+  setEquippedTileTheme(syncEquipped.tile_theme ?? null);
+}
+
+/** Billing calls this after durable entitlement changes, including revocation.
+ * Keep the saved selection so reactivation can restore it without another purchase. */
+export function refreshEquippedOwnership(): void {
+  if (cache) syncEquippedFrom(cache);
 }
 
 function isMap(value: unknown): value is Record<string, unknown> {
@@ -313,7 +327,7 @@ function copyState(state: CosmeticState): CosmeticState {
  * Confetti reads for the confetti palette and move sparks. Nothing lazily
  * refills them: the only async cosmetic reads in the app are ShopScreen's and
  * initCosmetics. So the clear is only half the fix; the other half is
- * cloudSave.restoreFromCloudData awaiting initCosmetics immediately after
+ * cloudSave.refreshRestoredServiceCaches awaiting initCosmetics immediately after
  * this. Without it, restoring a save stripped every purchased cosmetic off the
  * board for the rest of the session while the Shop still read "Equipped".
  */
@@ -328,6 +342,9 @@ export function invalidateCosmeticsCache(): void {
  * (mirrors initIAP/initAds). Safe to call repeatedly.
  */
 export async function initCosmetics(): Promise<void> {
+  // Boot warms these concurrently; ownership must be known before filtering
+  // equipped entitlement cosmetics, including an offline launch.
+  await loadEntitlements();
   const state = await load();
   // Always (re)apply, even on a warm cache, so the colors module reflects the
   // equipped theme after a cold start.
@@ -416,7 +433,8 @@ export async function purchaseAmberCosmetic(id: string): Promise<CosmeticPurchas
     return committed.result;
   } catch (error) {
     cache = null;
-    syncEquippedFrom({ owned: {}, equipped: previousEquipped });
+    syncEquipped = previousEquipped;
+    setEquippedTileTheme(syncEquipped.tile_theme ?? null);
     throw error;
   } finally {
     invalidateProgressCache();
@@ -466,7 +484,8 @@ async function changeEquipment(
     return committed.changed;
   } catch (error) {
     cache = null;
-    syncEquippedFrom({ owned: {}, equipped: previousEquipped });
+    syncEquipped = previousEquipped;
+    setEquippedTileTheme(syncEquipped.tile_theme ?? null);
     throw error;
   }
 }
@@ -492,8 +511,8 @@ export async function unequipCosmetic(category: CosmeticCategory): Promise<void>
 
 /** The equipped cosmetic id for a category, or undefined (= phase default). */
 export async function getEquipped(category: CosmeticCategory): Promise<string | undefined> {
-  const state = await load();
-  return state.equipped[category];
+  syncEquippedFrom(await load());
+  return syncEquipped[category];
 }
 
 /** Clear all cosmetic state (for Settings → Reset All). */

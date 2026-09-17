@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from './persistenceStorage';
 
 const STORAGE_KEY = 'wordshift_settings';
 
@@ -75,7 +75,7 @@ export function startSystemMotionPreference(onChange?: () => void): () => void {
 /**
  * Load settings from storage (or return cached)
  */
-export async function getSettings(): Promise<GameSettings> {
+export async function getSettings(strict: boolean = false): Promise<GameSettings> {
   if (settingsCache) return settingsCache;
 
   try {
@@ -86,15 +86,18 @@ export async function getSettings(): Promise<GameSettings> {
       const loaded: GameSettings = { ...DEFAULT_SETTINGS, ...parsed,
         reducedMotion: motionOverride ?? systemReducedMotion };
       settingsCache = loaded;
+      notifySettings();
       return loaded;
     }
   } catch (err) {
+    if (strict) throw err;
     console.warn('Failed to load settings:', err);
   }
 
   motionOverride = null;
   const defaults: GameSettings = { ...DEFAULT_SETTINGS, reducedMotion: systemReducedMotion };
   settingsCache = defaults;
+  notifySettings();
   return defaults;
 }
 

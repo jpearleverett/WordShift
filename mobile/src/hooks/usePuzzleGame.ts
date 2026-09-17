@@ -17,7 +17,7 @@ import { DICTIONARY_WORDS } from '../dictionary';
 import { CURATED_FINAL_PUZZLE } from '../constants/wordLists';
 import { isBlockedWord } from '../constants/blockedWords';
 import { isStandardChainSolvable } from '../services/puzzleSolvability';
-import { isFairPuzzleWord } from '../services/puzzleVocabulary';
+import { isFairPuzzleWord, isPuzzleVocabularyFair } from '../services/puzzleVocabulary';
 // Imported from gameBalance directly (not the constants barrel) so the hook's
 // test harness — which mocks '../constants' wholesale — still gets real values.
 import {
@@ -763,7 +763,7 @@ export interface PuzzleGameActions {
   setUndoLimited: (limited: boolean) => void;
   setCurrentPhase: (phase: DialoguePhase) => void;
   setSelectedVariant: (variant: PuzzleVariant) => void;
-  restorePuzzleState: (saved: SavedPuzzleState) => void;
+  restorePuzzleState: (saved: SavedPuzzleState, postRevelation?: boolean) => void;
   /** Restore the current board to its starting state (a true retry of THIS puzzle). */
   resetCurrentPuzzle: () => void;
   clearBoard: () => void;
@@ -1305,7 +1305,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setLexiconMode(false);
       speedModeRef.current = false;
       setSpeedMode(false);
-      setSelectedVariant('standard');
+      setSelectedVariantState('standard');
     } else if (blindOverride !== undefined) {
       setBlindMode(blindOverride);
     }
@@ -1473,15 +1473,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
             const echoPuzzle = await generateLocalPuzzle(requestedDifficulty, { startWord: echoWord });
             if (echoPuzzle) {
-              const extendedEcho = puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES
-                ? extendStandardPuzzle(echoPuzzle)
-                : echoPuzzle;
+              const extensionRequired = puzzlesSolved >= PUZZLE_EXTENSION_UNLOCK_PUZZLES && !speedModeRef.current;
+              const extendedEcho = extensionRequired ? extendStandardPuzzle(echoPuzzle) : echoPuzzle;
               // Mature standard boards always carry the extra row. If this
               // personalized chain cannot extend, do not leak a short board:
               // fall through to the bank's pre-filtered guaranteed pool.
               if (
-                puzzlesSolved < PUZZLE_EXTENSION_UNLOCK_PUZZLES ||
-                extendedEcho.words.length === echoPuzzle.words.length + 1
+                (!extensionRequired || extendedEcho.words.length === echoPuzzle.words.length + 1) &&
+                isPuzzleVocabularyFair(extendedEcho, requestedDifficulty === 'EXPERT' || requestedLexicon)
               ) {
                 if (isStale()) return;
                 commitNewBoard(
@@ -1598,7 +1597,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         !requestedLexicon
       ) {
         const extended = extendStandardPuzzle(puzzle);
-        puzzleToServe = extended.words.length === puzzle.words.length + 1
+        puzzleToServe = extended.words.length === puzzle.words.length + 1 &&
+          isPuzzleVocabularyFair(extended, requestedDifficulty === 'EXPERT' || requestedLexicon)
           ? extended
           : getGuaranteedExtendedStandardFallback(requestedDifficulty);
       }
@@ -1680,7 +1680,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         announceWeaveUnavailable();
       }
     }
-  }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant, setSelectedVariant,
+  }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant,
     gameState, history.length, currentVariant, blindMode, lexiconMode, speedMode, undoLimited, unbrokenWeaveMode]);
 
   // Daily Challenge bypasses the bank/generation path: words are supplied by
@@ -3185,7 +3185,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // still computes isValid while hidden.
   const previewValidityVisible = previewGradingMode === 'graded';
 
-  const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
+  const restorePuzzleState = useCallback((saved: SavedPuzzleState, postRevelation = false) => {
     generationIdRef.current++;
     pendingAbandonmentRef.current = null;
     vocabularyVersionRef.current = saved.vocabularyVersion === 1 ? 1 : 0;
@@ -3198,7 +3198,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       : false;
     const restoreUnbrokenWeave =
       saved.unbrokenWeaveMode === true &&
-      saved.currentPhase === 5 &&
+      isUnbrokenWeaveAvailable(currentPhase, postRevelation) &&
       saved.gameMode === 'standard' &&
       saved.currentVariant === 'standard' &&
       saved.blindMode !== true &&
@@ -3318,7 +3318,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setCurrentVariant(restoredCurrent);
     setSelectedVariantState(restoredSelected);
     setMoveDirection(saved.moveDirection);
-    setCurrentPhase(saved.currentPhase);
     setLastFormedWord(saved.lastFormedWord);
     setDoubleShiftPhase(
       (saved.doubleShiftPhase as typeof doubleShiftPhase)
@@ -3350,7 +3349,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setResonantChoiceCount(0);
     // A restored board has no honest solve-time origin — don't feed the trend.
     boardTimedRef.current = false;
-  }, []);
+  }, [currentPhase]);
 
   // Re-apply the same puzzle from its starting words (each row preserves its
   // immutable originalWord). Unlike startNewGame this does NOT fetch a different
@@ -3442,7 +3441,19 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     [history],
   );
 
-  const state: PuzzleGameState = {
+  const spentLetters = useMemo(() => [...spentLetterSet], [spentLetterSet]);
+  // Same-tick mode changes must update the mirrors before applyBoard reads
+  // them; memoizing these wrappers also keeps exported actions stable.
+  const updateGameMode = useCallback((mode: GameMode) => {
+    gameModeRef.current = mode;
+    setGameMode(mode);
+  }, []);
+  const updateUndoLimited = useCallback((limited: boolean) => {
+    undoLimitedRef.current = limited;
+    setUndoLimited(limited);
+  }, []);
+
+  const state = useMemo<PuzzleGameState>(() => ({
     speedMode,
     rows,
     activeRowIndex,
@@ -3468,7 +3479,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     undoLimited,
     lexiconMode,
     unbrokenWeaveMode,
-    spentLetters: [...spentLetterSet],
+    spentLetters,
     isSharedChallenge,
     undosRemaining,
     currentPhase,
@@ -3497,9 +3508,19 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     moveHistorySummary,
     lastArrival,
     speedRescueSignal,
-  };
+  }), [
+    speedMode, rows, activeRowIndex, selectedLetter, gameState, message,
+    error, history, isProcessing, hint, solution, reverseSolution,
+    difficulty, currentWordLength, showRules, showDifficultyMenu, showConfetti, invalidAttempts,
+    hintsUsed, earnedStars, gameMode, blindMode, undoLimited, lexiconMode,
+    unbrokenWeaveMode, spentLetters, isSharedChallenge, undosRemaining, currentPhase, lastCompletedWords,
+    lastIncantationName, lastFormedWord, currentVariant, selectedVariant, moveDirection, slotPreviews,
+    previewValidityVisible, previewGradingMode, doubleShiftPhase, isEchoPuzzle, isFinalBoard, isStuck,
+    hintBalance, hintDisclosures, vocabularyVersion, outOfHintsSignal, hintHighlight, moveOutcomes,
+    undosUsed, resonantChoiceCount, moveHistorySummary, lastArrival, speedRescueSignal,
+  ]);
 
-  const actions: PuzzleGameActions = {
+  const actions = useMemo<PuzzleGameActions>(() => ({
     initGame,
     startNewGame,
     startDailyGame,
@@ -3518,26 +3539,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameState,
     setEarnedStars,
     setMessage,
-    // Keep the synchronous mirror in step: applyBoard's undo reset reads the
-    // ref, so an external setGameMode('challenge') followed by initGame in
-    // the same tick must see 'challenge' (state alone lags a render).
-    setGameMode: (mode: GameMode) => {
-      gameModeRef.current = mode;
-      setGameMode(mode);
-    },
-    // Keep the synchronous mirror in step (same reasoning as setGameMode):
-    // applyBoard's undo reset reads undoLimitedRef, so a same-tick
-    // setUndoLimited + initGame must see the new value.
-    setUndoLimited: (limited: boolean) => {
-      undoLimitedRef.current = limited;
-      setUndoLimited(limited);
-    },
+    setGameMode: updateGameMode,
+    setUndoLimited: updateUndoLimited,
     setCurrentPhase,
     setSelectedVariant,
     restorePuzzleState,
     resetCurrentPuzzle,
     clearBoard,
-  };
+  }), [
+    initGame, startNewGame, startDailyGame, startSharedChallengeGame, resumeSpeedAfterRescue, handleLetterPress,
+    handleSlotPress, handleUndo, grantExtraUndo, handleHint, refreshHintBalance, handleNextLevel,
+    setShowRules, setShowDifficultyMenu, setShowConfetti, setGameState, setEarnedStars, setMessage,
+    updateGameMode, updateUndoLimited, setCurrentPhase, setSelectedVariant, restorePuzzleState, resetCurrentPuzzle,
+    clearBoard,
+  ]);
 
   return [state, actions];
 }

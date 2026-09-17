@@ -2978,13 +2978,8 @@ export function getFirstImperfectStarsMessage(phase: number, cause: ImperfectSta
   return `${opener} More than one slipped drop costs a star. One slip is always forgiven.`;
 }
 
-/**
- * The once-ever receipt: returns the phase-aware line the FIRST time a win
- * lands under three stars for a nameable reason, marking the device flag as it
- * does, and null on every later call (or when the win was three stars).
- * Broken storage is treated as already seen so it can never repeat.
- */
-export async function consumeFirstImperfectStarsReceipt(
+/** Resolve the first imperfect-stars line without consuming the device flag. */
+export async function peekFirstImperfectStarsReceipt(
   phase: number,
   win: { stars: number; hintsUsed: number; invalidAttempts: number },
 ): Promise<string | null> {
@@ -2994,11 +2989,32 @@ export async function consumeFirstImperfectStarsReceipt(
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- guarded lazy require keeps the helpers Node-importable
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     if ((await AsyncStorage.getItem(FIRST_IMPERFECT_STARS_SEEN_KEY)) === 'true') return null;
-    await AsyncStorage.setItem(FIRST_IMPERFECT_STARS_SEEN_KEY, 'true');
   } catch {
     return null;
   }
   return getFirstImperfectStarsMessage(phase, cause, win.stars);
+}
+
+/** Call when the line is shown, never when it is merely queued. */
+export async function markFirstImperfectStarsReceiptShown(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- guarded lazy require keeps the helpers Node-importable
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  await AsyncStorage.setItem(FIRST_IMPERFECT_STARS_SEEN_KEY, 'true');
+}
+
+/** Compatibility wrapper for surfaces that show the receipt immediately. */
+export async function consumeFirstImperfectStarsReceipt(
+  phase: number,
+  win: { stars: number; hintsUsed: number; invalidAttempts: number },
+): Promise<string | null> {
+  const line = await peekFirstImperfectStarsReceipt(phase, win);
+  if (!line) return null;
+  try {
+    await markFirstImperfectStarsReceiptShown();
+  } catch {
+    return null;
+  }
+  return line;
 }
 
 // ============================================================================
@@ -5325,5 +5341,31 @@ export function getBootFailureCopy(kind: BootFailureKind): {
     retry,
     continueWithoutCloud,
     contactSupport,
+  };
+}
+
+
+/** A visible retry surface when the next story board cannot be prepared. */
+export function getStoryPreparationRetryCopy(phase: number): {
+  title: string; message: string; retryLabel: string; cancelLabel: string;
+} {
+  return {
+    title: phase >= 3 ? 'The next arrangement is waiting' : 'Your next puzzle is waiting',
+    message: 'We could not prepare it just now. Your progress is safe. Try again when you are ready.',
+    retryLabel: 'Try again',
+    cancelLabel: 'Stay home',
+  };
+}
+
+
+/** Leave both saved boards intact when the daily cannot be prepared. */
+export function getDailyPreparationRetryCopy(phase: number): {
+  title: string; message: string; retryLabel: string; cancelLabel: string;
+} {
+  return {
+    title: phase >= 3 ? 'The daily arrangement is waiting' : 'The daily puzzle is waiting',
+    message: "We could not prepare today's puzzle just now. Your saved puzzles are safe. Try again when you are ready.",
+    retryLabel: 'Retry daily',
+    cancelLabel: 'Go home',
   };
 }

@@ -42,6 +42,7 @@ const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
   wordshift_cosmetic_receipt_: 'Key family (one per cosmetic id): the one-time first-showing receipt for a newly equipped confetti palette / move spark. Device-local UX pacing like share_prompts; a fresh device may deserve the receipt once more.',
   wordshift_event_log: 'Local analytics ring buffer, uploaded separately.',
   wordshift_entitlements: 'Store-authoritative: restored from the billing provider, never from a save.',
+  wordshift_iap_checkout_receipts: 'Store-time checkout aliases survive relaunch and Reset All; syncing would re-grant spent purchases.',
   wordshift_iap_history_baseline: 'Installation-local boundary for old already-spent store receipts; retained through reset and never cloud-restored.',
   wordshift_iap_amber_purchase_made: 'Store purchase history retains the first-ever amber bonus through local resets; verified billing history seeds a new installation.',
   wordshift_applied_iap_grants: 'Device-local paid transaction receipts; retained through reset to prevent duplicate grants.',

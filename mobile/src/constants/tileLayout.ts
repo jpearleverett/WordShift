@@ -8,13 +8,10 @@
  * dependency.
  */
 
-// Row container spacing. 4 + 4 (was 12 + 8): the 40dp the two used to take
-// out of a 360dp phone was the single largest lever on the board scale. With
-// the compact slot cell and the 1dp compact tile margin below, a 6-letter
-// board (whose widest transient row is 7 compact letters + 8 slots = 394dp)
-// now scales to ~0.87 on 360dp (tiles ~37x45dp) instead of 0.73 (~30x38dp),
-// a 5-letter board fits 360dp at exactly 1, and a 4-letter board scales 0.905
-// (was 0.842). Pinned by dragDrop.test.ts (computeBoardScale floors).
+// Row container spacing. The board scale also accounts for gameArea's 8dp
+// horizontal padding on each side. Measure each rendered fan/run using its
+// live letter count: the five-letter noncompact fan is 380dp, wider than the
+// six-letter compact fan (340dp). Geometry stays shared with drag estimation.
 export const ROW_HORIZONTAL_MARGIN = 4;
 export const ROW_PADDING = 4;
 

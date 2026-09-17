@@ -47,8 +47,8 @@ function parseCommit(raw: string): Commit {
   }
   return commit;
 }
-async function recover(): Promise<boolean> {
-  const raw = await NativeStorage.getItem(STORAGE_COMMIT_KEY);
+async function recover(knownCommit?: string | null): Promise<boolean> {
+  const raw = knownCommit === undefined ? await NativeStorage.getItem(STORAGE_COMMIT_KEY) : knownCommit;
   if (!raw) return false;
   try {
     await apply(parseCommit(raw).entries);
@@ -101,6 +101,23 @@ export function runStorageTransaction<T>(label: string, work: () => Promise<T>):
   return run;
 }
 
+/** Serialize transient snapshots with durable reset/restore transactions, without
+ * journaling each clock tick or briefly blocking player input for an autosave.
+ * A pending durable commit is always replayed first with its usual busy fence.
+ * Like runStorageTransaction, callers must not nest this inside a transaction. */
+export function runTransientStorageOperation<T>(work: () => Promise<T>): Promise<T> {
+  const run = serial.catch(() => {}).then(async () => {
+    const pending = await NativeStorage.getItem(STORAGE_COMMIT_KEY);
+    if (pending) {
+      setBusy(true);
+      try { await recover(pending); } finally { setBusy(false); }
+    }
+    return work();
+  });
+  serial = run;
+  return run;
+}
+
 const persistenceStorage = {
   ...NativeStorage,
   async getItem(key: string): Promise<string | null> {
@@ -129,7 +146,15 @@ const persistenceStorage = {
     return Array.from(keys);
   },
   async multiGet(keys: readonly string[]): Promise<readonly [string, string | null][]> {
-    return Promise.all(keys.map(async key => [key, await persistenceStorage.getItem(key)] as [string, string | null]));
+    const unstaged = keys.filter(key => !staged?.has(key));
+    try {
+      // One native bridge request, retaining read-your-writes inside a commit.
+      const saved = new Map(unstaged.length ? await NativeStorage.multiGet(unstaged) : []);
+      return keys.map(key => [key, staged?.has(key) ? staged.get(key)! : saved.get(key) ?? null]);
+    } catch (error) {
+      if (staged) stagedReadFailure = error;
+      throw error;
+    }
   },
   async multiSet(entries: readonly (readonly [string, string])[]): Promise<void> {
     for (const [key, value] of entries) await persistenceStorage.setItem(key, value);

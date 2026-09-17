@@ -62,6 +62,7 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
     return (
       <View
         style={[styles.card, { backgroundColor: cardBg, borderColor }]}
+        accessible
         accessibilityLabel="Loading your daily standing"
         accessibilityRole="text"
       >
@@ -93,12 +94,13 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
   return (
     <View
       style={[styles.card, { backgroundColor: cardBg, borderColor }]}
+      accessible
       accessibilityLabel={a11yParts.join(' ')}
       accessibilityRole="text"
     >
       <View style={styles.row}>
         {/* Sprite + text both carry the meaning — never color alone. */}
-        <Image source={TROPHY_ICON} style={styles.iconImg} accessibilityElementsHidden />
+        <Image source={TROPHY_ICON} style={styles.iconImg} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
         <Text style={[styles.title, { color: titleColor }]}>Daily Standing</Text>
       </View>
 
@@ -134,7 +136,7 @@ export const DailyLeaderboardCard: React.FC<DailyLeaderboardCardProps> = ({
             {historyLine}
           </Text>
           {trendLabel ? (
-            <Text style={[styles.trendText, { color: titleColor }]} accessibilityElementsHidden>
+            <Text style={[styles.trendText, { color: titleColor }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               {trendLabel}
             </Text>
           ) : null}

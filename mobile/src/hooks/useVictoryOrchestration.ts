@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Animated } from 'react-native';
 import {
   getVictoryGlitch,
@@ -676,7 +676,7 @@ export function useVictoryOrchestration(): [
   // ---------------------------------------------------------------
   // Return tuple
   // ---------------------------------------------------------------
-  const state: VictoryOrchestrationState = {
+  const state = useMemo<VictoryOrchestrationState>(() => ({
     whisper,
     showWhisper,
     interjection,
@@ -691,14 +691,14 @@ export function useVictoryOrchestration(): [
     microBeatOpacity,
     microBeatTranslateY,
     completionCoda,
-  };
+  }), [whisper, showWhisper, interjection, showInterjection, interjectionOpacity, interjectionTranslateY, victoryGlitch, showVictoryGlitch, victoryGlitchProminent, microBeat, showMicroBeat, microBeatOpacity, microBeatTranslateY, completionCoda]);
 
-  const actions: VictoryOrchestrationActions = {
+  const actions = useMemo<VictoryOrchestrationActions>(() => ({
     processVictory,
     setCompletionCoda,
     resetOrchestration,
     dismissWhisper,
-  };
+  }), [processVictory, setCompletionCoda, resetOrchestration, dismissWhisper]);
 
   return [state, actions];
 }

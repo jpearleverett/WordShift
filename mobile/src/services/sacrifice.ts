@@ -1,4 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction, isStorageTransactionActive } from './persistenceStorage';
+import { spendAmber, invalidateProgressCache, getFullProgress } from './amberCurrency';
+import { updateQuestProgress, invalidateQuestCache } from './weeklyQuests';
 
 /**
  * The optional Offering spends amber for an authored response and a record of
@@ -22,6 +24,16 @@ export interface SacrificeState {
   sacrificeHistory: SacrificeEntry[];
   /** Whether the one-time Phase-4 offering invitation has been delivered. */
   introSeen?: boolean;
+  /** Retry receipt for the latest altar gesture, saved with its debit. */
+  lastCommit?: { id: string; result: SacrificeResult };
+}
+
+interface SacrificeResult {
+  message: string;
+  isMilestone: boolean;
+  total: number;
+  count: number;
+  tierUp: DevotionTier | null;
 }
 
 export interface SacrificeEntry {
@@ -239,13 +251,17 @@ export async function loadSacrificeState(): Promise<SacrificeState> {
           lastSacrificeTimestamp: parsed.lastSacrificeTimestamp ?? 0,
           sacrificeHistory: parsed.sacrificeHistory,
           introSeen: parsed.introSeen === true,
+          lastCommit: parsed.lastCommit,
         };
       } else {
+        if (isStorageTransactionActive()) throw new Error('Your offering record could not be read. Please retry.');
         sacrificeCache = getDefaultState();
       }
       return sacrificeCache!;
     }
-  } catch {}
+  } catch (error) {
+    if (isStorageTransactionActive()) throw error;
+  }
   sacrificeCache = getDefaultState();
   return sacrificeCache;
 }
@@ -271,7 +287,8 @@ export async function performSacrifice(
   count: number;
   tierUp: DevotionTier | null;
 }> {
-  const state = await loadSacrificeState();
+  const saved = await loadSacrificeState();
+  const state = { ...saved, sacrificeHistory: [...saved.sacrificeHistory] };
   const prevCount = state.sacrificeCount;
 
   const entry: SacrificeEntry = {
@@ -313,6 +330,40 @@ export async function performSacrifice(
     count: newCount,
     tierUp,
   };
+}
+
+/** Debit and monument share a journal; the same gesture ID is safe to retry. */
+export async function commitSacrifice(
+  claimId: string,
+  amount: number,
+  currentPhase: number,
+  opts?: { sessionStreak?: number; everything?: boolean },
+): Promise<({ success: true; newBalance: number } & SacrificeResult) | { success: false; newBalance: number }> {
+  try {
+    return await runStorageTransaction('sacrifice', async () => {
+      invalidateSacrificeCache();
+      invalidateProgressCache();
+      invalidateQuestCache();
+      const progress = await getFullProgress();
+      const state = await loadSacrificeState();
+      if (state.lastCommit?.id === claimId) {
+        return { ...state.lastCommit.result, success: true, newBalance: progress.amber };
+      }
+      if (!claimId || !Number.isSafeInteger(amount) || amount <= 0 || !isSacrificeAvailable(currentPhase)) {
+        return { success: false, newBalance: progress.amber };
+      }
+      const debit = await spendAmber(amount, 'sacrifice');
+      if (!debit.success) return { success: false, newBalance: debit.newBalance };
+      const result = await performSacrifice(amount, currentPhase, opts);
+      await saveSacrificeState({ ...(await loadSacrificeState()), lastCommit: { id: claimId, result } });
+      await updateQuestProgress({ amberSacrificed: amount }, currentPhase);
+      return { ...result, success: true, newBalance: debit.newBalance };
+    });
+  } finally {
+    invalidateSacrificeCache();
+    invalidateProgressCache();
+    invalidateQuestCache();
+  }
 }
 
 /**
@@ -404,10 +455,8 @@ export async function markOfferingIntroSeen(): Promise<void> {
 // ============================================================================
 
 async function saveSacrificeState(state: SacrificeState): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   sacrificeCache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
 }
 
 /**

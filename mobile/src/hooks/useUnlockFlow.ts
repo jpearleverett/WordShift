@@ -16,9 +16,32 @@ import {
   skipReservedUnlock,
   getReservedSkipCost,
 } from '../services/homeWorldData';
-import { getAmberBalance, getReservedUnlockId } from '../services/amberCurrency';
+import { getAmberBalance, getReservedUnlockId, invalidateProgressCache } from '../services/amberCurrency';
 import { hapticError, hapticLight, hapticSuccess } from '../services/haptics';
 import { playUiSound } from '../services/uiSound';
+import { recoverPendingStorageTransaction, StorageRecoveryRequiredError } from '../services/persistenceStorage';
+import { saveWithPlayerRetry } from '../services/saveRetry';
+
+async function saveUnlockPurchase(
+  purchase: () => Promise<{ success: boolean; newBalance?: number; error?: string }>,
+): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+  try {
+    return await purchase();
+  } catch (error) {
+    if (!(error instanceof StorageRecoveryRequiredError)) throw error;
+    // The journal already owns this purchase. Finish that exact commit; a
+    // second purchase attempt would reject its newly restored ownership.
+    const newBalance = await saveWithPlayerRetry(async () => {
+      await recoverPendingStorageTransaction();
+      invalidateProgressCache();
+      return getAmberBalance();
+    }, {
+      title: 'Your unlock is waiting',
+      message: 'We need to finish saving your unlock. If your device storage is full, free some space, then retry. You will not spend amber again.',
+    });
+    return { success: true, newBalance };
+  }
+}
 
 interface UseUnlockFlowParams {
   progress: HomeWorldProgress | null;
@@ -78,7 +101,7 @@ interface UseUnlockFlowReturn {
   reservedSpeedUpState: ReservedSpeedUpState;
   /** Remaining premium amber to speed up the reserved unlock (0 when N/A). */
   reservedSkipCost: number;
-  handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<void>;
+  handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<boolean>;
   handleReserve: (unlock: Unlockable) => Promise<void>;
   handleSkip: (unlock: Unlockable) => Promise<void>;
   handleSpeedUpReserved: (unlock: Unlockable) => Promise<void>;
@@ -275,108 +298,129 @@ export function useUnlockFlow({
     }
   }, [animals, nextUnlock, recheckAffordability]);
 
+  const purchaseInFlight = useRef(false);
+  const runUnlockAction = useCallback(async <T>(action: () => Promise<T>): Promise<T | undefined> => {
+    if (purchaseInFlight.current) return;
+    purchaseInFlight.current = true;
+    setPurchaseError(null);
+    try {
+      return await action();
+    } catch {
+      hapticError();
+      setPurchaseError('We could not save your unlock. Check your device storage, then try again.');
+    } finally {
+      purchaseInFlight.current = false;
+    }
+  }, []);
+
   // Reserve a puzzle-gated unlock (pay now, auto-builds when the level opens).
   const handleReserve = useCallback(async (unlock: Unlockable) => {
-    setPurchaseError(null);
-    const result = await reserveNextUnlock(unlock.id);
-    if (result.success) {
-      hapticSuccess();
-      if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
-      await loadAllData();
-      setShowRoomUnlock(null);
-    } else {
-      hapticError();
-      setPurchaseError(result.error || 'Unable to reserve right now.');
-    }
-  }, [loadAllData, onAmberChange]);
+    await runUnlockAction(async () => {
+      const result = await saveUnlockPurchase(() => reserveNextUnlock(unlock.id));
+      if (result.success) {
+        hapticSuccess();
+        if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
+        await loadAllData();
+        setShowRoomUnlock(null);
+      } else {
+        hapticError();
+        setPurchaseError(result.error || 'Unable to reserve right now.');
+      }
+    });
+  }, [loadAllData, onAmberChange, runUnlockAction]);
 
   // Skip a level-gated unlock's wait: pay the premium and unlock it NOW.
   // Unlike Reserve, this builds immediately, so it celebrates + shows the
   // new-character intro just like a normal purchase.
   const handleSkip = useCallback(async (unlock: Unlockable) => {
-    setPurchaseError(null);
-    const result = await skipUnlockGate(unlock.id);
-    if (result.success) {
-      hapticSuccess();
-      playUiSound('unlock');
-      setShowCelebration(true);
-      if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
-      await loadAllData();
-      setShowRoomUnlock(null);
-      setShowInvitePrompt(false);
-      onUnlockCompleted?.();
-      if (unlock.type === 'character') {
-        const animal = ANIMALS.find(a => a.id === unlock.targetId);
-        if (animal) {
-          scheduleAnimalIntroduction(animal as unknown as Animal);
+    await runUnlockAction(async () => {
+      const result = await saveUnlockPurchase(() => skipUnlockGate(unlock.id));
+      if (result.success) {
+        hapticSuccess();
+        playUiSound('unlock');
+        setShowCelebration(true);
+        if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
+        await loadAllData();
+        setShowRoomUnlock(null);
+        setShowInvitePrompt(false);
+        onUnlockCompleted?.();
+        if (unlock.type === 'character') {
+          const animal = ANIMALS.find(a => a.id === unlock.targetId);
+          if (animal) {
+            scheduleAnimalIntroduction(animal as unknown as Animal);
+          }
         }
+      } else {
+        hapticError();
+        setPurchaseError(result.error || 'Unable to skip the wait right now.');
       }
-    } else {
-      hapticError();
-      setPurchaseError(result.error || 'Unable to skip the wait right now.');
-    }
-  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, scheduleAnimalIntroduction]);
+    });
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, scheduleAnimalIntroduction, runUnlockAction]);
 
   // Speed up an already-reserved unlock: pay the remaining premium, unlock now.
   const handleSpeedUpReserved = useCallback(async (unlock: Unlockable) => {
-    setPurchaseError(null);
-    const result = await skipReservedUnlock(unlock.id);
-    if (result.success) {
-      hapticSuccess();
-      playUiSound('unlock');
-      setShowCelebration(true);
-      if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
-      await loadAllData();
-      setShowRoomUnlock(null);
-      setShowInvitePrompt(false);
-      onUnlockCompleted?.();
-      if (unlock.type === 'character') {
-        const animal = ANIMALS.find(a => a.id === unlock.targetId);
-        if (animal) {
-          scheduleAnimalIntroduction(animal as unknown as Animal);
+    await runUnlockAction(async () => {
+      const result = await saveUnlockPurchase(() => skipReservedUnlock(unlock.id));
+      if (result.success) {
+        hapticSuccess();
+        playUiSound('unlock');
+        setShowCelebration(true);
+        if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
+        await loadAllData();
+        setShowRoomUnlock(null);
+        setShowInvitePrompt(false);
+        onUnlockCompleted?.();
+        if (unlock.type === 'character') {
+          const animal = ANIMALS.find(a => a.id === unlock.targetId);
+          if (animal) {
+            scheduleAnimalIntroduction(animal as unknown as Animal);
+          }
         }
+      } else {
+        hapticError();
+        setPurchaseError(result.error || 'Unable to speed this up right now.');
       }
-    } else {
-      hapticError();
-      setPurchaseError(result.error || 'Unable to speed this up right now.');
-    }
-  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, scheduleAnimalIntroduction]);
+    });
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, scheduleAnimalIntroduction, runUnlockAction]);
 
   // Handle unlock purchase
   const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
-    const result = await purchaseUnlock(unlock.id);
-    if (result.success) {
-      hapticSuccess();
-      playUiSound('unlock');
-      setShowCelebration(true);
+    return (await runUnlockAction(async () => {
+      const result = await saveUnlockPurchase(() => purchaseUnlock(unlock.id));
+      if (result.success) {
+        hapticSuccess();
+        playUiSound('unlock');
+        setShowCelebration(true);
 
-      await loadAllData();
-      setShowShop(false);
-      setShowRoomUnlock(null);
-      setShowInvitePrompt(false);
-      // Push the STORE's post-spend balance, never a snapshot subtraction:
-      // purchaseUnlock validated affordability against the live amberCurrency
-      // store, but HomeScreen's `progress` state can be stale-low (it misses
-      // credits that never trigger loadAllData), so `progress.amber - cost`
-      // could go negative and poison the app-level amber mirror.
-      const balance = await getAmberBalance();
-      onAmberChange?.(balance);
-      // The unlocked counts just moved: check the collection achievements now,
-      // not whenever the player next happens to finish a puzzle.
-      onUnlockCompleted?.();
+        await loadAllData();
+        setShowShop(false);
+        setShowRoomUnlock(null);
+        setShowInvitePrompt(false);
+        // Push the STORE's post-spend balance, never a snapshot subtraction:
+        // purchaseUnlock validated affordability against the live amberCurrency
+        // store, but HomeScreen's `progress` state can be stale-low (it misses
+        // credits that never trigger loadAllData), so `progress.amber - cost`
+        // could go negative and poison the app-level amber mirror.
+        const balance = await getAmberBalance();
+        onAmberChange?.(balance);
+        // The unlocked counts just moved: check the collection achievements now,
+        // not whenever the player next happens to finish a puzzle.
+        onUnlockCompleted?.();
 
-      // If we just unlocked a character, show their intro dialogue
-      if (unlock.type === 'character' && !options?.suppressIntro) {
-        const animal = ANIMALS.find(a => a.id === unlock.targetId);
-        if (animal) {
-          scheduleAnimalIntroduction(animal as unknown as Animal);
+        // If we just unlocked a character, show their intro dialogue
+        if (unlock.type === 'character' && !options?.suppressIntro) {
+          const animal = ANIMALS.find(a => a.id === unlock.targetId);
+          if (animal) {
+            scheduleAnimalIntroduction(animal as unknown as Animal);
+          }
         }
+      } else {
+        hapticError();
+        setPurchaseError(result.error || 'Unable to unlock. Try again later.');
       }
-    } else {
-      hapticError();
-      setPurchaseError(result.error || 'Unable to unlock. Try again later.');
-    }
-  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, scheduleAnimalIntroduction]);
+      return result.success;
+    })) === true;
+  }, [loadAllData, onAmberChange, onUnlockCompleted, setShowCelebration, scheduleAnimalIntroduction, runUnlockAction]);
 
   return {
     showShop,
@@ -405,4 +449,3 @@ export function useUnlockFlow({
     recheckAffordability,
   };
 }
-

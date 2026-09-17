@@ -201,14 +201,14 @@ describe('whisperGallery', () => {
       expect(state.totalCollected).toBe(3);
     });
 
-    it('caps entries at 500 keeping the most recent', async () => {
+    it('caps generated endgame whispers at 500 keeping the most recent', async () => {
       // Add 510 unique entries
       for (let i = 0; i < 510; i++) {
         await recordWhisper({
           animalType: 'fox',
           animalName: 'Ember',
           text: `Entry number ${i}`,
-          phase: 0,
+          phase: 5,
           type: 'whisper',
         });
       }
@@ -226,13 +226,33 @@ describe('whisperGallery', () => {
           animalType: 'fox',
           animalName: 'Ember',
           text: `Cap test ${i}`,
-          phase: 0,
+          phase: 5,
           type: 'whisper',
         });
       }
 
       const state = await loadWhisperGallery();
       expect(state.seenIds.length).toBe(500);
+    });
+
+    it('preserves early whispers, choices and keepsakes through unlimited endgame play', async () => {
+      const protectedEntries = [
+        { text: 'The first whisper', type: 'whisper' as const, phase: 0 },
+        { text: 'My answer', type: 'choice' as const, phase: 4 },
+        { text: 'Our keepsake', type: 'keepsake' as const, phase: 5 },
+        { text: 'A late authored passage', type: 'passage' as const, phase: 5 },
+      ];
+      for (const entry of protectedEntries) {
+        await recordWhisper({ animalType: 'fox', animalName: 'Ember', ...entry });
+      }
+      for (let i = 0; i < 600; i++) {
+        await recordWhisper({ animalType: 'fox', animalName: 'Ember', text: `Word ${i}`, phase: 5, type: 'whisper' });
+      }
+      const state = await loadWhisperGallery();
+      expect(state.entries).toHaveLength(504);
+      expect(state.entries.slice(0, 4).map(entry => entry.text)).toEqual(protectedEntries.map(entry => entry.text));
+      expect(state.entries[4].text).toBe('Word 100');
+      expect(state.seenIds).toHaveLength(504);
     });
 
     it('persists to storage', async () => {

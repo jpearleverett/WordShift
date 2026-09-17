@@ -66,6 +66,20 @@ beforeEach(async () => {
 });
 
 describe('seasonPass', () => {
+  test('a backwards month preserves paid premium, claims and season progress', async () => {
+    await getSeasonPassView(START);
+    await purchaseSeasonPremiumWithAmber(START);
+    await claimSeasonTier(1, 'premium', START + 6);
+    const stored = await AsyncStorage.getItem('wordshift_season_pass');
+    mockDay = '2026-06-30';
+    invalidateSeasonPassCache();
+    await getSeasonPassView(START + 6);
+    await getSeasonClaimableCount(START + 6);
+    expect(await AsyncStorage.getItem('wordshift_season_pass')).toBe(stored);
+    mockDay = '2026-07-05';
+    expect((await claimSeasonTier(1, 'premium', START + 6)).granted).toBe(false);
+    expect(spendAmber).toHaveBeenCalledTimes(1);
+  });
   test('concurrent premium unlocks spend once and concurrent tier claims grant once', async () => {
     await getSeasonPassView(START);
     const purchases = await Promise.all([purchaseSeasonPremiumWithAmber(START), purchaseSeasonPremiumWithAmber(START)]);

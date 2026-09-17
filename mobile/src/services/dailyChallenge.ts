@@ -1,10 +1,10 @@
-import AsyncStorage, { isStorageTransactionActive } from './persistenceStorage';
+import AsyncStorage, { isStorageTransactionActive, runStorageTransaction } from './persistenceStorage';
 import { DAILY_BOARD_VERSION } from './dailyBoardVersion';
 import { Difficulty, PuzzleSolutionStep } from '../types';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { selectDailyBankPuzzle } from './puzzleBank';
 import { getLocalDateString, daysAgoLocal, parseLocalDate } from './dateUtils';
-import { addHints } from './hints';
+import { addHintsInTransaction, invalidateHintsCache, getHintBalance } from './hints';
 
 const STORAGE_KEY = 'wordshift_daily_challenge';
 
@@ -39,6 +39,8 @@ export interface DailyChallengeProgress {
   totalCompleted: number;
   currentStreak: number;
   bestStreak: number;
+  /** Highest daily streak milestone already credited; never lowered by decay. */
+  lastClaimedStreakMilestone: number;
   lastCompletedDate: string | null;
   /** Banked daily-streak freezes (auto-applied to forgive a missed day). */
   streakFreezes: number;
@@ -93,6 +95,7 @@ function getDefaultProgress(): DailyChallengeProgress {
     totalCompleted: 0,
     currentStreak: 0,
     bestStreak: 0,
+    lastClaimedStreakMilestone: 0,
     lastCompletedDate: null,
     streakFreezes: 0,
     lastFreezeGrantDate: null,
@@ -307,7 +310,14 @@ export async function loadDailyProgress(): Promise<DailyChallengeProgress> {
     if (stored) {
       // Merge over defaults so saves written before the freeze fields existed
       // load with sane values instead of `undefined`.
-      progressCache = { ...getDefaultProgress(), ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored);
+      progressCache = { ...getDefaultProgress(), ...parsed };
+      // Old versions paid on the first crossing. Preserve those earned claims
+      // through migration, including a streak that has already decayed.
+      if (parsed.lastClaimedStreakMilestone === undefined) {
+        progressCache!.lastClaimedStreakMilestone = DAILY_STREAK_MILESTONES
+          .filter(m => m.days <= (parsed.bestStreak ?? 0)).at(-1)?.days ?? 0;
+      }
       return progressCache!;
     }
   } catch (err) {
@@ -481,24 +491,22 @@ export function prewarmDailyPuzzle(): void {
  * (deterministic and identical for all players on a date).
  */
 export async function grantFirstDailyMercy(): Promise<number | null> {
-  const progress = await loadDailyProgress();
-  if (progress.firstDailyMercyGranted) return null;
-
-  // Flip the flag on the shared cache before any await so a rapid double-call
-  // can't double-grant.
-  progress.firstDailyMercyGranted = true;
-  progressCache = progress;
-
-  await addHints(FIRST_DAILY_BONUS_HINTS, 'first_daily_mercy');
-
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-  } catch (err) {
-    if (isStorageTransactionActive()) throw err;
-    console.warn('Failed to save daily challenge progress:', err);
+    return await runStorageTransaction('first_daily_mercy', async () => {
+      progressCache = null;
+      invalidateHintsCache();
+      const progress = await loadDailyProgress();
+      if (progress.firstDailyMercyGranted) return null;
+      await addHintsInTransaction(FIRST_DAILY_BONUS_HINTS, 'first_daily_mercy');
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...progress, firstDailyMercyGranted: true }));
+      return FIRST_DAILY_BONUS_HINTS;
+    });
+  } finally {
+    progressCache = null;
+    invalidateHintsCache();
+    // Restore the render-path mirror after both a failed stage and recovery.
+    await getHintBalance().catch(() => {});
   }
-
-  return FIRST_DAILY_BONUS_HINTS;
 }
 
 /**
@@ -568,7 +576,7 @@ export async function recordDailyCompletion(
     const priorStreak = progress.currentStreak;
     const checkpoint = DAILY_STREAK_MILESTONES
       .map(m => m.days)
-      .filter(d => d < priorStreak)
+      .filter(d => d <= priorStreak)
       .pop() ?? 0;
     progress.currentStreak = Math.max(1, checkpoint);
     progress.streakDecayedTo = checkpoint > 0 ? checkpoint : undefined;
@@ -693,10 +701,11 @@ export const DAILY_STREAK_MILESTONES: DailyStreakMilestone[] = [
 export function checkDailyStreakMilestone(
   currentStreak: number,
   previousStreak: number,
-  phase: number
+  phase: number,
+  lastClaimedStreakMilestone = 0,
 ): { amber: number; message: string } | null {
   for (const milestone of DAILY_STREAK_MILESTONES) {
-    if (currentStreak >= milestone.days && previousStreak < milestone.days) {
+    if (currentStreak >= milestone.days && previousStreak < milestone.days && milestone.days > lastClaimedStreakMilestone) {
       return {
         amber: milestone.amber,
         message: phase >= 3 ? milestone.darkMessage : milestone.message,
@@ -704,6 +713,19 @@ export function checkDailyStreakMilestone(
     }
   }
   return null;
+}
+
+/** Called inside the victory transaction that also credits the milestone. */
+export async function claimDailyStreakMilestoneInTransaction(previousStreak: number, phase: number): Promise<{ amber: number; message: string } | null> {
+  const progress = await loadDailyProgress();
+  const milestone = checkDailyStreakMilestone(progress.currentStreak, previousStreak, phase, progress.lastClaimedStreakMilestone);
+  if (!milestone) return null;
+  const threshold = DAILY_STREAK_MILESTONES.find(m => m.days > previousStreak &&
+    m.days > progress.lastClaimedStreakMilestone && m.days <= progress.currentStreak)!;
+  const updated = { ...progress, lastClaimedStreakMilestone: threshold.days };
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  progressCache = updated;
+  return milestone;
 }
 
 /**

@@ -153,11 +153,18 @@ export async function recordWhisper(entry: {
   state.seenIds.push(id);
   state.totalCollected = state.entries.length;
 
-  // Cap at 500 entries (keep most recent)
-  if (state.entries.length > 500) {
-    state.entries = state.entries.slice(-500);
-    state.seenIds = state.entries.map(e => e.id);
-  }
+  // Only personalized endgame whispers are unbounded. Finite authored lines,
+  // choices and keepsakes must survive however long the player keeps playing.
+  let excess = state.entries.filter(e => e.type === 'whisper' && e.phase >= 5).length - 500;
+  state.entries = state.entries.filter(e => {
+    if (excess > 0 && e.type === 'whisper' && e.phase >= 5) {
+      excess--;
+      return false;
+    }
+    return true;
+  });
+  state.seenIds = state.entries.map(e => e.id);
+  state.totalCollected = state.entries.length;
 
   await saveGalleryState(state);
   return true;

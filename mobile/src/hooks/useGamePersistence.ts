@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import { getCumulativeStats, CumulativeStats } from '../services/starRating';
@@ -314,19 +314,19 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
   }, []);
 
-  const state: PersistenceState = {
+  const state = useMemo<PersistenceState>(() => ({
     cumulativeStats,
     amberBalance,
     currentPhase,
     phaseProgressFraction,
     pendingPhaseTransition,
-  };
+  }), [cumulativeStats, amberBalance, currentPhase, phaseProgressFraction, pendingPhaseTransition]);
 
-  const actions: PersistenceActions = {
+  const actions = useMemo<PersistenceActions>(() => ({
     recordVictory,
     setAmberBalance: setAmberBalanceSafe,
     refreshStats,
-  };
+  }), [recordVictory, setAmberBalanceSafe, refreshStats]);
 
   return [state, actions];
 }

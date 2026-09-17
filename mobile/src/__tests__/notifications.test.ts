@@ -414,10 +414,16 @@ describe('notifications', () => {
   describe('permission flow (expo-notifications available)', () => {
     function createExpoMock(status: string) {
       return {
+        SchedulableTriggerInputTypes: { DATE: 'date' },
         getPermissionsAsync: jest.fn(() => Promise.resolve({ status })),
         requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
         cancelAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve()),
-        scheduleNotificationAsync: jest.fn(() => Promise.resolve('notification-id')),
+        scheduleNotificationAsync: jest.fn((request: { trigger: { type: string; date: Date } }) => {
+          if (request.trigger.type !== 'date' || !(request.trigger.date instanceof Date)) {
+            throw new TypeError('Invalid Expo date trigger');
+          }
+          return Promise.resolve('notification-id');
+        }),
       };
     }
 
@@ -440,6 +446,9 @@ describe('notifications', () => {
       await svc.scheduleAllNotifications(0);
       expect(expoMock.getPermissionsAsync).toHaveBeenCalled();
       expect(expoMock.scheduleNotificationAsync).toHaveBeenCalled();
+      for (const [request] of expoMock.scheduleNotificationAsync.mock.calls) {
+        expect(request.trigger.type).toBe('date');
+      }
     });
 
     it('scheduleAllNotifications never calls requestPermissionsAsync', async () => {

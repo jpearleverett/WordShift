@@ -278,20 +278,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   const mandatoryHarvest = !!victoryData?.mandatoryHarvest;
   const mustVisitPit = !!phaseTransitionPending || mandatoryHarvest;
 
-  // Swift Victories: a ROUTINE win renders the compact result strip (instant,
-  // condensed) instead of the full ceremony. isRoutineVictory is the shared
-  // policy (also drives the instant animation path in useVictoryFlow); the
-  // extra guards here cover surfaces only the modal knows about (onboarding's
-  // single-button layout, the completion coda, the daily/pit props).
-  const compactMode =
-    getSettingsSync().swiftVictories === true &&
-    !isOnboarding &&
-    !isPlayingDaily &&
-    !mustVisitPit &&
-    !completionCoda &&
-    !forceFullCeremony &&
-    isRoutineVictory(victoryData);
-
   // The two hushed beats perform silence on screen — the finale board and the
   // scripted silent victory. Used to suppress the modal-open success haptic.
   const hushedBeat =
@@ -308,23 +294,39 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   // can change in Settings in between, so each open re-reads it and drops the
   // previous win's receipt (the adjust-state-on-prop-change pattern, not an
   // effect, so no cascading render).
-  const [swiftState, setSwiftState] = useState<{ forVisible: boolean; on: boolean; receipt: string | null }>(
-    () => ({ forVisible: visible, on: getSettingsSync().swiftVictories === true, receipt: null }),
+  const [swiftState, setSwiftState] = useState<{ forVisible: boolean; on: boolean; presentationOn: boolean; receipt: string | null }>(
+    () => ({ forVisible: visible, on: getSettingsSync().swiftVictories === true, presentationOn: getSettingsSync().swiftVictories === true, receipt: null }),
   );
+  let currentSwiftState = swiftState;
   if (swiftState.forVisible !== visible) {
-    setSwiftState({ forVisible: visible, on: getSettingsSync().swiftVictories === true, receipt: null });
+    currentSwiftState = { forVisible: visible, on: getSettingsSync().swiftVictories === true, presentationOn: getSettingsSync().swiftVictories === true, receipt: null };
+    setSwiftState(currentSwiftState);
   }
-  const swiftOn = swiftState.on;
-  const swiftReceipt = swiftState.receipt;
+  const swiftOn = currentSwiftState.on;
+  const swiftReceipt = currentSwiftState.receipt;
   const swiftAffordanceVisible =
     (victoryData?.puzzlesSolved ?? 0) >= SWIFT_VICTORY_MIN_PUZZLES &&
     !hushedBeat &&
     !completionCoda;
   const handleToggleSwift = useCallback(() => {
     const next = !swiftOn;
-    setSwiftState({ forVisible: visible, on: next, receipt: getSwiftVictoriesToggledMessage(phase, next) });
+    setSwiftState(previous => ({ ...previous, forVisible: visible, on: next, receipt: getSwiftVictoriesToggledMessage(phase, next) }));
     updateSetting('swiftVictories', next).catch(() => {});
   }, [swiftOn, phase, visible]);
+
+  // Swift Victories: a ROUTINE win renders the compact result strip (instant,
+  // condensed) instead of the full ceremony. isRoutineVictory is the shared
+  // policy (also drives the instant animation path in useVictoryFlow); the
+  // extra guards here cover surfaces only the modal knows about (onboarding's
+  // single-button layout, the completion coda, the daily/pit props).
+  const compactMode =
+    currentSwiftState.presentationOn &&
+    !isOnboarding &&
+    !isPlayingDaily &&
+    !mustVisitPit &&
+    !completionCoda &&
+    !forceFullCeremony &&
+    isRoutineVictory(victoryData);
 
   // Ritual echo chain + de-duplicated feedback register: the performance
   // feedback line and the ritual-echo footer occupy the same emotional slot,
@@ -495,7 +497,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   // therefore no tap-to-skip layer.
   // ---------------------------------------------------------------------
   if (compactMode) {
-    const compactTotal = victoryData?.amberEarned ?? 0;
+    const compactTotal = rewardedDoubleTarget;
     return (
       <View
         style={[styles.modalOverlay, {
@@ -553,9 +555,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               style={styles.compactAmberRow}
               accessible
               accessibilityLabel={
-                victoryData?.autoCollected
-                  ? `${compactTotal} amber earned`
-                  : `${compactTotal} amber gathered for the pit`
+                rewardedDoubleClaimed
+                  ? `${compactTotal} amber total. ${victoryTotalAmber} amber bonus added to your balance.${victoryData?.autoCollected ? '' : ` ${victoryTotalAmber} amber gathered for the pit.`}`
+                  : victoryData?.autoCollected
+                    ? `${compactTotal} amber earned`
+                    : `${compactTotal} amber gathered for the pit`
               }
             >
               <Image source={AMBER_ICON} style={styles.amberIconLarge} />
@@ -563,6 +567,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 +{compactTotal}
               </Text>
             </View>
+            {rewardedDoubleClaimed && (
+              <Text style={[styles.compactFlawless, { color: phaseTheme.modalSecondaryTextColor }]}>
+                {`Doubled +${victoryTotalAmber} · added to your balance`}
+              </Text>
+            )}
             {!!eventBonusLine && (
               <Text style={[styles.compactFlawless, { color: phaseTheme.modalSecondaryTextColor }]}>
                 {eventBonusLine}

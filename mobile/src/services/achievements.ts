@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { ImageSourcePropType } from 'react-native';
 import { CumulativeStats } from './starRating';
 import { ANIMALS, ROOMS } from './homeWorldData';
@@ -736,7 +736,8 @@ export async function loadAchievements(): Promise<AchievementProgress> {
       return progressCache!;
     }
   } catch (err) {
-    console.warn('Failed to load achievements:', err);
+    progressCache = null;
+    throw err;
   }
 
   progressCache = getDefaultProgress();
@@ -750,44 +751,45 @@ export async function loadAchievements(): Promise<AchievementProgress> {
 export async function checkAchievements(
   state: AchievementCheckState
 ): Promise<Achievement[]> {
-  const progress = await loadAchievements();
-  const newlyUnlocked: Achievement[] = [];
+  // Keep the receipt and every achievement's amber in the same journal. Read
+  // after recovery so retrying a partially applied commit cannot pay twice.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Preserve the economy import-cycle boundary.
+  const { awardBonusAmberInTransaction, invalidateProgressCache } = require('./amberCurrency');
+  try {
+    return await runStorageTransaction('achievement_unlock', async () => {
+      invalidateAchievementsCache();
+      invalidateProgressCache();
+      const saved = await loadAchievements();
+      const progress = { ...saved, unlockedIds: [...saved.unlockedIds], unlockDates: { ...saved.unlockDates } };
+      const newlyUnlocked: Achievement[] = [];
 
-  for (const achievement of ACHIEVEMENTS) {
-    // Skip already unlocked
-    if (progress.unlockedIds.includes(achievement.id)) continue;
+      for (const achievement of ACHIEVEMENTS) {
+        // Skip already unlocked
+        if (progress.unlockedIds.includes(achievement.id)) continue;
 
-    // Check if newly earned
-    if (achievement.check(state)) {
-      newlyUnlocked.push(achievement);
-      progress.unlockedIds.push(achievement.id);
-      progress.unlockDates[achievement.id] = Date.now();
-    }
-  }
-
-  if (newlyUnlocked.length > 0) {
-    progress.lastChecked = Date.now();
-    progressCache = progress;
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-    } catch (err) {
-      console.warn('Failed to save achievements:', err);
-    }
-
-    // Credit one-time amber rewards (never blocks the unlock itself)
-    const totalReward = newlyUnlocked.reduce((sum, a) => sum + a.rewardAmber, 0);
-    if (totalReward > 0) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
-        const { awardBonusAmber } = require('./amberCurrency');
-        await awardBonusAmber(totalReward, 'achievement');
-      } catch (err) {
-        console.warn('Failed to credit achievement amber:', err);
+        // Check if newly earned
+        if (achievement.check(state)) {
+          newlyUnlocked.push(achievement);
+          progress.unlockedIds.push(achievement.id);
+          progress.unlockDates[achievement.id] = Date.now();
+        }
       }
-    }
-  }
 
-  return newlyUnlocked;
+      if (newlyUnlocked.length > 0) {
+        progress.lastChecked = Date.now();
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+        const totalReward = newlyUnlocked.reduce((sum, a) => sum + a.rewardAmber, 0);
+        if (totalReward > 0) {
+          await awardBonusAmberInTransaction(totalReward, 'achievement');
+        }
+      }
+
+      return newlyUnlocked;
+    });
+  } finally {
+    invalidateAchievementsCache();
+    invalidateProgressCache();
+  }
 }
 
 /**

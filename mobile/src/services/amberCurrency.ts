@@ -154,9 +154,9 @@ async function updateStreak(completedDate?: string): Promise<number> {
     // First play ever - start streak at 1
     progress.currentStreak = 1;
     progress.lastPlayDate = today;
-  } else if (progress.lastPlayDate === today) {
-    // Already played today - streak unchanged
-    // Just return current streak
+  } else if (progress.lastPlayDate >= today) {
+    // Already played today, or the local clock moved backwards. Neither is a
+    // missed day: retain the latest recorded date and every banked freeze.
   } else if (progress.lastPlayDate === previousDay) {
     // Played yesterday — continue streak
     progress.currentStreak += 1;
@@ -300,6 +300,24 @@ export async function checkFreeStreakFreeze(): Promise<boolean> {
 /** Cost of a streak freeze in amber */
 export const STREAK_FREEZE_AMBER_COST = STREAK_FREEZE_COST;
 
+/** Reject unreadable ownership/progression records without manufacturing a save. */
+function isValidProgressRecord(value: unknown): value is HomeWorldProgress {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const progress = value as Record<string, unknown>;
+  for (const key of ['amber', 'puzzlesSolved']) {
+    if (typeof progress[key] !== 'number' || !Number.isFinite(progress[key]) || Number(progress[key]) < 0) return false;
+  }
+  for (const key of ['totalAmberEarned', 'phaseProgress', 'cycleCount', 'cycleStartPuzzles']) {
+    if (progress[key] !== undefined && (typeof progress[key] !== 'number' ||
+        !Number.isFinite(progress[key]) || Number(progress[key]) < 0)) return false;
+  }
+  if (!Number.isInteger(progress.currentPhase) || Number(progress.currentPhase) < 0 || Number(progress.currentPhase) > 5) return false;
+  for (const key of ['unlockedAnimals', 'unlockedRooms']) {
+    if (!Array.isArray(progress[key]) || !(progress[key] as unknown[]).every(item => typeof item === 'string')) return false;
+  }
+  return true;
+}
+
 /**
  * Load progress from AsyncStorage
  */
@@ -310,8 +328,12 @@ export async function loadProgress(): Promise<HomeWorldProgress> {
     }
 
     const stored = await AsyncStorage.getItem(PROGRESS_STORAGE_KEY);
-    if (stored) {
-      progressCache = JSON.parse(stored);
+    if (stored !== null) {
+      const parsed: unknown = JSON.parse(stored);
+      if (!isValidProgressRecord(parsed)) {
+        throw new Error('Your saved home progress could not be read. Please retry recovery.');
+      }
+      progressCache = parsed;
       let healedProgress = false;
       // Self-heal legacy saves: post-revelation locks the world at phase 5,
       // but older builds left currentPhase at 4 (calculatePhase caps there).
@@ -327,6 +349,8 @@ export async function loadProgress(): Promise<HomeWorldProgress> {
     }
   } catch (error) {
     console.warn('Failed to load home progress:', error);
+    progressCache = null;
+    throw error;
   }
 
   progressCache = getDefaultProgress();
@@ -758,7 +782,7 @@ export async function awardPuzzleAmber(
       ? Math.min(1, (effectiveProgress - currentThreshold) / progressRange)
       : 0;
     const puzzleFraction = puzzleRange > 0
-      ? Math.min(1, (progress.puzzlesSolved - currentMinPuzzles) / puzzleRange)
+      ? Math.min(1, (getCyclePuzzlesSolved(progress) - currentMinPuzzles) / puzzleRange)
       : 0;
 
     // Use the lesser of the two (weighted progress vs puzzle exposure gate)
@@ -862,38 +886,73 @@ export async function spendAmber(
   }
 }
 
-/**
- * Unlock an animal
- */
-export async function unlockAnimal(animalId: string, cost: number): Promise<boolean> {
-  const result = await spendAmber(cost, `animal_${animalId}`);
-  if (!result.success) return false;
+type UnlockPurchaseRequest = {
+  cost: number;
+} & ({ kind: 'reserve'; unlockId: string } | {
+  kind: 'unlock'; targetId: string; type: 'room' | 'character'; reservationId?: string;
+});
 
-  const progress = await loadProgress();
-  if (!progress.unlockedAnimals.includes(animalId)) {
-    progress.unlockedAnimals.push(animalId);
-    progressCache = progress;
-    await saveProgress();
+/** Debit, ownership/reservation and ledger share one recoverable commit. */
+async function commitUnlockPurchase(request: UnlockPurchaseRequest): Promise<{
+  success: boolean; newBalance: number; error?: string;
+}> {
+  try {
+    return await runStorageTransaction('unlock_purchase', async () => {
+      // Recovery may already have completed a previous attempt. Ownership is
+      // checked again inside the serialized transaction before any debit.
+      invalidateProgressCache();
+      const progress = await loadProgress();
+      const refuse = (error: string) => ({ success: false, newBalance: progress.amber, error });
+      if (!Number.isFinite(request.cost) || request.cost < 0) return refuse('Invalid amber cost');
+      if (request.kind === 'reserve') {
+        if (progress.reservedUnlockId === request.unlockId) return { success: true, newBalance: progress.amber };
+        if (progress.reservedUnlockId) return refuse('Another unlock is already reserved');
+      } else {
+        const owned = request.type === 'character' ? progress.unlockedAnimals : progress.unlockedRooms;
+        if (owned.includes(request.targetId)) return { success: true, newBalance: progress.amber };
+        if (request.reservationId && progress.reservedUnlockId !== request.reservationId) {
+          return refuse('This unlock is not reserved');
+        }
+      }
+      if (progress.amber < request.cost) return refuse('Not enough amber');
+
+      progress.amber -= request.cost;
+      if (request.kind === 'reserve') progress.reservedUnlockId = request.unlockId;
+      else {
+        const owned = request.type === 'character' ? progress.unlockedAnimals : progress.unlockedRooms;
+        owned.push(request.targetId);
+        if (request.reservationId) progress.reservedUnlockId = null;
+      }
+      progressCache = progress;
+      await saveProgress();
+      await recordTransaction({
+        amount: request.cost, type: 'spend', timestamp: Date.now(),
+        source: request.kind === 'reserve' ? `reserve_${request.unlockId}` :
+          request.reservationId ? `skip_reserved_${request.targetId}` :
+            `${request.type === 'character' ? 'animal' : 'room'}_${request.targetId}`,
+      });
+      return { success: true, newBalance: progress.amber };
+    });
+  } finally {
+    invalidateProgressCache();
   }
-
-  return true;
 }
 
-/**
- * Unlock a room
- */
+/** Purchase an immediate unlock, optionally completing a paid reservation. */
+export function purchaseUnlockWithAmber(
+  targetId: string, type: 'room' | 'character', cost: number, reservationId?: string,
+): Promise<{ success: boolean; newBalance: number; error?: string }> {
+  return commitUnlockPurchase({ kind: 'unlock', targetId, type, cost, reservationId });
+}
+
+/** Unlock an animal with an atomic, idempotent debit. */
+export async function unlockAnimal(animalId: string, cost: number): Promise<boolean> {
+  return (await purchaseUnlockWithAmber(animalId, 'character', cost)).success;
+}
+
+/** Unlock a room with an atomic, idempotent debit. */
 export async function unlockRoom(roomId: string, cost: number): Promise<boolean> {
-  const result = await spendAmber(cost, `room_${roomId}`);
-  if (!result.success) return false;
-
-  const progress = await loadProgress();
-  if (!progress.unlockedRooms.includes(roomId)) {
-    progress.unlockedRooms.push(roomId);
-    progressCache = progress;
-    await saveProgress();
-  }
-
-  return true;
+  return (await purchaseUnlockWithAmber(roomId, 'room', cost)).success;
 }
 
 // ---------------------------------------------------------------------------
@@ -911,15 +970,7 @@ export async function reserveUnlock(
   unlockId: string,
   cost: number,
 ): Promise<{ success: boolean; newBalance: number; error?: string }> {
-  const result = await spendAmber(cost, `reserve_${unlockId}`);
-  if (!result.success) {
-    return { success: false, newBalance: result.newBalance, error: result.error };
-  }
-  const progress = await loadProgress();
-  progress.reservedUnlockId = unlockId;
-  progressCache = progress;
-  await saveProgress();
-  return { success: true, newBalance: progress.amber };
+  return commitUnlockPurchase({ kind: 'reserve', unlockId, cost });
 }
 
 /** The currently reserved unlock id (null when nothing is reserved). */
@@ -951,9 +1002,9 @@ export async function claimReservedUnlock(
   type: 'room' | 'character',
 ): Promise<void> {
   const progress = await loadProgress();
-  if (type === 'character') {
+  if (targetId && type === 'character') {
     if (!progress.unlockedAnimals.includes(targetId)) progress.unlockedAnimals.push(targetId);
-  } else {
+  } else if (targetId) {
     if (!progress.unlockedRooms.includes(targetId)) progress.unlockedRooms.push(targetId);
   }
   progress.reservedUnlockId = null;
@@ -1003,7 +1054,12 @@ function calculatePhase(effectiveProgress: number, puzzlesSolved: number): Dialo
 function effectivePhaseFor(progress: HomeWorldProgress): DialoguePhase {
   if (progress.postRevelation === true) return 5;
   const effectiveProgress = progress.phaseProgress ?? progress.puzzlesSolved;
-  return calculatePhase(effectiveProgress, progress.puzzlesSolved);
+  return calculatePhase(effectiveProgress, getCyclePuzzlesSolved(progress));
+}
+
+/** Narrative exposure resets each cycle; collection and milestones stay lifetime. */
+export function getCyclePuzzlesSolved(progress: Pick<HomeWorldProgress, 'puzzlesSolved' | 'cycleStartPuzzles'>): number {
+  return Math.max(0, progress.puzzlesSolved - (progress.cycleStartPuzzles ?? 0));
 }
 
 /**
@@ -1235,7 +1291,7 @@ export async function getPuzzlesUntilNextPhase(): Promise<number | null> {
   const nextPuzzleMinimum = MIN_PUZZLES_FOR_PHASE[(currentPhase + 1) as DialoguePhase];
   const effectiveProgress = progress.phaseProgress ?? progress.puzzlesSolved;
   const weightedRemaining = Math.max(0, nextThreshold - effectiveProgress);
-  const puzzleRemaining = Math.max(0, nextPuzzleMinimum - progress.puzzlesSolved);
+  const puzzleRemaining = Math.max(0, nextPuzzleMinimum - getCyclePuzzlesSolved(progress));
   return Math.max(weightedRemaining, puzzleRemaining);
 }
 
@@ -1843,10 +1899,10 @@ export async function isFinalPuzzleCompleted(): Promise<boolean> {
 /**
  * Whether a completed Phase-4 win may arm the finale. Both conditions are
  * required: the capped dwell window must be full, and the run must reach the
- * puzzle-160 arming floor.
+ * per-cycle arming floor.
  */
-export function canArmFinale(dwellCount: number, completedTotal: number): boolean {
-  return dwellCount >= FINALE_DWELL_PUZZLES && completedTotal >= FINALE_ARM_MIN_PUZZLES;
+export function canArmFinale(dwellCount: number, completedTotal: number, cycleStartPuzzles = 0): boolean {
+  return dwellCount >= FINALE_DWELL_PUZZLES && completedTotal - cycleStartPuzzles >= FINALE_ARM_MIN_PUZZLES;
 }
 
 /**
@@ -2374,7 +2430,10 @@ const DEFERRED_CREDIT_SOURCES = new Set(['word_offering', 'auto_word_offering'])
  */
 export async function awardBonusAmber(amount: number, source: string): Promise<number> {
   try {
-    return await runStorageTransaction('amber_bonus', () => awardBonusAmberInTransaction(amount, source));
+    return await runStorageTransaction('amber_bonus', () => {
+      invalidateProgressCache();
+      return awardBonusAmberInTransaction(amount, source);
+    });
   } catch (error) { invalidateProgressCache(); throw error; }
 }
 

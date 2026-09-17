@@ -7,7 +7,7 @@ import { invalidateStoryCache, STORY_STORAGE_KEY } from './storySpine';
 import { ACQUAINTANCE_STORAGE_KEY, invalidateAnimalAcquaintanceCache } from './animalAcquaintance';
 import { invalidateProgressCache } from './amberCurrency';
 import { invalidatePuzzleStateCache } from './puzzleSaveState';
-import { invalidateSettingsCache } from './settings';
+import { invalidateSettingsCache, getSettings } from './settings';
 import { invalidateStatsCache } from './starRating';
 import { invalidateHintsCache , initHints } from './hints';
 import { invalidateCosmeticsCache , initCosmetics } from './cosmetics';
@@ -130,11 +130,15 @@ export const SYNC_KEYS = [
   'wordshift_word_history',
   'wordshift_word_harvest',
   'wordshift_in_progress_puzzle',
+  'wordshift_in_progress_daily',
+  'wordshift_in_progress_puzzle_clock',
+  'wordshift_in_progress_daily_clock',
   'wordshift_mastery', // private solve-time trend + best speed round (skill records)
   // Daily challenge & quests
   'wordshift_daily_challenge',
   'wordshift_weekly_quests',
   'wordshift_daily_quests',
+  'wordshift_quest_bonus_receipts',
   'wordshift_daily_login',
   'wordshift_daily_amber',
   'wordshift_daily_ladder', // persistent local daily-ladder history (best this week / participation)
@@ -515,6 +519,20 @@ export function invalidateRestoredServiceCaches(): void {
   invalidatePlayedPuzzleCaches();
 }
 
+/** Refresh render mirrors only after pending durable writes have recovered.
+ * Strict reads cannot replace an unreadable purchased balance with defaults.
+ * Call outside the owning transaction and await before exposing live controls. */
+export async function refreshRestoredServiceCaches(): Promise<void> {
+  await runStorageTransaction('refresh_service_caches', async () => {
+    invalidateRestoredServiceCaches();
+    // Sequential loads keep any rejection inside this transaction: no sibling
+    // task can mutate a cache after its failed transaction has already ended.
+    await initHints();
+    await initCosmetics();
+    await getSettings(true);
+  });
+}
+
 /**
  * Set the cloud save provider. Call this during app initialization
  * when a real backend is available.
@@ -554,8 +572,7 @@ export async function collectLocalSaveData(): Promise<CloudSaveData> {
   const data: Record<string, string> = {};
   // A storage error is not an absent key. Propagate it rather than uploading a
   // destructive partial snapshot. Explicit missing values are legitimate.
-  for (const key of keys) {
-    const value = await AsyncStorage.getItem(key);
+  for (const [key, value] of await AsyncStorage.multiGet([...keys])) {
     if (value !== null) data[key] = value;
   }
   return { version: CURRENT_SAVE_VERSION, timestamp: Date.now(), deviceId: await getDeviceId(), data };
@@ -667,15 +684,20 @@ export async function restoreFromCloudData(cloudData: CloudSaveData, owner?: str
       await runMigrations();
       if (owner) await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
       if (!shouldContinue()) throw new Error('Restore cancelled');
+      // Drop stale service state before releasing the queue to a reward or
+      // purchase already waiting behind this replacement.
+      invalidateRestoredServiceCaches();
     });
-    invalidateRestoredServiceCaches();
-    await Promise.all([initHints(), initCosmetics()]);
+    await refreshRestoredServiceCaches();
     logEvent({ type: 'cloud_sync_result', data: { operation: 'restore', result: 'saved' } });
     return true;
   } catch (error) {
     // Both a discarded stage and a journal awaiting replay require dropping
     // every mirror. Bootstrap/retry rolls a committed journal forward first.
     invalidateRestoredServiceCaches();
+    if (!(error instanceof StorageRecoveryRequiredError)) {
+      await refreshRestoredServiceCaches();
+    }
     logEvent({ type: 'cloud_sync_result', data: { operation: 'restore',
       result: error instanceof StorageRecoveryRequiredError ? 'recovery_required' : 'failed' } });
     if (error instanceof StorageRecoveryRequiredError) throw error;

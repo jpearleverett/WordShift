@@ -543,7 +543,7 @@ describe('finale staging (armed, not retroactive)', () => {
   test('the dwell gate waits for the arming floor before it arms the finale', () => {
     // Dwell remains recorded before the floor, then the direct service
     // predicate decides whether the first eligible win may arm.
-    expect(VICTORY_STORAGE).toMatch(/const dwell = await recordPhase4Dwell\(\);[\s\S]{0,150}if \(canArmFinale\(dwell, amberResult.puzzlesSolved\)\) await armFinale\(\);/);
+    expect(VICTORY_STORAGE).toMatch(/const dwell = await recordPhase4Dwell\(\);[\s\S]{0,150}if \(canArmFinale\(dwell, amberResult.puzzlesSolved, cycleStartPuzzles\)\) await armFinale\(\);/);
     expect(APP_TSX).not.toContain('await recordPhase4Dwell()');
   });
 
@@ -700,7 +700,7 @@ describe('monetization + daily wiring', () => {
 
   test('first-daily mercy is granted after the daily board starts', () => {
     const startIdx = APP_TSX.indexOf('startDailyGame(daily.words');
-    const mercyIdx = APP_TSX.indexOf('grantFirstDailyMercy()');
+    const mercyIdx = APP_TSX.indexOf('saveWithPlayerRetry(grantFirstDailyMercy)');
     expect(startIdx).toBeGreaterThan(-1);
     expect(mercyIdx).toBeGreaterThan(startIdx);
   });
@@ -1035,10 +1035,13 @@ describe('launch-readiness app-integration wiring', () => {
     expect(recheck).not.toMatch(/getDailyRank\(getLocalDateString\(\)\)/);
   });
 
-  test('the first sub-3-star win gets its receipt on the victory toast queue (ftue-7)', () => {
-    expect(APP_TSX).toMatch(
-      /if \(!wasFinalBoard && !\(result\.blind \?\? false\) && !onboardingFlow\.isOnboarding\) \{\s*consumeFirstImperfectStarsReceipt\(persistence\.currentPhase, \{\s*stars: victory\.earnedStars,\s*hintsUsed: result\.hintsUsed,\s*invalidAttempts: result\.invalidAttempts,\s*\}\)\.then\(line => \{\s*if \(line\) enqueueVictoryToast\(line, 'receipt'\);/
-    );
+  test('the first sub-3-star receipt is acknowledged only when its victory layer is visible', () => {
+    const receipt = sliceBetween('// First sub-3-star receipt', '// Show streak milestone');
+    expect(receipt).toContain('!wasFinalBoard && !(result.blind ?? false) && !onboardingFlow.isOnboarding');
+    expect(receipt).toContain('peekFirstImperfectStarsReceipt(persistence.currentPhase');
+    expect(receipt).toContain('receiptGeneration === victoryToastGenerationRef.current');
+    expect(receipt).toContain("enqueueVictoryToast(line, 'receipt', markFirstImperfectStarsReceiptShown)");
+    expect(APP_TSX).toContain("if (overlayOwner !== 'victory' || !victoryReceipt) return;");
   });
 
   test('a launch route that cannot open is reported before it fails (boot-persistence-2)', () => {

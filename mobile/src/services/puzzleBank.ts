@@ -690,11 +690,26 @@ export async function selectPreGeneratedPuzzle(
     !options.unbrokenWeaveOnly &&
     options.speed !== true && // Never lengthen a board played against a clock (see PuzzleBankSelectionOptions.speed)
     !lexicon; // Lexicon boards are curated rare — never extend (keeps the vocabulary intact)
-  const selectableBank = options.unbrokenWeaveOnly
+  let selectableBank = options.unbrokenWeaveOnly
     ? bank.filter(puzzle => isUnbrokenWeaveEligible(puzzle.solution))
-    : extensionRequired
-      ? bank.filter(puzzle => getCachedStandardExtension(bankKey, puzzle) !== null)
-      : bank;
+    : bank;
+  if (extensionRequired) {
+    selectableBank = [];
+    // A cold extension cache may traverse the vocabulary for every board.
+    // Yield between small batches so loading feedback and input can paint.
+    let coldAnalyses = 0;
+    for (let index = 0; index < bank.length; index++) {
+      if (!standardExtensionCache.has(`${bankKey}:${bank[index].id}`)) {
+        if (coldAnalyses > 0 && coldAnalyses % 12 === 0) {
+          await new Promise<void>(resolve => setTimeout(resolve, 0));
+        }
+        coldAnalyses++;
+      }
+      if (getCachedStandardExtension(bankKey, bank[index]) !== null) {
+        selectableBank.push(bank[index]);
+      }
+    }
+  }
   if (selectableBank.length === 0) return null;
 
   const storageConfig = getStorageConfig(bankKey);

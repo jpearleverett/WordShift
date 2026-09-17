@@ -53,6 +53,22 @@ describe('weeklyQuests', () => {
     await clearWeeklyQuests();
   });
 
+  it('gives formerly colliding digit permutations different daily quest boards', async () => {
+    jest.useFakeTimers();
+    try {
+      const sets = [];
+      for (const day of [1, 10, 19]) {
+        jest.setSystemTime(new Date(2026, 8, day, 12));
+        await clearWeeklyQuests();
+        const state = await loadWeeklyQuests(4, unlockedQuestContext);
+        sets.push(state.daily.quests.map(quest => quest.title).join('|'));
+      }
+      expect(new Set(sets).size).toBe(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   // ===========================================================================
   // getWeekId
   // ===========================================================================

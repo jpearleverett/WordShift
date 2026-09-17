@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Animated } from 'react-native';
 import {
   Animal,
@@ -109,7 +109,7 @@ export const DIALOGUE_PAGE_CHAR_BUDGET = 200;
  * character at a time (typewriter cadence) instead of appearing whole, so the
  * text reads as spoken rather than dumped. Fixed across every animal; only
  * the mouth-flap cadence below varies by species. Instant under reduced
- * motion (see the reveal effect in the hook body).
+ * motion (the DialogueRevealBody leaf owns the reveal timer).
  */
 export const DIALOGUE_REVEAL_CHAR_MS = 22;
 
@@ -463,14 +463,10 @@ interface UseDialogueFlowReturn {
   /** The current page's FULL text (unchanged contract: HomeScreen's choice-
    * prompt equality check and pagination logic key off this exact value). */
   dialogueText: string;
-  /**
-   * The progressively-revealed substring of `dialogueText` (F25): a prefix
-   * that grows one character at a time until it equals `dialogueText`.
-   * Reduced motion (or the modal being closed) resolves this to the full
-   * text immediately.
-   */
-  revealedText: string;
-  /** True while `revealedText` is still shorter than `dialogueText`. */
+  /** Stable page identity and cadence for the text leaf's private ticker. */
+  revealSource: string;
+  revealCharMs: number;
+  /** True until the text leaf finishes or the player completes the reveal. */
   revealInProgress: boolean;
   /** Jump the current reveal straight to the full text. No-op once complete. */
   completeReveal: () => void;
@@ -548,13 +544,10 @@ export function useDialogueFlow({
   const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
   const [talkingFrame, setIsTalking] = useState(false);
 
-  // Per-character dialogue reveal (F25): revealedChars is how much of the
-  // CURRENT visible page has materialized. The reveal effect further down
-  // (declared after getDialogueText, which it depends on) resets this to 0
-  // whenever the visible text changes and ticks it up to full length.
-  const [reveal, setReveal] = useState({ source: '', count: 0 });
+  // Only reveal boundaries belong to the flow. Character ticks live in the
+  // DialogueRevealBody leaf, keeping the home/world out of the 15–22ms loop.
+  const [completedRevealSource, setCompletedRevealSource] = useState<string | null>(null);
   const [dialogueVisit, setDialogueVisit] = useState(0);
-  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Skip-hint eligibility (ftue-6): null until the device flag has been read,
   // then true exactly until the first reveal it decorated has ended.
   const [revealSkipHintEligible, setRevealSkipHintEligible] = useState<boolean | null>(null);
@@ -858,7 +851,7 @@ export function useDialogueFlow({
   // or under the budget pass through unchanged (same string identity, so the
   // HomeScreen `dialogueText === activeChoice.prompt` check still holds); a
   // long line shows one readable page at a time, advanced by "Next".
-  const getDialogueText = (): string => {
+  const visibleDialogueText = useMemo((): string => {
     const fullText = getFullDialogueText();
     // Never paginate an active choice prompt: the choice buttons render only
     // while dialogueText equals the prompt verbatim. (Prompts are short today;
@@ -866,11 +859,11 @@ export function useDialogueFlow({
     if (activeChoice && fullText === activeChoice.prompt) return fullText;
     const { pages, index } = resolveVisiblePage(fullText, pageSource, pageCursor);
     return pages[index];
-  };
+  }, [getFullDialogueText, activeChoice, pageSource, pageCursor]);
 
   // Check if there's more content to show (remaining pages of the current
   // line, pre-dialogue pages, or further regular dialogue)
-  const computeHasMore = (): boolean => {
+  const hasMoreToShow = useMemo((): boolean => {
     // Remaining pages of the current line always mean more — the button must
     // read "Next" while the rest of the line waits.
     const fullText = getFullDialogueText();
@@ -889,63 +882,13 @@ export function useDialogueFlow({
     if (getRegularConversation(selectedAnimal)) return true;
     if (animalPhase === 5) return true;
     return animalPhase === 2 && getPhase2ExtraDialogues(selectedAnimal.type).length > 0;
-  };
+  }, [getFullDialogueText, activeChoice, pageSource, pageCursor, preDialoguePages,
+    selectedAnimal, progress, getRegularConversation]);
 
-  // The current page's full text, computed once per render and shared by the
-  // reveal/flap effects below and the returned `dialogueText` (still the
-  // unchanged FULL page value — HomeScreen's choice-prompt equality check and
-  // every pagination test key off this exact field; the reveal is a purely
-  // presentational layer on top via `revealedText`).
-  const visibleDialogueText = getDialogueText();
-  const revealSource = `${dialogueVisit}:${visibleDialogueText}`;
-  const reducedMotionNow = getSettingsSync().reducedMotion;
+  const revealSource = `${dialogueVisit}:${pageCursor}:${visibleDialogueText}`;
   const revealCharMs = getDialogueRevealCharMs(progress?.currentPhase ?? 0);
-  const revealedChars = reveal.source === revealSource ? reveal.count : 0;
-  // A reveal is "in progress" only while the modal is up, motion isn't
-  // reduced, and the typewriter hasn't caught up to the full page yet.
-  const revealInProgress =
-    showDialogue && !reducedMotionNow && revealedChars < visibleDialogueText.length;
-  // The visible (possibly partial) text: reduced motion and a closed modal
-  // both resolve to the full page instantly, so there's never a stuck partial
-  // render outside an active, motion-enabled session.
-  const revealedText =
-    reducedMotionNow || !showDialogue
-      ? visibleDialogueText
-      : visibleDialogueText.slice(0, revealedChars);
-
-  // Per-character reveal effect (F25): whenever the visible text changes (new
-  // line, new page, or a fresh session opens) restart the typewriter from
-  // character 0 and tick up to the full length at DIALOGUE_REVEAL_CHAR_MS per
-  // character. Instant under reduced motion or once the modal is closed. The
-  // interval is always cleared on the next dependency change (or unmount) so
-  // a reveal for a line that's no longer showing can never keep ticking into
-  // the next one.
-  useEffect(() => {
-    if (revealTimerRef.current) {
-      clearInterval(revealTimerRef.current);
-      revealTimerRef.current = null;
-    }
-    if (!showDialogue || !visibleDialogueText || getSettingsSync().reducedMotion) {
-      return;
-    }
-    const total = visibleDialogueText.length;
-    revealTimerRef.current = setInterval(() => {
-      setReveal(prev => {
-        const next = prev.source === revealSource ? prev.count + 1 : 1;
-        if (next >= total && revealTimerRef.current) {
-          clearInterval(revealTimerRef.current);
-          revealTimerRef.current = null;
-        }
-        return { source: revealSource, count: Math.min(next, total) };
-      });
-    }, revealCharMs);
-    return () => {
-      if (revealTimerRef.current) {
-        clearInterval(revealTimerRef.current);
-        revealTimerRef.current = null;
-      }
-    };
-  }, [visibleDialogueText, revealSource, showDialogue, reducedMotionNow, revealCharMs]);
+  const revealInProgress = showDialogue && !getSettingsSync().reducedMotion &&
+    visibleDialogueText.length > 0 && completedRevealSource !== revealSource;
 
   // One-time tap-to-skip hint (ftue-6). Read the device flag once the first
   // dialogue opens; the hint rides the first reveal it finds in progress and
@@ -974,7 +917,7 @@ export function useDialogueFlow({
   // per-species cadence ONLY while a reveal is in progress, and settle to a
   // static closed-mouth pose (isTalking false, no interval) the instant the
   // line finishes landing or the modal closes. Reduced motion never reaches
-  // here with revealInProgress true (the reveal effect above completes
+  // here with revealInProgress true (the reveal predicate completes
   // instantly), so this alone is enough to keep the pose static.
   useEffect(() => {
     if (!revealInProgress) return;
@@ -990,12 +933,8 @@ export function useDialogueFlow({
   /** Complete the current reveal instantly (tap-to-complete). A no-op once the
    * line has already fully landed. Never advances the dialogue itself. */
   const completeReveal = useCallback(() => {
-    if (revealTimerRef.current) {
-      clearInterval(revealTimerRef.current);
-      revealTimerRef.current = null;
-    }
-    setReveal({ source: revealSource, count: visibleDialogueText.length });
-  }, [visibleDialogueText, revealSource]);
+    setCompletedRevealSource(revealSource);
+  }, [revealSource]);
 
   // Handle animal tap
   const handleAnimalTap = useCallback(async (animal: Animal) => {
@@ -1771,7 +1710,7 @@ export function useDialogueFlow({
       let hasUndeliveredLines: boolean;
       if (animalPhase === 5) {
         const pool = getPhase5Pool(selectedAnimal.type);
-        hasUndeliveredLines = nextCaughtUp < pool.length;
+        hasUndeliveredLines = hasNewPhase5Line(pool, nextCaughtUp, buildPhase5Eligibility(selectedAnimal.type, pool, progress.unlockedAnimals));
       } else if (animalPhase === 2 && phase2Pool.length > 0 && newIndex >= total2) {
         hasUndeliveredLines = phase2PoolHasNew(selectedAnimal.type, nextPhase2Cursor);
       } else {
@@ -1903,7 +1842,8 @@ export function useDialogueFlow({
     selectedAnimal,
     showDialogue,
     dialogueText: visibleDialogueText,
-    revealedText,
+    revealSource,
+    revealCharMs,
     revealInProgress,
     completeReveal,
     revealSkipHint,
@@ -1913,7 +1853,7 @@ export function useDialogueFlow({
     cooldownSlide,
     dialogueSlide,
     isTalking: revealInProgress && talkingFrame,
-    hasMoreToShow: computeHasMore(),
+    hasMoreToShow,
     activeChoice,
     choiceOpen,
     choiceSaving: choiceSaving || lineSaving,

@@ -340,7 +340,7 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
     },
 
     async requestATTIfNeeded(): Promise<void> {
-      if (Platform.OS !== 'ios') return;
+      if (!mod || Platform.OS !== 'ios') return;
       const att = loadATTModule();
       if (!att) return;
       try {
@@ -417,8 +417,10 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
     async showInterstitial(): Promise<boolean> {
       if (!ready || !mod) return false;
       if (!slots.interstitial.loaded) {
-        await preload('interstitial');
-        if (!ready || !slots.interstitial.loaded) return false;
+        // This opportunity ends with the victory transition. A later network
+        // fill belongs to the next exit, never the board already in play.
+        void preload('interstitial');
+        return false;
       }
       const ad = slots.interstitial.loaded;
       slots.interstitial.loaded = null;

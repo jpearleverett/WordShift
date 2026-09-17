@@ -790,6 +790,33 @@ function routineVictoryData(overrides: Partial<VictoryData> = {}): VictoryData {
 }
 
 describe('swift victories compact strip', () => {
+  it('shows both the doubled total and the credited bonus without overstating the pit batch', () => {
+    mockSwiftVictories = true;
+    const tree = render(baseProps({
+      victoryData: routineVictoryData({ autoCollected: false }),
+      rewardedDoubleEnabled: true,
+      rewardedDoubleClaimed: true,
+      onRewardedDouble: jest.fn(),
+    }));
+    expect(textOf(tree)).toContain('36');
+    expect(textOf(tree)).toContain('Doubled +18 · added to your balance');
+    expect(findByA11yLabel(tree, '36 amber total. 18 amber bonus added to your balance. 18 amber gathered for the pit.')).not.toBeNull();
+    expect(findByA11yLabel(tree, '36 amber gathered for the pit')).toBeNull();
+  });
+
+  it('keeps the open presentation stable when the preference changes and applies it on the next open', () => {
+    const props = baseProps({ victoryData: routineVictoryData(), completedWords: ['CAT', 'CATS'] });
+    let tree = render(props);
+    const toggle = findAll(tree, el => el.props?.testID === 'swift-victories-affordance')[0];
+    (toggle.props!.onPress as () => void)();
+    mockSwiftVictories = true;
+    tree = render(props);
+    expect(textOf(tree)).toContain(getRitualEchoHeader(0));
+    render({ ...props, visible: false });
+    tree = render(props);
+    expect(textOf(tree)).not.toContain(getRitualEchoHeader(0));
+  });
+
   it('renders the condensed strip for a routine win when the setting is ON', () => {
     mockSwiftVictories = true;
     // A routine win past the auto-collect window queues its amber in a harvest

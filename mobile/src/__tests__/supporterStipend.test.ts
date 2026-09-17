@@ -46,6 +46,17 @@ beforeEach(async () => {
 });
 
 describe('supporterStipend', () => {
+  test('a backwards month never grants another stipend or replaces the receipt', async () => {
+    isSupporter = true;
+    await claimSupporterStipendIfDue();
+    mockDay = '2026-06-30';
+    invalidateSupporterCache();
+    expect(await isSupporterStipendDue()).toBe(false);
+    expect(await claimSupporterStipendIfDue()).toBeNull();
+    mockDay = '2026-07-05';
+    expect(await claimSupporterStipendIfDue()).toBeNull();
+    expect(await payments()).toHaveLength(1);
+  });
   test('getLocalMonthString is the local YYYY-MM (never UTC)', () => {
     mockDay = '2026-12-31';
     expect(getLocalMonthString()).toBe('2026-12');

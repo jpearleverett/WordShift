@@ -75,6 +75,7 @@ export const STORY_COPY = {
   archive: 'Earlier conversations',
   archiveHint: 'Read these in their earlier setting. Visiting the pages does not change your choices.',
   empty: 'There will be things to remember here. For now, come sit by the fire.',
+  archivedPages: 'The pages you reached',
   unread: 'A conversation is waiting',
   savedChoice: 'Your answer',
   saving: 'Keeping this moment...',

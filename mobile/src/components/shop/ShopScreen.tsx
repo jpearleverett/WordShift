@@ -1,3 +1,4 @@
+import { subscribeBillingChanges } from '../../services/iap';
 import { useCountUp } from '../../hooks/useCountUp';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
@@ -541,6 +542,10 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     setEquipped({ tile_theme: tile, confetti, spark });
   }, [allItems]);
 
+  useEffect(() => subscribeBillingChanges(() => {
+    void refresh().catch(() => {});
+  }), [refresh]);
+
   const refreshHouse = useCallback(async () => {
     const [roomList, upgrades, deepenings, attunements, gifts] = await Promise.all([
       getRoomsWithStatus(),
@@ -922,7 +927,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const renderActionButton = (item: CosmeticItem) => {
     const isOwned = owned[item.id];
     const isEquipped = equipped[item.category] === item.id;
-    if (isEquipped) {
+    if (isOwned && isEquipped) {
       return (
         <AnimatedEquippedChip
           spring={celebration?.id === item.id}

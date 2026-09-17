@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocalDateString } from './dateUtils';
+import { reportError } from './errorReporting';
 import { getWinBackMessage, getNotificationTitle } from './phaseNarrative';
+
+type NotificationsModule = typeof import('expo-notifications');
 
 /**
  * Push notification scheduling service for WordShift.
@@ -173,7 +176,7 @@ const QUEST_EXPIRY_MESSAGES: Record<number, string[]> = {
 
 let prefsCache: NotificationPreferences | null = null;
 let promptedCache: boolean | null = null;
-let notificationsModule: any = undefined;
+let notificationsModule: NotificationsModule | null | undefined;
 
 /**
  * Drop both notification caches after an external storage write (cloud
@@ -204,11 +207,11 @@ function getDefaultPrefs(): NotificationPreferences {
 // Expo Notifications Integration (lazy-loaded)
 // ============================================================================
 
-async function getNotificationsModule(): Promise<any> {
+async function getNotificationsModule(): Promise<NotificationsModule | null> {
   if (notificationsModule !== undefined) return notificationsModule;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
-    notificationsModule = require('expo-notifications');
+    notificationsModule = require('expo-notifications') as NotificationsModule;
     return notificationsModule;
   } catch {
     notificationsModule = null;
@@ -528,7 +531,7 @@ const WIN_BACK_RUNG_OFFSETS: [number, number, number, number, number] = [1, 3, 7
 const QUEST_EXPIRY_LEAD_MS = 6.5 * 60 * 60 * 1000;
 
 async function scheduleDailyReminder(
-  mod: any,
+  mod: NotificationsModule,
   hour: number,
   phase: number,
   playedToday: boolean,
@@ -588,12 +591,13 @@ async function scheduleDailyReminder(
           data: { target: dailyUnlocked ? 'daily' : 'home' },
         },
         trigger: {
+          type: mod.SchedulableTriggerInputTypes.DATE,
           date: triggerDate,
         },
       });
       occupiedDays.add(dayKey);
     }
-  } catch {}
+  } catch (error) { reportError(error instanceof Error ? error : String(error), { source: 'notification_schedule', metadata: { kind: 'daily' } }); }
 }
 
 /**
@@ -606,7 +610,7 @@ async function scheduleDailyReminder(
  * ping already claimed) so a lapsed player never gets two pings in one day.
  */
 async function scheduleWinBackLadder(
-  mod: any,
+  mod: NotificationsModule,
   phase: number,
   firstRungDays: number,
   finished: boolean,
@@ -638,11 +642,12 @@ async function scheduleWinBackLadder(
           data: { target: 'home' },
         },
         trigger: {
+          type: mod.SchedulableTriggerInputTypes.DATE,
           date: triggerDate,
         },
       });
       occupiedDays.add(dayKey);
-    } catch {}
+    } catch (error) { reportError(error instanceof Error ? error : String(error), { source: 'notification_schedule', metadata: { kind: 'win_back' } }); }
   }
 }
 
@@ -757,7 +762,7 @@ async function shouldRemindQuestExpirySafe(phase: number): Promise<boolean> {
 }
 
 async function scheduleQuestExpiry(
-  mod: any,
+  mod: NotificationsModule,
   phase: number,
   occupiedDays: Set<string>
 ): Promise<void> {
@@ -794,15 +799,16 @@ async function scheduleQuestExpiry(
         data: { target: 'home' },
       },
       trigger: {
+        type: mod.SchedulableTriggerInputTypes.DATE,
         date: triggerDate,
       },
     });
     occupiedDays.add(dayKey);
-  } catch {}
+  } catch (error) { reportError(error instanceof Error ? error : String(error), { source: 'notification_schedule', metadata: { kind: 'quest_expiry' } }); }
 }
 
 async function scheduleStreakRisk(
-  mod: any,
+  mod: NotificationsModule,
   phase: number,
   streak: number,
   dailyUnlocked: boolean,
@@ -840,13 +846,14 @@ async function scheduleStreakRisk(
         data: { target: dailyUnlocked ? 'daily' : 'home' },
       },
       trigger: {
+        type: mod.SchedulableTriggerInputTypes.DATE,
         date: triggerDate,
       },
     });
     // Streak-risk is the highest-priority ping — it claims its local day
     // first (scheduleAllNotifications runs it before the other ladders).
     occupiedDays.add(getLocalDateString(triggerDate));
-  } catch {}
+  } catch (error) { reportError(error instanceof Error ? error : String(error), { source: 'notification_schedule', metadata: { kind: 'streak_risk' } }); }
 }
 
 /**

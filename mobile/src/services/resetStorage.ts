@@ -1,5 +1,5 @@
-import storage, { recoverPendingStorageTransaction, runStorageTransaction } from './persistenceStorage';
-import { SYNC_KEYS, SYNC_KEY_PREFIXES, invalidateRestoredServiceCaches } from './cloudSave';
+import storage, { recoverPendingStorageTransaction, runStorageTransaction, StorageRecoveryRequiredError } from './persistenceStorage';
+import { SYNC_KEYS, SYNC_KEY_PREFIXES, invalidateRestoredServiceCaches, refreshRestoredServiceCaches } from './cloudSave';
 import { canStartNewCycle, getFullProgress, startNewCycle } from './amberCurrency';
 import { beginStoryCycle } from './storySpine';
 import { ACQUAINTANCE_STORAGE_KEY } from './animalAcquaintance';
@@ -29,6 +29,7 @@ export async function commitFullLocalReset(): Promise<void> {
       RESET_DEVICE_KEY_PREFIXES.some(prefix => key.startsWith(prefix)));
     await storage.multiRemove(keys);
     await storage.setItem('wordshift_local_reset_at', String(Date.now()));
+    invalidateRestoredServiceCaches();
   });
   invalidateRestoredServiceCaches();
 }
@@ -37,7 +38,9 @@ const NEW_CYCLE_NARRATIVE_KEYS = [
   ACQUAINTANCE_STORAGE_KEY,
   'wordshift_dialogue_sessions', 'wordshift_narrative_delivery',
   'wordshift_dialogue_choices', 'wordshift_micro_beats_seen',
-  'wordshift_cycle_beats_seen', 'wordshift_offering_requests',
+  'wordshift_cycle_beats_seen', 'wordshift_offering_requests', 'wordshift_tending',
+  'wordshift_in_progress_puzzle', 'wordshift_in_progress_daily',
+  'wordshift_in_progress_puzzle_clock', 'wordshift_in_progress_daily_clock',
 ];
 
 /** Archive the completed cycle and reset its narrative gates in one commit.
@@ -45,9 +48,9 @@ const NEW_CYCLE_NARRATIVE_KEYS = [
  * twice or lose its inherited boundary after an interrupted storage write. */
 export async function commitNewCycle(): Promise<number> {
   await recoverPendingStorageTransaction();
-  invalidateRestoredServiceCaches();
+  await refreshRestoredServiceCaches();
   try {
-    return await runStorageTransaction('new_cycle', async () => {
+    const cycle = await runStorageTransaction('new_cycle', async () => {
       if (!await canStartNewCycle()) return 0;
       const cycle = await startNewCycle();
       const nextProgress = await getFullProgress();
@@ -57,9 +60,16 @@ export async function commitNewCycle(): Promise<number> {
         unlockedAnimals: nextProgress.unlockedAnimals,
       });
       await storage.multiRemove(NEW_CYCLE_NARRATIVE_KEYS);
+      invalidateRestoredServiceCaches();
       return cycle;
     });
-  } finally {
+    await refreshRestoredServiceCaches();
+    return cycle;
+  } catch (error) {
     invalidateRestoredServiceCaches();
+    if (!(error instanceof StorageRecoveryRequiredError)) {
+      try { await refreshRestoredServiceCaches(); } catch { /* Retry owns any unreadable state. */ }
+    }
+    throw error;
   }
 }

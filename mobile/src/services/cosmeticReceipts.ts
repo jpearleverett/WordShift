@@ -61,31 +61,35 @@ async function hasBeenReceipted(id: string): Promise<boolean> {
   return seen;
 }
 
-async function markReceipted(id: string): Promise<void> {
+/** Acknowledge only after the receipt has actually reached its visible surface. */
+export async function markCosmeticFirstShowingShown(id: string): Promise<void> {
+  await AsyncStorage.setItem(receiptKeyFor(id), '1');
   seenCache.set(id, true);
-  try {
-    await AsyncStorage.setItem(receiptKeyFor(id), '1');
-  } catch {
-    /* ignore */
-  }
 }
 
-/**
- * If the equipped cosmetic in `category` has never shown on this device,
- * marks it shown and returns its display NAME (for
- * phaseNarrative.getCosmeticFirstShowingLine). Returns null when the default
- * is equipped, the receipt was already given, or the id is unknown.
- */
-export async function consumeCosmeticFirstShowing(category: ReceiptCategory): Promise<string | null> {
+/** Resolve the currently equipped cosmetic without consuming its receipt. */
+export async function peekCosmeticFirstShowing(
+  category: ReceiptCategory,
+): Promise<{ id: string; name: string } | null> {
   const equippedId = getEquippedSync(category);
   if (!equippedId) return null;
   const seen = (await hasBeenReceipted(equippedId)) ? new Set([equippedId]) : new Set<string>();
   const id = resolveFirstShowing(equippedId, seen);
   if (!id) return null;
   const item = getCosmetic(id);
-  if (!item) return null;
-  await markReceipted(id);
-  return item.name;
+  return item ? { id, name: item.name } : null;
+}
+
+/** Immediate surfaces (move sparks) can resolve and acknowledge together. */
+export async function consumeCosmeticFirstShowing(category: ReceiptCategory): Promise<string | null> {
+  const receipt = await peekCosmeticFirstShowing(category);
+  if (!receipt) return null;
+  try {
+    await markCosmeticFirstShowingShown(receipt.id);
+  } catch {
+    // The visible receipt is still useful; a failed write may repeat it later.
+  }
+  return receipt.name;
 }
 
 /**

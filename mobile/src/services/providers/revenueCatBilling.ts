@@ -131,13 +131,6 @@ function bareProductId(identifier: string): string {
   return typeof identifier === 'string' ? identifier.split(':')[0] : identifier;
 }
 
-/**
- * How far before the checkout started a receipt may be dated and still count
- * as the purchase just made (device clock vs store time). Only consulted when
- * the post-purchase customer info shows nothing new for the product.
- */
-const CHECKOUT_RECEIPT_SKEW_MS = 5 * 60_000;
-
 export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): BillingProvider {
   let Purchases: any | null = null;
   let ready = false;
@@ -178,7 +171,7 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
    * every consumable. `purchaseToken` is NOT emitted on the customer-info
    * surface (TransactionMapper.kt maps only id/product/date), so the link is
    * found by diffing this product's entries against the pre-checkout snapshot,
-   * keeping only an entry dated around this checkout; when nothing qualifies
+   * using store time to disambiguate simultaneous delayed approvals; when nothing qualifies
    * (a lagging customer info) no link is returned and iap.ts's same-product
    * time window plus the durable receipt alias cover the late receipt.
    */
@@ -186,20 +179,19 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
     customerInfo: any,
     productId: ProductId,
     before: ReadonlySet<string>,
-    checkoutStartedAt: number,
+    storePurchasedAt: number,
     orderId: string | undefined,
   ): string[] {
     const entries = transactionsFrom(customerInfo)
       .filter(entry => entry.productId === productId && typeof entry.transactionId === 'string');
     const newest = (list: StorePurchaseTransaction[]) => list.reduce<StorePurchaseTransaction | null>((best, entry) =>
       best === null || (Number.isFinite(entry.purchasedAt) && entry.purchasedAt >= best.purchasedAt) ? entry : best, null);
-    // A receipt names THIS purchase only when it is both new since the sheet
-    // opened AND dated around this checkout: an older known receipt is a
-    // different purchase, and a new-but-old-dated one is the late approval of
-    // an earlier pending payment that must keep its own credit.
+    // The before-snapshot identifies new receipts independently of device
+    // clock skew. Where available, compare store time only to store time so
+    // an earlier pending approval keeps its own credit.
     const match = newest(entries.filter(entry =>
       !before.has(entry.transactionId) &&
-      Number.isFinite(entry.purchasedAt) && entry.purchasedAt >= checkoutStartedAt - CHECKOUT_RECEIPT_SKEW_MS));
+      (!Number.isFinite(storePurchasedAt) || Math.abs(entry.purchasedAt - storePurchasedAt) <= 1000)));
     return match && match.transactionId !== orderId ? [match.transactionId] : [];
   }
 
@@ -393,10 +385,12 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
         // with the new receipt while the purchase promise is still pending, and
         // that must still read as "new since checkout began".
         const receiptsBefore = new Set(knownReceiptIds);
-        const checkoutStartedAt = Date.now();
         const { customerInfo, transaction } = await Purchases.purchaseStoreProduct(product);
         const orderId: string | undefined = transaction?.transactionIdentifier ?? undefined;
-        const linked = linkedReceiptIds(customerInfo, productId, receiptsBefore, checkoutStartedAt, orderId);
+        const storePurchasedAt = Date.parse(transaction?.purchaseDate);
+        const linked = linkedReceiptIds(customerInfo, productId, receiptsBefore, storePurchasedAt, orderId);
+        const purchasedAt = Number.isFinite(storePurchasedAt) ? storePurchasedAt
+          : transactionsFrom(customerInfo).find(entry => linked.includes(entry.transactionId))?.purchasedAt;
         noteCustomerInfo(customerInfo);
         return {
           success: true,
@@ -404,6 +398,7 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
           entitlements: entitlementsFrom(customerInfo),
           // Store transaction id → pending-grant ledger dedupe key (iap.ts).
           transactionId: orderId,
+          ...(Number.isFinite(purchasedAt) ? { purchasedAt } : {}),
           // The receipt-history name(s) of this same purchase (see iap.ts).
           ...(linked.length > 0 ? { linkedTransactionIds: linked } : {}),
         };

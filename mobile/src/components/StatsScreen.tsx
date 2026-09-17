@@ -343,6 +343,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
           return (
             <View
               key={achievement.id}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={`${achievement.title}. ${achievement.description}. ${achievement.isUnlocked ? 'Unlocked' : 'Locked'}.${prog ? ` Progress: ${prog.current} of ${prog.target}.` : ''} Reward ${achievement.rewardAmber} amber.`}
               style={[
                 styles.achievementRow,
                 i % 2 === 1 && { backgroundColor: rowAltTint },
@@ -367,7 +370,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                   resizeMode="contain"
                 />
                 {!achievement.isUnlocked && (
-                  <Image source={ACHIEVEMENT_LOCK_ICON} style={styles.achievementLockOverlay} resizeMode="contain" />
+                  <Image source={ACHIEVEMENT_LOCK_ICON} accessible={false} style={styles.achievementLockOverlay} resizeMode="contain" />
                 )}
               </View>
               <View style={styles.achievementInfo}>
@@ -407,7 +410,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 />
               </View>
               {achievement.isUnlocked && (
-                <Image source={CHROME_ICONS.check} style={styles.achievementCheckIcon} resizeMode="contain" accessibilityLabel="unlocked" />
+                <Image source={CHROME_ICONS.check} style={styles.achievementCheckIcon} resizeMode="contain" accessible={false} />
               )}
             </View>
           );

@@ -446,13 +446,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     hapticLight();
     setPurchaseRestoreBusy(true);
     try {
-      await restorePurchases();
+      const restored = await restorePurchases();
+      if (restored.error) {
+        showGameAlert('Restore Purchases', restored.error === 'purchase_in_progress'
+          ? 'Another purchase is still finishing. Please try again in a moment.'
+          : "We couldn't reach the store. Please try again in a moment.");
+        return;
+      }
       const patron = isPatronSync();
       const adFree = isAdFreeSync();
       if (patron) {
         showGameAlert('Purchases Restored', 'Welcome back. Your Patron benefits are active again.');
       } else if (adFree) {
         showGameAlert('Purchases Restored', 'Your ad-free purchase has been restored.');
+      } else if (restored.entitlements.length > 0) {
+        showGameAlert('Purchases Restored', 'Your purchases are active again.');
       } else {
         showGameAlert('Restore Purchases', 'No previous purchases were found for this store account.');
       }

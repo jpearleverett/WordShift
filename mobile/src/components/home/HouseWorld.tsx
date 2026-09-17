@@ -1786,7 +1786,7 @@ interface HouseWorldProps {
   quietNotifications?: boolean;
 }
 
-export const HouseWorld: React.FC<HouseWorldProps> = ({
+export const HouseWorld: React.FC<HouseWorldProps> = React.memo(function HouseWorld({
   storyKeepsake,
   onInspectStory,
   rooms,
@@ -1813,7 +1813,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   onFocusRoomConsumed,
   suppressInviteChips = false,
   quietNotifications = false,
-}) => {
+}) {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const SKY_BOX_HEIGHT = getSkyBoxHeight(SCREEN_WIDTH, SCREEN_HEIGHT);
   const tendingIntensity = getTendingIntensity(tendingLevel);
@@ -2786,7 +2786,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       />
     </GestureHandlerRootView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

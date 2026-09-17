@@ -61,3 +61,28 @@ test('queued operations read the preceding committed value', async () => {
   })));
   expect(await NativeStorage.getItem('wordshift_count')).toBe('3');
 });
+
+test('multiGet batches native reads while overlaying staged writes and deletions', async () => {
+  await NativeStorage.setItem('wordshift_first', 'old');
+  await NativeStorage.setItem('wordshift_second', 'deleted');
+  await NativeStorage.setItem('wordshift_third', 'saved');
+  (NativeStorage.multiGet as jest.Mock).mockClear();
+  await runStorageTransaction('batched_snapshot', async () => {
+    await storage.setItem('wordshift_first', 'new');
+    await storage.removeItem('wordshift_second');
+    expect(await storage.multiGet(['wordshift_first', 'wordshift_second', 'wordshift_third'])).toEqual([
+      ['wordshift_first', 'new'], ['wordshift_second', null], ['wordshift_third', 'saved'],
+    ]);
+  });
+  expect(NativeStorage.multiGet).toHaveBeenCalledTimes(1);
+  expect(NativeStorage.multiGet).toHaveBeenCalledWith(['wordshift_third']);
+});
+
+test('a swallowed native batch read failure still aborts its transaction', async () => {
+  (NativeStorage.multiGet as jest.Mock).mockRejectedValueOnce(new Error('batch unreadable'));
+  await expect(runStorageTransaction('bad_batch', async () => {
+    await storage.multiGet(['wordshift_example']).catch(() => []);
+    await storage.setItem('wordshift_example', '{}');
+  })).rejects.toThrow('batch unreadable');
+  expect(await NativeStorage.getItem('wordshift_example')).toBeNull();
+});

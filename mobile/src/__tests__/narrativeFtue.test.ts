@@ -39,6 +39,8 @@ import {
 import {
   FIRST_IMPERFECT_STARS_SEEN_KEY,
   consumeFirstImperfectStarsReceipt,
+  peekFirstImperfectStarsReceipt,
+  markFirstImperfectStarsReceiptShown,
   getArrivalResumeFramingLine,
   getDialogueRevealSkipHint,
   getFirstImperfectStarsMessage,
@@ -193,7 +195,7 @@ describe('ftue-6: dialogue reveal cadence and the tap-to-skip hint', () => {
   test('the reveal effect ticks at the phase-aware cadence', () => {
     const hook = src('hooks/useDialogueFlow.ts');
     expect(hook).toMatch(/const revealCharMs = getDialogueRevealCharMs\(progress\?\.currentPhase \?\? 0\);/);
-    expect(hook).toMatch(/\}, revealCharMs\);/);
+    expect(src('components/home/DialogueRevealBody.tsx')).toMatch(/\}, charMs\);/);
     expect(hook).toMatch(/revealSkipHint,\n/);
   });
 
@@ -252,7 +254,18 @@ describe('ftue-7: the star rule is taught', () => {
     }
   });
 
-  test('the receipt fires once ever, and never on a three-star win', async () => {
+  test('leaving before the first imperfect-stars toast does not consume it', async () => {
+    await AsyncStorage.clear();
+    const win = { stars: 2, hintsUsed: 1, invalidAttempts: 0 };
+    const first = await peekFirstImperfectStarsReceipt(0, win);
+    expect(first).toBe(getFirstImperfectStarsMessage(0, 'hint'));
+    expect(await peekFirstImperfectStarsReceipt(0, win)).toBe(first);
+    expect(await AsyncStorage.getItem(FIRST_IMPERFECT_STARS_SEEN_KEY)).toBeNull();
+    await markFirstImperfectStarsReceiptShown();
+    expect(await peekFirstImperfectStarsReceipt(0, win)).toBeNull();
+  });
+
+  test('the receipt fires once ever, and never on a three-star win' , async () => {
     await AsyncStorage.clear();
     expect(await consumeFirstImperfectStarsReceipt(0, { stars: 3, hintsUsed: 0, invalidAttempts: 1 })).toBeNull();
     expect(await AsyncStorage.getItem(FIRST_IMPERFECT_STARS_SEEN_KEY)).toBeNull();

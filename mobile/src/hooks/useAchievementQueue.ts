@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   checkAchievements,
   buildAchievementCheckState,
@@ -11,6 +11,7 @@ import { getDailyStatus } from '../services/dailyChallenge';
 import { VictoryData } from './useGamePersistence';
 import { hapticHeavy } from '../services/haptics';
 import { playUiSound } from '../services/uiSound';
+import { saveWithPlayerRetry } from '../services/saveRetry';
 
 export interface AchievementQueueState {
   currentAchievement: Achievement | null;
@@ -36,7 +37,10 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
 
   /** The one presentation path, shared by both entry points so neither drifts. */
   const presentUnlocks = useCallback(async (state: AchievementCheckState) => {
-    const newAchievements = await checkAchievements(state);
+    const newAchievements = await saveWithPlayerRetry(() => checkAchievements(state), {
+      title: 'Your achievement is waiting',
+      message: 'We could not save your achievement reward. Free some device storage if it is full, then retry.',
+    });
     if (newAchievements.length === 0) return;
     hapticHeavy();
     // achievement.wav (a composed 1.3s fanfare) shipped in the pack but was
@@ -115,8 +119,8 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
     setQueue(pending => id && pending[0]?.id === id ? pending.slice(1) : pending);
   }, [currentAchievement?.id]);
 
-  return [
-    { currentAchievement },
-    { checkForAchievements, checkAchievementsNow, dismissAchievement },
-  ];
+  const state = useMemo(() => ({ currentAchievement }), [currentAchievement]);
+  const actions = useMemo(() => ({ checkForAchievements, checkAchievementsNow, dismissAchievement }),
+    [checkForAchievements, checkAchievementsNow, dismissAchievement]);
+  return [state, actions];
 }

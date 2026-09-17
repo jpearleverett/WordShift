@@ -76,6 +76,7 @@ jest.mock('react-native-purchases', () => {
         productIdentifier: product?.identifier,
         transaction: {
           transactionIdentifier: state.transactionId,
+          purchaseDate: new Date().toISOString(),
           productIdentifier: product?.identifier,
         },
       };
@@ -307,6 +308,7 @@ describe('RevenueCat adapter — purchase entitlement mapping', () => {
       entitlements: [ENTITLEMENTS.ADFREE],
       // The store transaction id rides along for the pending-grant ledger.
       transactionId: 'txn_test_1',
+      purchasedAt: expect.any(Number),
     });
   });
 });

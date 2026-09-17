@@ -98,10 +98,9 @@ const insertionIndexCache = new Map<string, InsertionIndex>();
 
 /**
  * Build (or retrieve cached) the insertion index for a given word length.
- * For each base word of length W and each insertion position, checks all 26
- * letters to see if inserting produces a valid (W+1)-letter word.
- *
- * Cost: ~50-100ms per word length, computed once per session.
+ * Remove each position of the (W+1)-letter words, retaining valid W-letter
+ * remainders. This produces every legal insertion with one dictionary probe
+ * per position instead of trying all 26 letters from every base word.
  * Memory: ~1-2 MB per word length.
  */
 export function getInsertionIndex(wordLength: number): InsertionIndex {
@@ -115,20 +114,17 @@ export function getInsertionIndex(wordLength: number): InsertionIndex {
 
   const index: InsertionIndex = new Map();
 
-  for (const word of baseSet) {
-    for (let j = 0; j <= word.length; j++) {
-      for (let c = 65; c <= 90; c++) {
-        const letter = String.fromCharCode(c);
-        const combined = word.slice(0, j) + letter + word.slice(j);
-        if (maxSet.has(combined)) {
-          let targets = index.get(letter);
-          if (!targets) {
-            targets = [];
-            index.set(letter, targets);
-          }
-          targets.push({ baseWord: word, result: combined, position: j });
-        }
+  for (const result of maxSet) {
+    for (let position = 0; position < result.length; position++) {
+      const baseWord = result.slice(0, position) + result.slice(position + 1);
+      if (!baseSet.has(baseWord)) continue;
+      const letter = result[position];
+      let targets = index.get(letter);
+      if (!targets) {
+        targets = [];
+        index.set(letter, targets);
       }
+      targets.push({ baseWord, result, position });
     }
   }
 

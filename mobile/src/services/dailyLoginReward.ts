@@ -8,9 +8,9 @@
  *
  * Local-day bucketing only (services/dateUtils) — never UTC/toISOString.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { getLocalDateString, daysAgoLocal } from './dateUtils';
-import { awardBonusAmber } from './amberCurrency';
+import { awardBonusAmberInTransaction, invalidateProgressCache } from './amberCurrency';
 
 const STORAGE_KEY = 'wordshift_daily_login';
 
@@ -61,26 +61,18 @@ const getDefault = (): DailyLoginState => ({ lastClaimedDate: null, cycleDay: 0 
 
 async function load(): Promise<DailyLoginState> {
   if (cache) return cache;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      cache = JSON.parse(stored);
-      return cache!;
+  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    if (!parsed || !Number.isInteger(parsed.cycleDay) || parsed.cycleDay < 0 || parsed.cycleDay > 7 ||
+        !(parsed.lastClaimedDate === null || /^\d{4}-\d{2}-\d{2}$/.test(parsed.lastClaimedDate))) {
+      throw new Error('Your daily reward record could not be read. Please retry.');
     }
-  } catch {
-    // fall through to default
+    cache = parsed;
+    return cache!;
   }
   cache = getDefault();
   return cache;
-}
-
-async function save(state: DailyLoginState): Promise<void> {
-  cache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Non-critical — the in-memory cache keeps the session consistent.
-  }
 }
 
 /** Test/reset helper — clears the in-memory cache. */
@@ -120,7 +112,7 @@ export function computeNextCycleDay(state: DailyLoginState, today: string): { da
  */
 export async function isDailyLoginRewardAvailable(): Promise<boolean> {
   const state = await load();
-  return state.lastClaimedDate !== getLocalDateString();
+  return !state.lastClaimedDate || state.lastClaimedDate < getLocalDateString();
 }
 
 /**
@@ -130,7 +122,7 @@ export async function isDailyLoginRewardAvailable(): Promise<boolean> {
 export async function peekDailyLoginReward(): Promise<{ day: number; amount: number; reset: boolean } | null> {
   const state = await load();
   const today = getLocalDateString();
-  if (state.lastClaimedDate === today) return null;
+  if (state.lastClaimedDate && state.lastClaimedDate >= today) return null;
   const { day, reset } = computeNextCycleDay(state, today);
   return { day, amount: DAILY_LOGIN_REWARDS[day - 1], reset };
 }
@@ -141,9 +133,22 @@ export async function peekDailyLoginReward(): Promise<{ day: number; amount: num
  * per session at launch.
  */
 export async function claimDailyLoginReward(): Promise<DailyLoginGrant | null> {
+  try {
+    return await runStorageTransaction('daily_login_claim', async () => {
+      invalidateDailyLoginCache();
+      invalidateProgressCache();
+      return claimDailyLoginRewardInTransaction();
+    });
+  } finally {
+    invalidateDailyLoginCache();
+    invalidateProgressCache();
+  }
+}
+
+async function claimDailyLoginRewardInTransaction(): Promise<DailyLoginGrant | null> {
   const state = await load();
   const today = getLocalDateString();
-  if (state.lastClaimedDate === today) return null;
+  if (state.lastClaimedDate && state.lastClaimedDate >= today) return null;
 
   const { day, reset } = computeNextCycleDay(state, today);
   const amount = DAILY_LOGIN_REWARDS[day - 1];
@@ -154,12 +159,12 @@ export async function claimDailyLoginReward(): Promise<DailyLoginGrant | null> {
   const gap = state.lastClaimedDate ? daysAgoLocal(state.lastClaimedDate) : 0;
   const comebackBonus = gap >= COMEBACK_GAP_DAYS ? COMEBACK_BONUS_AMBER : 0;
 
-  const newBalance = await awardBonusAmber(
+  const newBalance = await awardBonusAmberInTransaction(
     amount + comebackBonus,
     comebackBonus > 0 ? 'daily_login_comeback' : 'daily_login'
   );
 
-  await save({ lastClaimedDate: today, cycleDay: day });
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ lastClaimedDate: today, cycleDay: day }));
 
   return { day, amount, comebackBonus, newBalance, reset, isFirstClaim };
 }

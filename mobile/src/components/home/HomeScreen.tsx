@@ -29,6 +29,7 @@ import { CHARACTER_SPRITES } from './AnimalSprite';
 import { DialogueChoicePage, DialogueChoiceEcho } from './DialogueChoicePage';
 import { getQuestArt } from '../questArt';
 import { DialogueBody } from './DialogueBody';
+import { DialogueRevealBody } from './DialogueRevealBody';
 import { CHROME_ICONS, SPOT_ART } from '../ui/chromeIcons';
 import { CandyColors, getDialogueTheme } from '../../theme/colors';
 import { SURFACE, getPressSpring, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
@@ -62,7 +63,6 @@ import {
   markIntroSeen,
   markHouseCompleted,
   markHouseCompletionCelebrated,
-  awardBonusAmber,
   hasSeenChallengeIntro,
   markChallengeIntroSeen,
   hasSeenPitNudge,
@@ -117,6 +117,7 @@ import { adaptAnimalIntroductionLines, hasAnimalConversationArrivalOccurred } fr
 import {
   loadDialogueSessions,
   updatePuzzleCount,
+  updateSessionPhase,
 } from '../../services/dialogueSession';
 
 import { useDialogueFlow } from '../../hooks/useDialogueFlow';
@@ -161,6 +162,9 @@ import { playUiSound, type UiSoundKind } from '../../services/uiSound';
 import { playUiHaptic } from '../../services/uiHaptic';
 import { announceForA11y } from '../../services/a11yAnnounce';
 import { logEvent } from '../../services/eventLogger';
+import { saveWithPlayerRetry } from '../../services/saveRetry';
+import { grantQuestBonus } from '../../services/questBonus';
+import { reportError } from '../../services/errorReporting';
 
 // Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
 const AMBER_ICON = require('../../../assets/ui/amber.png');
@@ -699,6 +703,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const timer = setTimeout(() => setQuietLandingKey(null), 6500);
     return () => clearTimeout(timer);
   }, [landingBoundary, landingInherited, landingCycle]);
+  const [homeLoadError, setHomeLoadError] = useState<string | null>(null);
   const [rooms, setRooms] = useState<Room[]>(homeSceneSnapshot?.rooms ?? []);
   const [animals, setAnimals] = useState<Animal[]>(homeSceneSnapshot?.animals ?? []);
   const [houseGifts, setHouseGifts] = useState<HouseUpgradeGift[]>(homeSceneSnapshot?.gifts ?? []);
@@ -825,7 +830,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // After a quest is claimed, an OPT-IN rewarded ad can double that reward
   // (placement 'quest_bonus'). Holds the just-claimed reward so the button
   // knows how much bonus amber to grant; cleared on double, re-claim, or reopen.
-  const [doubleQuestOffer, setDoubleQuestOffer] = useState<{ questId: string; amber: number } | null>(null);
+  const [doubleQuestOffer, setDoubleQuestOffer] = useState<{ questId: string; amber: number; receiptId: string } | null>(null);
   const [questTab, setQuestTab] = useState<'daily' | 'weekly'>('daily');
   const [showJournalModal, setShowJournalModal] = useState(false);
   const [showSeasonModal, setShowSeasonModal] = useState(false);
@@ -988,8 +993,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // so the freshly-built room is included below and a celebration fires.
     const claimed = await claimReservedUnlockIfReady();
 
-    const [progressData, roomsData, animalsData] = await Promise.all([
-      getFullProgress(),
+    const [progressData] = await Promise.all([getFullProgress(), loadDialogueSessions()]);
+    // Badge availability reads these synchronous mirrors. Warm them before
+    // asking for animals, including on the first home visit after cold boot.
+    updatePuzzleCount(progressData.puzzlesSolved);
+    updateSessionPhase(progressData.currentPhase);
+    const [roomsData, animalsData] = await Promise.all([
       getRoomsWithStatus(),
       getAnimalsWithStatus(),
     ]);
@@ -1015,9 +1024,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // here too (see onUnlockCompleted).
       unlockCompletedRef.current?.();
     }
-
-    // Update puzzle count for dialogue session system
-    updatePuzzleCount(progressData.puzzlesSolved);
 
     setProgress(progressData);
     setRooms(roomsData);
@@ -1089,6 +1095,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const tending = await getTendingLevel();
     setTendingLevel(tending);
 
+    setHomeLoadError(null);
     // Paint-ahead for the next mount (see homeSceneSnapshot). Written last, so
     // only a fully-read scene is ever replayed.
     homeSceneSnapshot = {
@@ -1102,6 +1109,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       tendingLevel: tending,
     };
   }, [refreshUnlockData, reservedArrivalOpacity]);
+
+  const handleHomeLoadFailure = useCallback((error: unknown) => {
+    reportError(error instanceof Error ? error : String(error), { source: 'home_load' });
+    setHomeLoadError('Your house could not be loaded. Check your device storage, then try again.');
+  }, []);
+  const retryHomeLoad = useCallback(() => {
+    void loadAllData().catch(handleHomeLoadFailure);
+  }, [loadAllData, handleHomeLoadFailure]);
 
   // Keep the ref in sync
   useLayoutEffect(() => { loadAllDataRef.current = loadAllData; });
@@ -1214,32 +1229,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [activeHouseGift, loadAllData]);
 
-  // Play the house-completion celebration only once the final animal's intro
-  // dialogue has closed. Completion is detected in the same tick as Bamboo's
-  // purchase, but his intro opens ~300ms later — the 650ms grace lets the
-  // intro claim the screen first, and the effect re-arms when it closes.
-  useEffect(() => {
-    if (!pendingHouseCompletion) return;
-    // Held while any intro dialogue surface is up (same pair the other
-    // one-time home intros gate on).
-    if (showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || activeHouseGift || giftOpening) return;
-    const timer = setTimeout(() => {
-      if (introPresentationRef.current.busy() || introPresentationRef.current.pendingCount() > 0 || introSurfaceBusyRef.current) return;
-      setPendingHouseCompletion(false);
-      // App saves a pending scene before presenting it and acknowledges only
-      // completion. Leaving or restarting during the scene keeps it available.
-      if (onHouseCompleted) {
-        // App plays the full HOUSE_COMPLETION_EVENT cinematic over the home scene.
-        onHouseCompleted();
-      } else {
-        // Fallback (e.g. in isolation/tests): the inline completion modal.
-        setShowHouseCompletion(true);
-        setHouseCompletionTextIndex(0);
-      }
-    }, 650);
-    return () => clearTimeout(timer);
-  }, [pendingHouseCompletion, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, activeHouseGift, giftOpening, storyOverlayActive, showStoryInspection, quietLanding, onHouseCompleted]);
-
   const claimableQuestAmber = useMemo(() => {
     if (!weeklyQuestState || !hasHomeProgress) return 0;
     return getUnclaimedAmber(weeklyQuestState, homePhase);
@@ -1299,9 +1288,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Refresh the storage-backed scene when its stable loader changes.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- The loader awaits authoritative storage before publishing the scene; no synchronous derived state.
-    loadAllData();
-    loadDialogueSessions(); // Load session data
-  }, [loadAllData]);
+    retryHomeLoad();
+  }, [retryHomeLoad]);
 
   // iOS live-region fallback for the dialogue cooldown toast: accessibilityLiveRegion
   // is Android-only, so speak the message through the announce bridge on iOS when
@@ -1312,13 +1300,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (msg) announceForA11y(msg);
   }, [dialogueFlow.cooldownMessage]);
 
+  useEffect(() => {
+    if (dialogueFlow.showDialogue && !dialogueFlow.revealInProgress && !dialogueFlow.choiceOpen) {
+      announceForA11y(dialogueFlow.dialogueText);
+    }
+  }, [dialogueFlow.showDialogue, dialogueFlow.revealInProgress, dialogueFlow.choiceOpen,
+    dialogueFlow.dialogueText, dialogueFlow.revealSource]);
+
   // Reload when an App-level amber-changing modal (Store/Patron) closes over
   // home — without this, a purchased amber pack doesn't register against the
   // next unlock (bar, Reserve/Skip affordability) until the screen remounts.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- An external purchase/restore signal refreshes asynchronously read scene data.
-    if (refreshSignal > 0) loadAllData();
-  }, [refreshSignal, loadAllData]);
+    if (refreshSignal > 0) retryHomeLoad();
+  }, [refreshSignal, retryHomeLoad]);
 
   // Recompute Reserve/Skip affordability the INSTANT the player's amber changes,
   // not only on a full loadAllData. Several home-local paths bump progress.amber
@@ -1329,8 +1324,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // next unlock; it's idempotent, so running it alongside loadAllData is safe.
   useEffect(() => {
     if (homeAmber == null) return;
-    recheckAffordability();
-  }, [homeAmber, recheckAffordability]);
+    void recheckAffordability().catch(handleHomeLoadFailure);
+  }, [homeAmber, recheckAffordability, handleHomeLoadFailure]);
 
   // Onboarding: auto-show invite prompt when data is loaded during home_empty.
   // Deferred ~2.6s so the empty-home reveal (the little den) lands FIRST AND the
@@ -1366,11 +1361,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       } else if (homeEmptyRecoveryAttemptsRef.current < 5) {
         // Unlock data hasn't resolved (or isn't the free invite yet) — reload.
         homeEmptyRecoveryAttemptsRef.current += 1;
-        loadAllData();
+        void loadAllData().catch(handleHomeLoadFailure);
       }
     }, INVITE_PROMPT_SAFETY_DELAY_MS);
     return () => clearTimeout(t);
-  }, [onboardingStep, unlockFlow.showInvitePrompt, unlockFlow.nextUnlock, setShowInvitePrompt, loadAllData]);
+  }, [onboardingStep, unlockFlow.showInvitePrompt, unlockFlow.nextUnlock, setShowInvitePrompt, loadAllData, handleHomeLoadFailure]);
 
   // Challenge Mode intro (one-time, Fox-led, after 15 puzzles).
   useEffect(() => {
@@ -2144,7 +2139,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setQuestReward({ amount: reward.amber, label: questId === 'all' ? `${reward.questIds.length} quests claimed` : 'Claimed', id: questRewardIdRef.current });
       // Bulk collection takes base rewards; separate claims retain their
       // optional single-quest double, never a new multiplied bulk offer.
-      setDoubleQuestOffer(questId === 'all' ? null : { questId, amber: reward.amber });
+      setDoubleQuestOffer(questId === 'all' ? null : { questId, amber: reward.amber, receiptId: `${progress.cycleCount ?? 0}:${questId}` });
       logEvent({ type: 'quest_reward_claimed', data: { questId, amber: reward.amber, questCount: reward.questIds.length } });
       hapticSuccess();
       if (questId !== 'all') runQuestCashOut(questId);
@@ -2161,15 +2156,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // just-claimed reward's amber (reward-only, never phase progress).
   const handleDoubleQuestReward = useCallback(async () => {
     if (!progress || !doubleQuestOffer) return;
-    const { questId, amber } = doubleQuestOffer;
+    const { questId, amber, receiptId } = doubleQuestOffer;
+    const newBalance = await saveWithPlayerRetry(() => grantQuestBonus(receiptId, amber), {
+      title: 'Your quest amber is waiting',
+      message: 'We could not save your amber yet. Free some device storage if needed, then retry the save. You do not need to watch another clip.',
+    });
     setDoubleQuestOffer(null);
-    const newBalance = await awardBonusAmber(amber, 'quest_bonus');
     onAmberChange?.(newBalance);
     setProgress(prev => (prev ? { ...prev, amber: newBalance } : prev));
     questRewardIdRef.current += 1;
     setQuestReward({ amount: amber, label: 'Doubled', id: questRewardIdRef.current });
     logEvent({ type: 'quest_reward_claimed', data: { questId, amber, doubled: true } });
   }, [progress, doubleQuestOffer, onAmberChange]);
+
+  const canStartQuestReward = useCallback(() => !questClaimBusyRef.current, []);
+  const handleQuestRewardBusy = useCallback((busy: boolean) => {
+    questClaimBusyRef.current = busy;
+    setQuestClaimBusy(busy);
+  }, []);
+  const handleQuestRewardError = useCallback((error: unknown) => {
+    reportError(error instanceof Error ? error : String(error), { source: 'quest_bonus' });
+    setQuestClaimError('Could not finish the reward. Please retry; a completed clip never needs to be watched again.');
+  }, []);
+  const handleCloseQuests = useCallback(() => {
+    if (!questClaimBusyRef.current) setShowQuestModal(false);
+  }, []);
 
   const handleOpenJournal = useCallback(() => {
     hapticLight();
@@ -2218,10 +2229,60 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     showJournalModal || showSeasonModal || showUtilityModal || showQuestModal ||
     unlockFlow.showShop || unlockFlow.showRoomUnlock !== null || unlockFlow.showInvitePrompt ||
     showHouseCompletion || journalSpotlightActive || showStoryInspection;
+  const localOverlayActiveRef = useRef(localOverlayActive);
+  useLayoutEffect(() => { localOverlayActiveRef.current = localOverlayActive; }, [localOverlayActive]);
+  // Play the house-completion celebration only once every home surface
+  // has closed. Completion is detected in the same tick as Bamboo's
+  // purchase, but his intro opens ~300ms later — the 650ms grace lets the
+  // intro claim the screen first, and the effect re-arms when it closes.
+  useEffect(() => {
+    if (!pendingHouseCompletion) return;
+    if (localOverlayActive || storyOverlayActive || quietLanding) return;
+    const timer = setTimeout(() => {
+      if (introPresentationRef.current.busy() || introPresentationRef.current.pendingCount() > 0 || introSurfaceBusyRef.current || localOverlayActiveRef.current) return;
+      setPendingHouseCompletion(false);
+      // App saves a pending scene before presenting it and acknowledges only
+      // completion. Leaving or restarting during the scene keeps it available.
+      if (onHouseCompleted) {
+        // App plays the full HOUSE_COMPLETION_EVENT cinematic over the home scene.
+        onHouseCompleted();
+      } else {
+        // Fallback (e.g. in isolation/tests): the inline completion modal.
+        setShowHouseCompletion(true);
+        setHouseCompletionTextIndex(0);
+      }
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [pendingHouseCompletion, localOverlayActive, storyOverlayActive, quietLanding, onHouseCompleted]);
+
   useEffect(() => {
     onOverlayActivityChange?.(localOverlayActive);
     return () => onOverlayActivityChange?.(false);
   }, [localOverlayActive, onOverlayActivityChange]);
+
+  const handleInspectStory = useCallback(() => setShowStoryInspection(true), []);
+  const handlePitPress = useCallback(() => {
+    hapticLight();
+    playUiSound('tap');
+    onOpenPit?.();
+  }, [onOpenPit]);
+
+  // "Visit next friend" chain: offered only at the dialogue session's natural
+  // end (the moment the button reads "Close"), never during onboarding and
+  // never while a one-time intro override owns the dialogue surface. The
+  // resolution is fully synchronous (badge-equivalent availability), so this
+  // costs nothing on the renders where the button cannot appear.
+  const { showDialogue: showResidentDialogue, hasMoreToShow: hasMoreResidentDialogue, getNextAnimalWithNews } = dialogueFlow;
+  const nextFriendWithNews = useMemo(() =>
+    showResidentDialogue &&
+    !hasMoreResidentDialogue &&
+    !isOnboarding &&
+    !introOverrideLines &&
+    !showIntroDialogue
+      ? getNextAnimalWithNews(animals)
+      : null,
+    [showResidentDialogue, hasMoreResidentDialogue, getNextAnimalWithNews,
+      isOnboarding, introOverrideLines, showIntroDialogue, animals]);
 
   if (!progress || rooms.length === 0) {
     // Only reachable on a genuinely cold read (first launch, or right after a
@@ -2229,7 +2290,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // now renders the real house on its first frame. Even here the fill is the
     // destination sky colour rather than the old bright purple card, so the
     // gap reads as the screen it is about to become instead of a flash.
-    return <View style={[styles.loadingContainer, { backgroundColor: PHASE_SKY_FILL[currentPhase] ?? PHASE_SKY_FILL[0] }]} />;
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: PHASE_SKY_FILL[currentPhase] ?? PHASE_SKY_FILL[0] }]}>
+        {homeLoadError && <>
+          <Text accessibilityRole="alert" style={{ padding: 24 }}>{homeLoadError}</Text>
+          <CandyButton label="Retry loading house" phase={currentPhase} onPress={retryHomeLoad} />
+        </>}
+      </View>
+    );
   }
 
   const phaseBgColor = PHASE_SKY_FILL[progress.currentPhase] ?? PHASE_SKY_FILL[0];
@@ -2306,19 +2374,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Phase-aware material for the PLAY dock (candy green → ember → mauve).
   const playDockColors = getPlayDockColors(progress.currentPhase);
-  // "Visit next friend" chain: offered only at the dialogue session's natural
-  // end (the moment the button reads "Close"), never during onboarding and
-  // never while a one-time intro override owns the dialogue surface. The
-  // resolution is fully synchronous (badge-equivalent availability), so this
-  // costs nothing on the renders where the button cannot appear.
-  const nextFriendWithNews =
-    dialogueFlow.showDialogue &&
-    !dialogueFlow.hasMoreToShow &&
-    !isOnboarding &&
-    !introOverrideLines &&
-    !showIntroDialogue
-      ? dialogueFlow.getNextAnimalWithNews(animals)
-      : null;
   const currentJournalSpotlightStep = journalSpotlightStepMeta[
     Math.max(0, Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1))
   ];
@@ -2371,6 +2426,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {(progress.currentStreak > 1 || isStreakAtRisk) && (
               <View
                 style={[styles.streakBadge, isStreakAtRisk && styles.streakAtRiskBadge]}
+                accessible
+                accessibilityRole="text"
                 accessibilityLabel={`${progress.currentStreak} day streak${isStreakAtRisk ? ', at risk' : ''}`}
               >
                 <Image
@@ -2472,7 +2529,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <HouseWorld
           storyKeepsake={storyKeepsake}
           quietNotifications={quietLanding}
-          onInspectStory={() => setShowStoryInspection(true)}
+          onInspectStory={handleInspectStory}
           rooms={rooms}
           animals={animals}
           currentPhase={progress.currentPhase}
@@ -2499,11 +2556,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           savedPanY={initialHousePanY}
           onPanYChange={onHousePanChange}
           pitNeedsAttention={pitNeedsAttention}
-          onPitPress={!isOnboarding && onOpenPit ? () => {
-            hapticLight();
-            playUiSound('tap');
-            onOpenPit();
-          } : undefined}
+          onPitPress={!isOnboarding && onOpenPit ? handlePitPress : undefined}
         />
 
         <View style={styles.homeOverlayColumn} pointerEvents="box-none">
@@ -2641,6 +2694,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.playButtonText}>PLAY</Text>
           </JuicyButton>
         </Animated.View>
+      )}
+
+      {homeLoadError && (
+        <View style={styles.reservedArrivalBanner}>
+          <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.reservedArrivalText}>{homeLoadError}</Text>
+          <CandyButton label="Retry loading house" phase={currentPhase} onPress={retryHomeLoad} />
+        </View>
       )}
 
       {/* Cooldown Message Toast */}
@@ -2856,12 +2916,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       Once landed, the tap is inert (disabled) so a settled
                       line doesn't flash touch feedback for no reason. */}
                   <TouchableOpacity
+                    testID="resident-dialogue-bubble"
                     style={styles.dialogueBubble}
                     activeOpacity={0.85}
                     disabled={!dialogueFlow.revealInProgress}
                     onPress={dialogueFlow.completeReveal}
                     accessibilityRole="button"
-                    accessibilityLabel="Show full line"
+                    accessibilityLabel={dialogueFlow.dialogueText}
+                    accessibilityHint={dialogueFlow.revealInProgress ? 'Show full line' : undefined}
+                    accessibilityActions={dialogueFlow.revealInProgress ? [{ name: 'activate', label: 'Show full line' }] : []}
+                    onAccessibilityAction={dialogueFlow.completeReveal}
                   >
                     <NineSliceFrame
                       skin={pixelSkin.card}
@@ -2869,7 +2933,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       edgeDp={CARD_EDGE_DP}
                       fillColor={pixelSkin.fillCard}
                     />
-                    <DialogueBody text={dialogueFlow.revealedText} style={[styles.dialogueText, { color: panelSt.body }]} />
+                    <DialogueRevealBody
+                      text={dialogueFlow.dialogueText}
+                      source={dialogueFlow.revealSource}
+                      revealing={dialogueFlow.revealInProgress}
+                      charMs={dialogueFlow.revealCharMs}
+                      onComplete={dialogueFlow.completeReveal}
+                      style={[styles.dialogueText, { color: panelSt.body }]}
+                    />
                   </TouchableOpacity>
                   {/* One-time pointer under the FIRST reveal (ftue-6): the
                       bubble has always been tappable to land the line at
@@ -3134,6 +3205,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
               Your Amber: <AmberInline /> {progress.amber}
             </Text>
+            {unlockFlow.purchaseError && (
+              <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.shopSubtitle, { color: panelSt.dangerText }]}>
+                {unlockFlow.purchaseError}
+              </Text>
+            )}
             <ScrollView style={styles.shopScroll} contentContainerStyle={styles.shopScrollContent}>
 
             {/* Next unlock */}
@@ -3288,7 +3364,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         transparent
         statusBarTranslucent
         animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'}
-        onRequestClose={() => setShowQuestModal(false)}
+        onRequestClose={handleCloseQuests}
       >
         <View
           style={[styles.modalOverlay, { backgroundColor: st.overlay }]}
@@ -3299,7 +3375,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <Pressable
             style={StyleSheet.absoluteFill}
-            onPress={() => setShowQuestModal(false)}
+            onPress={handleCloseQuests}
             accessibilityLabel="Close quests"
             accessibilityRole="button"
           />
@@ -3336,7 +3412,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 label={`Watch to double it · +${doubleQuestOffer.amber}`}
                 phase={progress.currentPhase}
                 surface={progress.currentPhase >= 4 ? 'dark' : 'light'}
-                onReward={() => { handleDoubleQuestReward().catch(() => {}); }}
+                onReward={handleDoubleQuestReward}
+                completeAfterUnmount
+                canStart={canStartQuestReward}
+                onBusyChange={handleQuestRewardBusy}
+                onRewardError={handleQuestRewardError}
                 style={styles.questDoubleButton}
               />
             )}
@@ -3467,7 +3547,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               phase={progress.currentPhase}
                 hostDark={dtHostDark}
               style={styles.closeAction}
-              onPress={() => setShowQuestModal(false)}
+              onPress={handleCloseQuests}
               accessibilityLabel="Close quests"
             />
           </SpringIn>
@@ -3524,7 +3604,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={[styles.amberBalance, { color: panelSt.amberText }]}>Your Amber: <AmberInline /> {progress.amber}</Text>
 
                 {unlockFlow.purchaseError && (
-                  <Text style={[styles.shopSubtitle, { color: panelSt.dangerText, marginTop: 8, fontWeight: '600', fontFamily: BODY_FONT_BOLD }]}>
+                  <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.shopSubtitle, { color: panelSt.dangerText, marginTop: 8, fontWeight: '600', fontFamily: BODY_FONT_BOLD }]}>
                     {unlockFlow.purchaseError}
                   </Text>
                 )}
@@ -3682,6 +3762,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               edgeDp={PANEL_EDGE_DP}
               fillColor={pixelSkin.fill}
             />
+            {unlockFlow.purchaseError && (
+              <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.shopSubtitle, { color: panelSt.dangerText }]}>
+                {unlockFlow.purchaseError}
+              </Text>
+            )}
             {unlockFlow.nextUnlock && unlockFlow.nextUnlock.type === 'character' && (() => {
               const animalData = ANIMALS.find(a => a.id === unlockFlow.nextUnlock!.targetId);
               const animalEmoji = animalData ? ANIMAL_EMOJIS[animalData.type] : '🐾';
@@ -3741,7 +3826,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     style={styles.inviteAction}
                     onPress={async () => {
                       const suppressIntro = onboardingStep === 'home_empty';
-                      await unlockFlow.handlePurchase(unlockFlow.nextUnlock!, { suppressIntro });
+                      const purchased = await unlockFlow.handlePurchase(unlockFlow.nextUnlock!, { suppressIntro });
+                      if (!purchased) return;
                       setShowInvitePrompt(false);
                       // During onboarding, advance to fox_invited step
                       // (skips the standard intro dialogue — FoxGuide handles it)

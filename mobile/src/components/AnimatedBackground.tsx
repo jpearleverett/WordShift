@@ -393,7 +393,7 @@ interface AnimatedBackgroundProps {
   phase?: number;
 }
 
-export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 0 }) => {
+export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = React.memo(function AnimatedBackground({ phase = 0 }) {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
   const reducedMotion = useReducedMotion();
   const theme = useMemo(() => getPhaseTheme(phase), [phase]);
@@ -537,7 +537,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
 
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -117,8 +117,10 @@ describe('the house-completion cinematic survives an interrupted delivery', () =
   });
 
   test('Home requests the ceremony without marking an unseen scene celebrated', () => {
-    const effect = HOME.slice(HOME.indexOf('if (!pendingHouseCompletion) return;'), HOME.indexOf('const claimableQuestAmber'));
+    const effect = HOME.slice(HOME.indexOf('if (!pendingHouseCompletion) return;'), HOME.indexOf('onOverlayActivityChange?.(localOverlayActive)'));
     expect(effect).toContain('onHouseCompleted();');
+    expect(effect).toContain('if (localOverlayActive || storyOverlayActive || quietLanding) return;');
+    expect(effect).toContain('localOverlayActiveRef.current');
     expect(effect).not.toContain('markHouseCompletionCelebrated()');
     expect(APP).toContain('onHouseCompleted={showHouseCeremony}');
     const request = APP.slice(APP.indexOf('const showHouseCeremony = useCallback'), APP.indexOf('const launchColdOpenPuzzle'));
@@ -197,3 +199,16 @@ describe('SettingsScreen: the destructive control and the deliberate restores', 
   });
 });
 
+
+
+describe('home badges warm persisted session state before their first evaluation', () => {
+  test('count, phase and session cache are ready before the animal status read', () => {
+    const load = HOME.slice(HOME.indexOf('const loadAllData = useCallback'), HOME.indexOf('const handleHomeLoadFailure'));
+    const readAnimals = load.indexOf('getAnimalsWithStatus()');
+    for (const required of ['await Promise.all([getFullProgress(), loadDialogueSessions()])',
+      'updatePuzzleCount(progressData.puzzlesSolved)', 'updateSessionPhase(progressData.currentPhase)']) {
+      expect(load.indexOf(required)).toBeGreaterThan(-1);
+      expect(load.indexOf(required)).toBeLessThan(readAnimals);
+    }
+  });
+});

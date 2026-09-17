@@ -61,6 +61,7 @@ jest.mock('react', () => ({
     return refStore.get(idx)!;
   },
   useCallback: (fn: Function, _deps: unknown[]) => fn,
+  useMemo: (fn: () => unknown) => fn(),
 }));
 
 jest.mock('react-native', () => ({
@@ -170,6 +171,7 @@ jest.mock('../services/sacrifice', () => ({
 }));
 
 jest.mock('../services/tending', () => ({
+  hasNewPhase5Line: jest.requireActual('../services/tending').hasNewPhase5Line,
   loadTendingState: jest.fn(async () => ({ level: 0, totalSpent: 0, caughtUp: {} })),
   selectPhase5Dialogue: jest.fn(() => ({ text: '', isNew: false, nextCaughtUp: 0 })),
   setPhase5CaughtUp: jest.fn(async () => {}),
@@ -1092,16 +1094,16 @@ describe('dialogue reveal visit ownership', () => {
       let hook = render();
       await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
       hook = render();
-      expect(hook.revealedText).toBe('');
+      expect(hook.revealInProgress).toBe(true);
       hook.completeReveal();
       hook = render();
-      expect(hook.revealedText).toBe(hook.dialogueText);
+      expect(hook.revealInProgress).toBe(false);
       await hook.handleCloseDialogue();
       hook = render();
       await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
       hook = render();
       expect(hook.dialogueText).toBe(SHORT_LINE);
-      expect(hook.revealedText).toBe('');
+      expect(hook.revealInProgress).toBe(true);
       expect(hook.isTalking).toBe(false);
     } finally {
       settings.getSettingsSync.mockReturnValue({ reducedMotion: true });

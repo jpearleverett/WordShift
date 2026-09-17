@@ -174,9 +174,9 @@ test('without a linked id, a receipt for the same product at the same moment is 
   await initializeStorePurchaseHistory([]);
   // A lagging customer info gave the checkout nothing to link. The receipt then
   // arrives seconds later under RevenueCat's id, dated at the purchase.
-  install(async () => ({ success: true, transactionId: 'GPA.order-3' }));
-  const result = await purchaseConsumable(PRODUCT_IDS.AMBER_MEDIUM);
   const purchasedAt = Date.now();
+  install(async () => ({ success: true, transactionId: 'GPA.order-3', purchasedAt }));
+  const result = await purchaseConsumable(PRODUCT_IDS.AMBER_MEDIUM);
   await reconcileStorePurchaseHistory([receipt('rc-receipt-3', PRODUCT_IDS.AMBER_MEDIUM, purchasedAt)]);
   // Before the caller settles: the pending grant covers it (no second grant).
   expect((await reconcilePendingConsumableGrants()).map(g => g.grantId)).toEqual(['GPA.order-3']);
@@ -302,4 +302,33 @@ test('a verified known purchase grants its own item when customer info lists onl
   expect(await hasEntitlement(ENTITLEMENTS.ADFREE)).toBe(true);
   invalidateEntitlementsCache();
   expect(await hasEntitlement(ENTITLEMENTS.PATRON)).toBe(true);
+});
+
+test.each([false, true])('store-clock coverage survives a fast device clock and a delayed receipt (settled=%s)', async settled => {
+  const storeTime = Date.now() - 6 * 60_000;
+  await initializeStorePurchaseHistory([]);
+  install(async () => ({ success: true, transactionId: 'fast-clock-order', purchasedAt: storeTime }));
+  const purchase = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+  if (settled) await settleConsumableGrant(purchase.grantId!);
+  // The store-time match lives on disk even if the process dies before the
+  // history listener. Neither a pending nor an already settled grant is doubled.
+  expect(JSON.parse((await NativeStorage.getItem('wordshift_iap_checkout_receipts'))!)).toEqual([
+    expect.objectContaining({ grantId: 'fast-clock-order', purchasedAt: storeTime }),
+  ]);
+  await initializeStorePurchaseHistory([receipt('fast-clock-rc', PRODUCT_IDS.AMBER_SMALL, storeTime)]);
+  await reconcileStorePurchaseHistory([receipt('fast-clock-rc', PRODUCT_IDS.AMBER_SMALL, storeTime)]);
+  await settleConsumableGrant(purchase.grantId!);
+  expect(await getAmberBalance()).toBe(purchase.reward!.amount);
+  await reconcileStorePurchaseHistory([receipt('fast-clock-rc', PRODUCT_IDS.AMBER_SMALL, storeTime)]);
+  expect(await getAmberBalance()).toBe(purchase.reward!.amount);
+});
+
+test('a checkout already linked to one receipt cannot swallow a second near-time purchase', async () => {
+  const storeTime = Date.now() - 6 * 60_000;
+  await initializeStorePurchaseHistory([]);
+  install(async () => ({ success: true, transactionId: 'one-order', purchasedAt: storeTime, linkedTransactionIds: ['one-rc'] }));
+  const purchase = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+  await settleConsumableGrant(purchase.grantId!);
+  await reconcileStorePurchaseHistory([receipt('two-rc', PRODUCT_IDS.AMBER_SMALL, storeTime + 500)]);
+  expect(await getAmberBalance()).toBe(purchase.reward!.amount + AMBER_PACK_GRANTS.small);
 });

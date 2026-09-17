@@ -1,8 +1,9 @@
 import { Share, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { Difficulty } from '../types';
 import { incrementShareCount } from './achievements';
 import { PLAY_STORE_URL } from '../constants/links';
+import { saveWithPlayerRetry } from './saveRetry';
 
 /**
  * Share results system for WordShift
@@ -408,21 +409,24 @@ export async function isDailyShareBonusAvailable(): Promise<boolean> {
 
 /**
  * Credit a small amber bonus for the first completed share of the day.
- * Returns the amount awarded (0 if already claimed today or on failure).
+ * Returns the amount awarded (0 if already claimed today). Storage failures
+ * propagate so the completed share's reward can be retried.
  */
 export async function maybeAwardDailyShareBonus(): Promise<number> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Preserve the economy import-cycle boundary.
+  const { awardBonusAmberInTransaction, invalidateProgressCache } = require('./amberCurrency');
   try {
-    const dayKey = localDayKey();
-    const last = await AsyncStorage.getItem(SHARE_BONUS_KEY);
-    if (last === dayKey) return 0;
-    await AsyncStorage.setItem(SHARE_BONUS_KEY, dayKey);
-    // Lazy require keeps this module free of an amberCurrency import cycle
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
-    const { awardBonusAmber } = require('./amberCurrency');
-    await awardBonusAmber(DAILY_SHARE_BONUS_AMBER, 'daily_share');
-    return DAILY_SHARE_BONUS_AMBER;
-  } catch {
-    return 0;
+    return await runStorageTransaction('daily_share_bonus', async () => {
+      invalidateProgressCache();
+      const dayKey = localDayKey();
+      const last = await AsyncStorage.getItem(SHARE_BONUS_KEY);
+      if (last === dayKey) return 0;
+      await AsyncStorage.setItem(SHARE_BONUS_KEY, dayKey);
+      await awardBonusAmberInTransaction(DAILY_SHARE_BONUS_AMBER, 'daily_share');
+      return DAILY_SHARE_BONUS_AMBER;
+    });
+  } finally {
+    invalidateProgressCache();
   }
 }
 
@@ -433,7 +437,10 @@ export async function maybeAwardDailyShareBonus(): Promise<number> {
  */
 export async function recordShareSuccess(): Promise<void> {
   await incrementShareCount();
-  await maybeAwardDailyShareBonus();
+  await saveWithPlayerRetry(maybeAwardDailyShareBonus, {
+    title: 'Your share reward is waiting',
+    message: 'We could not save your amber. Free some device storage if it is full, then retry.',
+  });
 }
 
 /**

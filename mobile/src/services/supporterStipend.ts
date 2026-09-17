@@ -94,7 +94,7 @@ export async function clearSupporterState(): Promise<void> {
 export async function isSupporterStipendDue(): Promise<boolean> {
   if (!isSupporterSync()) return false;
   const state = await load();
-  return state.lastStipendMonth !== getLocalMonthString();
+  return !state.lastStipendMonth || state.lastStipendMonth < getLocalMonthString();
 }
 
 /**
@@ -116,7 +116,7 @@ export async function claimSupporterStipendIfDue(): Promise<SupporterStipendGran
       if (!isSupporterSync()) return null;
       const state = await load();
       const month = getLocalMonthString();
-      if (state.lastStipendMonth === month) return null;
+      if (state.lastStipendMonth && state.lastStipendMonth >= month) return null;
       const newBalance = await awardBonusAmberInTransaction(SUPPORTER_MONTHLY_AMBER, 'supporter_stipend');
       await save({ lastStipendMonth: month });
       return { amount: SUPPORTER_MONTHLY_AMBER, newBalance, month };

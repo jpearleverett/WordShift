@@ -62,7 +62,7 @@ describe('the victory confetti is mounted ABOVE the results scrim', () => {
     // The nearest pointerEvents="none" before the mount is its own wrapper
     // (within a few lines), not some unrelated element far above.
     expect(confettiAt - wrapperAt).toBeLessThan(200);
-    expect(APP.indexOf('<GameAlertModal')).toBeGreaterThan(confettiAt);
+    expect(APP.lastIndexOf('<GameAlertModal')).toBeGreaterThan(confettiAt);
   });
 
   test('StarBurst stays on the puzzle screen (above the board, under the modals)', () => {
@@ -211,6 +211,6 @@ describe('first-showing receipts ride the right surfaces', () => {
     expect(APP).toMatch(/if \(result\.formedWord && !result\.resonant && !puzzle\.isFinalBoard\) \{[\s\S]*?consumeCosmeticFirstShowing\('spark'\)/);
   });
   test('the confetti receipt is a receipt-priority victory toast gated on the confetti actually falling', () => {
-    expect(APP).toMatch(/if \(!wasFinalBoard && !isSilentVictoryBeat\(completedTotal\)\) \{[\s\S]*?consumeCosmeticFirstShowing\('confetti'\)[\s\S]*?enqueueVictoryToast\(getCosmeticFirstShowingLine\(receiptPhase, name\), 'receipt'\)/);
+    expect(APP).toMatch(/if \(!wasFinalBoard && !isSilentVictoryBeat\(completedTotal\)\) \{[\s\S]*?peekCosmeticFirstShowing\('confetti'\)[\s\S]*?enqueueVictoryToast\(getCosmeticFirstShowingLine\(receiptPhase, receipt.name\), 'receipt',/);
   });
 });

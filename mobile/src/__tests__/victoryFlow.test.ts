@@ -27,6 +27,7 @@ function rewindHookIndices() {
 }
 
 jest.mock('react', () => ({
+  useMemo: (factory: () => unknown) => factory(),
   useState: (initial: unknown) => {
     const idx = stateIndex++;
     if (!stateStore.has(idx)) {

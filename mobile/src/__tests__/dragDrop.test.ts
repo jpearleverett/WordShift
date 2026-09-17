@@ -108,18 +108,31 @@ describe('computeBoardScale', () => {
     expect(computeBoardScale(441, 4)).toBe(1);
   });
 
-  it.each([320, 360, 390, 400, 768])('fits independently measured row footprints at width %i', width => {
+  it.each([320, 360, 390, 400, 768])('fits every rendered row state at width %i', width => {
     for (const base of [4, 5, 6]) {
-      const widest = base + 1;
-      // Rendered tree: an 18dp slot (14dp on a compact row) + two 2dp outer
-      // margins - two 1dp arc margins; a 52dp tile + two 3dp margins - two 3dp
-      // arc margins (42 + 2x1 - 6 on a compact row). The row keeps 4dp margin
-      // + 4dp padding each side, so the inner width is `width - 16`.
-      const slotCell = widest >= 6 ? 14 + 4 - 2 : 18 + 4 - 2;
-      const letterCell = widest >= 6 ? 42 + 2 - 6 : 52 + 6 - 6;
-      const rendered = (widest + 1) * slotCell + widest * letterCell;
-      expect(rendered * computeBoardScale(width, base)).toBeLessThanOrEqual(width - 16 + 0.00001);
+      for (const doubleShift of [false, true]) {
+        const scale = computeBoardScale(width, base, doubleShift);
+        // Measured from Row's actual live-length compact rule: the fan exists
+        // before insertion (and after drop one for Double Shift). Completed
+        // rows have no slots. gameArea adds 8dp each side, row adds 4+4 each.
+        for (const liveLength of doubleShift ? [base, base + 1] : [base]) {
+          const compact = liveLength >= 6;
+          const slotCell = compact ? 14 + 4 - 2 : 18 + 4 - 2;
+          const letterCell = compact ? 42 + 2 - 6 : 52 + 6 - 6;
+          const fanWidth = (liveLength + 1) * slotCell + liveLength * letterCell;
+          expect(fanWidth * scale).toBeLessThanOrEqual(width - 32 + 0.00001);
+        }
+        const finalLength = base + (doubleShift ? 2 : 1);
+        const plainWidth = finalLength * (finalLength >= 6 ? 42 + 2 : 52 + 6);
+        expect(plainWidth * scale).toBeLessThanOrEqual(width - 32 + 0.00001);
+      }
     }
+  });
+
+  it('fits the noncompact first-row fan when EXPERT reverses back up', () => {
+    const fiveLetterFan = 6 * 20 + 5 * 52;
+    const scale = computeBoardScale(360, 6, false, true);
+    expect(fiveLetterFan * scale).toBeLessThanOrEqual(328);
   });
 
   // accessibility-devices-1: the 6-letter tier (EXPERT + every Sunday daily)
@@ -134,8 +147,8 @@ describe('computeBoardScale', () => {
     expect(52 * s).toBeGreaterThanOrEqual(44); // compact tile height
   });
 
-  it('lets a 5-letter board fit a 360dp phone unscaled and a 4-letter board above 0.9', () => {
-    expect(computeBoardScale(360, 5)).toBe(1);
+  it('fits the wide five-letter fan on a 360dp phone and keeps four-letter boards full size', () => {
+    expect(computeBoardScale(360, 5)).toBeCloseTo(328 / 380);
     expect(computeBoardScale(360, 4)).toBeGreaterThanOrEqual(0.9);
   });
 

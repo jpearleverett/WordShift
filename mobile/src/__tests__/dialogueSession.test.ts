@@ -364,3 +364,16 @@ describe('cooldown lifecycle', () => {
     expect(result3.available).toBe(true);
   });
 });
+
+
+test('an established cold-start session becomes badge-available when its persisted count and phase are warmed', async () => {
+  await AsyncStorage.setItem('wordshift_dialogue_sessions', JSON.stringify([{
+    animalId: 'fox', dialoguesInSession: 5, puzzlesAtSessionEnd: 85,
+    sessionsCompleted: GRACE_SESSIONS + 1,
+  }]));
+  await loadDialogueSessions();
+  expect(isOnCooldown('fox')).toBe(true);
+  updatePuzzleCount(89);
+  updateSessionPhase(2);
+  expect(isOnCooldown('fox')).toBe(false);
+});

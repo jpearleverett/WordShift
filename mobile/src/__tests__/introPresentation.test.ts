@@ -68,7 +68,7 @@ it('wires opening, pending arrivals, and stale-save guards into the actual HomeS
   expect(opening).toContain('adaptAnimalIntroductionLines(animal.type, normalLines, freshProgress.currentPhase, hasAnimalConversationArrivalOccurred(freshProgress))');
   expect(home).toContain('onIntroduction: presentAnimalIntroduction');
   expect(home).not.toMatch(/getCatchupIntroDialogue|presentAnimalAcquaintance|Tell me about yourself/);
-  const completion = home.slice(home.indexOf('// Play the house-completion'), home.indexOf('const claimableQuestAmber'));
+  const completion = home.slice(home.indexOf('const localOverlayActive ='), home.indexOf('onOverlayActivityChange?.(localOverlayActive)'));
   expect(completion).toContain('introOpening || pendingAnimalIntroCount > 0');
   expect(completion).toContain('introPresentationRef.current.busy()');
   const advance = home.slice(home.indexOf('const handleAdvanceIntroDialogue'), home.indexOf('// Handle closing intro dialogue'));

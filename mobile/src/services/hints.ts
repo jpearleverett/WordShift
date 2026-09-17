@@ -13,7 +13,7 @@
  * `handleHint` callback can read and consume without awaiting storage.
  */
 
-import AsyncStorage, { runStorageTransaction, isStorageTransactionActive } from './persistenceStorage';
+import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
 import { STARTING_FREE_HINTS } from '../constants/gameBalance';
 
 const STORAGE_KEY = 'wordshift_hints';
@@ -39,19 +39,16 @@ function mirror(state: HintState): void {
 
 async function load(): Promise<HintState> {
   if (cache) return cache;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed.balance === 'number') {
-        cache = { balance: parsed.balance, seededFree: parsed.seededFree === true };
-        mirror(cache);
-        return cache;
-      }
+  const stored = await AsyncStorage.getItem(STORAGE_KEY);
+  if (stored !== null) {
+    const parsed: unknown = JSON.parse(stored);
+    if (!parsed || typeof parsed !== 'object' || !('balance' in parsed) ||
+        typeof parsed.balance !== 'number' || !Number.isSafeInteger(parsed.balance) || parsed.balance < 0) {
+      throw new Error('Your saved hints could not be read. Please try again.');
     }
-  } catch (error) {
-    if (isStorageTransactionActive()) throw error;
-    /* ignore — fall through to default */
+    cache = { balance: parsed.balance, seededFree: 'seededFree' in parsed && parsed.seededFree === true };
+    mirror(cache);
+    return cache;
   }
   cache = getDefault();
   mirror(cache);
@@ -64,7 +61,7 @@ async function load(): Promise<HintState> {
  * The mirror is ZEROED, not left stale, deliberately: a stale mirror would let
  * the player spend against a balance the restore may have lowered. That makes
  * the re-warm mandatory rather than optional, and it lives at the restore
- * boundary (cloudSave.restoreFromCloudData awaits initHints right after this)
+ * boundary (cloudSave.refreshRestoredServiceCaches awaits initHints after this)
  * because nothing on any live path calls back into `load()` — initHints is
  * bootstrap-only and refreshHintBalance only re-reads this mirror. Without
  * that re-warm the HINT button read 0 for the rest of the session and the app
@@ -92,14 +89,12 @@ async function save(): Promise<void> {
  */
 export async function initHints(): Promise<HintState> {
   const state = await load();
-  if (!state.seededFree) {
-    state.balance += STARTING_FREE_HINTS;
-    state.seededFree = true;
-    cache = state;
-    mirror(state);
-    await save();
-  }
-  return state;
+  if (state.seededFree) return state;
+  const seeded = { balance: state.balance + STARTING_FREE_HINTS, seededFree: true };
+  cache = seeded;
+  mirror(seeded);
+  await save();
+  return seeded;
 }
 
 /** Synchronous balance (off the in-memory mirror; 0 until warmed). */
@@ -124,16 +119,20 @@ export function hasHintSync(): boolean {
  * background. Returns false (and changes nothing) when the balance is empty.
  */
 export function consumeHintSync(): boolean {
-  if (!cache) {
-    // Cache not warmed yet — fall back to the mirror so we never over-spend.
-    if (syncBalance <= 0) return false;
-  }
-  const current = cache ? cache.balance : syncBalance;
-  if (current <= 0) return false;
-  const next = current - 1;
-  if (cache) cache.balance = next;
-  syncBalance = next;
-  save().catch(() => {});
+  const previous = cache;
+  if (!previous || previous.balance <= 0) return false;
+  const spent = { ...previous, balance: previous.balance - 1 };
+  cache = spent;
+  mirror(spent);
+  // A failed debit must not erase every remaining paid hint. Roll back only
+  // this exact optimistic state; a later spend/grant/restore owns its mirror.
+  // Keep the snapshot immutable so a delayed write cannot serialize a newer grant.
+  void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(spent)).catch(() => {
+    if (cache === spent) {
+      cache = previous;
+      mirror(previous);
+    }
+  });
   return true;
 }
 
@@ -151,11 +150,11 @@ export async function addHints(amount: number, source?: string): Promise<number>
 export async function addHintsInTransaction(amount: number, _source?: string): Promise<number> {
   if (amount <= 0) return getHintBalance();
   const state = await load();
-  state.balance += amount;
-  cache = state;
-  mirror(state);
+  const next = { ...state, balance: state.balance + amount };
+  cache = next;
+  mirror(next);
   await save();
-  return state.balance;
+  return next.balance;
 }
 
 /**
@@ -174,9 +173,8 @@ export const BONUS_HINT_SOFT_CAP = 10;
 export async function grantBonusHint(_source: string): Promise<boolean> {
   const state = await load();
   if (state.balance >= BONUS_HINT_SOFT_CAP) return false;
-  state.balance += 1;
-  cache = state;
-  mirror(state);
+  cache = { ...state, balance: state.balance + 1 };
+  mirror(cache);
   await save();
   return true;
 }

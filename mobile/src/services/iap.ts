@@ -15,6 +15,7 @@
 
 import AsyncStorage, { runStorageTransaction, isStorageTransactionActive } from './persistenceStorage';
 import { saveWithPlayerRetry } from './saveRetry';
+import { refreshEquippedOwnership } from './cosmetics';
 import { claimSupporterStipendIfDue } from './supporterStipend';
 import { awardBonusAmberInTransaction, getAmberBalance, invalidateProgressCache } from './amberCurrency';
 import { addHintsInTransaction, getHintBalance, invalidateHintsCache } from './hints';
@@ -196,6 +197,8 @@ export interface PurchaseResult {
    * a consumable grant is deduped against the exact store transaction.
    */
   transactionId?: string;
+  /** Verified store timestamp, never the device checkout clock. */
+  purchasedAt?: number;
   /**
    * OTHER ids the store's receipt history uses for this SAME purchase. On
    * Google Play, RevenueCat's checkout result carries the Play order id while
@@ -414,6 +417,8 @@ export interface PendingConsumableGrant {
   /** Reward to apply (already includes the first-purchase 2x when applicable). */
   reward: ConsumableReward;
   purchasedAt: number;
+  /** Absent only on legacy/device-dated grants; never compare those to store time. */
+  storePurchasedAt?: number;
   /** True when this grant's amber amount includes the one-time first-purchase 2x. */
   firstPurchaseDoubled?: boolean;
   /**
@@ -465,6 +470,8 @@ interface GrantIntent {
   productId: ProductId;
   reward: ConsumableReward;
   transactionId?: string;
+  /** Verified store timestamp, never the device checkout clock. */
+  purchasedAt?: number;
   /**
    * Receipt-history ids that describe this same purchase under another name
    * (see PurchaseResult.linkedTransactionIds; for the starter pack each id
@@ -476,32 +483,32 @@ interface GrantIntent {
   firstPurchaseDoubled: boolean;
 }
 
-/**
- * A recovered receipt is also treated as covered when a grant for the same
- * product was recorded within this window of its store purchase time. This is
- * the belt-and-braces behind the linked ids above: if the checkout result's
- * customer info lagged behind the purchase and no linked id could be captured,
- * the receipt still cannot re-credit a purchase this device already granted.
- * Sixty seconds tolerates the sheet-to-persist delay plus modest clock skew
- * between the device clock (grant time) and the store's purchase time, while
- * staying far below any plausible repeat purchase of the same pack.
- */
-export const RECEIPT_MATCH_WINDOW_MS = 60_000;
+/** Store payloads may round the same purchase time to whole seconds. */
+export const RECEIPT_MATCH_WINDOW_MS = 1000;
+const CHECKOUT_RECEIPTS_KEY = 'wordshift_iap_checkout_receipts';
+interface CheckoutReceipt {
+  grantId: string;
+  productId: ProductId;
+  purchasedAt: number;
+  linkedIds: string[];
+}
+async function loadCheckoutReceipts(): Promise<CheckoutReceipt[]> {
+  const raw = await AsyncStorage.getItem(CHECKOUT_RECEIPTS_KEY);
+  if (raw === null) return [];
+  const receipts: unknown = JSON.parse(raw);
+  if (!Array.isArray(receipts) || !receipts.every(item => item && typeof item.grantId === 'string' &&
+      typeof item.productId === 'string' && Number.isFinite(item.purchasedAt) &&
+      Array.isArray(item.linkedIds) && item.linkedIds.every((id: unknown) => typeof id === 'string'))) {
+    throw new Error('Your purchase receipts need recovery');
+  }
+  return receipts;
+}
 
-interface CheckoutReceipt { productId: ProductId; purchasedAt: number }
-/**
- * Checkout grants persisted THIS session (product + time only). Settled grants
- * leave the pending ledger, so once the caller has credited a purchase the
- * time-window guard needs this in-memory record to recognise its late receipt
- * (the SDK's customer-info listener fires seconds after every checkout).
- */
-const sessionCheckoutReceipts: CheckoutReceipt[] = [];
-const SESSION_CHECKOUT_RECEIPT_CAP = 32;
-
-function receiptCoveredByGrant(transaction: StorePurchaseTransaction, pending: PendingConsumableGrant[]): boolean {
-  const matches = (grant: CheckoutReceipt) => grant.productId === transaction.productId &&
-    Math.abs(grant.purchasedAt - transaction.purchasedAt) <= RECEIPT_MATCH_WINDOW_MS;
-  return pending.some(matches) || sessionCheckoutReceipts.some(matches);
+function receiptCoveredByGrant(transaction: StorePurchaseTransaction, receipts: CheckoutReceipt[]): CheckoutReceipt[] {
+  // A checkout may acquire one receipt-history alias. Once linked, it cannot
+  // accidentally swallow a distinct repeat purchase of the same pack.
+  return receipts.filter(grant => grant.productId === transaction.productId && grant.linkedIds.length === 0 &&
+    Math.abs(grant.purchasedAt - transaction.purchasedAt) <= RECEIPT_MATCH_WINDOW_MS);
 }
 
 async function persistPendingConsumableGrants(entries: GrantIntent[]): Promise<string[]> {
@@ -510,7 +517,8 @@ async function persistPendingConsumableGrants(entries: GrantIntent[]): Promise<s
     const linkedIds = (entry.linkedTransactionIds ?? [])
       .filter(id => typeof id === 'string' && id.length > 0 && id !== grantId);
     return {
-      grantId, productId: entry.productId, reward: entry.reward, purchasedAt: Date.now(),
+      grantId, productId: entry.productId, reward: entry.reward, purchasedAt: entry.purchasedAt ?? Date.now(),
+      ...(Number.isFinite(entry.purchasedAt) ? { storePurchasedAt: entry.purchasedAt } : {}),
       ...(entry.firstPurchaseDoubled ? {firstPurchaseDoubled:true} : {}),
       ...(linkedIds.length > 0 ? {linkedIds} : {}),
     };
@@ -518,20 +526,20 @@ async function persistPendingConsumableGrants(entries: GrantIntent[]): Promise<s
   // Retry storage only; never call the store purchase API a second time.
   await saveWithPlayerRetry(async () => { try { await runStorageTransaction('paid_grant_intent', async () => {
     const grants = await loadPendingGrants();
+    const receipts = await loadCheckoutReceipts();
     const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
     for (const intent of intents) {
+      if (intent.storePurchasedAt !== undefined && !receipts.some(receipt => receipt.grantId === intent.grantId)) {
+        receipts.push({ grantId: intent.grantId, productId: intent.productId,
+          purchasedAt: intent.storePurchasedAt, linkedIds: intent.linkedIds ?? [] });
+      }
       if (!applied.has(intent.grantId) && !grants.some(grant => grant.grantId===intent.grantId)) grants.push(intent);
     }
     await savePendingGrants(grants);
+    await AsyncStorage.setItem(CHECKOUT_RECEIPTS_KEY, JSON.stringify(receipts));
     if (entries.some(entry=>entry.firstPurchaseDoubled)) await markAmberPurchaseMade();
     if (entries.some(entry=>entry.productId===PRODUCT_IDS.STARTER_PACK)) await grantEntitlements([ENTITLEMENTS.STARTER_PACK]);
   }); } catch(error) { invalidateEntitlementsCache(); throw error; } }, PAID_SAVE_COPY);
-  for (const intent of intents) {
-    sessionCheckoutReceipts.push({ productId: intent.productId, purchasedAt: intent.purchasedAt });
-  }
-  if (sessionCheckoutReceipts.length > SESSION_CHECKOUT_RECEIPT_CAP) {
-    sessionCheckoutReceipts.splice(0, sessionCheckoutReceipts.length - SESSION_CHECKOUT_RECEIPT_CAP);
-  }
   return intents.map(intent=>intent.grantId);
 }
 
@@ -634,6 +642,7 @@ async function purchaseConsumableUnlocked(productId: ProductId): Promise<Consuma
       productId,
       reward: grantedReward,
       transactionId: result.transactionId,
+      purchasedAt: result.purchasedAt,
       linkedTransactionIds: result.linkedTransactionIds,
       firstPurchaseDoubled: doubled,
     });
@@ -685,9 +694,9 @@ async function purchaseStarterPackUnlocked(): Promise<StarterPackPurchaseResult>
       (result.linkedTransactionIds ?? []).map(id => `${id}:${kind}`);
     const [amberGrantId, hintsGrantId] = await persistPendingConsumableGrants([
       {productId,reward:{kind:'amber',amount:STARTER_PACK_GRANTS.amber},
-        transactionId:txBase ? `${txBase}:amber` : undefined,linkedTransactionIds:linked('amber'),firstPurchaseDoubled:false},
+        transactionId:txBase ? `${txBase}:amber` : undefined,purchasedAt:result.purchasedAt,linkedTransactionIds:linked('amber'),firstPurchaseDoubled:false},
       {productId,reward:{kind:'hints',amount:STARTER_PACK_GRANTS.hints},
-        transactionId:txBase ? `${txBase}:hints` : undefined,linkedTransactionIds:linked('hints'),firstPurchaseDoubled:false},
+        transactionId:txBase ? `${txBase}:hints` : undefined,purchasedAt:result.purchasedAt,linkedTransactionIds:linked('hints'),firstPurchaseDoubled:false},
     ]);
     return {
       success: true,
@@ -829,7 +838,7 @@ export function reconcileStorePurchaseHistory(transactions: StorePurchaseTransac
         const baseline = new Set<string>(JSON.parse(raw));
         const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
         const pending = await loadPendingGrants();
-        return { ignored: baseline.has(transaction.transactionId), applied, pending };
+        return { ignored: baseline.has(transaction.transactionId), applied, pending, receipts: await loadCheckoutReceipts() };
       }), PAID_SAVE_COPY);
       if (snapshot.ignored) continue;
       const ids = transaction.productId === PRODUCT_IDS.STARTER_PACK
@@ -844,12 +853,13 @@ export function reconcileStorePurchaseHistory(transactions: StorePurchaseTransac
         // Same product, same moment as a grant this device already recorded
         // under another id (a lagging customer info left no linked id to
         // match): the checkout path owns its delivery, so never re-grant it.
-        if (receiptCoveredByGrant(transaction, snapshot.pending)) {
+        const covered = receiptCoveredByGrant(transaction, snapshot.receipts);
+        if (covered.length > 0) {
           // Record the receipt's own ids as delivered NOW: the covering grant
           // knows nothing of this id, so once it has settled (or the app
-          // restarts and sessionCheckoutReceipts is empty) nothing else would
+          // restarts before the caller settles) nothing else would
           // stop the next reconcile from crediting the same purchase again.
-          await saveWithPlayerRetry(() => recordReceiptAliases(ids), PAID_SAVE_COPY);
+          await saveWithPlayerRetry(() => recordReceiptAliases(ids, covered.map(grant => grant.grantId)), PAID_SAVE_COPY);
           continue;
         }
         await saveWithPlayerRetry(() => persistRecoveredStorePurchase(transaction), PAID_SAVE_COPY);
@@ -867,11 +877,16 @@ export function reconcileStorePurchaseHistory(transactions: StorePurchaseTransac
  * this device credited under another id (the checkout grant), so neither the
  * listener nor a later cold-start reconcile may credit them again.
  */
-async function recordReceiptAliases(ids: string[]): Promise<void> {
+async function recordReceiptAliases(ids: string[], coveringGrantIds: string[]): Promise<void> {
   await runStorageTransaction('iap_receipt_alias', async () => {
     const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
     for (const id of ids) applied.add(id);
     await AsyncStorage.setItem(APPLIED_GRANTS_KEY, JSON.stringify([...applied]));
+    const receipts = await loadCheckoutReceipts();
+    for (const receipt of receipts) {
+      if (coveringGrantIds.includes(receipt.grantId)) receipt.linkedIds = ids;
+    }
+    await AsyncStorage.setItem(CHECKOUT_RECEIPTS_KEY, JSON.stringify(receipts));
   });
 }
 
@@ -912,6 +927,7 @@ export function subscribeBillingChanges(listener: (change: BillingChange) => voi
   return () => { billingListeners.delete(listener); };
 }
 export function notifyBillingChanges(change: BillingChange = {}): void {
+  refreshEquippedOwnership();
   billingListeners.forEach(listener => {
     try { listener(change); } catch (error) { console.warn('[IAP] Purchase UI refresh failed:', error); }
   });

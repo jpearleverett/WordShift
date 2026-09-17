@@ -75,7 +75,7 @@ describe('root ErrorBoundary coverage', () => {
       APP_TSX.indexOf('function resetAfterRootRenderError'),
       rootAppStart
     );
-    expect(reset).toMatch(/clearPuzzleState\(\)\.catch\(\(\) => \{\}\);/);
+    expect(reset).toContain("Promise.all([clearPuzzleState(), clearPuzzleState('daily')])");
     expect(reset).toMatch(/resetHomeSceneSnapshot\(\);/);
     // Durable progress is never touched by a render-error reset.
     expect(reset).not.toMatch(/performFullReset|clearProgress|AsyncStorage\.clear/);

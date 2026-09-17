@@ -9,6 +9,7 @@ jest.mock('../services/settings', () => ({
   getSettings: async () => preferences,
 }));
 jest.mock('react', () => ({
+  useMemo: (factory: () => unknown) => factory(),
   useState: (initial: unknown) => [typeof initial === 'function' ? (initial as () => unknown)() : initial, jest.fn()],
   useRef: (value: unknown) => ({ current: value }),
   useCallback: (callback: unknown) => callback,

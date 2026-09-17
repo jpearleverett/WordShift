@@ -78,6 +78,13 @@ function beatTextFor(percentile: number, phase: number, total: number): string {
 }
 
 describe('DailyLeaderboardCard', () => {
+  test('the complete standing and trend summary is one accessible element on both platforms', () => {
+    const tree = render({ rank: 2, total: 10, historyLine: 'Best this week: 2', trendLabel: 'Improving' }) as El;
+    expect(tree.props?.accessible).toBe(true);
+    expect(a11yLabelOf(tree)).toContain('Placement trend: Improving.');
+    expect((render({ loading: true }) as El).props?.accessible).toBe(true);
+  });
+
   test('renders no percentage at all on a solo board, but keeps the true rank', () => {
     const tree = render({
       rank: 1,

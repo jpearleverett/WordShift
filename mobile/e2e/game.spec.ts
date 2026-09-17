@@ -733,10 +733,12 @@ test('a daily resumed after midnight retains its original board identity and clo
     localStorage.setItem('wordshift_home_progress', JSON.stringify(progress));
   });
   await page.reload({ waitUntil: 'domcontentloaded' });
+  const normalBefore = await page.evaluate(() => localStorage.getItem('wordshift_in_progress_puzzle'));
+  expect(normalBefore).not.toBeNull();
   await page.getByRole('button', { name: /^Start daily challenge/ }).click();
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle') || '{}').isPlayingDaily)).toBe(true);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('wordshift_in_progress_daily') || '{}').isPlayingDaily)).toBe(true);
   const before = await page.evaluate(() => {
-    const save = JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle')!);
+    const save = JSON.parse(localStorage.getItem('wordshift_in_progress_daily')!);
     return { date: save.dailyDate, version: save.dailyBoardVersion, eased: save.dailyEased, started: save.dailyStartedAt,
       words: save.rows.map((row: { originalWord: string }) => row.originalWord) };
   });
@@ -752,11 +754,12 @@ test('a daily resumed after midnight retains its original board identity and clo
   await page.getByRole('button', { name: /^Start daily challenge/ }).click();
   await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible();
   const after = await page.evaluate(() => {
-    const save = JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle')!);
+    const save = JSON.parse(localStorage.getItem('wordshift_in_progress_daily')!);
     return { date: save.dailyDate, version: save.dailyBoardVersion, eased: save.dailyEased, started: save.dailyStartedAt,
       words: save.rows.map((row: { originalWord: string }) => row.originalWord) };
   });
   expect(after).toEqual(before);
+  expect(await page.evaluate(() => localStorage.getItem('wordshift_in_progress_puzzle'))).toBe(normalBefore);
 });
 
 test('claiming a season reward updates amber once and stays claimed after relaunch', async ({ page }) => {

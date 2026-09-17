@@ -10,8 +10,8 @@ function buildWordSets(advanced: boolean): Record<number, Set<string>> {
   return sets;
 }
 
-const commonWordSets = buildWordSets(false);
-const advancedWordSets = buildWordSets(true);
+let commonWordSets: Record<number, Set<string>> | undefined;
+let advancedWordSets: Record<number, Set<string>> | undefined;
 let advancedGeneration = false;
 let generationTail: Promise<unknown> = Promise.resolve();
 
@@ -21,7 +21,9 @@ export function getGenerationVocabularyKey(): 'common' | 'advanced' {
 }
 
 export function getGenerationWordSets(): Record<number, Set<string>> {
-  return advancedGeneration ? advancedWordSets : commonWordSets;
+  // Bank-served sessions never need these dictionaries on the first-paint path.
+  if (advancedGeneration) return advancedWordSets ??= buildWordSets(true);
+  return commonWordSets ??= buildWordSets(false);
 }
 
 /**

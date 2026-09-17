@@ -28,7 +28,7 @@ export const PracticeModal: React.FC<PracticeModalProps> = ({ visible, lessonId,
     setPresentation({ visible, lessonId });
     if (visible) setState(createPracticeState(lessonId));
   }
-  useEffect(() => { if (visible) announceForA11y(state.message); }, [visible, state.message]);
+  useEffect(() => { if (visible && Platform.OS === 'ios') announceForA11y(state.message); }, [visible, state.message]);
   useEffect(() => {
     if (!visible || Platform.OS !== 'web') return;
     const handleKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };

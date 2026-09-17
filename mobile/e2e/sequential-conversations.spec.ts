@@ -47,7 +47,7 @@ async function visitVesper(page: Page) {
 }
 
 async function expectOrdinaryConversation(page: Page, firstSentence: string) {
-  const bubble = page.getByRole('button', { name: 'Show full line', exact: true });
+  const bubble = page.getByTestId('resident-dialogue-bubble');
   // Live one-off notes can precede ordinary dialogue. Follow their usual
   // Continue control, without changing the stable regular-reading ledger.
   for (let count = 0; count < 12; count++) {
@@ -94,7 +94,7 @@ test('a phase-three recruit receives the full welcome and keeps her earliest unr
   // Merely opening the line never claims that it has been read.
   expect(await readVesperIds(page)).toEqual([]);
   for (let pageIndex = 0; pageIndex < 6 && !(await readVesperIds(page)).includes('tr_0_1'); pageIndex++) {
-    const bubble = page.getByRole('button', { name: 'Show full line', exact: true });
+    const bubble = page.getByTestId('resident-dialogue-bubble');
     const previousText = await bubble.textContent();
     await page.getByRole('button', { name: 'Continue dialogue', exact: true }).click();
     await expect.poll(() => bubble.textContent()).not.toBe(previousText);
@@ -154,7 +154,7 @@ test('arrival preserves an earlier unread conversation and presents its authored
   await visitVesper(page);
   const recollection = 'I watched that cleared patch all night before the arrival.';
   await expectOrdinaryConversation(page, recollection);
-  const bubble = page.getByRole('button', { name: 'Show full line', exact: true });
+  const bubble = page.getByTestId('resident-dialogue-bubble');
   await expect(bubble).not.toContainText('waiting for someone');
   expect(await readVesperIds(page)).toEqual(completedIds);
 

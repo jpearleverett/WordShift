@@ -1,5 +1,7 @@
 # WordShift — end-to-end assessment (2026-09-16)
 
+> Follow-up: all numbered findings and actionable appendix items were addressed in the [September 17 resolution](ASSESSMENT_RESOLUTION_2026-09-17.md). This document remains the original pre-fix audit; see the resolution for qualifications and validation.
+
 Audit of `main`-derived branch `claude/nifty-faraday-hd4rnj` at `5314450`, covering the whole
 app: ~180k lines across 82 components, 117 services, 22 hooks, plus App.tsx.
 

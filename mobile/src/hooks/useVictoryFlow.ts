@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { Animated } from 'react-native';
 import { VictoryData } from './useGamePersistence';
 import { getSettingsSync } from '../services/settings';
@@ -380,7 +380,7 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     setVictoryStage('idle');
   }, [clearSpinner]);
 
-  const state: VictoryFlowState = {
+  const state = useMemo<VictoryFlowState>(() => ({
     victoryData,
     isProcessingVictory,
     victoryStage,
@@ -391,16 +391,16 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     victoryModalScale,
     victoryModalOpacity,
     phaseFlashOpacity,
-  };
+  }), [victoryData, isProcessingVictory, victoryStage, victorySpinnerVisible, victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity, phaseFlashOpacity]);
 
-  const actions: VictoryFlowActions = {
+  const actions = useMemo<VictoryFlowActions>(() => ({
     setVictoryData,
     setProcessingVictory,
     playVictorySequence,
     playPhaseChangeFlash,
     resetVictory,
     skipToEnd,
-  };
+  }), [setVictoryData, setProcessingVictory, playVictorySequence, playPhaseChangeFlash, resetVictory, skipToEnd]);
 
   return [state, actions];
 }

@@ -45,6 +45,7 @@ jest.mock('react', () => ({
     return refStore.get(idx)!;
   },
   useCallback: (fn: Function, _deps: unknown[]) => fn,
+  useMemo: (fn: () => unknown) => fn(),
 }));
 
 jest.mock('react-native', () => ({

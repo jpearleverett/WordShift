@@ -655,3 +655,18 @@ describe('AdMob adapter — native presentation lifetime', () => {
     expect(admob.__state.ads).toHaveLength(2);
   });
 });
+
+test('an uncached interstitial skips this exit; a late fill waits for the next exit', async () => {
+  admob.__state.hangLoads = true;
+  const provider = createAdMobAdProvider({ interstitialId: 'interstitial-unit', rewardedId: 'rewarded-unit' });
+  await provider.initialize();
+  await flushBackgroundChain();
+  expect(provider.isReady()).toBe(true);
+  expect(await provider.showInterstitial()).toBe(false);
+  expect(admob.__state.calls).not.toContain('interstitial.show');
+  admob.__state.ads[0].listeners.loaded?.();
+  await flushBackgroundChain();
+  expect(admob.__state.calls).not.toContain('interstitial.show');
+  expect(await provider.showInterstitial()).toBe(true);
+  expect(admob.__state.calls.filter((call: string) => call === 'interstitial.show')).toHaveLength(1);
+});

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-jest.mock('../services/cloudSave', () => ({ invalidateRestoredServiceCaches: jest.fn() }));
+jest.mock('../services/cloudSave', () => ({ invalidateRestoredServiceCaches: jest.fn(), refreshRestoredServiceCaches: jest.fn(async () => {}) }));
 jest.mock('../services/seasonPass', () => ({ recordSeasonPuzzleCompletion: jest.fn(async () => {}) }));
 /**
  * Tests for useGamePersistence hook.
@@ -29,6 +29,7 @@ function rewindHookIndices() {
 }
 
 jest.mock('react', () => ({
+  useMemo: (factory: () => unknown) => factory(),
   useState: (initial: unknown) => {
     const idx = stateIndex++;
     if (!stateStore.has(idx)) {

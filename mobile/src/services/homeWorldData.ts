@@ -1,5 +1,5 @@
 import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase, LATE_PHASE_RECRUITS } from '../types/homeWorld';
-import { loadProgress, unlockAnimal, unlockRoom, canAfford, reserveUnlock, getReservedUnlockId, claimReservedUnlock, spendAmber } from './amberCurrency';
+import { loadProgress, purchaseUnlockWithAmber, canAfford, reserveUnlock, getReservedUnlockId, claimReservedUnlock } from './amberCurrency';
 import { phase2PoolHasNew } from './dialogue/animalDialogueBase';
 import { getPhase2PoolCursors } from './dialogue/animalDialogueNarrative';
 import { getTotalDialogueCount } from './animalDialogue';
@@ -1007,14 +1007,9 @@ export async function purchaseUnlock(unlockId: string): Promise<{
     return { success: false, error: 'Not enough amber' };
   }
 
-  let success: boolean;
-  if (unlock.type === 'character') {
-    success = await unlockAnimal(unlock.targetId, unlock.cost);
-  } else {
-    success = await unlockRoom(unlock.targetId, unlock.cost);
-  }
+  const result = await purchaseUnlockWithAmber(unlock.targetId, unlock.type, unlock.cost);
 
-  if (success) {
+  if (result.success) {
     logEvent({
       type: 'unlock_purchased',
       data: {
@@ -1026,7 +1021,7 @@ export async function purchaseUnlock(unlockId: string): Promise<{
     });
   }
 
-  return { success };
+  return result;
 }
 
 /**
@@ -1163,10 +1158,8 @@ export async function skipUnlockGate(unlockId: string): Promise<{
   }
 
   const skipCost = getUnlockSkipCost(unlock);
-  const success = unlock.type === 'character'
-    ? await unlockAnimal(unlock.targetId, skipCost)
-    : await unlockRoom(unlock.targetId, skipCost);
-  if (!success) return { success: false, error: 'Not enough amber' };
+  const result = await purchaseUnlockWithAmber(unlock.targetId, unlock.type, skipCost);
+  if (!result.success) return result;
 
   logEvent({
     type: 'unlock_purchased',
@@ -1328,7 +1321,8 @@ export async function getReservedSpeedUpState(unlockId: string): Promise<Reserve
   const progress = await loadProgress();
   if (progress.reservedUnlockId !== unlockId) return 'none';
   // Gate already open: it auto-claims for free, so there is nothing to buy.
-  if (unlock.minPuzzles !== undefined && progress.puzzlesSolved >= unlock.minPuzzles) return 'none';
+  if (!isUnlockGateBlocked(unlock, progress)) return 'none';
+  if (unlock.minPuzzles !== undefined && progress.puzzlesSolved >= unlock.minPuzzles) return 'not_yet';
   // Same narrative guard as canSkipUnlockGate: a reserved descent-trio room may
   // not be sped past its gate before global Phase 3 (the reservation itself
   // stays valid and auto-claims when the gate opens).
@@ -1369,11 +1363,8 @@ export async function skipReservedUnlock(unlockId: string): Promise<{
     return { success: false, error: 'This room is not ready to be hurried' };
   }
   const premium = getReservedSkipCost(unlock);
-  const spend = await spendAmber(premium, `skip_reserved_${unlock.targetId}`);
-  if (!spend.success) return { success: false, error: 'Not enough amber' };
-  // Base cost was already spent at reserve time — claim marks it unlocked and
-  // clears the reservation (no further spend).
-  await claimReservedUnlock(unlock.targetId, unlock.type);
+  const result = await purchaseUnlockWithAmber(unlock.targetId, unlock.type, premium, unlock.id);
+  if (!result.success) return result;
   logEvent({
     type: 'unlock_purchased',
     data: { unlockId: unlock.id, targetId: unlock.targetId, cost: premium, skippedReservedGate: true },

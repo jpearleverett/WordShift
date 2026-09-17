@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState, memo } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -707,14 +707,21 @@ export const Row: React.FC<RowProps> = memo(({
   // drop slots) pulses its two ADJACENT slots. Letter i sits between slots i
   // and i+1 in the interleaved arc layout; seq makes repeat taps re-fire.
   const [slotPulse, setSlotPulse] = useState<{ left: number; right: number; seq: number } | null>(null);
-  const handleInterSlotTap = (letterIndex: number) => {
+  const handleInterSlotTap = useCallback((letterIndex: number) => {
     hapticSelection();
     setSlotPulse(prev => ({
       left: letterIndex,
       right: letterIndex + 1,
       seq: (prev?.seq ?? 0) + 1,
     }));
-  };
+  }, []);
+  const tilePressHandlers = useMemo(() => new Map(rowData.words.map(letter => [
+    letter.id, () => onLetterPress(letter, rowIndex),
+  ])), [rowData.words, onLetterPress, rowIndex]);
+  const interSlotPressHandlers = useMemo(
+    () => rowData.words.map((_, index) => () => handleInterSlotTap(index)),
+    [rowData.words, handleInterSlotTap],
+  );
 
   // Stable ref callback so the parent can measure this row in-window for drop
   // Y-bounds checking. Kept stable across renders to avoid detach/attach churn.
@@ -1016,7 +1023,7 @@ export const Row: React.FC<RowProps> = memo(({
               // plus a brief pulse on the two adjacent drop slots, drawing the
               // eye to where drops go without committing anything (and without
               // leaking validity).
-              onLockedPress={() => handleInterSlotTap(letterIndex)}
+              onLockedPress={interSlotPressHandlers[letterIndex]}
               arrivalMoveId={tileArrival && tileArrival.letterId === letter.id ? tileArrival.moveId : undefined}
               arrivalDirection={tileArrival && tileArrival.letterId === letter.id ? tileArrival.direction : undefined}
             />
@@ -1043,7 +1050,7 @@ export const Row: React.FC<RowProps> = memo(({
           isSelected={selectedLetter?.id === letter.id}
           isInteractable={isSource && !isProcessing && !letter.isLocked}
           highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
-          onPress={canDrag ? undefined : () => onLetterPress(letter, rowIndex)}
+          onPress={canDrag ? undefined : tilePressHandlers.get(letter.id)}
           // Locked tiles in the ACTIVE source row are tappable for feedback
           // only: the press routes to the same handler, whose locked branch
           // fires the error haptic + locked-letter message. Previously the
@@ -1051,7 +1058,7 @@ export const Row: React.FC<RowProps> = memo(({
           // unreachable and the tap produced literally nothing.
           onLockedPress={
             isSource && !isProcessing && letter.isLocked
-              ? () => onLetterPress(letter, rowIndex)
+              ? tilePressHandlers.get(letter.id)
               : undefined
           }
           // Tiles in completed/future rows (and the target row before a

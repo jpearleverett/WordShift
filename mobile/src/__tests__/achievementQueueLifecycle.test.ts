@@ -7,6 +7,7 @@ jest.mock('react', () => ({
     }];
   },
   useCallback: (callback: unknown) => callback,
+  useMemo: (factory: () => unknown) => factory(),
 }));
 jest.mock('../services/achievements', () => ({
   checkAchievements: jest.fn(),

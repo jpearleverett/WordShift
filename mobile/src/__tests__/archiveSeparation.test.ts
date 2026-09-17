@@ -69,7 +69,8 @@ describe('the gallery records only what the journal cannot show', () => {
     // would be a second copy of the journal, and would be hidden on sight.
     expect(kinds.filter(entry => !['whisper', 'choice', 'keepsake', 'passage'].includes(entry.kind))).toEqual([]);
     expect(kinds.some(entry => entry.file.includes('useDialogueFlow') && entry.kind === 'choice')).toBe(true);
-    expect(kinds.filter(entry => entry.kind === 'keepsake').length).toBe(2);
+    // Offering milestones and both Keeper's Record close paths are durable keepsakes.
+    expect(kinds.filter(entry => entry.kind === 'keepsake').length).toBe(3);
     expect(kinds.filter(entry => entry.kind === 'passage').length).toBe(1);
   });
 
