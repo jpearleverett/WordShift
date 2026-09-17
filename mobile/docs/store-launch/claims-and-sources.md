@@ -1,51 +1,40 @@
-# Listing claim review
+# Copy evidence — September 17 refresh
 
-Written September 7, 2026; feature claims reviewed against `main` at `6f96ebb`
-on September 13. This is editorial evidence for the copy pack, not a new public
-feature list. Paths below are relative to the repository root. The review
-does not certify the dated web screenshots against the latest signed build.
+Reviewed against the local source at `30a32597f27980acdebcf6081f60b2ea3351ed7c`, including the normal-walk update. Paths are relative to the repository root. This file verifies product claims; it does not establish Play Console publication or signed Android capture parity.
 
-| Claim or choice | Current evidence | Marketing boundary |
+| Copy claim | Source | Limit reflected in the copy |
 | --- | --- | --- |
-| Move L from PLAY into PANT to create PAY and PLANT | `mobile/e2e/game.spec.ts`, opening board and scripted real solution; `mobile/src/hooks/usePuzzleGame.ts` | This is an actual starting move, not a fabricated advertising puzzle. |
-| Shifted letters lock | `mobile/src/hooks/usePuzzleGame.ts`, move application and locked cells | Explain the basic rule, without implying every advanced variant behaves identically. |
-| 13 animal companions, including Ember, Panko and Axel | `mobile/src/services/homeWorldData.ts`, `ANIMALS`; `mobile/src/services/animalAcquaintance.ts` | They arrive through progression, with personal introductory visits for later recruits; do not imply everyone is present on first launch. |
-| A growing house and room details | `mobile/src/services/homeWorldData.ts`, `ROOMS`; `mobile/src/services/roomUpgrades.ts` | Room upgrades are authored additions. Current placement changed after the September 7 capture; compare the house image before reuse. Do not imply freeform furniture placement or arbitrary layouts. |
-| Tile styles | `mobile/src/services/cosmetics.ts` | Some are earned or bought with amber; some are tied to purchases. Do not say every style is free. |
-| Thousands of puzzles, five difficulties | `mobile/src/services/puzzleBank.ts`; `mobile/src/components/puzzle/DifficultyMenu.tsx`; current gated-bank audit in `AGENTS.md` | The eligible pool exceeds 4,000. Do not market all stored boards as currently playable or call generated boards hand-crafted. |
-| Reverse, Double Shift, Speed, Blind Mode, Lexicon | `mobile/src/components/puzzle/DifficultyMenu.tsx`; `mobile/src/constants/gameBalance.ts` | Variants and modifiers unlock during progression. Blind Offering is a later narrative label; use the early name publicly. Lexicon deliberately includes rarer vocabulary. |
-| Daily challenges | `mobile/src/services/dailyChallenge.ts` | The first daily is eased for newcomers and does not submit to the shared leaderboard. Avoid “every player gets the same puzzle.” |
-| Daily and weekly quests, 56 achievements | `mobile/src/services/weeklyQuests.ts`; `mobile/src/services/achievements.ts` | Do not invent completion rates or imply rewards require payment. |
-| Unsettling story, remembered choices, journal | `docs/STORY_AND_VISUAL_IMPLEMENTATION.md`; `mobile/src/services/storySpine.ts`; `mobile/src/services/dialogueChoices.ts`; `mobile/src/components/StoryJournalModal.tsx` | Choices have later callbacks and story details; do not promise a separate campaign for every answer. Compare updated choice presentation with the old capture. Keep the presence, final board, final choices, ending imagery and robed cast out of store art. |
-| Core puzzles offline, no account needed | `README.md`; local puzzle banks and AsyncStorage services | Cloud features, leaderboard requests, ads and purchases have network dependencies. “Fully offline” would overstate the whole app. |
-| Main story does not require purchases | Progression is based on play in `mobile/src/services/homeWorldData.ts`; `mobile/src/components/monetization/SupportComparison.tsx` says the support options preserve story pace | Convenience and cosmetic purchases should not be described as extra story chapters. |
-| Ads and optional auto-renewing Supporter subscription | `mobile/src/services/ads.ts`; `mobile/src/services/iap.ts`, `SUPPORTER_SUB` | Do not advertise “no ads,” lifetime access for the subscription, or locally hard-coded prices. |
-| Sound, music, motion and haptics controls | `mobile/src/components/SettingsScreen.tsx`; `mobile/src/services/settings.ts` | These are settings, not evidence for a certified accessibility claim. |
+| Both words must be valid; PLAY/PANT → PAY/PLANT | `mobile/e2e/game.spec.ts`, `mobile/src/hooks/usePuzzleGame.ts` | The example is a legal opening move. Removing the source letter and inserting it in the next row both leave valid words. |
+| Moved letters lock in place | `mobile/src/hooks/usePuzzleGame.ts` | Explains the basic puzzle; does not promise identical move rules in every variant. |
+| 13 animal friends, including Ember, Panko and Axel | `mobile/src/services/homeWorldData.ts`, `ANIMALS`; `mobile/src/services/animalAcquaintance.ts` | Friends join through progression; the screenshot subtitle says the household grows. |
+| Earn amber, unlock rooms and add details | `mobile/src/services/homeWorldData.ts`; `mobile/src/services/roomUpgrades.ts` | Authored unlocks and room gifts, with no freeform-placement claim. |
+| Tile styles | `mobile/src/services/cosmetics.ts` | Styles may be bought with amber or obtained through purchase/entitlement; no claim that every style is free. |
+| Thousands of puzzles across five difficulties | `AGENTS.md` current eligible-bank audit; `mobile/src/services/puzzleBank.ts`; `mobile/src/components/puzzle/DifficultyMenu.tsx` | Uses the supported broad count, not all stored boards or a hand-authored claim. |
+| Reverse Shift, Double Shift, timed, hidden-preview and rarer-word challenges | `mobile/src/components/puzzle/DifficultyMenu.tsx`; `mobile/src/constants/gameBalance.ts` | “More ways to play open as you progress” prevents a first-launch availability promise. |
+| Practice boards | `mobile/src/components/puzzle/PracticeModal.tsx` | A learning mode, not a promise that every game board is freely selectable. |
+| Daily challenges, streaks and daily/weekly quests | `mobile/src/services/dailyChallenge.ts`; `mobile/src/services/weeklyQuests.ts`; `mobile/src/services/dailyLoginReward.ts` | No claim that all players receive the same first Daily puzzle. No invented streak or rank. |
+| Choices, conversations and a journal | `mobile/src/services/storySpine.ts`; `mobile/src/services/dialogueChoices.ts`; `mobile/src/components/StoryJournalModal.tsx` | Choices can leave callbacks and details, not a separate campaign for every answer. |
+| A mystery that becomes unsettling | `mobile/src/services/homeWorldData.ts`, phase-aware room descriptions; `mobile/src/services/storySpine.ts` | No advertised reveal, robes, ritual close-up, finale or ending image. |
+| Nighttime mystery image | `mobile/src/components/home/HouseWorld.tsx`, phase-3 pre-storm night sky and house tint; `mobile/src/components/home/RoomView.tsx`, night window treatment | “What changes after dark?” is a thematic question. Do not advertise a real-time day/night mechanic. Use an actual attainable night scene. |
+| Story progresses without purchases | `mobile/src/services/homeWorldData.ts`; `mobile/src/components/monetization/SupportComparison.tsx` | No purchase needed to follow the main story; convenience and cosmetics do not become extra story chapters. |
+| Core puzzles offline; no account needed | `README.md`; local puzzle banks and AsyncStorage services | Internet still needed for online features and purchases. No “fully offline” claim. |
+| Sound, music, motion and haptics controls | `mobile/src/components/SettingsScreen.tsx`; `mobile/src/services/settings.ts` | Settings are listed directly; no certified-accessibility claim. |
+| Ads, purchases and optional auto-renewing Supporter subscription | `mobile/src/services/ads.ts`; `mobile/src/services/iap.ts`, `SUPPORTER_SUB` | No fixed-price or lifetime-subscription claim. |
 
-## Existing public copy aligned in this change
+## Campaign decisions
 
-The September pack supersedes the older Android listing text in
-`docs/STORE_LISTING.md`. The owner has confirmed Supporter is already configured;
-verify the existing product on the signed build rather than repeating the
-older setup task.
+- Keep the title and short description as approved. The full description is 1,887 characters, including line breaks, before its file's final newline.
+- The word “real” no longer explains puzzle validity in this campaign. The opener and full description explicitly say both results must be valid.
+- Put the actual nighttime mystery scene in slot 4. The old benign cup conversation no longer carries the mystery promise alone.
+- Keep the icon control for initial use. The simpler icon, alternate opener and alternate short description are individual later experiment candidates.
+- “Game” → “Word” is the category recommendation. Select tags from the current Console's actual offered vocabulary; no fixed tag list is invented here.
 
-The landing-page source `docs/index.md` was aligned with the launch copy:
+## Official field references
 
-- “Thousands of hand-tuned word chains” became “Thousands of word puzzles across five difficulty levels.” The game uses generated, audited pools; “hand-tuned” suggests individual authorship that the source does not establish.
-- “A daily challenge shared by every player” became “Daily word challenges, with streaks and an online leaderboard.” The first daily has an easier shape for new players.
-- “Progress backs up automatically” was qualified with network context: “No account required; cloud backups sync when online.” This still describes the automatic behavior without implying an offline remote backup.
+The parent campaign audit checked Google's current requirements on September 17, 2026. The references below explain upload fields and creative presentation, rather than endorsing this campaign's editorial choices.
 
-The landing page also lists “Challenge friends with a link to the exact puzzle you just solved.” This was not included in the recommended launch copy: the first campaign is stronger when it explains the core mechanic, house, and story before adding more feature claims. This is an editorial cut, not a report of a broken feature.
-
-The website source and historical listing notice were updated with the
-September 7 campaign. This September 13 review changes documentation only;
-it does not establish current live website or Play Console publication state.
-
-## Official references
-
-- Text limits: [Create and set up your app](https://support.google.com/googleplay/android-developer/answer/9859152).
-- Asset dimensions, genuine gameplay presentation, text placement, descriptions and video: [Add preview assets to showcase your app](https://support.google.com/googleplay/android-developer/answer/9866151).
-- Accurate titles, descriptions and promotional claims: [Metadata policy](https://support.google.com/googleplay/android-developer/answer/9898842).
-- Categories and relevant tags: [Choose a category and tags](https://support.google.com/googleplay/android-developer/answer/9859673).
-
-These references were checked on September 7, 2026. The copy's positioning and image sequence are creative recommendations based on the current game; Google does not prescribe or endorse this campaign.
+- [Create and set up your app](https://support.google.com/googleplay/android-developer/answer/9859152?hl=en)
+- [Add preview assets to showcase your app](https://support.google.com/googleplay/android-developer/answer/9866151?hl=en)
+- [Google Play icon design specifications](https://developer.android.com/distribute/google-play/resources/icon-design-specifications)
+- [Choose a category and tags](https://support.google.com/googleplay/android-developer/answer/9859673?hl=en)
+- [Store listing experiments](https://support.google.com/googleplay/android-developer/answer/12053285?hl=en)

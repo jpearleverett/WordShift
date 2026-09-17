@@ -1,102 +1,115 @@
 {
   "locale": "en-US",
+  "campaign": "launch-2026-09-v2",
   "app_name": "WordShift: Cozy Word Puzzle",
   "short_description": "Move letters, build a woodland home, and uncover a quietly unsettling mystery",
-  "full_description": "One letter moves. Two words change. A little home grows.\n\nWordShift is a word puzzle game with a warm woodland heart and a mystery that slowly stirs beneath it.\n\nA small move. A satisfying discovery.\n\nTake a letter from one word and place it in the next. Both words must stay real. Move the L from PLAY into PANT, and you get PAY and PLANT. Keep the chain going to solve the puzzle.\n\nEasy to understand, with plenty to think about: a letter you move locks into its new word, so your next choice matters.\n\nBuild somewhere worth coming back to.\n\nEarn amber by solving puzzles. Open rooms in a growing pixel-art house, add special room details, and welcome 13 animal companions. Get to know Ember the fox, Panko the pangolin, Axel the axolotl, and the rest of a very unusual household.\n\nThere are conversations by the fire, little routines, and familiar faces waiting when you return.\n\nStay for the mystery.\n\nAs the house grows, its warmth begins to feel different. Conversations change. Small details ask for a second look. Your choices become part of a story you can revisit in your journal.\n\nThe mystery unfolds through play. No purchase is needed to follow the main story.\n\nFind your kind of challenge.\n\nMore styles and challenges open as you progress.\n\n- Thousands of word puzzles across five difficulty levels\n- Reverse Shift, which takes the chain down and back up\n- Double Shift, with two letters to move at each step\n- Optional timed Speed Shift and hidden-preview Blind Mode\n- Lexicon mode for players who enjoy rarer words\n- Practice boards to learn the twists\n- Daily challenges, streaks, and daily and weekly quests\n- 56 achievements to work toward\n- Tile styles, room details, and a home that changes as you play\n\nMake room for a little wordplay.\n\nCore puzzles work offline, and no account is required. Use a hint when you need a nudge. Adjust sound, music, motion, and haptics to suit you. Online features and purchases require an internet connection.\n\nContains ads and in-app purchases, including an optional auto-renewing Supporter subscription. The story develops unsettling themes and mild horror.\n\nA cozy word game. Mostly.",
+  "full_description": "One letter. Two new words. A home full of stories.\n\nWordShift is a cozy word puzzle game where clever letter moves help a woodland house grow. Solve word chains, welcome 13 animal friends, and discover a mystery that becomes quietly unsettling.\n\nA SMALL MOVE. A SATISFYING PUZZLE.\nTake a letter from one word and place it in the next. The word you take it from and the word you add it to must both be valid. Move the L from PLAY into PANT to make PAY and PLANT, then keep the chain going. Moved letters lock in place, so think ahead.\n\nTURN WORDS INTO A HOME.\nEarn amber through puzzles, unlock rooms, and add special details to your growing pixel-art house. Get to know Ember the fox, Panko the pangolin, Axel the axolotl, and the rest of an unusual household. Return for conversations, make choices, and revisit what you have read in your journal.\n\nA COZY GAME. MOSTLY.\nAs the house grows, its warmth begins to feel different. Familiar conversations take on new meaning, and small details invite a second look. Keep playing to discover what your woodland home has been hiding. No purchase is needed to follow the main story.\n\nFIND YOUR KIND OF CHALLENGE.\nMore ways to play open as you progress.\n• Thousands of word puzzles across five difficulty levels\n• Reverse Shift and Double Shift, with more ways to work through a chain\n• Optional timed, hidden-preview, and rarer-word challenges\n• Practice boards to learn new puzzle styles\n• Daily challenges, streaks, and daily and weekly quests\n• Unlockable tile styles and room details\n\nCore puzzles work offline, with no account required. Online features and purchases need an internet connection. Adjust sound, music, motion, and haptics to suit you.\n\nContains ads and in-app purchases, including an optional auto-renewing Supporter subscription. The story includes unsettling themes and mild horror.\n\nA little wordplay. A world to uncover.",
   "character_counts": {
     "app_name": 27,
     "short_description": 77,
-    "full_description": 2140
+    "full_description": 1887
   },
   "short_description_alternatives": [
     {
-      "angle": "mechanic first",
-      "text": "Clever letter shifts, animal friends, and a cozy home with a mystery of its own",
-      "characters": 79
-    },
-    {
-      "angle": "story first",
-      "text": "A cozy word puzzle with animal friends and a story that slowly turns unsettling",
-      "characters": 79
-    },
-    {
-      "angle": "daily habit",
-      "text": "Solve word chains, grow a woodland home, and return for daily puzzle challenges",
-      "characters": 79
+      "angle": "characters first",
+      "text": "Shift letters, build a cozy home, and uncover a mystery with 13 animal friends",
+      "characters": 78,
+      "use": "Single challenger for a later isolated store-listing experiment; do not replace the baseline in the initial upload."
     }
   ],
   "screenshots": [
     {
       "order": 1,
-      "slug": "01-move-one-letter",
-      "headline": "Move one letter.",
-      "subtitle": "Keep both words real.",
-      "alt_text": "The WordShift board with L selected in PLAY, ready to move into PANT and form PLANT.",
-      "capture": "Actual opening puzzle with L selected; valid PLANT insertion visible. Keep the board dominant."
+      "slug": "01-one-letter",
+      "headline": "One letter. Two new words.",
+      "subtitle": "Both results must be valid words.",
+      "alt_text": "A WordShift puzzle shows L selected in PLAY, with a valid move into PANT to make PAY and PLANT.",
+      "capture": "Opening PLAY/PANT puzzle with L selected and its legal PLANT insertion visible. Wait for transient instruction toasts to clear. If using a second result view, clearly separate a crop of the genuine PAY/PLANT capture.",
+      "alt_text_status": "Verify against final exported image before upload."
     },
     {
       "order": 2,
-      "slug": "02-two-new-words",
-      "headline": "Change two words.",
-      "subtitle": "A little change goes a long way.",
-      "alt_text": "After shifting L, the WordShift board reads PAY, PLANT, and HEAR, with PLANT active for the next move.",
-      "capture": "Same real opening board after the L move. Preserve the actual locked letter and next active row."
+      "slug": "02-build-a-home",
+      "headline": "Turn words into a home.",
+      "subtitle": "Solve puzzles. Unlock rooms.",
+      "alt_text": "A growing woodland house in WordShift contains furnished rooms and animal residents.",
+      "capture": "Current bright house with several furnished rooms and normal residents. Include the compact next-reward bar; keep rooms and inhabitants readable.",
+      "alt_text_status": "Verify against final exported image before upload."
     },
     {
       "order": 3,
-      "slug": "03-build-a-home",
-      "headline": "Build a home.",
-      "subtitle": "Every puzzle brings it closer.",
-      "alt_text": "A growing woodland house with warm furnished rooms and animal residents in WordShift.",
-      "capture": "Actual early or middle house, several rooms and animals visible; no finale or late-game costumes."
+      "slug": "03-unlikely-friends",
+      "headline": "Meet 13 unlikely friends.",
+      "subtitle": "Get to know your growing household.",
+      "alt_text": "An animal resident talks with the player in WordShift, with the woodland house behind the conversation.",
+      "capture": "Short warm early conversation in the current dialogue layout. Prefer Ember; keep inhabited rooms visible. Residents unlock over time.",
+      "alt_text_status": "Verify against final exported image before upload."
     },
     {
       "order": 4,
-      "slug": "04-unlikely-friends",
-      "headline": "13 unlikely friends.",
-      "subtitle": "Everyone has something to say.",
-      "alt_text": "Ember the fox talks about Panko’s mushroom soup, with furnished rooms visible behind her.",
-      "capture": "Actual early resident conversation. Supplemental existing character art may frame it but must not replace gameplay."
+      "slug": "04-after-dark",
+      "headline": "A cozy game. Mostly.",
+      "subtitle": "What changes after dark?",
+      "alt_text": "WordShift’s woodland house stands beneath a dark night sky, with warm rooms glowing inside.",
+      "capture": "Actual phase-3 pre-storm night house, with normal residents, warm interior lights and a dark sky. Choose framing that conceals late-story details. No phase 4+, robes, ending, revealed presence, invented marks, or added creatures.",
+      "alt_text_status": "Verify against final exported image before upload."
     },
     {
       "order": 5,
-      "slug": "05-make-it-yours",
-      "headline": "Your kind of cozy.",
-      "subtitle": "Tiles to suit your mood.",
-      "alt_text": "WordShift’s Tile Shop shows color previews and amber costs for unlockable tile styles.",
-      "capture": "Actual Tile Shop with multiple style previews and amber prices. Do not imply that every cosmetic is free."
+      "slug": "05-next-challenge",
+      "headline": "Find your next challenge.",
+      "subtitle": "Reverse the chain. Shift two letters.",
+      "alt_text": "A Double Shift puzzle in WordShift asks the player to move two letters and make valid words.",
+      "capture": "Real Double Shift board after its instructions are dismissed. Show two selected letters and a legal result. The caption names Reverse Shift too; this frame demonstrates Double Shift only.",
+      "alt_text_status": "Verify against final exported image before upload."
     },
     {
       "order": 6,
-      "slug": "06-daily-ritual",
-      "headline": "A daily ritual.",
-      "subtitle": "A new challenge, every day.",
-      "alt_text": "WordShift’s Daily Challenge offers a word puzzle to return to each day.",
-      "capture": "Actual Daily Challenge surface or active daily board. Do not alter the date or invent a leaderboard rank."
+      "slug": "06-daily-puzzle",
+      "headline": "A new puzzle every day.",
+      "subtitle": "Build a streak, one solve at a time.",
+      "alt_text": "WordShift’s Daily Challenge presents a word puzzle for the day in the current daily-play interface.",
+      "capture": "Regular Daily Challenge in progress, with genuine current daily context. Avoid first-time bonus toasts. Preserve actual dates, streaks and results; no fabricated rank.",
+      "alt_text_status": "Verify against final exported image before upload."
     },
     {
       "order": 7,
-      "slug": "07-change-the-rules",
-      "headline": "A different twist.",
-      "subtitle": "Reverse. Double Shift. More ways to think.",
-      "alt_text": "A Double Shift puzzle with DUSKY and MOLES on the board and instructions to move two letters.",
-      "capture": "Actual Double Shift board with two-letter instructions; the caption also names the verified Reverse Shift variant."
+      "slug": "07-your-kind-of-cozy",
+      "headline": "Make it your kind of cozy.",
+      "subtitle": "Unlock tile styles and room details.",
+      "alt_text": "An equipped tile style gives the letter tiles in a WordShift puzzle a different appearance.",
+      "capture": "Actual puzzle with an earned or purchased tile style equipped through the game. Use a visible style difference. If the final image instead shows a completed room gift, update alt text to that visible gift.",
+      "alt_text_status": "Verify against final exported image before upload."
     },
     {
       "order": 8,
-      "slug": "08-cozy-mostly",
-      "headline": "A cozy game. Mostly.",
-      "subtitle": "Some things change when you stay.",
-      "alt_text": "Ember offers a choice of cups and drinks in a story conversation, with two player responses shown.",
-      "capture": "Actual early cup-choice conversation with Ember. The caption hints at the later mystery without revealing future scenes."
+      "slug": "08-choices",
+      "headline": "Your choices leave a trace.",
+      "subtitle": "Conversations you can return to.",
+      "alt_text": "An early story conversation in WordShift offers the player a choice of responses.",
+      "capture": "Current early story-choice layout, one readable screen with a concise exchange and real responses. Alternatively use a previously read journal entry and update the alt text accordingly.",
+      "alt_text_status": "Verify against final exported image before upload."
     }
   ],
+  "opener_challenger": {
+    "slug": "01-one-letter-challenger",
+    "headline": "Move a letter. Make two words.",
+    "subtitle": "PLAY becomes PAY. PANT becomes PLANT.",
+    "alt_text": "Moving L from PLAY into PANT changes the two words to PAY and PLANT in WordShift.",
+    "capture": "Use genuine before-and-after captures of the same legal L move, clearly separated. Test only against the baseline opener with every other asset unchanged."
+  },
   "feature_graphic": {
-    "headline": "A little wordplay. A world to uncover.",
-    "alt_text": "Ember the fox sits by a glowing hearth beside mugs and letter tiles, with a dim doorway behind her."
+    "headline": "One letter. A home full of secrets.",
+    "alt_text": "Ember the fox sits in a warm woodland den beside letter tiles, with a dark doorway behind her."
   },
   "icon": {
-    "alt_text": "Ember the fox in a green knit sweater holds a warm ochre W letter tile."
+    "alt_text": "Ember the fox in a green sweater holds an ochre letter tile marked W.",
+    "selection": "Existing icon remains the control; the simpler face-and-tile candidate is a later experiment challenger."
   },
-  "scope": "English Google Play main listing; promotional copy only. This file does not publish anything."
+  "category": {
+    "application_type": "Game",
+    "category": "Word",
+    "tags": "Select up to five accurate tags that the current Console actually offers. Prioritize word gameplay, puzzles and the story only where matching tags are available."
+  },
+  "scope": "English Google Play main-listing copy and creative package. File generation does not establish publication or signed Android capture verification."
 }
