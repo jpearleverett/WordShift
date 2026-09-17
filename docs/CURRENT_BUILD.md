@@ -1,23 +1,27 @@
 # Current build and documentation
 
+## September 17 walking follow-up
+
+[PR #449](https://github.com/jpearleverett/WordShift/pull/449), on `feature/alternating-animal-walks` based on main `3b7ec4e`, supplies 12 refreshed normal cycles and 13 robed cycles; the original ten-frame normal fox walk remains. Outfit selection, loading fallbacks, facing and interrupted travel are covered, with reduced-motion and device-tier limits retained. [The walking review](ANIMAL_WALK_REVIEW_2026-09-17.md) records all 25 atlas checks, 5,161 unit tests and 43 browser journeys passing. This follow-up awaits owner merge and does not represent a new signed Android build or Play upload.
+
 ## September 17 assessment fixes
 
-The follow-up to `main` at `c9f5835` addresses the September 16 audit. See the [complete resolution map and validation](ASSESSMENT_RESOLUTION_2026-09-17.md). Earlier dated test totals below retain their original scope. Source version remains 1.3.6 / Android 101; this change is not a new Play upload.
+The follow-up to `main` at `c9f5835` addresses the September 16 audit. See the [complete resolution map and validation](ASSESSMENT_RESOLUTION_2026-09-17.md). Earlier dated test totals below retain their original scope. At that assessment-fix snapshot, source version was 1.3.6 / Android 101; the later version bump is recorded below. The assessment fixes did not themselves constitute a Play upload.
 
 Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main` at `687a08d` (the launch-readiness merge, PR 439). The earlier CI audit remains tied to [`6f96ebb583f591f46c9c023be6462d99d816a8e7`](https://github.com/jpearleverett/WordShift/commit/6f96ebb583f591f46c9c023be6462d99d816a8e7). This page distinguishes current implementation from recorded validation; it does not certify an uploaded AAB, a Play rollout, or hosted service configuration.
 
 ## Build identity
 
-Current source builds on main `70a1883`, which carries the launch-readiness fixes (PR 439), the in-band CI exit-code fix (PR 440/441) and the release-candidate version bump. App version is **1.3.6** and Android version code **101** (100 was set on 2026-09-14 with the 1.3.6 bump; 101 is the 2026-09-15 `expo-device` native build, bumped locally by the owner and committed the same day). `expo-device` is a new native module, so that artifact is a new binary and its OTA runtime moved with it; the owner confirmed it installs and runs, which is not the same as the device matrix. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source builds on main `3b7ec4e`, which includes the assessment fixes and the September 17 version bump. App version is **1.3.7** and Android version code **102** (100 was set on 2026-09-14 with the 1.3.6 bump; 101 is the 2026-09-15 `expo-device` native build, bumped locally by the owner and committed the same day). `expo-device` is a new native module, so that artifact is a new binary and its OTA runtime moved with it; the owner confirmed it installs and runs, which is not the same as the device matrix. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
-| App version | `1.3.6` | `mobile/app.json` |
-| Android package / version code | `com.wordshift.app` / `101` | `mobile/app.json` |
+| App version | `1.3.7` | `mobile/app.json` |
+| Android package / version code | `com.wordshift.app` / `102` | `mobile/app.json` |
 | iOS bundle / build number | `com.wordshift.app` / `3` | `mobile/app.json` |
 | Expo / React Native | SDK 57; lockfile resolves Expo `57.0.20`, RN `0.86.3` | `mobile/package-lock.json` |
 | Version management | Local; increase Android version code for each new Play upload | `mobile/eas.json` |
-| Resolved OTA runtime | `1.3.6-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
+| Resolved OTA runtime | `1.3.7-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
 | Android release optimization | R8 minification, resource shrinking, optimized ProGuard defaults and optimized resource shrinking enabled; PNG crunch disabled | `mobile/app.json`, `mobile/plugins/withAndroidOptimization.js` |
 
 `mobile/package.json` still has npm package version `1.3.1`; that field is tooling metadata, not the Expo app version or Android version code. Do not infer the installed app version from it. The current React Native Gradle plugin resolves AGP 8.12.0; the optimization configuration does not require an AGP 9 migration.
