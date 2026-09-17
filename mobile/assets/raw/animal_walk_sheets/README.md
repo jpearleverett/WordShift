@@ -33,7 +33,7 @@ From `mobile/`:
 node scripts/tools/buildAnimalWalkAtlases.mjs --check
 node scripts/tools/buildAnimalWalkAtlases.mjs rabbit --pose robed --check
 node scripts/tools/buildAnimalWalkAtlases.mjs --import /absolute/metadata-directory wombat
-node scripts/tools/buildWalkReview.mjs /absolute/output/walk-review.html
+node scripts/tools/buildWalkReview.mjs --html /absolute/output/walk-review.html
 ```
 
 Import metadata uses `type`, `pose` (`normal` or `robed`), `generatedPath`,

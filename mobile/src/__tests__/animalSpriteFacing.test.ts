@@ -481,6 +481,31 @@ describe('packed animal walk cycles', () => {
     } finally { harness.dispose(); }
   });
 
+  test('an interrupted walk resumes from its actual position and finishes the facing turn', () => {
+    const random = jest.spyOn(Math, 'random').mockReturnValue(0.9);
+    const harness = createHarness();
+    try {
+      harness.render(3);
+      jest.advanceTimersByTime(4000);
+      const moving = harness.render(3) as Node;
+      const position = flattenStyle(moving.props.style).transform[0].translateX.input;
+      const facing = flattenStyle(find(moving, 'animal-sprite-body')!.props.style).transform[0].scaleX;
+      // Native animations can be between their endpoints when a new phase
+      // interrupts them. The ordinary timing mock jumps straight to x=74.
+      position.setValue(56);
+      facing.setValue(-0.3);
+      const stopped = harness.render(4);
+      expect(position.value).toBe(56);
+      expect(sourceMirror(stopped, 'static')).toBe(1);
+      // x=78 is a valid rightward leg from the actual x=56. Using the
+      // abandoned x=74 target would reject it as too short and turn left.
+      random.mockReturnValue(58 / 60);
+      jest.advanceTimersByTime(6000);
+      expect(sourceMirror(harness.render(4), 'walk-atlas')).toBe(1);
+      expect(position.value).toBe(78);
+    } finally { harness.dispose(); }
+  });
+
   test('a failed robed atlas falls back to the robe without breaking normal walks', () => {
     jest.spyOn(Math, 'random').mockReturnValue(0.9);
     const harness = createHarness();

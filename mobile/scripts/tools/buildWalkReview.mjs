@@ -82,7 +82,7 @@ const html = `<!doctype html>
 <p class="meta">All indices are zero-based. New 8-frame cycles: contact poses 0/4 and passing poses 2/6. The original fox uses approximate matching phases 0/5 and 2/7. Scrubbing covers every frame; playback preserves each species' base cadence.</p></header><main id="main"></main>
 <script>
 const cycles=${JSON.stringify(cycles)};
-let playing=true, left=false, elapsed=0, last=performance.now(), scrub=0, speed=1;
+let playing=true, left=false, elapsed=0, last=performance.now(), speed=1;
 const root=document.querySelector('#main');
 const views=[];
 function canvas(size){const c=document.createElement('canvas');c.width=c.height=size*2;c.style.width=c.style.height=size+'px';return c;}
@@ -96,18 +96,19 @@ for(let i=0;i<cycles.length;i+=2){
   for(const size of [${box},${box * 2}]){const wrap=document.createElement('div');wrap.className='sample';const c=canvas(size);wrap.append(c);const label=document.createElement('span');label.textContent=size===${box}?'90px game viewport':'180px · 2×';wrap.append(label);pose.querySelector('.playback').append(wrap);screens.push(c);}
   const checkpoints=cycle.count===10?[0,5,2,7]:[0,4,2,6];const comparisons=[];
   for(const [j,index] of checkpoints.entries()){const item=document.createElement('div');item.className='comparison';const c=canvas(100);item.append(c);item.append((j<2?'Contact ':'Passing ')+index);pose.querySelector('.compare').append(item);comparisons.push({canvas:c,index});}
-  const images=cycle.frames.map(src=>{const image=new Image();image.src=src;return image;});views.push({cycle,images,screens,comparisons,label:pose.querySelector('.frame')});
+  const images=cycle.frames.map(src=>{const image=new Image();image.src=src;return image;});views.push({cycle,images,screens,comparisons,elapsed:0,label:pose.querySelector('.frame')});
  }
 }
 function draw(c,image,cycle){if(!image.complete||!image.naturalWidth)return;const ctx=c.getContext('2d');const size=c.width;ctx.clearRect(0,0,size,size);ctx.save();ctx.translate(size/2,size/2+cycle.correction*size/${box});ctx.scale(left?-cycle.scale:cycle.scale,cycle.scale);ctx.drawImage(image,-size/2,-size/2,size,size);ctx.restore();}
-function tick(now){if(playing)elapsed+=(now-last)/speed;last=now;for(const view of views){const index=playing?Math.floor(elapsed/view.cycle.frameMs)%view.cycle.count:Math.min(view.cycle.count-1,Math.floor(scrub*view.cycle.count));for(const c of view.screens)draw(c,view.images[index],view.cycle);for(const c of view.comparisons)draw(c.canvas,view.images[c.index],view.cycle);view.label.textContent='Frame '+index+'/'+(view.cycle.count-1);}
+function setPhase(phase){phase=Math.max(0,Math.min(1-Number.EPSILON,phase));elapsed=phase*8*125;for(const view of views)view.elapsed=phase*view.cycle.frameMs*view.cycle.count;}
+function tick(now){const delta=(now-last)/speed;if(playing)elapsed+=delta;last=now;for(const view of views){if(playing)view.elapsed+=delta;const index=Math.floor(view.elapsed/view.cycle.frameMs)%view.cycle.count;for(const c of view.screens)draw(c,view.images[index],view.cycle);for(const c of view.comparisons)draw(c.canvas,view.images[c.index],view.cycle);view.label.textContent='Frame '+index+'/'+(view.cycle.count-1);}
  if(playing){const phase=elapsed%(8*125)/(8*125);document.querySelector('#scrub').value=Math.floor(phase*999);document.querySelector('#position').textContent=Math.floor(phase*100)+'% (reference cycle)';}requestAnimationFrame(tick);}
-document.querySelector('#play').onclick=()=>{playing=!playing;if(!playing)scrub=Number(document.querySelector('#scrub').value)/1000;document.querySelector('#play').textContent=playing?'Pause':'Play';};
+document.querySelector('#play').onclick=()=>{playing=!playing;document.querySelector('#play').textContent=playing?'Pause':'Play';};
 document.querySelector('#direction').onclick=()=>{left=!left;document.querySelector('#direction').textContent=left?'← Facing left':'Facing right →';};
 document.querySelector('#speed').onchange=e=>{speed=Number(e.target.value);};
-document.querySelector('#scrub').oninput=e=>{playing=false;scrub=Number(e.target.value)/1000;document.querySelector('#play').textContent='Play';document.querySelector('#position').textContent=(scrub*100).toFixed(1)+'%';};
-document.querySelector('#restart').onclick=()=>{elapsed=0;scrub=0;};
-window.__walkReview={cycles:cycles.map(({frames,...metadata})=>metadata),setFramePhase(phase){playing=false;scrub=phase;},setDirection(direction){left=direction==='left';}};
+document.querySelector('#scrub').oninput=e=>{playing=false;const phase=Number(e.target.value)/1000;setPhase(phase);document.querySelector('#play').textContent='Play';document.querySelector('#position').textContent=(phase*100).toFixed(1)+'%';};
+document.querySelector('#restart').onclick=()=>{setPhase(0);document.querySelector('#scrub').value=0;document.querySelector('#position').textContent='0%';};
+window.__walkReview={cycles:cycles.map(({frames,...metadata})=>metadata),setFramePhase(phase){playing=false;setPhase(phase);document.querySelector('#play').textContent='Play';},setDirection(direction){left=direction==='left';}};
 requestAnimationFrame(tick);
 </script></html>`;
 await fs.mkdir(path.dirname(htmlPath), { recursive: true });
