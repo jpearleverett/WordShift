@@ -99,7 +99,7 @@ if (!onlyStills) {
   const tmpVideo=path.join(OUT,'WordShift-Assembled-Preview.partial.mp4');
   const soundtrack=['puzzle_phase0.mp3','home_phase1.mp3','home_phase3.mp3'].map(f=>path.join(MOBILE,'assets/music',f));
   const audio=soundtrack.map((_,i)=>`[${i+1}:a]atrim=duration=6,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.35,afade=t=out:st=5.6:d=0.4[a${i}]`).join(';')+';[a0][a1][a2]concat=n=3:v=0:a=1,loudnorm=I=-18:TP=-2:LRA=9[a]';
-  const child=spawn('ffmpeg',['-hide_banner','-loglevel','warning','-y','-f','rawvideo','-pixel_format','rgb24','-video_size',`${W}x${H}`,'-framerate',String(FPS),'-i','pipe:0',...soundtrack.flatMap(p=>['-i',p]),'-filter_complex',audio,'-map','0:v','-map','[a]','-t',String(SECONDS),'-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p','-c:a','aac','-b:a','160k','-movflags','+faststart',tmpVideo],{stdio:['pipe','ignore','pipe']});
+  const child=spawn('ffmpeg',['-hide_banner','-loglevel','warning','-y','-f','rawvideo','-pixel_format','rgb24','-video_size',`${W}x${H}`,'-framerate',String(FPS),'-i','pipe:0',...soundtrack.flatMap(p=>['-i',p]),'-filter_complex',audio,'-map','0:v','-map','[a]','-t',String(SECONDS),'-c:v','libx264','-preset','veryfast','-crf','20','-pix_fmt','yuv420p','-c:a','aac','-ar','48000','-b:a','160k','-movflags','+faststart',tmpVideo],{stdio:['pipe','ignore','pipe']});
   let stderr=''; child.stderr.on('data',d=>{stderr+=d.toString();});
   child.stdin.on('error',()=>{});
   const closed=once(child,'close');
@@ -118,7 +118,7 @@ if (!onlyStills) {
   const v=inspected.streams.find(s=>s.codec_type==='video');
   const a=inspected.streams.find(s=>s.codec_type==='audio');
   if(v?.width!==W || v?.height!==H || Number(v.nb_read_frames)!==FPS*SECONDS || Math.abs(Number(inspected.format.duration)-SECONDS)>0.1 || !a) throw new Error('Preview failed video/audio/dimension/duration validation.');
-  videoEvidence={file:rel(video),sha256:await sha(video),bytes:(await fs.stat(video)).size,width:v.width,height:v.height,frames:Number(v.nb_read_frames),durationSeconds:Number(inspected.format.duration),videoCodec:v.codec_name,audioCodec:a.codec_name};
+  videoEvidence={file:rel(video),sha256:await sha(video),bytes:(await fs.stat(video)).size,width:v.width,height:v.height,frames:Number(v.nb_read_frames),durationSeconds:Number(inspected.format.duration),videoCodec:v.codec_name,audioCodec:a.codec_name,audioSampleRate:Number(a.sample_rate)};
   console.log(`Wrote ${rel(video)}`);
 }
 

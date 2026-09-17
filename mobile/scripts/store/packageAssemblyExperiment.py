@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Package the explicitly assembled creative study, never genuine captures."""
 from pathlib import Path
+import hashlib
 import json
 import zipfile
 
@@ -14,6 +15,9 @@ def main():
         raise ValueError('Expected the assembled experiment provenance.')
     if not provenance.get('notLiveCapture') or not provenance.get('animation', {}).get('exported'):
         raise ValueError('Expected honestly labeled assembled images and completed preview video.')
+    video = OUT / 'WordShift-Assembled-Preview.mp4'
+    if hashlib.sha256(video.read_bytes()).hexdigest() != provenance['animation']['output']['sha256']:
+        raise ValueError('Preview video differs from its recorded provenance.')
     required = [(ROOT / 'README.md', 'README.md'),
                 (ROOT / 'source/provenance.json', 'source/provenance.json'),
                 (ROOT / 'contact-sheet.png', 'WordShift-Assembly-Contact-Sheet.png'),
