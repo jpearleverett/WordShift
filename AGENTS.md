@@ -1,5 +1,11 @@
 # WordShift - Agent Instructions
 
+## Branch and merge workflow
+
+- Make all changes on a `feature/...` branch, including fixes, optimizations and documentation updates.
+- Push that branch and open a pull request for the owner to review and merge.
+- Do not push directly to `main` or merge the pull request yourself unless the owner explicitly changes this instruction.
+
 ## Cursor Cloud specific instructions
 
 ### Project overview
