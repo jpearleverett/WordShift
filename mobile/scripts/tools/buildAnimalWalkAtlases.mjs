@@ -7,7 +7,9 @@
  *
  * This is asset preparation only: remove the flat chroma backing, apply a single
  * scale and horizontal anchor to each cycle, and pack transparent 256px cells.
- * Existing idle, talk, robed and fox artwork is never modified.
+ * Existing portraits and the fox's original normal walk are retained.
+ * --pose normal|robed selects one outfit. Recovered prepared sources are copied
+ * byte-for-byte after the same framing, baseline and frame-uniqueness checks.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,7 +26,7 @@ const COLUMNS = 4;
 const ROWS = 2;
 const GUTTER = 3;
 const ANIMALS = [
-  'owl', 'pangolin', 'capybara', 'fennec_fox', 'sloth', 'wombat',
+  'fox', 'owl', 'pangolin', 'axolotl', 'capybara', 'fennec_fox', 'sloth', 'wombat',
   'rabbit', 'red_panda', 'tarsier', 'aye_aye', 'kakapo',
 ];
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -129,13 +131,26 @@ function assertGeometry(atlas, targetBaseline, name) {
 }
 
 async function build(record, check) {
+  const pose = record.pose ?? 'normal';
+  const name = `${record.type}/${pose}`;
   const sourceBytes = fs.readFileSync(path.join(RAW_DIR, record.source));
   if (sha256(sourceBytes) !== record.sourceSha256) throw new Error(`${record.type}: authored source checksum changed`);
   const sheet = PNG.sync.read(sourceBytes);
   if (Math.abs(sheet.width / sheet.height - 2) > 0.01) throw new Error(`${record.type}: expected a 4×2 sheet with square cells`);
-  const idleBytes = fs.readFileSync(path.join(ROOT, 'assets/characters', record.type, 'idle.png'));
+  const idleBytes = fs.readFileSync(path.join(ROOT, 'assets/characters', record.type, pose === 'robed' ? 'robed.png' : 'idle.png'));
   const idle = PNG.sync.read(idleBytes);
   const idleBox = bounds(idle);
+  const outputPath = path.join(ROOT, 'assets/characters', record.type, pose === 'robed' ? 'robed_walk.png' : 'walk.png');
+  if (record.sourceFormat === 'prepared-atlas') {
+    if (sheet.width !== CELL_SIZE * COLUMNS || sheet.height !== CELL_SIZE * ROWS) throw new Error(`${name}: invalid prepared atlas dimensions`);
+    const baseline = Math.round((idleBox.bottom + 1) / idle.height * CELL_SIZE) - 1;
+    const boxes = assertGeometry(sheet, baseline, name);
+    if (check) {
+      if (!fs.existsSync(outputPath) || !fs.readFileSync(outputPath).equals(sourceBytes)) throw new Error(`${name}: prepared atlas differs from its retained source`);
+    } else fs.writeFileSync(outputPath, sourceBytes);
+    console.log(`${name}: ${check ? 'verified' : 'restored'} 8 prepared frames; baseline=${baseline}; heights=${boxes.map(b => b.height).join(',')}`);
+    return;
+  }
   const frames = [];
   for (let row = 0; row < ROWS; row++) {
     for (let column = 0; column < COLUMNS; column++) frames.push(extractCell(sheet, column, row));
@@ -183,24 +198,27 @@ async function build(record, check) {
     const y = targetBaseline - resizedBox.bottom;
     PNG.bitblt(resized, atlas, 0, 0, width, height, (i % COLUMNS) * CELL_SIZE + x, Math.floor(i / COLUMNS) * CELL_SIZE + y);
   }
-  const boxes = assertGeometry(atlas, targetBaseline, record.type);
+  const boxes = assertGeometry(atlas, targetBaseline, name);
   const encoded = PNG.sync.write(atlas, { colorType: 6, inputColorType: 6 });
-  const outputPath = path.join(ROOT, 'assets/characters', record.type, 'walk.png');
   if (check) {
     if (!fs.existsSync(outputPath) || !fs.readFileSync(outputPath).equals(encoded)) {
-      throw new Error(`${record.type}: walk.png is stale; rerun the atlas builder`);
+      throw new Error(`${name}: walk atlas is stale; rerun the atlas builder`);
     }
   } else fs.writeFileSync(outputPath, encoded);
-  console.log(`${record.type}: ${check ? 'verified' : 'built'} 8 distinct frames; baseline=${targetBaseline}; heights=${boxes.map((b) => b.height).join(',')}; ${(encoded.length / 1024).toFixed(1)}KB`);
+  console.log(`${name}: ${check ? 'verified' : 'built'} 8 distinct frames; baseline=${targetBaseline}; heights=${boxes.map((b) => b.height).join(',')}; ${(encoded.length / 1024).toFixed(1)}KB`);
 }
 
 const args = process.argv.slice(2);
 const check = args.includes('--check');
 let importDir;
+let selectedPose;
 const requested = [];
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--check') continue;
-  if (args[i] === '--import') {
+  if (args[i] === '--pose') {
+    selectedPose = args[++i];
+    if (!['normal', 'robed'].includes(selectedPose)) throw new Error('--pose requires normal or robed');
+  } else if (args[i] === '--import') {
     importDir = args[++i];
     if (!importDir) throw new Error('--import requires a metadata directory');
   } else {
@@ -211,7 +229,7 @@ for (let i = 0; i < args.length; i++) {
 if (check && importDir) throw new Error('--check cannot import or change authored sources');
 fs.mkdirSync(RAW_DIR, { recursive: true });
 const manifest = fs.existsSync(MANIFEST_PATH) ? JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8')) : {
-  version: 1,
+  version: 2,
   description: 'Authored right-facing eight-pose walks; raw 4×2 sheets retain the original image generation output and prompt.',
   atlas: { columns: COLUMNS, rows: ROWS, frameWidth: CELL_SIZE, frameHeight: CELL_SIZE },
   animals: [],
@@ -220,27 +238,39 @@ if (importDir) {
   for (const file of fs.readdirSync(importDir).filter((name) => name.endsWith('.json'))) {
     const metadata = JSON.parse(fs.readFileSync(path.join(importDir, file), 'utf8'));
     const type = metadata.type ?? metadata.animal;
+    const pose = metadata.pose ?? 'normal';
+    if (!['normal', 'robed'].includes(pose)) throw new Error(`${file}: invalid pose`);
     if (!ANIMALS.includes(type) || (requested.length && !requested.includes(type))) continue;
+    if (selectedPose && pose !== selectedPose) continue;
+    if (type === 'fox' && pose === 'normal') throw new Error('Retain the fox original ten-frame normal walk');
     if (!metadata.prompt || !metadata.generatedPath) throw new Error(`${file}: missing prompt or generatedPath`);
     const bytes = fs.readFileSync(metadata.generatedPath);
     const record = {
       type,
-      source: `${type}.png`,
+      pose,
+      sourceFormat: 'sheet',
+      source: pose === 'robed' ? `${type}_robed.png` : `${type}.png`,
       sourceSha256: sha256(bytes),
       sourceFacing: 'right',
       idleFacing: type === 'fennec_fox' ? 'left' : 'right',
-      reference: `../../characters/${type}/idle.png`,
+      reference: `../../characters/${type}/${pose === 'robed' ? 'robed.png' : 'idle.png'}`,
       prompt: metadata.prompt,
+      visualReview: metadata.visualReview,
     };
     fs.writeFileSync(path.join(RAW_DIR, record.source), bytes);
-    manifest.animals = [...manifest.animals.filter((item) => item.type !== type), record];
+    manifest.animals = [...manifest.animals.filter((item) => item.type !== type || (item.pose ?? 'normal') !== pose), record];
   }
-  manifest.animals.sort((a, b) => ANIMALS.indexOf(a.type) - ANIMALS.indexOf(b.type));
+  manifest.version = 2;
+  manifest.description = 'Alternating two-step walks in both outfits. Each record identifies original generated sheets or recovered prepared outputs explicitly.';
+  manifest.animals.sort((a, b) => ANIMALS.indexOf(a.type) - ANIMALS.indexOf(b.type) || (a.pose ?? 'normal').localeCompare(b.pose ?? 'normal'));
   fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2) + '\n');
 }
 const selected = requested.length ? requested : ANIMALS;
 for (const type of selected) {
-  const record = manifest.animals.find((item) => item.type === type);
-  if (!record) throw new Error(`${type}: no authored sheet in the manifest`);
-  await build(record, check);
+  for (const pose of selectedPose ? [selectedPose] : ['normal', 'robed']) {
+    if (type === 'fox' && pose === 'normal') continue;
+    const record = manifest.animals.find((item) => item.type === type && (item.pose ?? 'normal') === pose);
+    if (!record) throw new Error(`${type}/${pose}: no authored sheet in the manifest`);
+    await build(record, check);
+  }
 }

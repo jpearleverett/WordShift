@@ -35,6 +35,7 @@ jest.mock('react-native', () => {
         value: number;
         constructor(value: number) { this.value = value; }
         setValue(value: number) { this.value = value; }
+        stopAnimation(done?: (value: number) => void) { done?.(this.value); }
         interpolate() { return { input: this }; }
       },
       timing: (value: { setValue: (value: number) => void }, config: { toValue: number; duration: number }) => ({
@@ -43,9 +44,9 @@ jest.mock('react-native', () => {
         stop: jest.fn(),
       }),
       parallel: (animations: { start: () => void }[]) => ({
-        start: (done?: () => void) => {
+        start: (done?: (result: { finished: boolean }) => void) => {
           animations.forEach(animation => animation.start());
-          if (done) mockTravelCompletions.push(done);
+          if (done) mockTravelCompletions.push(() => done({ finished: true }));
         },
         stop: jest.fn(),
       }),
@@ -75,9 +76,11 @@ import {
   getSpriteFacingCorrection,
   getWalkAtlasFrame,
   getWalkFrameDurationMs,
+  getGaitPaceScale,
+  getPhaseMotionScale,
 } from '../components/home/AnimalSprite';
 
-type Node = { props: { children?: unknown; testID?: string; style?: unknown; source?: unknown; onError?: () => void }; type?: unknown };
+type Node = { props: { children?: unknown; testID?: string; style?: unknown; source?: unknown; onError?: () => void; onLoad?: () => void }; type?: unknown };
 
 function find(node: unknown, testID: string): Node | undefined {
   if (!node || typeof node !== 'object') return undefined;
@@ -116,7 +119,17 @@ function sourceMirror(tree: unknown, pose: 'static' | 'walk-atlas' | 'talk'): nu
   return body.transform[0].scaleX.value * layer.transform[0].scaleX;
 }
 
+function atlasImage(tree: unknown): Node {
+  return (find(tree, 'animal-sprite-walk-atlas')!.props.children as Node[])[0];
+}
+
+function atlasOffset(tree: unknown) {
+  const style = flattenStyle(atlasImage(tree).props.style);
+  return { x: style.transform[0].translateX.value, y: style.transform[1].translateY.value };
+}
+
 function createHarness(type: AnimalType = 'fennec_fox', extraProps: Record<string, unknown> = {}) {
+  const decodedSources = new Set<unknown>();
   const values = new Map<number, unknown>();
   const effects = new Map<number, { deps?: readonly unknown[]; cleanup?: () => void }>();
   let pending: { index: number; effect: Effect; deps?: readonly unknown[] }[] = [];
@@ -148,7 +161,7 @@ function createHarness(type: AnimalType = 'fennec_fox', extraProps: Record<strin
   };
   const animal = { type, name: 'Fennick', position: { x: 50, y: 50 }, hasNewDialogue: true } as Animal;
   return {
-    render(phase: DialoguePhase = 0): unknown {
+    render(phase: DialoguePhase = 0, decodeAtlas = true): unknown {
       let tree: unknown;
       let renders = 0;
       do {
@@ -159,6 +172,14 @@ function createHarness(type: AnimalType = 'fennec_fox', extraProps: Record<strin
         for (const update of pending) {
           effects.get(update.index)?.cleanup?.();
           effects.set(update.index, { deps: update.deps, cleanup: update.effect() || undefined });
+        }
+        const atlas = find(tree, 'animal-sprite-walk-atlas');
+        if (decodeAtlas && atlas) {
+          const image = atlasImage(tree);
+          if (image.props.onLoad && !decodedSources.has(image.props.source)) {
+            decodedSources.add(image.props.source);
+            image.props.onLoad();
+          }
         }
         if (++renders > 10) throw new Error('Animal did not settle');
       } while (changed);
@@ -177,6 +198,9 @@ beforeEach(() => {
   mockLowTier = false;
   mockPremount = true;
   mockTravelCompletions.length = 0;
+  // Different native asset handles let late callbacks prove outfit isolation.
+  CHARACTER_SPRITES.fennec_fox!.walkAtlas!.source = 101;
+  CHARACTER_SPRITES.fennec_fox!.robedWalkAtlas!.source = 102;
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -189,6 +213,7 @@ describe('the fennec faces its direction of travel in every source pose', () => 
       expect(getSpriteFacingCorrection('fennec_fox', pose)).toBe(-1);
     }
     expect(getSpriteFacingCorrection('fennec_fox', 'walk')).toBe(1);
+    expect(getSpriteFacingCorrection('fennec_fox', 'robedWalk')).toBe(1);
     expect(getSpriteFacingCorrection('fox', 'idle')).toBe(1);
     expect(getSpriteFacingCorrection('fox', 'walk')).toBe(1);
   });
@@ -219,29 +244,54 @@ describe('the fennec faces its direction of travel in every source pose', () => 
     },
   );
 
-  test('a robed fennec glides right with the same direction correction', () => {
-    jest.spyOn(Math, 'random').mockReturnValue(0.9);
+  test.each([
+    [4, 'right', 0.9, 1], [4, 'left', 0.1, -1],
+    [5, 'right', 0.9, 1], [5, 'left', 0.1, -1],
+  ] as const)('a phase-%s robed fennec walks %s through all eight frames', (phase, _direction, random, expected) => {
+    jest.spyOn(Math, 'random').mockReturnValue(random);
     const harness = createHarness();
     try {
-      harness.render(4);
-      jest.advanceTimersByTime(6000);
-      const tree = harness.render(4);
-      expect(sourceMirror(tree, 'static')).toBe(-1);
-      expect(find(tree, 'animal-sprite-walk-atlas')).toBeUndefined();
-      expect(find(tree, 'animal-sprite-talk')).toBeUndefined();
+      harness.render(phase);
+      jest.advanceTimersByTime(7000);
+      const started = harness.render(phase);
+      expect(sourceMirror(started, 'walk-atlas')).toBe(expected);
+      expect(sourceMirror(started, 'static')).toBe(-expected);
+      expect(find(started, 'animal-sprite-talk')).toBeUndefined();
+      expect(flattenStyle(find(started, 'animal-sprite-static')!.props.style).opacity).toBe(0);
+      const source = atlasImage(started).props.source;
+      expect(source).toBe(CHARACTER_SPRITES.fennec_fox!.robedWalkAtlas!.source);
+      const cadence = getWalkFrameDurationMs('fennec_fox') * getGaitPaceScale(
+        24, 2000 * getPhaseMotionScale(phase).speedMul, 2000,
+      );
+      const offsets = [atlasOffset(started)];
+      for (let frame = 1; frame < 8; frame++) {
+        jest.advanceTimersByTime(Math.ceil(cadence));
+        const tree = harness.render(phase);
+        expect(atlasImage(tree).props.source).toBe(source);
+        offsets.push(atlasOffset(tree));
+      }
+      expect(new Set(offsets.map(offset => `${offset.x},${offset.y}`)).size).toBe(8);
+      expect(new Set(offsets.map(offset => offset.y))).toEqual(new Set([0, -90]));
+      mockTravelCompletions.shift()!();
+      const stopped = harness.render(phase);
+      expect(atlasOffset(stopped)).toEqual({ x: 0, y: 0 });
+      expect(flattenStyle(find(stopped, 'animal-sprite-static')!.props.style).opacity).toBe(1);
+      expect(sourceMirror(stopped, 'static')).toBe(-expected);
     } finally { harness.dispose(); }
   });
 
-  test.each(['reduced motion', 'low tier'] as const)('%s keeps the static artwork and avoids decoding an atlas', mode => {
+  test.each([
+    ['reduced motion', 0], ['low tier', 0], ['reduced motion', 4], ['low tier', 4], ['reduced motion', 5], ['low tier', 5],
+  ] as const)('%s in phase %s keeps the static artwork and avoids decoding an atlas', (mode, phase) => {
     mockReducedMotion = mode === 'reduced motion';
     mockLowTier = mode === 'low tier';
     jest.spyOn(Math, 'random').mockReturnValue(0.9);
     const harness = createHarness();
     try {
-      const initial = harness.render();
+      const initial = harness.render(phase);
       expect(sourceMirror(initial, 'static')).toBe(1);
-      jest.advanceTimersByTime(3000);
-      const tree = harness.render();
+      jest.advanceTimersByTime(7000);
+      const tree = harness.render(phase);
       expect(find(tree, 'animal-sprite-walk-atlas')).toBeUndefined();
       expect(sourceMirror(tree, 'static')).toBe(mockReducedMotion ? 1 : -1);
     } finally { harness.dispose(); }
@@ -331,14 +381,17 @@ describe('accessibility label', () => {
 });
 
 describe('packed animal walk cycles', () => {
-  test('all eleven requested residents have eight frames, preserving fox and excluding axolotl', () => {
+  test('all residents have normal and robed cycles, preserving the fox source animation', () => {
     const types = Object.keys(CHARACTER_SPRITES) as AnimalType[];
+    expect(types).toHaveLength(13);
     const atlases = types.filter(type => CHARACTER_SPRITES[type]?.walkAtlas);
-    expect(atlases).toHaveLength(11);
+    expect(atlases).toHaveLength(12);
     expect(atlases).not.toContain('fox');
-    expect(atlases).not.toContain('axolotl');
+    expect(atlases).toContain('axolotl');
     expect(CHARACTER_SPRITES.fox?.walk).toHaveLength(10);
-    expect(CHARACTER_SPRITES.axolotl?.walk).toBeUndefined();
+    for (const type of types) {
+      expect(CHARACTER_SPRITES[type]!.robedWalkAtlas).toMatchObject({ columns: 4, rows: 2, frameCount: 8 });
+    }
     for (const type of atlases) {
       expect(CHARACTER_SPRITES[type]!.walkAtlas).toMatchObject({ columns: 4, rows: 2, frameCount: 8 });
     }
@@ -372,6 +425,77 @@ describe('packed animal walk cycles', () => {
       expect(find(fallback, 'animal-sprite-walk-atlas')).toBeUndefined();
       expect(sourceMirror(fallback, 'static')).toBe(-1);
       expect(flattenStyle(find(fallback, 'animal-sprite-static')!.props.style).opacity).toBe(1);
+    } finally { harness.dispose(); }
+  });
+
+  test('the current outfit stays visible until its own atlas has decoded', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.9);
+    const harness = createHarness();
+    try {
+      const first = harness.render(3, false);
+      const staleNormalImage = atlasImage(first);
+      jest.advanceTimersByTime(4000);
+      const waiting = harness.render(3, false);
+      expect(flattenStyle(find(waiting, 'animal-sprite-static')!.props.style).opacity).toBe(1);
+      expect(flattenStyle(find(waiting, 'animal-sprite-walk-atlas')!.props.style).opacity).toBe(0);
+      harness.render(4, false);
+      jest.advanceTimersByTime(6000);
+      // A late normal-clothes decode cannot reveal a still-undecoded robe.
+      staleNormalImage.props.onLoad!();
+      const robedWaiting = harness.render(4, false);
+      expect(atlasImage(robedWaiting).props.source).toBe(102);
+      expect(flattenStyle(find(robedWaiting, 'animal-sprite-static')!.props.style).opacity).toBe(1);
+      expect(find(robedWaiting, 'animal-sprite-talk')).toBeUndefined();
+      // An error from that obsolete image also cannot disable the robe.
+      staleNormalImage.props.onError!();
+      const robedReady = harness.render(4);
+      expect(atlasImage(robedReady).props.source).toBe(102);
+      expect(flattenStyle(find(robedReady, 'animal-sprite-walk-atlas')!.props.style).opacity).toBe(1);
+      expect(flattenStyle(find(robedReady, 'animal-sprite-static')!.props.style).opacity).toBe(0);
+    } finally { harness.dispose(); }
+  });
+
+  test('changing outfit resets the walk and ignores the old travel completion', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.9);
+    const harness = createHarness();
+    try {
+      harness.render(3);
+      jest.advanceTimersByTime(4000);
+      harness.render(3);
+      jest.advanceTimersByTime(500);
+      expect(atlasOffset(harness.render(3))).not.toEqual({ x: 0, y: 0 });
+      const oldTravelDone = mockTravelCompletions.shift()!;
+      const changed = harness.render(4);
+      expect(atlasOffset(changed)).toEqual({ x: 0, y: 0 });
+      expect(flattenStyle(find(changed, 'animal-sprite-static')!.props.style).opacity).toBe(1);
+      jest.advanceTimersByTime(6000);
+      const moving = harness.render(4);
+      expect(flattenStyle(find(moving, 'animal-sprite-walk-atlas')!.props.style).opacity).toBe(1);
+      oldTravelDone();
+      expect(flattenStyle(find(harness.render(4), 'animal-sprite-walk-atlas')!.props.style).opacity).toBe(1);
+      mockTravelCompletions.shift()!();
+      expect(flattenStyle(find(harness.render(4), 'animal-sprite-static')!.props.style).opacity).toBe(1);
+      const normalAgain = harness.render(3);
+      expect(atlasImage(normalAgain).props.source).toBe(101);
+      expect(atlasOffset(normalAgain)).toEqual({ x: 0, y: 0 });
+    } finally { harness.dispose(); }
+  });
+
+  test('a failed robed atlas falls back to the robe without breaking normal walks', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.9);
+    const harness = createHarness();
+    try {
+      harness.render(4);
+      jest.advanceTimersByTime(6000);
+      atlasImage(harness.render(4)).props.onError!();
+      const fallback = harness.render(4);
+      expect(find(fallback, 'animal-sprite-walk-atlas')).toBeUndefined();
+      expect(flattenStyle(find(fallback, 'animal-sprite-static')!.props.style).opacity).toBe(1);
+      expect((find(fallback, 'animal-sprite-static')!.props.children as Node[])[0].props.source)
+        .toBe(CHARACTER_SPRITES.fennec_fox!.robed);
+      harness.render(3);
+      jest.advanceTimersByTime(4000);
+      expect(flattenStyle(find(harness.render(3), 'animal-sprite-walk-atlas')!.props.style).opacity).toBe(1);
     } finally { harness.dispose(); }
   });
 

@@ -493,14 +493,18 @@ describe('procedural gait profile', () => {
     expect(GAIT_LEAN_DEG).toBe(2.5);
   });
 
-  test('gait respects the reverence/motion gates in source', () => {
+  test('gait respects motion budgets while robes have their own walking artwork', () => {
     const src = fs.readFileSync(
       path.resolve(__dirname, '../components/home/AnimalSprite.tsx'),
       'utf8'
     );
-    // Robed Phase-4+ figures glide (no gait), real-frame walkers keep frames,
-    // and reduced motion / low tier keep the static sprite.
-    expect(src).toMatch(/!hasWalkFrames &&\s*\n\s*currentPhase < 4/);
+    // The outfit selects the art; accessibility/device budgets still suppress
+    // costly gait layers in every phase. Robes must not force a static glide.
+    const walk = src.slice(src.indexOf('const walkActive ='), src.indexOf('// Procedural gait for the animals'));
+    expect(walk).not.toMatch(/currentPhase < 4/);
+    expect(walk).toMatch(/!getSettingsSync\(\)\.reducedMotion/);
+    expect(walk).toMatch(/!shouldSimplifyAnimations\(\)/);
+    expect(src).toMatch(/robedWalkAtlas/);
     expect(src).not.toMatch(/useNativeDriver: false/);
   });
 });
