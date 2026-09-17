@@ -1,0 +1,388 @@
+{
+  "schema": 1,
+  "renderer": "mobile/scripts/tools/buildWalkReview.mjs",
+  "viewport": 90,
+  "foxNormal": {
+    "frameCount": 10,
+    "scale": 1.1,
+    "footCorrection": -2.790000000000003
+  },
+  "cycles": [
+    {
+      "animal": "fox",
+      "name": "Fox",
+      "pose": "normal",
+      "count": 10,
+      "frameMs": 125,
+      "scale": 1.1,
+      "correction": -2.790000000000003
+    },
+    {
+      "animal": "fox",
+      "name": "Fox",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 125,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "owl",
+      "name": "Owl",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "owl",
+      "name": "Owl",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "pangolin",
+      "name": "Pangolin",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 112,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "pangolin",
+      "name": "Pangolin",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 112,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "axolotl",
+      "name": "Axolotl",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 128,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "axolotl",
+      "name": "Axolotl",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 128,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "capybara",
+      "name": "Capybara",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 160,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "capybara",
+      "name": "Capybara",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 160,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "fennec_fox",
+      "name": "Fennec Fox",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "fennec_fox",
+      "name": "Fennec Fox",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "sloth",
+      "name": "Sloth",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 200,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "sloth",
+      "name": "Sloth",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 200,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "wombat",
+      "name": "Wombat",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 128,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "wombat",
+      "name": "Wombat",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 128,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "rabbit",
+      "name": "Rabbit",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "rabbit",
+      "name": "Rabbit",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "red_panda",
+      "name": "Red Panda",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "red_panda",
+      "name": "Red Panda",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "tarsier",
+      "name": "Tarsier",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "tarsier",
+      "name": "Tarsier",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 100,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "aye_aye",
+      "name": "Aye Aye",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 112,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "aye_aye",
+      "name": "Aye Aye",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 112,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "kakapo",
+      "name": "Kakapo",
+      "pose": "normal",
+      "count": 8,
+      "frameMs": 144,
+      "scale": 1,
+      "correction": 0
+    },
+    {
+      "animal": "kakapo",
+      "name": "Kakapo",
+      "pose": "robed",
+      "count": 8,
+      "frameMs": 144,
+      "scale": 1,
+      "correction": 0
+    }
+  ],
+  "sources": [
+    {
+      "path": "mobile/assets/characters/fox/walk_0.png",
+      "sha256": "6ff6d02b18c4b99850fb84f6e53c6f578fe90f2db6360e8cc8a72655b9734777"
+    },
+    {
+      "path": "mobile/assets/characters/fox/walk_1.png",
+      "sha256": "5587ede5d8d3dbc79aa120d45e7cb59da8dd84662dc18a1f8e464d0bb7eab036"
+    },
+    {
+      "path": "mobile/assets/characters/fox/walk_2.png",
+      "sha256": "4211d328d3a9865204b077d2b90693a75da07d44307651af75f407395b848526"
+    },
+    {
+      "path": "mobile/assets/characters/fox/walk_3.png",
+      "sha256": "077d20cfb922c9bff67dcde1657099e79dd4d9bb2f0cf217aaba838cdddb209a"
+    },
+    {
+      "path": "mobile/assets/characters/fox/walk_4.png",
+      "sha256": "36270718d769e768af0a9ccaa306da2de350ebe7dc8bed83f211ba81fea83606"
+    },
+    {
+      "path": "mobile/assets/characters/fox/walk_5.png",
+      "sha256": "c632bf6a527288accca1cf69445de51f9a47857ee578f2614d0d7cfdf8a5ad13"
+    },
+    {
+      "path": "mobile/assets/characters/fox/walk_6.png",
+      "sha256": "b9d79b166cd528e8c4ee746208d4f49c4476707278d036e0b2380e86727d70b0"
+    },
+    {
+      "path": "mobile/assets/characters/fox/walk_7.png",
+      "sha256": "7cea73bfccc998d8753f2143662705cb632b36737faab74b08c8f9f4d31e5fcf"
+    },
+    {
+      "path": "mobile/assets/characters/fox/walk_8.png",
+      "sha256": "84e056f249b17dfd6157c1fae41dfb82b1f54d5a29693f1d329d692169c0d096"
+    },
+    {
+      "path": "mobile/assets/characters/fox/walk_9.png",
+      "sha256": "0a91757f408da5c03a7cd183d02c4f4f68564d6c2ca05937bc37f4b73767fc66"
+    },
+    {
+      "path": "mobile/assets/characters/fox/robed_walk.png",
+      "sha256": "7ea0a1cfd3d670e3dc6418e0c8081317c6ee580a060c0c58d96a7e9907942bb7"
+    },
+    {
+      "path": "mobile/assets/characters/owl/walk.png",
+      "sha256": "45f83a9ba076dd4f9456ffb77176b5e1d0732991c2b551e13867ab37e5e1336b"
+    },
+    {
+      "path": "mobile/assets/characters/owl/robed_walk.png",
+      "sha256": "8fc9262b57669c9447ff316b3900e390e33f50627808809bf223b97cabedf27c"
+    },
+    {
+      "path": "mobile/assets/characters/pangolin/walk.png",
+      "sha256": "3a6815df681fa968962cbc9ea2951aac70f176261dfde45465422a01a6fbf02b"
+    },
+    {
+      "path": "mobile/assets/characters/pangolin/robed_walk.png",
+      "sha256": "6c3207eec1ef00e2ac9fcff7fe6197db5a7d7ddfcd6bc0be0d8055e1490ad3b4"
+    },
+    {
+      "path": "mobile/assets/characters/axolotl/walk.png",
+      "sha256": "ead0876f0e14f53e42acadecfe85d5775f522a6f8cf2c7386a511ffbe5386975"
+    },
+    {
+      "path": "mobile/assets/characters/axolotl/robed_walk.png",
+      "sha256": "99289121477c37f5b830c79f4826bd9e2a614d1e69e0495a8c30ead600a9fa3f"
+    },
+    {
+      "path": "mobile/assets/characters/capybara/walk.png",
+      "sha256": "ddaa2c8ccb981ce685d18b3f72ebf7f8fb320de6cf64468cbf6bd8e74983eb7d"
+    },
+    {
+      "path": "mobile/assets/characters/capybara/robed_walk.png",
+      "sha256": "d8e9774571c2c0fb46bce5cd91c69aaf9e376f2e105e6793b4943a9a79de932f"
+    },
+    {
+      "path": "mobile/assets/characters/fennec_fox/walk.png",
+      "sha256": "c5cea8ba353b132a83f3761dc015c62baafc68f71d868dd8d1acb50daca28d56"
+    },
+    {
+      "path": "mobile/assets/characters/fennec_fox/robed_walk.png",
+      "sha256": "3f6950b3f881f6dd92b01d497e508b16800aa9a6d8fc98a4b8b6bb548404816a"
+    },
+    {
+      "path": "mobile/assets/characters/sloth/walk.png",
+      "sha256": "72fbb122627eb90ed679a8e1e6a83cfecca8c002165847a3d5b64c7ea0b4680e"
+    },
+    {
+      "path": "mobile/assets/characters/sloth/robed_walk.png",
+      "sha256": "eb7154708fe509875fe79d0a8a754ffc0914edeef9e901d3c682d4dd3858914f"
+    },
+    {
+      "path": "mobile/assets/characters/wombat/walk.png",
+      "sha256": "195c4610c41f649e825fefa03a92f6a421598a6098b8ebe4673d2a847d1788ba"
+    },
+    {
+      "path": "mobile/assets/characters/wombat/robed_walk.png",
+      "sha256": "ebe12108aa11af2488ada375e03d06a7bf173948b7c3d69dac127352918b430d"
+    },
+    {
+      "path": "mobile/assets/characters/rabbit/walk.png",
+      "sha256": "42a430da4a252659459ead5484334f60adeaf1299e87c35d6f910aa28efe286c"
+    },
+    {
+      "path": "mobile/assets/characters/rabbit/robed_walk.png",
+      "sha256": "fee5f395564eee2c4e9c231caadee4a40bba608f256128866aee9e9240f45882"
+    },
+    {
+      "path": "mobile/assets/characters/red_panda/walk.png",
+      "sha256": "5b4fcdf9b5afece48d73ac2db7970a5fa20314b9c4e3b8532c0c7b916b82a667"
+    },
+    {
+      "path": "mobile/assets/characters/red_panda/robed_walk.png",
+      "sha256": "83d30324545faf3e2f2d3fea18dc081fda8ee26c929246e0f6e227e356054508"
+    },
+    {
+      "path": "mobile/assets/characters/tarsier/walk.png",
+      "sha256": "4c34d6d4ce759e547f56ec720cff15a33251314ca121415f62c9cf088b76b7db"
+    },
+    {
+      "path": "mobile/assets/characters/tarsier/robed_walk.png",
+      "sha256": "15ad3676e59dbd3de47639508c683a5d5395d43fe12909351c75b2f387f75ba8"
+    },
+    {
+      "path": "mobile/assets/characters/aye_aye/walk.png",
+      "sha256": "de5f40ef3f28916655422691a448d1e054166cbb29b1627124bf8af69c5d1f39"
+    },
+    {
+      "path": "mobile/assets/characters/aye_aye/robed_walk.png",
+      "sha256": "0f13d1a8dd0438543192954849fef993160411bd723698bf46f3703486ebe28f"
+    },
+    {
+      "path": "mobile/assets/characters/kakapo/walk.png",
+      "sha256": "449a0175d64305ea7f0c5c56f01b29ea250ef5d5751a6fac5f2cf28f7b24a1af"
+    },
+    {
+      "path": "mobile/assets/characters/kakapo/robed_walk.png",
+      "sha256": "7c0455c6b283af7b9f0ae11d82bb3b44fa2835986d8a6b977f5de0801e1e86fa"
+    }
+  ]
+}

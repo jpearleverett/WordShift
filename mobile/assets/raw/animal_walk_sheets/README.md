@@ -1,46 +1,42 @@
-# Animal walk source sheets
+# Animal walking sources
 
-Reviewed September 13, 2026 against `main` at `6f96ebb`.
+The runtime has 26 outfit cycles for thirteen residents: the fox's original ten
+normal frames, twelve normal eight-frame atlases, and thirteen robed eight-frame
+atlases. Normal clothing runs in phases 0–3 and robes in phases 4–5. Both atlas
+outfits face right, including fennec; the renderer separately corrects his
+left-facing static portraits. Reduced-motion and device-tier limits still apply.
 
-These eleven original image generation outputs contain eight authored walking
-poses each, in a four-column, two-row grid. `manifest.json` retains the exact
-prompt and SHA-256 of every source. Each prompt references the corresponding
-existing `assets/characters/<animal>/idle.png` to preserve character identity.
-All walks face right. Fennec's original idle art faces left; the build accounts
-for that difference when matching its horizontal framing, and the renderer
-accounts for it when displaying the existing idle and speaking art.
+Every eight-frame cycle contains two steps: the near foot leads at frame 0 and
+trails at frame 4, with opposite passing legs at frames 2 and 6. A set of eight
+different images alone does not prove that the legs alternate. Inspect the full
+loop, direction, costume and contact poses after any artwork change.
 
-The source sheets are provenance/build inputs only and are not imported by the
-app. The repository-root `.easignore` excludes this raw source directory from EAS
-uploads; the files remain in Git for regeneration. See the
-[build and upload guide](../../../../docs/BUILD_AND_UPLOAD.md).
-The runtime imports one `walk.png` atlas for each of these eleven characters.
-Fox keeps its original ten walk frames. Axolotl keeps its existing movement.
-Walk frames run in Phases 0–3 when motion settings and device tier permit;
-robed phases retain the existing glide. Fennec's facing correction is per pose,
-so turning during travel does not reuse the left-facing idle correction on the
-right-facing walk atlas.
+`manifest.json` retains checksums and distinguishes two source formats:
 
-From `mobile/` in a full repository checkout (including raw sources), rebuild or verify the prepared assets with:
+- `sheet`: original generated 4×2 image plus its exact generation prompt. The
+  builder removes backing/fringe, uses one scale and horizontal anchor for the
+  whole cycle, and packs transparent 256px cells at the matching portrait floor.
+- `prepared-atlas`: an accepted, normalized output recovered after automatic
+  workspace cleanup removed its larger generated source and exact per-call
+  prompt. The unchanged reviewed atlas is retained under `recovered/`, with an
+  explicitly labelled prompt summary and provenance. The builder checks its
+  geometry and checksum, then restores it byte-for-byte. It is not represented
+  as the original image-generation output.
+
+The older unreferenced sheets remain historical art; the manifest identifies the
+inputs used for current builds. Raw sources are excluded from EAS archives; only
+prepared runtime character assets ship.
+
+From `mobile/`:
 
 ```sh
-node scripts/tools/buildAnimalWalkAtlases.mjs
 node scripts/tools/buildAnimalWalkAtlases.mjs --check
-node scripts/tools/buildAnimalWalkAtlases.mjs fennec_fox --check
+node scripts/tools/buildAnimalWalkAtlases.mjs rabbit --pose robed --check
+node scripts/tools/buildAnimalWalkAtlases.mjs --import /absolute/metadata-directory wombat
+node scripts/tools/buildWalkReview.mjs --html /absolute/output/walk-review.html
 ```
 
-The build removes only the flat magenta backing and connected magenta edge
-fringe, packs each sheet into eight transparent 256×256 frames (1024×512 total),
-and uses nearest-neighbor sampling to retain pixel edges. One scale and one
-horizontal anchor apply to the entire cycle. This preserves the relative motion
-of limbs and tails instead of recentering each pose to its changing silhouette.
-The visible feet align with that character's existing idle alpha baseline, and
-the median cycle height matches its idle height. A fit safeguard retains all
-ears, tails and feet inside a transparent gutter without clipping.
-
-For a newly generated/revised source, `--import <directory>` accepts JSON records
-containing `type`, `prompt` and `generatedPath`, copies the original PNG output
-into this folder, updates the manifest and builds the selected character(s).
-No generated source or runtime sheet modifies existing idle, speaking or robed
-artwork. Visual review of all eight poses is still required after changing an
-authored sheet; geometric checks cannot judge character fidelity or a gait.
+Import metadata uses `type`, `pose` (`normal` or `robed`), `generatedPath`,
+`prompt`, and optional `visualReview`. Without `--pose`, both outfits are built;
+the fox's original normal sequence is always retained. Existing idle, speaking
+and robed portraits are not modified.

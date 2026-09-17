@@ -13,13 +13,14 @@ const { PNG } = require('pngjs') as {
 };
 const ASSETS = path.resolve(__dirname, '../../assets');
 const ANIMALS = [
-  'owl', 'pangolin', 'capybara', 'fennec_fox', 'sloth', 'wombat',
+  'fox', 'owl', 'pangolin', 'axolotl', 'capybara', 'fennec_fox', 'sloth', 'wombat',
   'rabbit', 'red_panda', 'tarsier', 'aye_aye', 'kakapo',
 ];
 const manifest = JSON.parse(fs.readFileSync(path.join(ASSETS, 'raw/animal_walk_sheets/manifest.json'), 'utf8')) as {
   atlas: { columns: number; rows: number; frameWidth: number; frameHeight: number };
-  animals: { type: string; source: string; sourceSha256: string; sourceFacing: string; idleFacing: string; prompt: string }[];
+  animals: { type: string; pose: 'normal' | 'robed'; source: string; sourceFormat: 'sheet' | 'prepared-atlas'; sourceSha256: string; sourceFacing: string; idleFacing: string; prompt?: string; promptSummary?: string; provenance?: string }[];
 };
+const CYCLES = ANIMALS.flatMap(type => (type === 'fox' ? ['robed'] : ['normal', 'robed']).map(pose => ({ type, pose })));
 
 function visibleBounds(png: DecodedPng, startX = 0, startY = 0, width = png.width, height = png.height) {
   let left = width, right = -1, top = height, bottom = -1;
@@ -37,11 +38,13 @@ function visibleBounds(png: DecodedPng, startX = 0, startY = 0, width = png.widt
 }
 
 describe('authored animal walk assets', () => {
-  it('covers the eleven requested animals and retains the source prompts and facing conventions', () => {
-    expect(manifest.animals.map((record) => record.type).sort()).toEqual([...ANIMALS].sort());
+  it('covers every outfit and distinguishes original sources from recovered prepared outputs', () => {
+    expect(manifest.animals.map(({ type, pose }) => `${type}/${pose}`).sort()).toEqual(CYCLES.map(({ type, pose }) => `${type}/${pose}`).sort());
     expect(manifest.atlas).toEqual({ columns: 4, rows: 2, frameWidth: 256, frameHeight: 256 });
     for (const record of manifest.animals) {
-      expect(record.prompt.length).toBeGreaterThan(100);
+      expect((record.prompt ?? record.promptSummary ?? '').length).toBeGreaterThan(100);
+      if (record.sourceFormat === 'prepared-atlas') expect(record.provenance).toContain('recovered');
+      else expect(record.prompt).toBeDefined();
       expect(record.sourceFacing).toBe('right');
       expect(record.idleFacing).toBe(record.type === 'fennec_fox' ? 'left' : 'right');
       const source = fs.readFileSync(path.join(ASSETS, 'raw/animal_walk_sheets', record.source));
@@ -49,9 +52,9 @@ describe('authored animal walk assets', () => {
     }
   });
 
-  it.each(ANIMALS)('%s has eight uncropped, transparent frames at the existing character scale and floor', (animal) => {
-    const atlas = PNG.sync.read(fs.readFileSync(path.join(ASSETS, 'characters', animal, 'walk.png')));
-    const idle = PNG.sync.read(fs.readFileSync(path.join(ASSETS, 'characters', animal, 'idle.png')));
+  it.each(CYCLES)('$type/$pose has eight uncropped transparent frames at its outfit scale and floor', ({ type: animal, pose }) => {
+    const atlas = PNG.sync.read(fs.readFileSync(path.join(ASSETS, 'characters', animal, pose === 'robed' ? 'robed_walk.png' : 'walk.png')));
+    const idle = PNG.sync.read(fs.readFileSync(path.join(ASSETS, 'characters', animal, pose === 'robed' ? 'robed.png' : 'idle.png')));
     const idleBox = visibleBounds(idle);
     const baseline = Math.round((idleBox.bottom + 1) / idle.height * 256) - 1;
     const expectedHeight = idleBox.height / idle.height * 256;
