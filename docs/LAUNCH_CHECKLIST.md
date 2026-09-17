@@ -1,5 +1,7 @@
 # WordShift launch checklist
 
+> September 17 refresh: revised copy and nighttime promotional artwork are prepared on `feature/play-store-refresh`; fresh screenshots/trailer and publication remain pending. See [refresh status](../mobile/assets/Play_store/launch-2026-09-v2/README.md). Earlier owner-upload checkmarks below describe the September 7 campaign and do not certify the refresh.
+
 Reviewed against main `6f96ebb` on 2026-09-13. [Current build](CURRENT_BUILD.md) is
 the source of truth for merged behavior and configured versions; [build and
 upload](BUILD_AND_UPLOAD.md) covers EAS archives and Android optimization. Checked

@@ -1,0 +1,47 @@
+{
+  "status": "template-awaiting-authentic-capture",
+  "canvas": [
+    1080,
+    1920
+  ],
+  "palette": {
+    "background": "#F7EDDA",
+    "heading": "#274C3E",
+    "support": "#586653",
+    "line": "#B39759",
+    "edge": "#D3C5A5"
+  },
+  "caption_region_fraction": 0.12916666666666668,
+  "heading": {
+    "width": 918,
+    "height": 57,
+    "font_size": 79,
+    "text": "One letter. Two new words.",
+    "font": "../../fonts/EpundaSlab-Bold.ttf",
+    "left": 76,
+    "top": 75
+  },
+  "subtitle": {
+    "width": 551,
+    "height": 28,
+    "font_size": 38,
+    "text": "Both results must be valid words.",
+    "font": "../../fonts/Figtree-Regular.ttf",
+    "left": 78,
+    "top": 163
+  },
+  "capture": {
+    "file": "raw/01-one-letter.png",
+    "maximum_rendered_size": [
+      900,
+      1616
+    ],
+    "horizontal_alignment": "center",
+    "top": 248,
+    "fit": "inside",
+    "crop": false,
+    "retouched": false
+  },
+  "capture_brief": "Opening PLAY/PANT puzzle with L selected and its legal PLANT insertion visible. Wait for transient instruction toasts to clear. If using a second result view, clearly separate a crop of the genuine PAY/PLANT capture.",
+  "note": "This is an editable layout template, not a completed or verified screenshot. The exporter requires the genuine current capture before producing a Play upload image."
+}
