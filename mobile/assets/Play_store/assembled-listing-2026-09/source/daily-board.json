@@ -1,0 +1,117 @@
+{
+  "status": "source-resolved-daily-board",
+  "notLiveCapture": true,
+  "date": "2026-09-19",
+  "dateSemantics": "Local calendar day, parsed by source parseLocalDate.",
+  "eased": false,
+  "boardVersion": "daily_v2_9098291d6c7b4bf4",
+  "seed": "wordshift-daily-2026-09-19",
+  "roll": 0.5302934649075817,
+  "ramp": {
+    "difficulty": "HARD",
+    "wordLength": 5,
+    "targetRows": 5
+  },
+  "bankDifficulty": "HARD",
+  "qualifiedPoolSize": 100,
+  "selectedIndex": 53,
+  "puzzleId": "b5fae9566f50",
+  "words": [
+    "GOATS",
+    "BRIDE",
+    "LIMOS",
+    "PROMS",
+    "MATED"
+  ],
+  "hint": "Start by shifting 'G'",
+  "solution": [
+    {
+      "stepIndex": 0,
+      "sourceWord": "GOATS",
+      "targetWord": "BRIDE",
+      "letterToMove": "G",
+      "explanation": "Move 'G' from GOATS to form BRIDGE.",
+      "insertionPosition": 4,
+      "removalPosition": 0
+    },
+    {
+      "stepIndex": 1,
+      "sourceWord": "BRIDGE",
+      "targetWord": "LIMOS",
+      "letterToMove": "B",
+      "explanation": "Move 'B' from BRIDGE to form LIMBOS.",
+      "insertionPosition": 3,
+      "removalPosition": 0
+    },
+    {
+      "stepIndex": 2,
+      "sourceWord": "LIMBOS",
+      "targetWord": "PROMS",
+      "letterToMove": "O",
+      "explanation": "Move 'O' from LIMBOS to form PROMOS.",
+      "insertionPosition": 4,
+      "removalPosition": 4
+    },
+    {
+      "stepIndex": 3,
+      "sourceWord": "PROMOS",
+      "targetWord": "MATED",
+      "letterToMove": "S",
+      "explanation": "Move 'S' from PROMOS to form MASTED.",
+      "insertionPosition": 2,
+      "removalPosition": 5
+    }
+  ],
+  "wordLength": 5,
+  "sourceMethod": "Executed source getDailyRamp, seededRandom, bankForDailyShape and selectDailyBankPuzzle declarations; source getBank applies qualifyFreshBankPuzzle and the current vocabulary policy. No player state or leaderboard data was invented.",
+  "sources": [
+    {
+      "path": "mobile/src/constants/wordLists.ts",
+      "sha256": "6f5da1e4d38b05330b0fd89f7d523561989e70143b25ced12c7bab28f0373a22"
+    },
+    {
+      "path": "mobile/src/data/puzzleBankHard.ts",
+      "sha256": "ae7632b9126b47cd74ee4dd5a95b192caa98ac8e21ebfe2e1ed32d118ecab135"
+    },
+    {
+      "path": "mobile/src/data/vocabulary/puzzleVocabulary.ts",
+      "sha256": "ccfe8be118e4952e122eb3afba70015d9ce1b3d6e81eafcf355e0f740292e0a9"
+    },
+    {
+      "path": "mobile/src/dictionary.ts",
+      "sha256": "4ea1b4cf5bf5fa6d84456e9110f1b107d3423b10eec0d617d9ac7e22b46c0ab3"
+    },
+    {
+      "path": "mobile/src/services/bankDeliveryPolicy.ts",
+      "sha256": "08ce78b202150a4cf9b14c8f39c48518b4637418813a6a930a4e06bfa5b722c5"
+    },
+    {
+      "path": "mobile/src/services/dailyBoardVersion.ts",
+      "sha256": "3fbc782abb49da87852ba566201146fc5c2c439ed40efac525a0c9fff82ef678"
+    },
+    {
+      "path": "mobile/src/services/dailyChallenge.ts",
+      "sha256": "336a1bf3bda232c78bc52f4aa89f42ca341e544b430218db6de1e767b92230b5"
+    },
+    {
+      "path": "mobile/src/services/dateUtils.ts",
+      "sha256": "97058be5277ec87b11caf2d9694baef8d4bbea71820811322eb307195bb9a6dc"
+    },
+    {
+      "path": "mobile/src/services/puzzleBank.ts",
+      "sha256": "7af07e0b60cfb1df54be0cf725b9c4c5407b499cf042ba3153fdb1556c83d362"
+    },
+    {
+      "path": "mobile/src/services/puzzleSolutionReplay.ts",
+      "sha256": "19b64b8187303bef6bd24feae01b287013018fcf548beda24cad9c95d3998953"
+    },
+    {
+      "path": "mobile/src/services/puzzleSolvability.ts",
+      "sha256": "0372d59af8a2b4aa4dfe3ba954a5231205dd08ba8d8dc42d568035aad4eb1707"
+    },
+    {
+      "path": "mobile/src/services/puzzleVocabulary.ts",
+      "sha256": "d69f8fc1192e89435e71058f3843cfc072dd526efc1d9198f0d85244b64f1332"
+    }
+  ]
+}

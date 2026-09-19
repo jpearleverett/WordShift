@@ -81,7 +81,7 @@ async function tintedMask(input, color, opacity) {
  * Three-room editorial diorama. t drives real sprite frames on a deterministic
  * left/right route with pauses; the app's random route scheduler is not run.
  */
-export async function createHouseRenderer({ width = 1080, height = 1540, phase = 1 } = {}) {
+export async function createHouseRenderer({ width = 1080, height = 1540, phase = 1, includePit = false, bottomClearance = 70 } = {}) {
   if (![1, 3].includes(phase)) throw new Error('House study supports phase 1 or 3 only; reveal artwork is excluded.');
   if (![width, height].every(v => Number.isInteger(v) && v >= 120)) throw new Error('width and height must be integer pixels >= 120');
 
@@ -118,10 +118,13 @@ export async function createHouseRenderer({ width = 1080, height = 1540, phase =
     { room: 'cozy_den', animal: 'fox', name: 'Ember', offset: 0 },
   ];
   const bodyH = rh * selection.length + gap * selection.length + connector * (selection.length - 1) + padding;
-  const fullH = roofH - 6 + bodyH + foundationH - 2;
-  const scale = Math.min(width / 390, height / 690);
+  const pitW = includePit ? world.read('PIT_RENDER_WIDTH') : 0;
+  const pitH = includePit ? world.read('PIT_RENDER_HEIGHT') : 0;
+  const pitGap = includePit ? world.read('PIT_MARGIN_TOP') : 0;
+  const fullH = roofH - 6 + bodyH + foundationH - 2 + pitH + pitGap;
+  const scale = includePit ? Math.min(width / 390, (height - bottomClearance - 82) / fullH) : Math.min(width / 390, height / 690);
   const n = value => Math.round(value * scale);
-  const bottom = Math.round(height - height * 0.04);
+  const bottom = includePit ? height - bottomClearance : Math.round(height - height * 0.04);
   const houseTop = Math.round(bottom - fullH * scale);
   const bodyTop = houseTop + n(roofH - 6);
   const bodyLeft = Math.round((width - n(bw)) / 2);
@@ -143,7 +146,7 @@ export async function createHouseRenderer({ width = 1080, height = 1540, phase =
   const shadowFile = source(world.read('HOUSE_SHADOW_IMG'));
   const shadowStyle = world.read('CONTACT_SHADOW')[phase];
   const shadow = await tintedMask(await sharp(shadowFile).resize(n(fw + 40), n(54)).png().toBuffer(), shadowStyle.color, 0.55 * shadowStyle.mult);
-  exteriorLayers.push({ input: shadow, left: Math.round((width - n(fw + 40)) / 2), top: bottom - n(12) });
+  exteriorLayers.push({ input: shadow, left: Math.round((width - n(fw + 40)) / 2), top: bottom - n(pitH + pitGap + 12) });
 
   let wall = await sharp(source(world.read('WALL_IMG'))).resize(n(bw), n(bodyH), { fit: 'cover' }).png().toBuffer();
   wall = await tint(wall, houseTint.color, houseTint.ext);
@@ -169,6 +172,12 @@ export async function createHouseRenderer({ width = 1080, height = 1540, phase =
   exteriorLayers.push({ input: roof, left: Math.round((width - n(roofW)) / 2), top: houseTop });
   const foundation = await sharp(source(world.read('FOUNDATION_IMGS')[phase])).resize(n(fw), n(foundationH)).png().toBuffer();
   exteriorLayers.push({ input: foundation, left: Math.round((width - n(fw)) / 2), top: foundationTop });
+  const pitTop = foundationTop + n(foundationH + pitGap);
+  if (includePit) {
+    const pit = await tint(await sharp(source(world.read('PIT_ENTRANCE_IMG'))).resize(n(pitW), n(pitH)).png().toBuffer(), houseTint.color, houseTint.ext);
+    if (pitTop + n(pitH) > height - bottomClearance + 2) throw new Error('Pit and path must fit above the lower safe margin');
+    exteriorLayers.push({ input: pit, left: Math.round((width - n(pitW)) / 2), top: pitTop });
+  }
 
   // Clip the below-foundation contact shadow to the image bounds before Sharp's
   // composite operation, which requires every overlay to fit on the canvas.
@@ -213,13 +222,13 @@ export async function createHouseRenderer({ width = 1080, height = 1540, phase =
     kind: 'assembled-source-art-promotional-study', nativeScreenshot: false, actualGameplayCapture: false,
     width, height, phase,
     assets: assetsAndHashes,
-    geometry: { source: relative(world.absolute), roomWidthDp: rw, roomHeightDp: rh, roomGapDp: gap, connectorDp: connector, scalePixelsPerDp: scale, skyCropTopPx: skyCropTop },
+    geometry: { source: relative(world.absolute), roomWidthDp: rw, roomHeightDp: rh, roomGapDp: gap, connectorDp: connector, scalePixelsPerDp: scale, skyCropTopPx: skyCropTop, pit: includePit ? { widthDp: pitW, heightDp: pitH, marginTopDp: pitGap, topPx: pitTop, bottomPx: pitTop + n(pitH), clearancePx: height - pitTop - n(pitH), fullPathVisible: true } : null },
     rooms: selection.map(item => ({ room: item.room, animal: item.animal, name: item.name, frameCount: item.frames.length, frameMs: item.frameMs })),
     motion: 'Real shipped normal walk frames; deterministic 30-unit left/right travel, source species cadence, source phase-3 1.4× slowdown and pauses. Does not run the random app scheduler.',
     limitations: [
       'Illustrative three-room selection, not a reachable phase-3 saved game or screenshot.',
       'Editorial sky crop and house framing; no in-game HUD, name plaques, notifications or controls.',
-      'No robed sprites, shadow figure, offering pit or story reveal.',
+      includePit ? 'Source pit entrance/path is shown fully; no offering animation, robed sprites, shadow figure or story reveal.' : 'No robed sprites, shadow figure, offering pit or story reveal.',
       'Room depth lighting, upgrades, ambient motes, smoke and arrangement sigils omitted.',
       'Sharp raster composition approximates native alpha tinting, resampling and sprite placement; no Android renderer verification.',
     ],

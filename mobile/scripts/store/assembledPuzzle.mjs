@@ -42,9 +42,13 @@ async function loadPureSource(file) {
   return exports;
 }
 
-export async function createPuzzleRenderer({ width = 1080, height = 1540 } = {}) {
+export async function createPuzzleRenderer({ width = 1080, height = 1540, tileTheme = null } = {}) {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 390 || height < 550) throw new Error('Use a portrait canvas of at least 390 × 550.');
   const palette = await loadPureSource('src/theme/colors.ts');
+  if (tileTheme) {
+    if (!palette.TILE_THEMES[tileTheme]) throw new Error(`Unknown source tile palette: ${tileTheme}`);
+    palette.setEquippedTileTheme(tileTheme);
+  }
   const geometry = await loadPureSource('src/constants/tileLayout.ts');
   const scale = Math.min(width / 390, height / 556);
   const dw = width / scale;
@@ -122,7 +126,7 @@ export async function createPuzzleRenderer({ width = 1080, height = 1540 } = {})
     kind: 'source-derived promotional reconstruction', genuineGameplayCapture: false,
     renderer: 'Sharp/Pango native compositor; SVG geometry; no browser or app runtime',
     canvas: { width, height, sourceLayoutWidthDp: 390, scale },
-    phase: 0, board: { before: ['PLAY', 'PANT', 'HEAR'], after: ['PAY', 'PLANT', 'HEAR'], movedLetter: 'L', sourceWord: 'PLAY', sourceIndex: 1, destinationWord: 'PANT', destinationIndex: 1, legalMove: 'Remove L from PLAY to form PAY. Insert L after P in PANT to form PLANT.' },
+    phase: 0, tileTheme: tileTheme ?? 'default', board: { before: ['PLAY', 'PANT', 'HEAR'], after: ['PAY', 'PLANT', 'HEAR'], movedLetter: 'L', sourceWord: 'PLAY', sourceIndex: 1, destinationWord: 'PANT', destinationIndex: 1, legalMove: 'Remove L from PLAY to form PAY. Insert L after P in PANT to form PLANT.' },
     faithful: ['Original transparent wordmark and UI icon artwork', 'Bundled Epunda Slab Bold letter font and Figtree Bold chrome font', 'Phase-0 background and default per-letter tile palette read from source', 'Standard tile sizing and drop-fan horizontal positions read from source', 'Painted-token bevel, 3D edge, selection pink, locked tile palette, source/target warm row palette', 'Original kept-table texture at source opacity 0.065', 'Original authored PLAY/PANT/HEAR puzzle and legal L move'],
     approximated: ['Overall 390 dp screen layout is compressed into the review panel, without Android safe areas', 'Native React Native shadows, rasterization, fonts and exact flex layout are not reproduced', 'Drop-slot perspective is approximated by SVG geometry; idle particles are omitted', 'The letter flight and neighboring tile movements are editorial keyframes, not runtime animation', 'No transient message is shown; HINT is abbreviated without the fixture balance', 'No score, purchase, leaderboard, victory or completion is claimed'],
     timing: { selected: [0, 1.3], move: [1.3, 2.8], result: [2.8, 6], note: 'One legal move only; the three-row puzzle is not yet complete.' },
