@@ -77,8 +77,9 @@ export async function assembledBoard({ width = 1080, height = 1600, words, activ
   const rowGap = words.length >= 5 ? 68 : words.length >= 4 ? 92 : 112;
   const rowH = words.length >= 5 ? 60 : 92;
   let shapes = `<rect width="100%" height="100%" fill="${base}"/><rect x="0" y="0" width="100%" height="100%" fill="#1F3D33" opacity=".08"/><circle cx="${n(40)}" cy="${n(50)}" r="${n(20)}" fill="#FFF" opacity=".25"/><circle cx="${n(350)}" cy="${n(50)}" r="${n(20)}" fill="#FFF" opacity=".25"/>`;
-  const texture = await sharp(asset('assets/story/optimized/kept-table-header.webp')).resize(width, n(170), {fit:'cover'}).ensureAlpha(.065).png().toBuffer();
-  layers.push({ input: texture, left: 0, top: height-n(170) });
+  const background = svg(width, height, shapes);
+  shapes = '';
+  const texture = await sharp(asset('assets/story/optimized/kept-table-header.webp')).resize(width, n(170), {fit:'cover'}).removeAlpha().ensureAlpha(.065).png().toBuffer();
   layers.push({ input: await image('assets/ui/wordmark.png', n(236), n(59)), left: n(77), top:n(20) });
   layers.push({input:await image('assets/ui/home.png',n(23),n(23)),left:n(29),top:n(38)});
   layers.push({input:await image('assets/ui/rules.png',n(24),n(24)),left:n(337),top:n(38)});
@@ -113,5 +114,5 @@ export async function assembledBoard({ width = 1080, height = 1600, words, activ
     layers.push({input:await image(`assets/ui/${icon}.png`,n(34),n(34)),left:x-n(17),top:controlsY+n(10)});
     layers.push(await centered(label,x,controlsY+n(72),{font:'bold',size:n(11),color:'#FFF'}));
   }
-  return sharp(svg(width,height,shapes)).composite(layers).removeAlpha().png().toBuffer();
+  return sharp(background).composite([{input:texture,left:0,top:height-n(170)},{input:svg(width,height,shapes)},...layers]).removeAlpha().png().toBuffer();
 }

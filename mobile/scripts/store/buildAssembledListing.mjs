@@ -24,6 +24,7 @@ const relative=p=>path.relative(ROOT,p).split(path.sep).join('/');
 const copy=JSON.parse(await fs.readFile(asset('assets/Play_store/launch-2026-09-v2/copy/listing-en-US.json'),'utf8'));
 const evidence=[];
 const ui=[];
+for (const file of ['scripts/store/assembledHouse.mjs','scripts/store/assembledPuzzle.mjs','scripts/store/assembledStorePrimitives.mjs','scripts/store/buildAssembledListing.mjs','scripts/store/packageAssembledListing.py','src/components/StorySceneModal.tsx','src/components/StoryPortrait.tsx']) asset(file);
 
 async function shell(body, caption, dark=false) {
   const bg=dark?'#13282A':'#F7EDDA';
@@ -100,14 +101,15 @@ try {
   const quote="That flower was meant to be a fox. You can be kind about it, but please don't lie.";
   const options=['The flower cup. Cocoa, please.','The chipped cup. Tea, please.'];
   if(![quote,...options].every(value=>storySource.includes(value)))throw new Error('Choice copy changed; re-review the assembled scene');
-  const muted=await sharp(await puzzle.render(0)).composite([{input:svg(W,BODY,'<rect width="100%" height="100%" fill="#22162F" opacity=".50"/>')}]).png().toBuffer();
-  const art=await image(choice.file,832,284,'cover','lanczos3');
-  const dialogue=await text(quote,{font:'reading',size:42,width:824,wrap:true});
-  const choiceLayers=[{input:await frame(1008,1530,{scale:2.45}),left:36,top:35},{input:art,left:124,top:125},await centered('A place at the table',540,461,{font:'bold',size:49,width:840}),{input:await image('assets/characters/fox/talk.png',252,252),left:414,top:500},await centered('Ember',540,791,{font:'bold',size:38}),{input:dialogue.input,left:128,top:842},await centered('3 / 3',167,1018,{font:'body',size:30,color:'#6B4A2F'})];
-  for(let i=0;i<options.length;i++)choiceLayers.push({input:await button(options[i],838,{variant:i===0?'primary':'secondary',fontSize:38}),left:121,top:1062+i*130});
-  choiceLayers.push({input:await button('Previous page',838,{variant:'quiet',fontSize:34,scale:2.2}),left:121,top:1334});
-  choiceLayers.push({input:await button('Come back to this',838,{variant:'quiet',fontSize:34,scale:2.2}),left:121,top:1440});
-  await writeScene(7,await sharp(muted).composite(choiceLayers).removeAlpha().png().toBuffer(),{scene:'cup',page:2,exactDialogue:quote,choices:options,art:choice,portrait:'assets/characters/fox/talk.png',interface:'Source cottage frame and page-specific runtime art; assembled geometry, persistent Ember portrait.'},{altText:'Ember jokes that the crooked flower on a cup was meant to be a fox. The player can choose the flower cup with cocoa or the chipped cup with tea.'});
+  const muted=await sharp(await puzzle.render(0)).composite([{input:svg(W,BODY,'<rect width="100%" height="100%" fill="#22162F" opacity=".78"/>')}]).png().toBuffer();
+  const art=await image(choice.file,832,468,'contain','lanczos3');
+  const dialogue=await text(quote,{font:'reading',size:38,width:824,wrap:true});
+  if(dialogue.height>102)throw new Error('Choice dialogue collides with the page counter');
+  const choiceLayers=[{input:await frame(1008,1530,{scale:2.45}),left:36,top:35},{input:art,left:124,top:118},await centered('A place at the table',540,628,{font:'bold',size:49,width:840}),{input:await image('assets/characters/fox/talk.png',180,180),left:450,top:676},await centered('Ember',540,887,{font:'bold',size:38}),{input:dialogue.input,left:128,top:932},await centered('3 / 3',167,1053,{font:'body',size:29,color:'#6B4A2F'})];
+  for(let i=0;i<options.length;i++)choiceLayers.push({input:await button(options[i],838,{variant:i===0?'primary':'secondary',fontSize:38,scale:2.05}),left:121,top:1083+i*104});
+  choiceLayers.push({input:await button('Previous page',838,{variant:'quiet',fontSize:34,scale:2.05}),left:121,top:1292});
+  choiceLayers.push({input:await button('Come back to this',838,{variant:'quiet',fontSize:34,scale:2.05}),left:121,top:1393});
+  await writeScene(7,await sharp(muted).composite(choiceLayers).removeAlpha().png().toBuffer(),{scene:'cup',page:2,exactDialogue:quote,choices:options,art:choice,artFrame:{width:832,height:468,aspectRatio:'16:9',fit:'contain',cropped:false},portrait:'assets/characters/fox/talk.png',interface:'Source cottage frame and page-specific runtime art; assembled geometry, persistent Ember portrait sized approximately 88dp.'},{altText:'Ember jokes that the crooked flower on a cup was meant to be a fox. The player can choose the flower cup with cocoa or the chipped cup with tea.'});
 }catch(error){if(!partial||error.code!=='ENOENT')throw error;console.log('Updated choice art pending; partial review only.');}
 
 // An isolated opener challenger; panels explicitly show before versus after.
