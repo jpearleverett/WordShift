@@ -4,20 +4,20 @@ import { AnimalType, DialoguePhase } from '../types/homeWorld';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { CHARACTER_SPRITES } from './home/AnimalSprite';
 
-/** Default frame size and bottom margin; StorySceneModal reserves this exact footprint on narrator / player pages. */
+/** Stable portrait footprint, retained while the narrator or player speaks. */
 export const STORY_PORTRAIT_SIZE = 116;
 export const STORY_PORTRAIT_MARGIN_BOTTOM = 8;
 
 /** A short speaking gesture, using the existing cast frames; never a looping distraction. */
-export function StoryPortrait({ speaker, phase, passage, size = STORY_PORTRAIT_SIZE }: {
-  speaker: AnimalType; phase: DialoguePhase; passage: string; size?: number;
+export function StoryPortrait({ speaker, phase, passage, size = STORY_PORTRAIT_SIZE, speaking = true }: {
+  speaker: AnimalType; phase: DialoguePhase; passage: string; size?: number; speaking?: boolean;
 }) {
   const passageKey = `${speaker}:${passage}`;
   const [frame, setFrame] = useState<{ key: string; talking: boolean } | null>(null);
   const sprites = CHARACTER_SPRITES[speaker];
   const reducedMotion = useReducedMotion();
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || !speaking) return;
     let ticks = 0;
     const timer = setInterval(() => {
       ticks += 1;
@@ -25,8 +25,8 @@ export function StoryPortrait({ speaker, phase, passage, size = STORY_PORTRAIT_S
       if (ticks >= 5) clearInterval(timer);
     }, 220);
     return () => clearInterval(timer);
-  }, [passageKey, reducedMotion]);
-  const talking = !reducedMotion && frame?.key === passageKey && frame.talking;
+  }, [passageKey, reducedMotion, speaking]);
+  const talking = speaking && !reducedMotion && frame?.key === passageKey && frame.talking;
   if (!sprites) return null;
   const idle = phase >= 4 ? sprites.robed ?? sprites.idle : sprites.idle;
   const talk = phase >= 4 ? sprites.robedTalk ?? idle : sprites.talk ?? idle;
