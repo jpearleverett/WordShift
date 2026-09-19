@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import sharp from 'sharp';
+import crypto from 'node:crypto';
+const [id,source]=process.argv.slice(2);
+if(!/^[a-z0-9_-]+$/.test(id)||!source?.startsWith('/workspace/scratch/'))throw Error('Invalid generation result');
+const root=path.resolve(import.meta.dirname,'../..');
+const dir=path.join(root,'assets/story/pages');fs.mkdirSync(dir,{recursive:true});
+const output=path.join(dir,id+'.webp');
+await sharp(source).resize(960,540,{fit:'cover'}).webp({quality:83,effort:6}).toFile(output);
+const bytes=fs.readFileSync(output);
+const metaDir=path.join(root,'scripts/story/generation');fs.mkdirSync(metaDir,{recursive:true});
+fs.writeFileSync(path.join(metaDir,id+'.json'),JSON.stringify({id,tool:'built-in image_gen',sourceImage:path.basename(source),width:960,height:540,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex')},null,2)+'\n');
+console.log(id+' '+bytes.length);
