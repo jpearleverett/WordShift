@@ -41,3 +41,42 @@ Use case: illustration-story. Asset type: landscape ending illustration for pixe
 ### Outward road at midnight (edit)
 
 Edit reference: `outward-road.png`. Edit this exact WordShift pixel-art illustration into its MIDNIGHT counterpart. Preserve the identical garden gate, outward-pointing stone, footpath, trees, meadow, hills, camera, composition and sophisticated 16-bit storybook pixel clusters. Replace the dawn sky and golden sunlight with a deep desaturated indigo night sky, a sparse few small stars, and quiet silvery moonlight from offscreen. The distant path must remain readable and continue beyond the trees. Cool blue-violet moonlight edges the grass; only the smallest trace of warm reflected amber light touches the near gate from the unseen cottage behind the viewer. This is a peaceful but consequential midnight welcome with freedom to leave. No sunrise, no sunset, no warm horizon glow. Keep substantial tonal detail and readable silhouettes at phone size without brightening it into daytime. No people, animals, text, glyphs, logo or watermark. Produce the edited landscape bitmap at the same aspect ratio.
+
+## Per-page story art (September 19 refresh)
+
+StorySceneModal now resolves a separate illustration for each authored narrative
+beat, including both choice responses, later phases, aftermath variants and
+retrospective openers. `src/data/storyArtCatalog.ts` defines 185 illustration
+IDs for 16 scene IDs. PLUM's later recruitment scene reuses the same authored
+PLUM beats; different pages within a conversation do not share an illustration.
+The files live in `pages/` as opaque 960×540 WebPs, loaded with static offline
+requires from `src/components/storyPageArt.ts`.
+
+`StoryLine.artId` is optional to preserve older frozen story saves. The pure
+resolver in `src/services/storyPresentation.ts` recognizes the original text
+without changing saved dialogue, choices, page positions or presentation phase.
+It reserves exact matches before assigning unused related art to older wording.
+An animal portrait remains present on narrator and player pages, retaining the
+most recent resident (or the first resident before their opening line). Narrator
+and player pages use the idle portrait instead of a speaking gesture.
+
+The illustrations remain visible on compact screens and in later phases. The
+card scrolls when necessary. No generic teacup fallback or image-height gate is
+used by the story reader.
+
+Production recipes are in `scripts/story/`:
+
+- `inventoryStoryArt.mjs` enumerates narrative branches using the actual service.
+- `story-art-prompts.json` records the current individual illustration prompts.
+- `buildArtCatalog.mjs` writes the offline asset map and old-save text catalog.
+- `nextArtJob.mjs` claims an assigned local production job; it calls no image API.
+- `saveStoryArt.mjs` creates an optimized WebP and atomically saves its SHA-256,
+  dimensions, source-image basename and available exact generation prompt.
+- `generation/*.json` records each selected image. Initial production batches
+  predate exact-prompt capture; their earlier recipes remain in Git history.
+
+New raster art is generated with the built-in image-generation tool, one image
+per beat, then reviewed against the narrative. Source PNG masters remain outside
+the runtime asset directory. Only the optimized WebPs ship in the app. Scripts,
+prompts, review sheets and production-queue state are authoring material, not
+application screens. These changes do not alter narrative copy or choices.

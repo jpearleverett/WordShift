@@ -6,9 +6,15 @@
   "height": 540,
   "webpQuality": 83,
   "encoderEffort": 4,
-  "bytes": 156710,
-  "sha256": "8bb9ab104a5a49afd602f4faad390915f268bd691eccd8a2fb9be521683afeff",
+  "bytes": 55652,
+  "sha256": "a1ae87a442725400b946f149ac087edd2cc1e8417d818fbe931f1de2bb24e800",
   "generatedAt": "2026-09-19T18:55:22.033Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 OBJECT-ONLY environmental still-life for a WordShift story page. Illustrate the props and setting only; the game displays the exact resident portrait separately, so NEVER add a full person or animal to this image. Depict this exact authored narrative moment: \"Someone has written SAFE in the margin. The handwriting is much newer than the plan.\". Setting: the workshop, foundations, library and watch-window of a woodland cottage, uncertain evening. Story speaker species is narrator; narrator passages describe the surrounding household.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped. FINAL HARD CONSTRAINT: depict objects and environment ONLY, never full characters, people, human faces, resident faces or written dialogue. The small elderly orange-gold fish PLUM is an explicit exception: include this fish when it is the named subject of the narrative, with a worried face and small notch in its fin.",
-  "promptSha256": "2d3951e4242046ccf54a0ce1adaa03c4a9c0baca70847d1321e4b7d95ca04ec0"
+  "promptSha256": "2d3951e4242046ccf54a0ce1adaa03c4a9c0baca70847d1321e4b7d95ca04ec0",
+  "flattenBackground": "#f2e5bc",
+  "alphaNormalization": {
+    "previousSha256": "8bb9ab104a5a49afd602f4faad390915f268bd691eccd8a2fb9be521683afeff",
+    "source": "original generated PNG",
+    "at": "2026-09-19T18:56:51.241Z"
+  }
 }

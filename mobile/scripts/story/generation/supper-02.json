@@ -4,9 +4,17 @@
   "sourceImage": "exec-4f5d3562-74c8-4760-b5bd-9e34031c18e4.png",
   "width": 960,
   "height": 540,
-  "bytes": 176296,
-  "sha256": "9fe76a1c6dced04f5e231838ed05c9179020c1de65f82b478eac4babbb31f17b",
+  "bytes": 78230,
+  "sha256": "ab9ab66ba832036b3bc850b5aaad6f5f864742527e3595fbf05ba29beeaba096",
   "generatedAt": "2026-09-19T18:50:01.493Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 OBJECT-ONLY environmental still-life for a WordShift story page. Illustrate the props and setting only; the game displays the exact resident portrait separately, so NEVER add a full person or animal to this image. Depict this exact authored narrative moment: \"Supper. Now. The empty place at the table can wait. The rest of us have stomachs.\". Setting: a woodland cottage kitchen and supper table with soup, warm hearth in uneasy dusk. Story speaker species is pangolin; narrator passages describe the surrounding household. OBJECTS ONLY. A steaming soup pot and ladle on a warm rustic cottage kitchen counter, beside an empty place setting. No cook, no animal, no person, no faces. The scene is about supper being ready; the exact pangolin portrait appears separately in the game. Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped. FINAL HARD CONSTRAINT: depict objects and environment ONLY, never full characters, people, human faces, resident faces or written dialogue. The small elderly orange-gold fish PLUM is an explicit exception: include this fish when it is the named subject of the narrative, with a worried face and small notch in its fin.",
-  "promptSha256": "bf9cb9c71727b34f72816cd83a6e05f9a2a94c46b00950957af0782f0115ab8d"
+  "promptSha256": "bf9cb9c71727b34f72816cd83a6e05f9a2a94c46b00950957af0782f0115ab8d",
+  "flattenBackground": "#f2e5bc",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "alphaNormalization": {
+    "previousSha256": "9fe76a1c6dced04f5e231838ed05c9179020c1de65f82b478eac4babbb31f17b",
+    "source": "original generated PNG",
+    "at": "2026-09-19T18:56:52.877Z"
+  }
 }
