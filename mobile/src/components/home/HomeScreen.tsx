@@ -2255,7 +2255,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => clearTimeout(timer);
   }, [pendingHouseCompletion, localOverlayActive, storyOverlayActive, quietLanding, onHouseCompleted]);
 
-  useEffect(() => {
+  // Publish before paint so App can hide its underlying onboarding guide
+  // in the same frame that a native home modal (e.g. the visitor) opens.
+  useLayoutEffect(() => {
     onOverlayActivityChange?.(localOverlayActive);
     return () => onOverlayActivityChange?.(false);
   }, [localOverlayActive, onOverlayActivityChange]);

@@ -1,24 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Animated,
   Image,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
-import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
-import { FONT_SIZE } from '../theme/typeScale';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { getActiveEvent } from '../services/liveEvents';
 import { getEventBadgeLabel } from '../services/phaseNarrative';
 import { Difficulty } from '../types';
 import { getSettingsSync } from '../services/settings';
 
-// Same flame sprite as the header streak pill — the badge is the DAILY streak
-// count, and the flame keeps it from reading as an unread-notification count.
-const FLAME_ICON = require('../../assets/ui/flame.png');
 const CALENDAR_ICON = require('../../assets/ui/calendar.png');
 const MOON_ICON = require('../../assets/ui/moon.png');
 // Completed state: the carved check + the real star sprites (the card used to
@@ -49,8 +43,9 @@ interface DailyChallengeCardProps {
 /**
  * Compact daily challenge button designed to sit in the header row.
  * - Not completed: pulsing calendar icon, tap starts daily
- * - Completed: checkmark with stars, tap does nothing extra
- * - Streak badge shown when streak > 1
+ * - Completed: checkmark with stars, tap re-checks the daily standing
+ * - The home header owns the single visible play-streak indicator. This
+ *   button keeps its separate daily-only streak in its accessibility label.
  */
 export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   onStartDaily,
@@ -184,7 +179,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
         activeOpacity={isCompleted && !onRecheckStanding ? 1 : 0.7}
         accessibilityLabel={
           (isCompleted
-            ? `Daily challenge completed. ${stars} stars. ${streak > 1 ? `${streak} day streak. ` : ''}${onRecheckStanding ? 'Tap to check your standing.' : ''}`
+            ? `Daily challenge completed. ${stars} stars. ${streak > 1 ? `${streak} day daily-challenge streak. ` : ''}${onRecheckStanding ? 'Tap to check your standing.' : ''}`
             : 'Start daily challenge') +
           (eventBadgeLabel ? ` ${eventBadgeLabel}.` : '')
         }
@@ -219,18 +214,6 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
           <Image source={CALENDAR_ICON} style={styles.calendarIconImage} />
         )}
 
-        {/* Daily-streak badge (flame + count, mirroring the header streak
-            pill; a bare number here read as a notification count) */}
-        {streak > 1 && (
-          <View style={[
-            styles.streakBadge,
-            phase >= 3 && { backgroundColor: '#8B4513' },
-          ]}>
-            <Image source={FLAME_ICON} style={styles.streakBadgeFlame} />
-            <Text style={styles.streakBadgeText}>{streak}</Text>
-          </View>
-        )}
-
         {/* Not-completed indicator dot */}
         {!isCompleted && (
           <View style={[
@@ -240,8 +223,8 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
         )}
 
         {/* Full-moon event badge (small moon accent; the label rides the
-            card's accessibilityLabel above). Absolute, mirroring the streak
-            badge, so the card's size and layout are unchanged. */}
+            card's accessibilityLabel above). Absolute so the card's size and
+            layout are unchanged. */}
         {eventBadgeLabel && (
           <View
             style={[styles.moonBadge, phase >= 4 && styles.moonBadgeDark]}
@@ -271,10 +254,6 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     borderWidth: 2,
   },
-  calendarIcon: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.title,
-  },
   calendarIconImage: {
     width: 24,
     height: 24,
@@ -296,31 +275,6 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     marginHorizontal: 0.5,
-  },
-  streakBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -6,
-    backgroundColor: CandyColors.orange.main,
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 3,
-  },
-  // 12dp floor: at 9dp the flame's contour and value steps averaged to a dot.
-  streakBadgeFlame: {
-    width: 12,
-    height: 12,
-    marginRight: 1,
-  },
-  streakBadgeText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.micro,
-    fontWeight: '900',
-    color: CandyColors.white,
   },
   notifDot: {
     position: 'absolute',
@@ -344,10 +298,6 @@ const styles = StyleSheet.create({
   },
   moonBadgeDark: {
     backgroundColor: 'rgba(120, 45, 45, 0.85)',
-  },
-  moonBadgeText: {
-    fontFamily: BODY_FONT,
-    fontSize: FONT_SIZE.micro,
   },
   moonBadgeIcon: {
     width: 12,
