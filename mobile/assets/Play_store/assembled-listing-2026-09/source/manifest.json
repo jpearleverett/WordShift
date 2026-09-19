@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "campaign": "assembled-listing-2026-09",
   "status": "assembled-images-complete",
-  "sourceCommit": "dab873545b8dda237d8d19cd9a37f84f03c80970",
+  "sourceCommit": "a1d1132f1ac4c00398d1511465e6afa51567aa27",
   "method": "Owner-approved offline assembly of existing source artwork and source-derived UI using Sharp/Pango/SVG. No app or browser capture.",
   "genuineGameplayCapture": false,
   "nativeAndroidFidelityVerified": false,
@@ -1287,7 +1287,7 @@
     },
     {
       "file": "assets/story/pages/cup-03.webp",
-      "sha256": "5fc3d1f061d319d2155019deacd06bf9efbeaa93fb0a7f13d0e973e2cafbb867"
+      "sha256": "019f379ca4d66c0dcd263e0062c8bd9a3ccbeaa9067aa7f3433c6bd75627621d"
     },
     {
       "file": "assets/ui/check_badge.png",
@@ -2532,8 +2532,8 @@
     },
     {
       "file": "export/phone/08-choices.png",
-      "sha256": "b4979d7d1889246793e09004e0963c9aeaf62dc9a8fb7e64e52c606cf7a78a40",
-      "bytes": 949622,
+      "sha256": "1a1b4e33e2d179146eac655680d03e87d00c009adc91ef774fe254b18b7a0002",
+      "bytes": 984311,
       "width": 1080,
       "height": 1920,
       "channels": 3,
@@ -2577,8 +2577,8 @@
     },
     {
       "file": "contact-sheet.png",
-      "sha256": "b985dbf0a301287a02cbba8dcae1266215f92a1b6396d0adf937beae848b73fd",
-      "bytes": 1199657,
+      "sha256": "7a055c1fbe54b728b159812f3a06eb71a25cf887f515344448c24d681bdfb326",
+      "bytes": 1201508,
       "width": 1184,
       "height": 1036,
       "channels": 3,

@@ -1,0 +1,11 @@
+{
+  "id": "returned-08",
+  "tool": "built-in image_gen",
+  "sourceImage": "exec-f324379d-ef19-4561-84ed-273f15560871.png",
+  "width": 960,
+  "height": 540,
+  "bytes": 101588,
+  "sha256": "3d4dd0b4d65b8dd0f7a13c67af1dec364ed5844c1793a1801951f5e0f56659d4",
+  "generatedAt": "2026-09-19T18:48:42.806Z",
+  "promptProvenance": "Initial queue; prompt source is retained in feature-branch history."
+}

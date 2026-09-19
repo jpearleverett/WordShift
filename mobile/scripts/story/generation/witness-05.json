@@ -1,9 +1,12 @@
 {
   "id": "witness-05",
   "tool": "built-in image_gen",
-  "sourceImage": "exec-0ad8ca44-f723-46a3-85fb-1c765c8d8104.png",
+  "sourceImage": "exec-5345011d-fe8e-48d3-9c8d-cfc89b369a13.png",
   "width": 960,
   "height": 540,
-  "bytes": 101650,
-  "sha256": "9fc039173dc70d9777745456d018b244db616a694cd90f5d4ed4f1f73c41df0a"
+  "bytes": 110550,
+  "sha256": "cc99086bd215096e875065a8976242eaad03e8f67a16c410112fd27847190d34",
+  "generatedAt": "2026-09-19T18:48:24.401Z",
+  "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 story-page illustration for WordShift, an intimate woodland-cottage pixel-art game. Depict this exact authored narrative moment: \"I will tell them what happened. I will say I do not know why. You can stop me if I start making it sound safer than it is.\". Setting: the cottage writing desk and shared table at dusk. A shared cottage table with chairs drawn close around it, a small folded account at its center, angled away so absolutely NO writing is visible. The empty places and open arrangement suggest an honest household conversation. Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped.",
+  "promptSha256": "e11a45d066ddefc5985effe5f26233a33beebc3587985517e471ccf2437f8866"
 }
