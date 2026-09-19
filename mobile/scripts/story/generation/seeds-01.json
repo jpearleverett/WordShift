@@ -1,0 +1,20 @@
+{
+  "id": "seeds-01",
+  "tool": "built-in image_gen",
+  "sourceImage": "exec-db1eb282-d035-417f-a2aa-e1010fe91d80.png",
+  "width": 960,
+  "height": 540,
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "bytes": 74742,
+  "sha256": "295b88ee339f473c4cd2bd881f1c8b5e4fb37a8146cec2ce6e92f0afe02179b1",
+  "generatedAt": "2026-09-19T18:53:51.089Z",
+  "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 OBJECT-ONLY environmental still-life for a WordShift story page. Illustrate the props and setting only; the game displays the exact resident portrait separately, so NEVER add a full person or animal to this image. Depict this exact authored narrative moment: \"I packed seeds. I have not decided to leave. I packed them so that leaving stays something I can still choose.\". Setting: a small wooden garden gate, seed tin, and a forest footpath leading out of a woodland cottage garden in moonlight. Story speaker species is rabbit; narrator passages describe the surrounding household.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped. FINAL HARD CONSTRAINT: depict objects and environment ONLY, never full characters, people, human faces, resident faces or written dialogue. The small elderly orange-gold fish PLUM is an explicit exception: include this fish when it is the named subject of the narrative, with a worried face and small notch in its fin.",
+  "promptSha256": "3871b48b7b4d3cab02e30852d7b9b2a3d1a8628fad43c7cc01bc82e4ad9ac1d3",
+  "flattenBackground": "#f2e5bc",
+  "alphaNormalization": {
+    "previousSha256": "be92de69189e3fb25080f227ba5b442ff2f3436a4ca5217fff4a2618648aed49",
+    "source": "original generated PNG",
+    "at": "2026-09-19T18:56:52.329Z"
+  }
+}

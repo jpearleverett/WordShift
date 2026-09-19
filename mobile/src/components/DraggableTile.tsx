@@ -1,5 +1,6 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Easing, Platform, StyleSheet, View } from 'react-native';
+import { useDragOverlay } from './DragOverlay';
 import { getDragShadowColor } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
@@ -75,6 +76,17 @@ export function DraggableTile({
   onDragActiveChange,
   boardScale = 1,
 }: DraggableTileProps) {
+  const overlay = useDragOverlay();
+  const overlayRef = useRef(overlay);
+  const wrapperRef = useRef<View>(null);
+  const ownerRef = useRef({});
+  const dimensionsRef = useRef({ width: 0, height: 0 });
+  const childrenRef = useRef(children);
+  const phaseRef = useRef(phase);
+  useLayoutEffect(() => { overlayRef.current = overlay; childrenRef.current = children; phaseRef.current = phase; });
+  useEffect(() => {
+    return () => overlay?.clear(ownerRef.current);
+  }, [overlay]);
   const [translateX] = useState(() => new Animated.Value(0));
   const [translateY] = useState(() => new Animated.Value(0));
   // Lift (F7): 0 at rest, springs to -DRAG_LIFT_DP once the drag activates so
@@ -130,6 +142,11 @@ export function DraggableTile({
           x: evt.nativeEvent.pageX,
           y: evt.nativeEvent.pageY,
         };
+        overlayRef.current?.clear(ownerRef.current);
+        ownerRef.current = {};
+        floatingScale.stopAnimation();
+        floatingOpacity.stopAnimation();
+        liftAnim.stopAnimation();
         isDragging.current = true;
         dragActivated.current = false;
         translateX.setValue(0);
@@ -148,6 +165,40 @@ export function DraggableTile({
           hapticSelection();
           onDragStartRef.current();
 
+          // The root overlay keeps the visual copy outside native ScrollView
+          // clipping. Its measured footprint already includes the board scale;
+          // page-space gesture deltas therefore stay unscaled in this layer.
+          if (overlayRef.current && wrapperRef.current) {
+            const dimensions = dimensionsRef.current;
+            const child = childrenRef.current;
+            const shadow = getDragShadowColor(phaseRef.current);
+            overlayRef.current.show({
+              owner: ownerRef.current,
+              anchor: wrapperRef.current,
+              render: frame => {
+                const width = dimensions.width || frame.width;
+                const height = dimensions.height || frame.height;
+                return (
+                  <Animated.View style={{
+                    position: 'absolute', left: frame.x, top: frame.y,
+                    width: frame.width, height: frame.height,
+                    opacity: floatingOpacity,
+                    transform: [{ translateX }, { translateY: Animated.add(translateY, liftAnim) }, { scale: floatingScale }],
+                  }}>
+                    <View style={[
+                      styles.floatingTile,
+                      {
+                        left: (frame.width - width) / 2, top: (frame.height - height) / 2,
+                        width, height, shadowColor: shadow,
+                        transform: [{ scale: frame.width / width }],
+                      },
+                    ]}>{child}</View>
+                  </Animated.View>
+                );
+              },
+            });
+          }
+
           // Show floating tile, dim source
           floatingOpacity.setValue(1);
           sourceOpacity.setValue(0.3);
@@ -155,7 +206,7 @@ export function DraggableTile({
           // Counter-scale the lift too, or the ghost rides only 44*s dp above
           // the finger while lines 164/177 subtract the full 44 — the aim point
           // and the visible centre would disagree by ~10dp on EXPERT.
-          const liftScale = scaleRef.current || 1;
+          const liftScale = overlayRef.current ? 1 : scaleRef.current || 1;
           if (!settings.reducedMotion) {
             Animated.spring(floatingScale, {
               toValue: 1.1,
@@ -179,7 +230,7 @@ export function DraggableTile({
           // equals the finger's page-space travel. The positions reported to
           // onMove/onDragEnd stay raw page space — estimateSlotIndex hit-tests
           // there and applies the scale itself.
-          const s = scaleRef.current || 1;
+          const s = overlayRef.current ? 1 : scaleRef.current || 1;
           translateX.setValue(dx / s);
           translateY.setValue(dy / s);
           // Live hover feedback: report the finger's page position, lifted by
@@ -203,6 +254,7 @@ export function DraggableTile({
           const dropY = startPos.current.y + gestureState.dy - DRAG_LIFT_DP;
 
           const settings = getSettingsSync();
+          const releasedOwner = ownerRef.current;
           if (!settings.reducedMotion) {
             // Pop-then-collapse: brief scale-up "impact" → shrink to nothing
             Animated.sequence([
@@ -228,12 +280,14 @@ export function DraggableTile({
                 }),
               ]),
             ]).start(() => {
+              if (ownerRef.current !== releasedOwner) return;
               // Reset after animation
               translateX.setValue(0);
               translateY.setValue(0);
               liftAnim.setValue(0);
               floatingScale.setValue(1);
               sourceOpacity.setValue(1);
+              overlayRef.current?.clear(ownerRef.current);
             });
           } else {
             translateX.setValue(0);
@@ -242,6 +296,7 @@ export function DraggableTile({
             floatingOpacity.setValue(0);
             floatingScale.setValue(1);
             sourceOpacity.setValue(1);
+            overlayRef.current?.clear(ownerRef.current);
           }
 
           onDragEndRef.current({ x: dropX, y: dropY });
@@ -265,6 +320,7 @@ export function DraggableTile({
         floatingOpacity.setValue(0);
         floatingScale.setValue(1);
         sourceOpacity.setValue(1);
+        overlayRef.current?.clear(ownerRef.current);
       },
     })));
 
@@ -284,7 +340,7 @@ export function DraggableTile({
     : {};
 
   return (
-    <View style={styles.wrapper}>
+    <View ref={wrapperRef} collapsable={false} style={styles.wrapper} onLayout={event => { dimensionsRef.current = event.nativeEvent.layout; }}>
       {/* Source tile (dims during drag). This wrapper is the ONE accessibility
           node for a draggable letter (accessibility-devices-3). It is
           `focusable` with an `onClick` so an assistive-tech activation on
@@ -312,7 +368,7 @@ export function DraggableTile({
 
       {/* Floating drag tile (follows finger). Never an accessibility stop: it
           is a visual copy of the letter above. */}
-      <Animated.View
+      {!overlay && <Animated.View
         pointerEvents="none"
         importantForAccessibility="no-hide-descendants"
         accessibilityElementsHidden
@@ -332,7 +388,7 @@ export function DraggableTile({
         ]}
       >
         {children}
-      </Animated.View>
+      </Animated.View>}
     </View>
   );
 }

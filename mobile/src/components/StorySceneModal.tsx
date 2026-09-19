@@ -5,13 +5,13 @@ import { Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DialoguePhase } from '../types/homeWorld';
 import { getSettingsSync } from '../services/settings';
-import { StoryMemory, STORY_COPY, getStoryPages, getStoryPresentationPhase } from '../services/storySpine';
+import { StoryMemory, STORY_COPY, getStoryPages, getStoryPresentationPhase, getStoryPortraitSpeaker } from '../services/storySpine';
 import { getStorySpeakerName } from '../services/storyArchive';
 import { announceForA11y } from '../services/a11yAnnounce';
 import { BODY_FONT, BODY_FONT_ITALIC } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
-import { StoryPortrait, STORY_PORTRAIT_MARGIN_BOTTOM, STORY_PORTRAIT_SIZE } from './StoryPortrait';
-import { STORY_ART } from './storyArt';
+import { StoryPortrait } from './StoryPortrait';
+import { getStoryPageArt } from './storyPageArt';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 
@@ -27,18 +27,6 @@ import { CandyButton } from './ui/CandyButton';
  * pass-throughs to save() so no extra await tick can split them.
  */
 const SAVING_REVEAL_MS = 350;
-
-/** StoryPortrait's frame height plus its bottom margin: the slot a narrator or player page reserves in its place. */
-const PORTRAIT_SLOT_DP = STORY_PORTRAIT_SIZE + STORY_PORTRAIT_MARGIN_BOTTOM;
-const SCENES_WITH_HEADER_ART = ['cup', 'supper', 'plum'];
-/**
- * The header art stays for every page of its scene (a page-0-only image moved
- * both card edges by 76dp on the first Continue). On the smallest phones that
- * makes a three-line page overflow the card and pushes the quiet actions
- * behind a scroll, so the art is shown only when the card has room for it,
- * decided once per scene from the same available height the card is capped at.
- */
-const HEADER_ART_MIN_CARD_DP = 720;
 
 export interface StorySceneModalProps {
   memory: StoryMemory | null; phase: DialoguePhase;
@@ -68,17 +56,11 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const speakerName = line ? getStorySpeakerName(line.speaker) : '';
   const options = memory && visiblePage === memory.page && !memory.choice && memory.page === memory.scene.lines.length - 1 ? memory.scene.options : undefined;
   const presentationPhase = memory ? getStoryPresentationPhase(memory) : phase;
-  // Frame stability: the card is content-sized and centred, so anything that
-  // mounts or unmounts between pages moves BOTH of its edges. The header art
-  // stays for every page of its scene, the portrait slot is reserved on
-  // narrator / player pages of any scene where an animal speaks, and the
-  // previous-page bevel occupies its slot from page one (invisible, inert), so
-  // page to page only the words change.
+  // Every page retains its image and resident. Compact screens scroll the
+  // complete card instead of dropping the scene art or hiding the animal.
   const availableHeight = height - insets.top - insets.bottom - 32;
-  const showHeaderArt = !!memory && presentationPhase < 3 && SCENES_WITH_HEADER_ART.includes(memory.scene.id)
-    && availableHeight >= HEADER_ART_MIN_CARD_DP;
-  const portraitSpeaker = line && line.speaker !== 'narrator' && line.speaker !== 'player' ? line.speaker : null;
-  const reservePortrait = !portraitSpeaker && pages.some(page => page.speaker !== 'narrator' && page.speaker !== 'player');
+  const illustration = memory && line ? getStoryPageArt(memory, visiblePage) : null;
+  const portraitSpeaker = memory ? getStoryPortraitSpeaker(memory, visiblePage) : null;
   useEffect(() => {
     retry.current = null;
   }, [pageKey]);
@@ -111,10 +93,9 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
     <View style={[styles.overlay, { backgroundColor: theme.overlay, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} accessibilityViewIsModal>
       <PanelCard phase={phase} kind="panel" style={{ width: '100%', maxWidth: 560, maxHeight: availableHeight }}>
         <ScrollView ref={scroll} contentContainerStyle={styles.content} bounces={false} keyboardShouldPersistTaps="handled">
-          {showHeaderArt && <Image source={STORY_ART.tableHeader} resizeMode="cover" style={styles.sceneArt} accessible={false} />}
+          {illustration && <Image source={illustration.source} resizeMode="contain" style={styles.sceneArt} accessible={false} />}
           <AppText textRole="title" accessibilityRole="header"  style={[styles.title, { color: theme.title }]}>{memory?.scene.title}</AppText>
-          {portraitSpeaker && <StoryPortrait speaker={portraitSpeaker} phase={presentationPhase} passage={`${memory?.scene.id}:${visiblePage}`} />}
-          {reservePortrait && <View style={styles.portraitSlot} accessible={false} pointerEvents="none" />}
+          {portraitSpeaker && <StoryPortrait speaker={portraitSpeaker} phase={presentationPhase} passage={`${memory?.scene.id}:${visiblePage}`} size={88} speaking={line?.speaker === portraitSpeaker} />}
           <AppText textRole="label"  style={[styles.speaker, { color: theme.title }]}>{speakerName}</AppText>
           <AppText textRole="reading"  style={[styles.body, line?.speaker === 'narrator' && styles.narration, { color: theme.body }]}>{line?.text}</AppText>
           <View style={styles.actions}>
@@ -146,10 +127,8 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
   content: { paddingHorizontal: SURFACE.panelPadX, paddingVertical: 32 },
-  sceneArt: { width: '100%', height: 132, marginBottom: 20 },
+  sceneArt: { width: '100%', aspectRatio: 16 / 9, marginBottom: 18 },
   title: { ...TEXT_ROLE.title, textAlign: 'center', marginBottom: 18 },
-  portrait: { width: 96, height: 96, alignSelf: 'center', marginBottom: 8 },
-  portraitSlot: { height: PORTRAIT_SLOT_DP },
   speaker: { ...TEXT_ROLE.label, marginBottom: 10 },
   body: { ...TEXT_ROLE.reading, marginBottom: 24 },
   narration: { fontFamily: BODY_FONT_ITALIC },

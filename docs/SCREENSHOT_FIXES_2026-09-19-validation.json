@@ -1,0 +1,48 @@
+{
+  "expected_suites": 222,
+  "verified_passed_suites": 222,
+  "unverified_suites": [],
+  "initial_reported_pass_suites": 106,
+  "remainder_suites": 116,
+  "remainder_tests": 1650,
+  "remainder_initial_failures": 2,
+  "last_targeted_suites": 2,
+  "last_targeted_tests": 26,
+  "typecheck": "passed",
+  "lint_max_warnings_zero": "passed",
+  "limitations": [
+    "Initial full Jest process exited without an aggregate summary after 106 passing suites and the pre-fix story legacy-art test failure; the 116 unreported/failing suites were run separately.",
+    "Two stale source-shape assertions were updated and their 26 tests rerun successfully.",
+    "Source tests and the production Android JavaScript/assets export do not establish native clipboard, gesture rendering or Android lifecycle behavior."
+  ],
+  "story_assets": {
+    "expected": 185,
+    "present": 185,
+    "totalBytes": 20781058,
+    "missing": [],
+    "invalid": []
+  },
+  "story_visual_review": {
+    "reviewed": 185,
+    "open_flags": [],
+    "manifest": "mobile/scripts/story/visual-review.json"
+  },
+  "android_export": {
+    "platform": "android",
+    "export_exit_code": 0,
+    "asset_count": 910,
+    "bundle": "_expo/static/js/android/AppEntry-640e3962403c624a90e55156e592b4da.hbc",
+    "story_images": 185,
+    "story_images_matched_by_sha256": 185,
+    "unmatched_story_images": [],
+    "scope": "Production Hermes JavaScript/assets export; no signed native build or device verification"
+  },
+  "store_campaign": {
+    "portrait_images": 8,
+    "width": 1080,
+    "height": 1920,
+    "format": "opaque RGB PNG",
+    "method": "source-asset assembly",
+    "archive_sha256": "4c260478b39580949507f4da19838a8639aff6ce1de43bd3515e2484672c9bfe"
+  }
+}

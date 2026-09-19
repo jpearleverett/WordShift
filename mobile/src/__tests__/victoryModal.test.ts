@@ -182,6 +182,9 @@ import {
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../services/shareResults';
 import { getPhaseTheme } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
+import { NineSliceFrame } from '../components/ui/NineSlice';
+import { CandyButton } from '../components/ui/CandyButton';
+import { getPixelSkin } from '../theme/pixelSkin.generated';
 
 // ---------------------------------------------------------------------------
 // Tree helpers
@@ -848,16 +851,46 @@ describe('swift victories compact strip', () => {
     expect(textOf(tree)).toContain(getFlawlessHonorific(0));
   });
 
-  it('stays phase-aware: the compact card uses the phase modal colors', () => {
-    mockSwiftVictories = true;
-    const phase4 = getPhaseTheme(4);
+  it.each([0, 1, 2, 3, 4, 5] as DialoguePhase[])(
+    'uses the full result cottage frame and actionable cottage buttons at phase %i', phase => {
+      mockSwiftVictories = true;
+      const props = baseProps({ phase, victoryData: routineVictoryData() });
+      const tree = render(props);
+      const frame = findAll(tree, el => el.type === NineSliceFrame)[0];
+      expect(frame.props!.skin).toBe(getPixelSkin(phase, phase >= 3).panel);
+      expect(frame.props!.fillColor).toBe(getPhaseTheme(phase).modalBgColor);
+      const actions = [
+        ['Next level', props.onNextLevel],
+        ['Share result', props.onShare],
+        ['Return home', props.onReturnHome],
+      ] as const;
+      for (const [label, callback] of actions) {
+        const button = findByA11yLabel(tree, label)!;
+        expect(button.type).toBe(CandyButton);
+        expect(button.props!.phase).toBe(phase);
+        expect(button.props!.hostDark).toBe(phase >= 3);
+        (button.props!.onPress as () => void)();
+        expect(callback).toHaveBeenCalledTimes(1);
+      }
+      // Short devices and large text must not push the last action out of reach.
+      expect(findAll(tree, el => el.type === 'ScrollView')).toHaveLength(1);
+    },
+  );
+
+  it.each([false, true])('omits word-count clutter but keeps rewards and collection (swift: %s)', swift => {
+    mockSwiftVictories = swift;
     const tree = render(baseProps({
-      phase: 4,
-      victoryData: routineVictoryData(),
+      victoryData: routineVictoryData({ harvestedWords: ['PLAY', 'PANT'], totalWordsFormed: 79 }),
+      completedWords: ['PAY', 'PLANT'],
     }));
-    const cards = findAll(tree, el =>
-      flatStyle((el.props as Record<string, unknown>).style).backgroundColor === phase4.modalBgColor);
-    expect(cards.length).toBeGreaterThan(0);
+    const text = textOf(tree);
+    expect(text).not.toMatch(/words harvested|words shifted|words offered|79/i);
+    expect(findByA11yLabel(tree, 'Collect amber in the pit')).not.toBeNull();
+    expect(findByA11yLabel(tree, 'Next level')).not.toBeNull();
+    if (!swift) {
+      expect(text).toContain('PAY');
+      expect(text).toContain('PLANT');
+    }
   });
 
   it('setting OFF keeps the full ceremony for the same routine win', () => {

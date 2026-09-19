@@ -1,0 +1,20 @@
+{
+  "reviewDate": "2026-09-19",
+  "method": "Direct inspection of exported PNGs and contact sheet with no app/browser execution",
+  "status": "reviewed",
+  "checks": [
+    "All eight ordered compositions inspected at contact-sheet scale.",
+    "Dialogue, choice, daily, night house, feature graphic and before-after opener inspected at full image size.",
+    "Complete source pit entrance and path visible in day and night scenes with approximately 70px ground clearance.",
+    "Daily's five word rows clear the action controls after a spacing correction; hard overlap validation added to the renderer.",
+    "Choice illustration matches the exact crooked-flower/fox line, with Ember continuously visible and both exact choices readable.",
+    "Choice actions stay inside the parchment and clear the bottom wood frame.",
+    "Fonts, source colors, L move and both locked Double Shift letters checked.",
+    "Night remains pre-reveal, with normal animal clothing and source phase-3 sky/window lighting.",
+    "Opaque RGB 1080x1920 phone exports and 1024x500 feature verified by build/package scripts."
+  ],
+  "limits": [
+    "Promotional reconstructions; native Android fidelity remains unverified.",
+    "Dimension and composition review do not guarantee store promotional-surface eligibility."
+  ]
+}

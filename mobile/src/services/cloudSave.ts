@@ -1,4 +1,4 @@
-import AsyncStorage, { runStorageTransaction, StorageRecoveryRequiredError } from './persistenceStorage';
+import AsyncStorage, { recoverPendingStorageTransaction, runStorageTransaction, StorageRecoveryRequiredError } from './persistenceStorage';
 import { createSecureIdentity, isSecureIdentity, formatSecureRecoveryCode, parseSecureRecoveryCode } from './secureIdentity';
 import { CURRENT_SCHEMA_VERSION, runMigrations } from './dataMigration';
 import { getSupportMetadata } from './supportIdentity';
@@ -202,9 +202,9 @@ export const SYNC_KEY_PREFIXES = [
 ];
 
 /**
- * Mirrored from SettingsScreen rather than imported: a service must not import
- * from a component (import cycle). SettingsScreen owns the write; this file
- * only reads it. Deliberately unsynced and deliberately survives Reset All —
+ * Shared with resetStorage and SettingsScreen without a component import.
+ * The journaled reset owns the write; upload acknowledgements and explicit
+ * restores clear it. Deliberately unsynced and deliberately survives Reset All —
  * see its entry in storageKeyRegistry.test.ts.
  */
 const LOCAL_RESET_MARKER_KEY = 'wordshift_local_reset_at';
@@ -369,15 +369,56 @@ export class CloudRecoveryError extends Error {
   constructor(public readonly reason: CloudRecoveryFailure, message: string) { super(message); }
 }
 
-/** Reveal a credential only after its backup is durable on the server. */
-export async function getOrCreateRecoveryCode(): Promise<string> {
-  if (!(await uploadToCloud())) {
+/** Reveal a credential only after its backup is durable on the server.
+ * Keep the upload and owner read together: a queued Reset must not switch the
+ * owner between them and reveal a new code with no corresponding backup. */
+export function getOrCreateRecoveryCode(): Promise<string> {
+  return enqueueCloudOperation(async () => {
+    if (!(await uploadCurrentSave())) {
+      const status = await getSyncStatus();
+      throw new CloudRecoveryError(status.conflictDetected ? 'conflict' : 'unavailable',
+        status.conflictDetected ? 'Resolve the newer backup before sharing a recovery code.' :
+        'Connect to the internet and back up successfully before showing your recovery code.');
+    }
+    return formatSecureRecoveryCode(await getCloudOwnerId());
+  });
+}
+
+/** Run Reset behind previous uploads/restores and keep later autosaves waiting
+ * until the fresh game's identity and all local cleanup are committed. Existing
+ * backups get a final non-forced upload; an offline/conflicted backed-up save
+ * stays untouched so the player can retry without losing recent progress. */
+export function resetWithPreservedCloudBackup<T>(resetLocal: () => Promise<T>): Promise<T> {
+  return enqueueCloudOperation(async () => {
+    if (uploadHold) await uploadHold;
+    await recoverPendingStorageTransaction();
     const status = await getSyncStatus();
-    throw new CloudRecoveryError(status.conflictDetected ? 'conflict' : 'unavailable',
-      status.conflictDetected ? 'Resolve the newer backup before sharing a recovery code.' :
-      'Connect to the internet and back up successfully before showing your recovery code.');
-  }
-  return formatSecureRecoveryCode(await getCloudOwnerId());
+    const hasBackup = status.lastSyncTimestamp > 0 || status.remoteRevision !== undefined;
+    const hasProgress = !!await AsyncStorage.getItem(FRESH_INSTALL_SENTINEL_KEY);
+    if (hasProgress && (hasBackup || await provider.isReady())) {
+      const uploaded = await uploadCurrentSave();
+      const currentStatus = await getSyncStatus();
+      if (!uploaded && (hasBackup || currentStatus.conflictDetected)) {
+        throw new CloudRecoveryError(currentStatus.conflictDetected ? 'conflict' : 'unavailable',
+          currentStatus.conflictDetected
+            ? 'Your cloud backup has newer progress. Resolve the backup conflict in Settings before starting over. Your current game has not been reset.'
+            : 'Connect to the internet so we can save your latest progress before starting over. Your current game has not been reset.');
+      }
+    }
+    return resetLocal();
+  });
+}
+
+/** Called inside the full-reset storage transaction. The old capability stays
+ * valid on the server, while the empty game gets a separate secure identity.
+ * A journaled wipe can never leave the old owner attached to the new game. */
+export async function detachCloudBackupForReset(): Promise<void> {
+  if (ownerCreation) await ownerCreation;
+  const owner = await createSecureIdentity();
+  await AsyncStorage.setItem(CLOUD_OWNER_KEY, owner);
+  await AsyncStorage.removeItem(LEGACY_CLOUD_OWNER_KEY);
+  await AsyncStorage.removeItem(SYNC_STATUS_KEY);
+  syncStatusCache = null;
 }
 
 function recoveryOwner(code: string): string {
@@ -450,7 +491,7 @@ export async function maybeAutoRestoreOnFreshInstall(shouldContinue: () => boole
     if (!cloudData || !shouldContinue()) return false;
 
     // A pending deliberate reset blocks automatic restore regardless of device
-    // clock skew. Only a successful reset upload or an explicit player restore
+    // clock skew. Only a successful fresh-game upload or an explicit player restore
     // may replace that choice; remote wall-clock timestamps cannot authorize it.
     const resetMarker = await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY);
     if (resetMarker) return false;
@@ -742,52 +783,56 @@ function enqueueCloudOperation<T>(work: () => Promise<T>): Promise<T> {
   return run;
 }
 export function uploadToCloud(force: boolean = false): Promise<boolean> {
-  return enqueueCloudOperation(async () => {
-    if (!(await provider.isReady())) return false;
-    if (uploadHold) await uploadHold;
-    try {
-      const snapshot = await runStorageTransaction('cloud_snapshot', async () => ({
-        owner: await getCloudOwnerId(), status: await getSyncStatus(),
-        resetMarker: await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY), data: await collectLocalSaveData(),
-      }));
-      const { owner, status, data: saveData } = snapshot;
-      if (!validateCloudSaveData(saveData)) throw new Error('Local save needs repair before backup');
-      const baseline = status.owner === owner ? status.remoteRevision ?? null : null;
-      let success: boolean;
-      let revision: number | undefined;
-      if (provider.uploadConditional) {
-        const result = await provider.uploadConditional(saveData, baseline, force, owner);
-        if (result.status === 'conflict') { await recordSyncConflict(); return false; }
-        success = result.status === 'saved';
-        revision = result.revision;
-      } else {
-        // Custom/offline providers retain their original seam. Production uses
-        // the mandatory v2 conditional RPC; it never falls back to legacy upsert.
-        if (!force && status.lastSyncTimestamp > 0 && await provider.hasNewerSave(status.lastSyncTimestamp)) {
-          await recordSyncConflict(); return false;
-        }
-        success = await provider.upload(saveData);
+  return enqueueCloudOperation(() => uploadCurrentSave(force));
+}
+
+/** Only call while owning the cloud queue (including code reveal and Reset). */
+async function uploadCurrentSave(force: boolean = false): Promise<boolean> {
+  if (!(await provider.isReady())) return false;
+  if (uploadHold) await uploadHold;
+  try {
+    const snapshot = await runStorageTransaction('cloud_snapshot', async () => ({
+      owner: await getCloudOwnerId(), status: await getSyncStatus(),
+      resetMarker: await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY), data: await collectLocalSaveData(),
+    }));
+    const { owner, status, data: saveData } = snapshot;
+    if (!validateCloudSaveData(saveData)) throw new Error('Local save needs repair before backup');
+    const baseline = status.owner === owner ? status.remoteRevision ?? null : null;
+    let success: boolean;
+    let revision: number | undefined;
+    if (provider.uploadConditional) {
+      const result = await provider.uploadConditional(saveData, baseline, force, owner);
+      if (result.status === 'conflict') { await recordSyncConflict(); return false; }
+      success = result.status === 'saved';
+      revision = result.revision;
+    } else {
+      // Custom/offline providers retain their original seam. Production uses
+      // the mandatory v2 conditional RPC; it never falls back to legacy upsert.
+      if (!force && status.lastSyncTimestamp > 0 && await provider.hasNewerSave(status.lastSyncTimestamp)) {
+        await recordSyncConflict(); return false;
       }
-      await runStorageTransaction('cloud_acknowledgement', async () => {
-        const markerNow = await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY);
-        // An acknowledgement of a PRE-reset snapshot cannot acknowledge a reset
-        // made while its network request was in flight. Compare and clear inside
-        // the same serialized operation as Reset's marker write.
-        if (success && snapshot.resetMarker && markerNow === snapshot.resetMarker) {
-          await AsyncStorage.removeItem(LOCAL_RESET_MARKER_KEY);
-        }
-        if (await getCloudOwnerId() === owner) {
-          await updateSyncStatus(success, { ...saveData, revision }, owner);
-          if (markerNow && markerNow !== snapshot.resetMarker) await markPendingChanges();
-        }
-      });
-      logEvent({ type: 'cloud_sync_result', data: { operation: 'upload', result: success ? 'saved' : 'unavailable' } });
-      return success;
-    } catch {
-      await updateSyncStatus(false);
-      return false;
+      success = await provider.upload(saveData);
     }
-  });
+    await runStorageTransaction('cloud_acknowledgement', async () => {
+      const markerNow = await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY);
+      // An acknowledgement of a PRE-reset snapshot cannot acknowledge a reset
+      // made while its network request was in flight. Compare and clear inside
+      // the same serialized operation as Reset's marker write.
+      const currentOwner = await getCloudOwnerId();
+      if (success && currentOwner === owner && snapshot.resetMarker && markerNow === snapshot.resetMarker) {
+        await AsyncStorage.removeItem(LOCAL_RESET_MARKER_KEY);
+      }
+      if (currentOwner === owner) {
+        await updateSyncStatus(success, { ...saveData, revision }, owner);
+      }
+      if (markerNow && markerNow !== snapshot.resetMarker) await markPendingChanges();
+    });
+    logEvent({ type: 'cloud_sync_result', data: { operation: 'upload', result: success ? 'saved' : 'unavailable' } });
+    return success;
+  } catch {
+    await updateSyncStatus(false);
+    return false;
+  }
 }
 
 /**
@@ -907,7 +952,7 @@ export async function clearSyncStatus(): Promise<void> {
   try {
     await AsyncStorage.removeItem(SYNC_STATUS_KEY);
     await AsyncStorage.removeItem('wordshift_device_id');
-    // Reset progress preserves the cloud identity so its explicit overwrite
-    // addresses the same backup. Unlinking must be a separate player action.
+    // Identity changes belong to the atomic reset transaction. Clearing sync
+    // metadata alone must not change which backup an ordinary restore uses.
   } catch {}
 }

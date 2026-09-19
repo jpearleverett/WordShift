@@ -572,9 +572,10 @@ describe('cloudSave', () => {
       expect((await getSyncStatus()).conflictDetected).toBe(false);
     });
 
-    it('uploads unguarded when this device has no sync baseline (e.g. right after Reset All cleared the sync status)', async () => {
-      // performFullReset clears the sync status BEFORE its deliberate
-      // cloud-overwrite upload — the guard must not block that flow.
+    it('legacy custom providers accept their first upload without a sync baseline', async () => {
+      // This compatibility seam has no server revisions. Production's v2
+      // provider always uses conditional writes; Reset now gives the fresh
+      // game a separate owner and never force-overwrites the old backup.
       const mockUpload = jest.fn(async () => true);
       const hasNewer = jest.fn(async () => true);
       setCloudProvider(createMockProvider({ upload: mockUpload, hasNewerSave: hasNewer }));

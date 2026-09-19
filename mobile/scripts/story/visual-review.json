@@ -1,0 +1,1361 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-09-19T19:19:36.776911+00:00",
+  "method": "Independent visual inspection against authored narrative lines, followed by per-scene sequence review and final SHA-256 reconciliation. No native device walkthrough is asserted.",
+  "inventory": "scripts/story/story-art-prompts.json",
+  "summary": {
+    "expected": 185,
+    "reviewed": 185,
+    "passed": 185,
+    "openFlags": 0,
+    "currentHashesMatched": 185
+  },
+  "sceneCounts": {
+    "cup": 8,
+    "echo": 7,
+    "witness": 8,
+    "supper": 14,
+    "plan": 9,
+    "shelter": 11,
+    "plum": 9,
+    "record": 15,
+    "seeds": 15,
+    "promise": 14,
+    "returned": 11,
+    "council": 18,
+    "after": 26,
+    "reply": 10,
+    "old_mark": 9,
+    "plum_recruited": 1
+  },
+  "reviews": [
+    {
+      "id": "cup-01",
+      "scene": "cup",
+      "asset": "assets/story/pages/cup-01.webp",
+      "sha256": "b8b8067296ee32ffb4c4875181157582acef87f7da06243fd3cc7b035efd8a54",
+      "status": "pass"
+    },
+    {
+      "id": "cup-02",
+      "scene": "cup",
+      "asset": "assets/story/pages/cup-02.webp",
+      "sha256": "34b273e1ec4821ef492985f20f737758e8a2d1bab9ae32456ae14da64d363c91",
+      "status": "pass"
+    },
+    {
+      "id": "cup-03",
+      "scene": "cup",
+      "asset": "assets/story/pages/cup-03.webp",
+      "sha256": "019f379ca4d66c0dcd263e0062c8bd9a3ccbeaa9067aa7f3433c6bd75627621d",
+      "status": "pass"
+    },
+    {
+      "id": "cup-04",
+      "scene": "cup",
+      "asset": "assets/story/pages/cup-04.webp",
+      "sha256": "c14c09ba1d1b6f022e39814951195f47f423a55518ec1026034877059bf8274e",
+      "status": "pass"
+    },
+    {
+      "id": "cup-05",
+      "scene": "cup",
+      "asset": "assets/story/pages/cup-05.webp",
+      "sha256": "391df36483841f311af5efbb9ae5af5b81f87e985392fe1bb70064562c1433a8",
+      "status": "pass"
+    },
+    {
+      "id": "cup-06",
+      "scene": "cup",
+      "asset": "assets/story/pages/cup-06.webp",
+      "sha256": "91fb43fdcbc460b87ab848c1b8f07f19df5bf1dee0d934af370741d53ec9dd62",
+      "status": "pass"
+    },
+    {
+      "id": "cup-07",
+      "scene": "cup",
+      "asset": "assets/story/pages/cup-07.webp",
+      "sha256": "341432aa9cc04a6480dd13a58d044d46edb7640148c1a12c0ecaaee421f6f333",
+      "status": "pass"
+    },
+    {
+      "id": "echo-01",
+      "scene": "echo",
+      "asset": "assets/story/pages/echo-01.webp",
+      "sha256": "72ffaea69cb790d98400ed52c614486bf755485123af0151843aff52b04c77f3",
+      "status": "pass"
+    },
+    {
+      "id": "echo-02",
+      "scene": "echo",
+      "asset": "assets/story/pages/echo-02.webp",
+      "sha256": "53e09887d2583fc1cfaa99869b04e692b00d76a7876f9148e374efaae8d096cb",
+      "status": "pass"
+    },
+    {
+      "id": "echo-03",
+      "scene": "echo",
+      "asset": "assets/story/pages/echo-03.webp",
+      "sha256": "5b65f94026ec144418f5014ad5704fce71316f577109669e5d850fa9d9e76827",
+      "status": "pass"
+    },
+    {
+      "id": "echo-04",
+      "scene": "echo",
+      "asset": "assets/story/pages/echo-04.webp",
+      "sha256": "bd18862434ac7092835421ae836902dd4b33888d391432e12f4b413992092d79",
+      "status": "pass"
+    },
+    {
+      "id": "echo-05",
+      "scene": "echo",
+      "asset": "assets/story/pages/echo-05.webp",
+      "sha256": "07c805f25b53e82a4c7415afd394e20a7e68d5a67342171162f1038508aa390d",
+      "status": "pass"
+    },
+    {
+      "id": "echo-06",
+      "scene": "echo",
+      "asset": "assets/story/pages/echo-06.webp",
+      "sha256": "d5a4b5a8d7699ba663e3c16b56d192a06fa7dc0d33e1918e1de755f54ebdeedf",
+      "status": "pass"
+    },
+    {
+      "id": "witness-01",
+      "scene": "witness",
+      "asset": "assets/story/pages/witness-01.webp",
+      "sha256": "98edfbbd27635846f43b062415808fb95b95d4597bc6bc625f3535c2a58f9f0d",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "witness-02",
+      "scene": "witness",
+      "asset": "assets/story/pages/witness-02.webp",
+      "sha256": "3e22c8e6c2d9f9f13de9af6e9b0cee6d46ddc6d9153bf8d86c80044fae808450",
+      "status": "pass"
+    },
+    {
+      "id": "witness-03",
+      "scene": "witness",
+      "asset": "assets/story/pages/witness-03.webp",
+      "sha256": "2ed338104699aa1e0fd873ed8835234a870761ce364f411225d786b3d54ed0fb",
+      "status": "pass"
+    },
+    {
+      "id": "witness-04",
+      "scene": "witness",
+      "asset": "assets/story/pages/witness-04.webp",
+      "sha256": "d824c76c6d4d5fcc31d42341107ec4629d804ee8c760c1453db00c7f7f301931",
+      "status": "pass"
+    },
+    {
+      "id": "witness-05",
+      "scene": "witness",
+      "asset": "assets/story/pages/witness-05.webp",
+      "sha256": "cc99086bd215096e875065a8976242eaad03e8f67a16c410112fd27847190d34",
+      "status": "pass"
+    },
+    {
+      "id": "witness-06",
+      "scene": "witness",
+      "asset": "assets/story/pages/witness-06.webp",
+      "sha256": "a0d3bb252f96fd7eab8439ebdfba7451a2a9bb06139f32e619e851579780457d",
+      "status": "pass"
+    },
+    {
+      "id": "witness-07",
+      "scene": "witness",
+      "asset": "assets/story/pages/witness-07.webp",
+      "sha256": "870c3598eba1a7a74c30257d2a6d72520e99a8e284d29e5de45160441fdacfa0",
+      "status": "pass"
+    },
+    {
+      "id": "supper-01",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-01.webp",
+      "sha256": "9dfbb4860d1aad59bf267341ca3e44855f98fb5289ae1a59f57a52ae469d5b33",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "supper-02",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-02.webp",
+      "sha256": "ab9ab66ba832036b3bc850b5aaad6f5f864742527e3595fbf05ba29beeaba096",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "supper-03",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-03.webp",
+      "sha256": "34058a24f9e897b328e7c6c7670ce901351d745c91bf6090f8cd975b2700801c",
+      "status": "pass"
+    },
+    {
+      "id": "supper-04",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-04.webp",
+      "sha256": "66a206130b5745331e3c4c583f08e35aecf9985f42e762862e2d96ce590ba8e2",
+      "status": "pass"
+    },
+    {
+      "id": "supper-05",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-05.webp",
+      "sha256": "e8738d3fbea589a19c9394189345e140ee07fd5ab11367540b89ac7061966dc2",
+      "status": "pass"
+    },
+    {
+      "id": "supper-06",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-06.webp",
+      "sha256": "827c5e80d69ebe2e7e0942c038f009761443865f58f29670f36342215b9e2b62",
+      "status": "pass"
+    },
+    {
+      "id": "supper-07",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-07.webp",
+      "sha256": "da713be13298dd046b68233424276da65cd947d0246a4982e9401939248eedc0",
+      "status": "pass"
+    },
+    {
+      "id": "supper-08",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-08.webp",
+      "sha256": "75dda0053891a81a269c1994e69d273434f0ba1110288c8a7e3574b1afed15dc",
+      "status": "pass"
+    },
+    {
+      "id": "supper-09",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-09.webp",
+      "sha256": "6399a54b62cdd8008bb55fed7c7c13a565da9be7e893307b36d18b2d1feaa6dd",
+      "status": "pass"
+    },
+    {
+      "id": "supper-10",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-10.webp",
+      "sha256": "e4dca9bf908912a9e8e761b60e162c6fac7556ac09f4a4b152d5ce8365eacccb",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "supper-11",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-11.webp",
+      "sha256": "9188d761a2e9c9b6230a45daffb3724774c8351e7907519a6e463c13c3f5621c",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "supper-12",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-12.webp",
+      "sha256": "c7739473e8106af49ee181360772e825c29c8af2e98549b91928b74b9e8cda08",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "supper-13",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-13.webp",
+      "sha256": "2c45b7a06f3efe7c3e153c1d241e6d1287a51863389a9fbdad25ba5bdada91ba",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "plan-01",
+      "scene": "plan",
+      "asset": "assets/story/pages/plan-01.webp",
+      "sha256": "8f6bca3f439bc8b432b9d0aa83d12c5f68001e888b6dc4ba4f71de2489cdd559",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "plan-02",
+      "scene": "plan",
+      "asset": "assets/story/pages/plan-02.webp",
+      "sha256": "8f2f26b3fece5e6ec8942a4a320124f170ef6a99ccc4ad39971bc1da07f1aad4",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "plan-03",
+      "scene": "plan",
+      "asset": "assets/story/pages/plan-03.webp",
+      "sha256": "be6535a67165896fd865b8532fae1e864a3da3c73eadd71ac8ecb0911332d08a",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "plan-04",
+      "scene": "plan",
+      "asset": "assets/story/pages/plan-04.webp",
+      "sha256": "29cd62ae62eb499d81e30546f8bf7df0d8ec8673e7e6b938f3bd9fa914a1a61e",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "plan-05",
+      "scene": "plan",
+      "asset": "assets/story/pages/plan-05.webp",
+      "sha256": "b039abd1acd63b410b5a7f7e11c9e4d6a4be135192d1c6f3bf1df6342b7e628c",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "plan-06",
+      "scene": "plan",
+      "asset": "assets/story/pages/plan-06.webp",
+      "sha256": "5fed1d2633328c484013ee62e29081aceb45aab8d4cd908f511291533dcbf717",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "plan-07",
+      "scene": "plan",
+      "asset": "assets/story/pages/plan-07.webp",
+      "sha256": "a1ae87a442725400b946f149ac087edd2cc1e8417d818fbe931f1de2bb24e800",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "plan-08",
+      "scene": "plan",
+      "asset": "assets/story/pages/plan-08.webp",
+      "sha256": "c7b29b924846322ac2f3afb8e1b67639254175071e7617ae1b3530d0dd3537a6",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "shelter-01",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-01.webp",
+      "sha256": "ad065c7115c70a446c633003acd99304460c62112aa2e142dfadb840308b8835",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-02",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-02.webp",
+      "sha256": "288a8ecd84d02970d964b57f87b4def5264819523228aeb36da78335072dc7a1",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-03",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-03.webp",
+      "sha256": "58c2ce8afce7b9e80c2dfa6578969fda0b821de205283f84c46aef8b375934be",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-04",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-04.webp",
+      "sha256": "446ae866ed7231f5a5e3e6ebf6767f6e0a5fa3c6f04aab2e6d134b440ef81b33",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-05",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-05.webp",
+      "sha256": "524ca66a9d26bb1a66c91613a89544740698cb3d8c0506c5b772a0a2897d2744",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-06",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-06.webp",
+      "sha256": "ec5bf572735d6751d8b62e2e8fb46f3b41d8d3641e7a52873f269ee227b95474",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-07",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-07.webp",
+      "sha256": "fc4b0a24fed36fe06294596bb1b197ed900e50104d59cf1abaf89f427a53b6ba",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-08",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-08.webp",
+      "sha256": "bd3791a1837f71ca15bff9f23fb988f4c4fd5f3d32ca798362f2cbab2946280d",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-09",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-09.webp",
+      "sha256": "8e9291bb86c5834aabf829888b66601269617b4f9b74c69af7b2ce128c32f20b",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-10",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-10.webp",
+      "sha256": "10ed7b3017f0b88d3b9fdd7031fa68250e9df6bd6bf1250461f14467d7f775bd",
+      "status": "pass"
+    },
+    {
+      "id": "plum-01",
+      "scene": "plum",
+      "asset": "assets/story/pages/plum-01.webp",
+      "sha256": "5b83bc48ea68f2fd53d1e787f689c6ebb9e06bf749c1e5ff9b02789847beab50",
+      "status": "pass"
+    },
+    {
+      "id": "plum-02",
+      "scene": "plum",
+      "asset": "assets/story/pages/plum-02.webp",
+      "sha256": "db4213d94420538fda8d8d39c6c827aeab19afdd36eefb3beaa8a39279e22032",
+      "status": "pass"
+    },
+    {
+      "id": "plum-03",
+      "scene": "plum",
+      "asset": "assets/story/pages/plum-03.webp",
+      "sha256": "db9785d5cb937331c87a041cd7e3069ddad7f8cbaa85fbb2085122845ee7b161",
+      "status": "pass"
+    },
+    {
+      "id": "plum-04",
+      "scene": "plum",
+      "asset": "assets/story/pages/plum-04.webp",
+      "sha256": "e49d8389e7fbf3f81c6c7dc68a0d05fa1e6c7a0da3aeb9f00a46df0aeef6433f",
+      "status": "pass"
+    },
+    {
+      "id": "plum-05",
+      "scene": "plum",
+      "asset": "assets/story/pages/plum-05.webp",
+      "sha256": "3fc0659c14a3d3b33a3434c35edf1751cfcfb61dfde2d18b91e25119c3177edf",
+      "status": "pass"
+    },
+    {
+      "id": "plum-06",
+      "scene": "plum",
+      "asset": "assets/story/pages/plum-06.webp",
+      "sha256": "b50e4b8a975b05d9c1fe4486bf960232b6fd5e361dac5abf028bacde952906b0",
+      "status": "pass"
+    },
+    {
+      "id": "plum-07",
+      "scene": "plum",
+      "asset": "assets/story/pages/plum-07.webp",
+      "sha256": "559b12054ac510fce5eb258f6a86b43fa49cc649a8687d1be03c3a10f9c506f1",
+      "status": "pass"
+    },
+    {
+      "id": "plum-08",
+      "scene": "plum",
+      "asset": "assets/story/pages/plum-08.webp",
+      "sha256": "925c647a24f7eae2818305cdcb5082e31542689866d10f84898673a0caf79bc8",
+      "status": "pass"
+    },
+    {
+      "id": "record-01",
+      "scene": "record",
+      "asset": "assets/story/pages/record-01.webp",
+      "sha256": "45e1da68c4ab1cd76565dcad3521f004124f769a9140b4778d1abac6ff9bd9ed",
+      "status": "pass"
+    },
+    {
+      "id": "record-02",
+      "scene": "record",
+      "asset": "assets/story/pages/record-02.webp",
+      "sha256": "4206b8032586ab98f9c3416c9ab96606449c89ca876faf0565251260968218e8",
+      "status": "pass"
+    },
+    {
+      "id": "record-03",
+      "scene": "record",
+      "asset": "assets/story/pages/record-03.webp",
+      "sha256": "20169e42b728094d4f3b0b0facd68d66ac16c55220096deda557bc10d6ef5e2f",
+      "status": "pass"
+    },
+    {
+      "id": "record-04",
+      "scene": "record",
+      "asset": "assets/story/pages/record-04.webp",
+      "sha256": "36f191169b5415ab77d7cc7227694b6e9cde39493c315a3c459069549841814f",
+      "status": "pass"
+    },
+    {
+      "id": "record-05",
+      "scene": "record",
+      "asset": "assets/story/pages/record-05.webp",
+      "sha256": "e703cf82cd936cf33cdcd2310ece53898b221ece4823b9ea2c558c2bf62d521c",
+      "status": "pass"
+    },
+    {
+      "id": "record-06",
+      "scene": "record",
+      "asset": "assets/story/pages/record-06.webp",
+      "sha256": "d48af50e86ae171775f1365e32fd074a9cc73ee46849f8ed9b77ead05a103582",
+      "status": "pass"
+    },
+    {
+      "id": "record-07",
+      "scene": "record",
+      "asset": "assets/story/pages/record-07.webp",
+      "sha256": "76d53bfff27d9b02b91c10e521a2bd166293cca9d53a4beaca3910920101b5da",
+      "status": "pass"
+    },
+    {
+      "id": "record-08",
+      "scene": "record",
+      "asset": "assets/story/pages/record-08.webp",
+      "sha256": "2b56c16125334eb4be094d13b5b305b94d91ae42ddda8ab3a6efce7810f9704f",
+      "status": "pass"
+    },
+    {
+      "id": "record-09",
+      "scene": "record",
+      "asset": "assets/story/pages/record-09.webp",
+      "sha256": "36dc608f747f720fad93b001876a8189661ad79b2b1a37f200bf3ed1625b493d",
+      "status": "pass"
+    },
+    {
+      "id": "record-10",
+      "scene": "record",
+      "asset": "assets/story/pages/record-10.webp",
+      "sha256": "1f169cf54fc4173ddb8ab619fff9199bc8c6dae2096977940d303c2ba801863a",
+      "status": "pass"
+    },
+    {
+      "id": "record-11",
+      "scene": "record",
+      "asset": "assets/story/pages/record-11.webp",
+      "sha256": "680b2bd2d1c79dca8208efc397806cc7d94fe6e572ebc26d74efcd92f2410ffb",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "record-12",
+      "scene": "record",
+      "asset": "assets/story/pages/record-12.webp",
+      "sha256": "ad5888d8db5070609c3d170c20ba0e193837a5888b8f00a8a5f2927bf187961b",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "record-13",
+      "scene": "record",
+      "asset": "assets/story/pages/record-13.webp",
+      "sha256": "eefb472122375bef761a9c0ca71f2c60fdbc1251d86b1237a7b8e1931193013c",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "record-14",
+      "scene": "record",
+      "asset": "assets/story/pages/record-14.webp",
+      "sha256": "6cc989d57f683107d87f0d75dfcbb0bd494a0184ab939de92123a8584fb20a70",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "seeds-01",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-01.webp",
+      "sha256": "295b88ee339f473c4cd2bd881f1c8b5e4fb37a8146cec2ce6e92f0afe02179b1",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "seeds-02",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-02.webp",
+      "sha256": "d60e281ba655a6c19be3c1fbe1197df19644fbc00e675204623948f7dd0f3760",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "seeds-03",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-03.webp",
+      "sha256": "4696c4b665cbf59165603e9611295ec0c147e233e634958db0b9bc0c158d4948",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "seeds-04",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-04.webp",
+      "sha256": "4d28e698c7ed4c8b32ed6d144f2ef7048d5d510800900ec94c253166dfdb1679",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-05",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-05.webp",
+      "sha256": "01c8a4fab26d9435f6176df1a0404905b6f03b15f6b0909618dfecf03b0721bf",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-06",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-06.webp",
+      "sha256": "3b6ca6cb757a1d796be94824aa33d3fdd19283a4862df0256cdf211ac486d3e5",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-07",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-07.webp",
+      "sha256": "fcdfc3893e7d5a80fabc49e97f22d5d7a4fea3dfd0ef46cd6fdb19f88ea39b2f",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-08",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-08.webp",
+      "sha256": "1daf5ba42eb81fd9a60a3e70af3f0f60b6a9a82ef05635b0908bf1a15a343fd5",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-09",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-09.webp",
+      "sha256": "59acc420e71cb92e67a6cff4a3b278cc33f73b01a62d5ced23992ce510aa8702",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-10",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-10.webp",
+      "sha256": "d2f2852815ea68ef7e0113097e023d219dffd2c8f06e024b23fd1b207bac4753",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-11",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-11.webp",
+      "sha256": "be323c6b92376ce9819fc3f408a2063e850aed7faf44749b34d35372f4f7a7af",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-12",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-12.webp",
+      "sha256": "88ceb3640027e9a42e317635cd4c311c49e2ec378d78557d7ae99a67d60ca005",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-13",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-13.webp",
+      "sha256": "eb59cab9c106185c140d1374ef4051368f322ec38f6ad94b2623e4f9ca5a422d",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-14",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-14.webp",
+      "sha256": "a5f41afdc1f771a4fa76c9d6af60c80047b01fd3b3bf5df22af21b718f7079b0",
+      "status": "pass"
+    },
+    {
+      "id": "promise-01",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-01.webp",
+      "sha256": "e6fe5543d9a4734cc93e1339b41d67b872496d1b59460baa642f3165e4f014c7",
+      "status": "pass"
+    },
+    {
+      "id": "promise-02",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-02.webp",
+      "sha256": "6daedbdc463a8ac44e6a1fa05d77e37bf4d50001e62a1d4bdc55faeb7416caf1",
+      "status": "pass"
+    },
+    {
+      "id": "promise-03",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-03.webp",
+      "sha256": "d4e1833ed61b476c80a869e5b7bb9f80cee2f50269e13ffab871d4f390a44547",
+      "status": "pass"
+    },
+    {
+      "id": "promise-04",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-04.webp",
+      "sha256": "24ed68e62a7f184188a43ba70695f638afd2f4bd4be2aa2caf67adf241a56d2a",
+      "status": "pass"
+    },
+    {
+      "id": "promise-05",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-05.webp",
+      "sha256": "90c4e67a0b3e6555aeb54f1fb0aa33077c96cd307114b0e53fb23eec7c8721cb",
+      "status": "pass"
+    },
+    {
+      "id": "promise-06",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-06.webp",
+      "sha256": "cdfc9cc46a21e4a4cccbc4c783766d2d7951efd1359eb8da4e90ce6d318be75b",
+      "status": "pass"
+    },
+    {
+      "id": "promise-07",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-07.webp",
+      "sha256": "c7d62edd69b139ab6c61cb2579f475cc322fc1c4ef3da691c88ca207654794c9",
+      "status": "pass"
+    },
+    {
+      "id": "promise-08",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-08.webp",
+      "sha256": "af07ab67d35fb1b0c2afde05f7fe2e40812f38b0ffbb0f092c6496761d971245",
+      "status": "pass"
+    },
+    {
+      "id": "promise-09",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-09.webp",
+      "sha256": "89588e9f2a76ba6f6a9a77aef020d78bd6e726b5b2c88f443fe95bc0521af433",
+      "status": "pass"
+    },
+    {
+      "id": "promise-10",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-10.webp",
+      "sha256": "b1276b39ec9a50f1af489da640d2f42633091b34cafb88e58d8befad114e9eb1",
+      "status": "pass"
+    },
+    {
+      "id": "promise-11",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-11.webp",
+      "sha256": "9cc86f184f5248ac04f1f7f7efc1457ec98b5e557d45efc6fb43e6503dd787b2",
+      "status": "pass"
+    },
+    {
+      "id": "promise-12",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-12.webp",
+      "sha256": "905e6277cbcd0c84dc79c92207175f25bb069dda80179c7bac448e0aaf827eb4",
+      "status": "pass"
+    },
+    {
+      "id": "promise-13",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-13.webp",
+      "sha256": "ea017c4f68334435783faeff0849f55e5c1c2c0ec3b36ce58090bae0c327564d",
+      "status": "pass"
+    },
+    {
+      "id": "returned-01",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-01.webp",
+      "sha256": "fa05181684d9333d071ef3a50f8b2603c876a9b0191683d81dd02d7a0582041b",
+      "status": "pass"
+    },
+    {
+      "id": "returned-02",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-02.webp",
+      "sha256": "d1034f671b2945b4840edf549f06bc4b3a6720c0efa95e277a6f1f0b76aff084",
+      "status": "pass"
+    },
+    {
+      "id": "returned-03",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-03.webp",
+      "sha256": "4051c508df1ad446815561579f4c6f85fc73c1276aeb0ffb15cd70dc60ceec21",
+      "status": "pass"
+    },
+    {
+      "id": "returned-04",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-04.webp",
+      "sha256": "af2017e26de28f4ebeb254b96f2aa0979e3130962399468eb4679979e593f37a",
+      "status": "pass"
+    },
+    {
+      "id": "returned-05",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-05.webp",
+      "sha256": "3ff7cc73bbd38d1667dab5ba51786c040a1b359be9f986e38b787dece1f301ad",
+      "status": "pass"
+    },
+    {
+      "id": "returned-06",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-06.webp",
+      "sha256": "760d488a3a368e619650c68b76d409f0ac9d72b79648caaaaf2f2fdda459b7df",
+      "status": "pass"
+    },
+    {
+      "id": "returned-07",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-07.webp",
+      "sha256": "6ae1317d89f841ba4f1f4b3ec243535a9355ed5b02c67ec8f42ab667e0223513",
+      "status": "pass"
+    },
+    {
+      "id": "returned-08",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-08.webp",
+      "sha256": "2520d651c3cd93c8b3319d7be9adb4ac9543c1faeae0dd9f4e48240b0743b723",
+      "status": "pass"
+    },
+    {
+      "id": "returned-09",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-09.webp",
+      "sha256": "1228c4682e38dcf1ea8432f8cf65b6f4e0dfb830bea70acdd7d2fe516aa6dc66",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "returned-10",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-10.webp",
+      "sha256": "a3bf775bad7c6639b43a5ec8378ffc7985476d8290ffde37f0e9b8e4248360c3",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "council-01",
+      "scene": "council",
+      "asset": "assets/story/pages/council-01.webp",
+      "sha256": "6e6fa7db1eaf0a109c49e2b57f092096b3b38f6d7cbe6563bf4b63d3a3c36582",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "council-02",
+      "scene": "council",
+      "asset": "assets/story/pages/council-02.webp",
+      "sha256": "840cebd104e67f3edd3676c26c4b7bd5e05ba6345cba7772edacb77e9a2f38b9",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "council-03",
+      "scene": "council",
+      "asset": "assets/story/pages/council-03.webp",
+      "sha256": "6884fa1e436c6fdd496b8d6bc21cdbad27d2e5786ce59720f53a3a6c5f732dd7",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "council-04",
+      "scene": "council",
+      "asset": "assets/story/pages/council-04.webp",
+      "sha256": "3b9e90c77e8882a6548da7f56a289466d77477e2302a003716891b6a6ce479b0",
+      "status": "pass"
+    },
+    {
+      "id": "council-06",
+      "scene": "council",
+      "asset": "assets/story/pages/council-06.webp",
+      "sha256": "571ca98eb7f3fee620a28e522cc9fd9d2594f52cd26f6d8136f3e03f7bae4420",
+      "status": "pass"
+    },
+    {
+      "id": "council-07",
+      "scene": "council",
+      "asset": "assets/story/pages/council-07.webp",
+      "sha256": "fe23e3238c0122a339e76cdde68fc61bfc3292bdcefd43e3f31061c68542f874",
+      "status": "pass"
+    },
+    {
+      "id": "council-08",
+      "scene": "council",
+      "asset": "assets/story/pages/council-08.webp",
+      "sha256": "a4c2ac41dbb8f30833b2dce718990108c7cfd289209ef8f7ee95c445e4f02c04",
+      "status": "pass"
+    },
+    {
+      "id": "council-09",
+      "scene": "council",
+      "asset": "assets/story/pages/council-09.webp",
+      "sha256": "16435b75ed85c8eed86a6c162d345356e5588aeffd339624c19330013e4bd2fd",
+      "status": "pass"
+    },
+    {
+      "id": "council-10",
+      "scene": "council",
+      "asset": "assets/story/pages/council-10.webp",
+      "sha256": "072a37b4d967bd2b705ce8439bb5250b7bc48ed5c0e9f2af0bcbfab8168b098d",
+      "status": "pass"
+    },
+    {
+      "id": "council-11",
+      "scene": "council",
+      "asset": "assets/story/pages/council-11.webp",
+      "sha256": "af8e758349f7fb852e2ac09958e38025a5ff2b9d9b3c48d382d22467be8b5df0",
+      "status": "pass"
+    },
+    {
+      "id": "council-12",
+      "scene": "council",
+      "asset": "assets/story/pages/council-12.webp",
+      "sha256": "a6c606d30f777276e066795bf874c57abb50309f3ee82d110b694c078f22bed2",
+      "status": "pass"
+    },
+    {
+      "id": "council-13",
+      "scene": "council",
+      "asset": "assets/story/pages/council-13.webp",
+      "sha256": "47452a20cb40cfb39960a2ca543406a66acabe7cb8debc12f2a2cd7e684c597a",
+      "status": "pass"
+    },
+    {
+      "id": "council-14",
+      "scene": "council",
+      "asset": "assets/story/pages/council-14.webp",
+      "sha256": "88c877d6082181f59cdd254404a47182800dee960c84f96b0cdcb796c935b53a",
+      "status": "pass"
+    },
+    {
+      "id": "after-02",
+      "scene": "after",
+      "asset": "assets/story/pages/after-02.webp",
+      "sha256": "758b091f788dfc912593cc1e9ea5ee2ce446f57f4eb978e14a0a2ad01679acd0",
+      "status": "pass"
+    },
+    {
+      "id": "after-03",
+      "scene": "after",
+      "asset": "assets/story/pages/after-03.webp",
+      "sha256": "b20e087ff0c4d5775d94ed208e6e5dd71879b1809ab13629e9a3d1c5837e86ab",
+      "status": "pass"
+    },
+    {
+      "id": "after-04",
+      "scene": "after",
+      "asset": "assets/story/pages/after-04.webp",
+      "sha256": "b522a9f825282687a4dfa6865afae88767799fcf3915cde736751ee17d2da9ad",
+      "status": "pass"
+    },
+    {
+      "id": "after-05",
+      "scene": "after",
+      "asset": "assets/story/pages/after-05.webp",
+      "sha256": "a67d9dd5ee98ac090772ad41927bf7d110524e043274989a5cdfe6d5a7029479",
+      "status": "pass"
+    },
+    {
+      "id": "after-06",
+      "scene": "after",
+      "asset": "assets/story/pages/after-06.webp",
+      "sha256": "ffff094b85f6805200cd1bfdcff71f2d58215109b6ba8865784e3720374bc8ca",
+      "status": "pass"
+    },
+    {
+      "id": "after-07",
+      "scene": "after",
+      "asset": "assets/story/pages/after-07.webp",
+      "sha256": "16b02880bc6ba6a5f6af7233567c4206e6759a6e40b5b5fb98bdbd7253fafe82",
+      "status": "pass"
+    },
+    {
+      "id": "after-08",
+      "scene": "after",
+      "asset": "assets/story/pages/after-08.webp",
+      "sha256": "f2de7abf00a87bc421c8f155dc78dd786d0a74f2ae8e3da5979b9e1eaba70659",
+      "status": "pass"
+    },
+    {
+      "id": "after-09",
+      "scene": "after",
+      "asset": "assets/story/pages/after-09.webp",
+      "sha256": "7e1e8cacfe7150a20a73b84d5db5d546d54815b01d5ddc6d586dd126ec9c3671",
+      "status": "pass"
+    },
+    {
+      "id": "after-10",
+      "scene": "after",
+      "asset": "assets/story/pages/after-10.webp",
+      "sha256": "c2dcd60c876a20bfb1cebe38d6451be8616fb60c6f29dc7ccdebe18cfd77d20d",
+      "status": "pass"
+    },
+    {
+      "id": "after-11",
+      "scene": "after",
+      "asset": "assets/story/pages/after-11.webp",
+      "sha256": "99dafc935c0cf2e94aa4f0c2715ada21e73ecd08ceadd61253ae0062a9b82ff8",
+      "status": "pass"
+    },
+    {
+      "id": "after-12",
+      "scene": "after",
+      "asset": "assets/story/pages/after-12.webp",
+      "sha256": "d55b8f015cf466d917363dd44c48a1b0526d26ffac6d9cf0df37c691e3b0e5ad",
+      "status": "pass"
+    },
+    {
+      "id": "after-13",
+      "scene": "after",
+      "asset": "assets/story/pages/after-13.webp",
+      "sha256": "cab329ca992b9761f451a8fdbe5fa5bf972e0ff09418a8ab34ab62cd5e3dd143",
+      "status": "pass"
+    },
+    {
+      "id": "after-14",
+      "scene": "after",
+      "asset": "assets/story/pages/after-14.webp",
+      "sha256": "1ac56ef65ef65f40b8b68c46e8e183c181d0cb4ee7476f48ecae5a6d3dabde2d",
+      "status": "pass"
+    },
+    {
+      "id": "after-15",
+      "scene": "after",
+      "asset": "assets/story/pages/after-15.webp",
+      "sha256": "eb7c8fd22f2f0f1c562e58efe7e797bd7aff73513c30fca2a550e463caf38a6e",
+      "status": "pass"
+    },
+    {
+      "id": "after-16",
+      "scene": "after",
+      "asset": "assets/story/pages/after-16.webp",
+      "sha256": "a65df25a6d0c01f7235f3021cf1a36aaf6323509d2bff76094a889caa622e978",
+      "status": "pass"
+    },
+    {
+      "id": "after-17",
+      "scene": "after",
+      "asset": "assets/story/pages/after-17.webp",
+      "sha256": "3ee72d2a8e951b91753c7d720612d0c229e322d26aa406cc82695c725ee8124a",
+      "status": "pass"
+    },
+    {
+      "id": "after-18",
+      "scene": "after",
+      "asset": "assets/story/pages/after-18.webp",
+      "sha256": "90f01a4b0833ef1e780de956483a0d8763dd7825898f970d086bc7a78b1732ef",
+      "status": "pass"
+    },
+    {
+      "id": "reply-01",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-01.webp",
+      "sha256": "3f31ec75f4a0377b9159756397b31826149ce5f82a59e757114c1ce2315475e8",
+      "status": "pass"
+    },
+    {
+      "id": "reply-02",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-02.webp",
+      "sha256": "05cfd29fb49e7b4ee03ba4e89ade2715691d994132efe3c9658a693d44a0472e",
+      "status": "pass"
+    },
+    {
+      "id": "reply-03",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-03.webp",
+      "sha256": "7553e451f26d19babe7681b015e55751450bc0b9e5a642b46aa8acf163a513b8",
+      "status": "pass"
+    },
+    {
+      "id": "reply-04",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-04.webp",
+      "sha256": "e4ebc49afc42c4fec3e7e1eaacb391f9a272b9fabff4a7c5187a3a681a2d37d7",
+      "status": "pass"
+    },
+    {
+      "id": "reply-05",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-05.webp",
+      "sha256": "c513bb29b096308b08a49d5f44e8880dfbfd443f273ba94f171a6adc1e6e0725",
+      "status": "pass"
+    },
+    {
+      "id": "reply-06",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-06.webp",
+      "sha256": "b1db139526225321eb2f0b3a38629b0f3219e00e928bac0bcb00f56a4f87b5e2",
+      "status": "pass"
+    },
+    {
+      "id": "reply-07",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-07.webp",
+      "sha256": "ddb428d70d7d9ae32ecda19174fc1302c768a41bc14b6418bb0976ce28e4297d",
+      "status": "pass"
+    },
+    {
+      "id": "reply-08",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-08.webp",
+      "sha256": "4d22376b6c30f545b397bb1aa4a6c3ce82fc4d01a60de796469ea04e22def3ae",
+      "status": "pass"
+    },
+    {
+      "id": "reply-09",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-09.webp",
+      "sha256": "a3d04aaceb6e237ac964a7383bf1fe8c35c7c9971e5b11c46269f9ef3f7ae7a5",
+      "status": "pass"
+    },
+    {
+      "id": "old_mark-01",
+      "scene": "old_mark",
+      "asset": "assets/story/pages/old_mark-01.webp",
+      "sha256": "83cdbe9d8f1bfa2f387d085d5ba217507238d7874cd9976e6b9a733f89628f01",
+      "status": "pass"
+    },
+    {
+      "id": "old_mark-02",
+      "scene": "old_mark",
+      "asset": "assets/story/pages/old_mark-02.webp",
+      "sha256": "be3fd459209e3794d8d40630ba1ce5c469c5283fea75376c18a45a709609ab32",
+      "status": "pass"
+    },
+    {
+      "id": "old_mark-03",
+      "scene": "old_mark",
+      "asset": "assets/story/pages/old_mark-03.webp",
+      "sha256": "8f106546b8b66152bcd8b85f958a2e2c9eb5968df0d32dda17db826857508248",
+      "status": "pass"
+    },
+    {
+      "id": "old_mark-04",
+      "scene": "old_mark",
+      "asset": "assets/story/pages/old_mark-04.webp",
+      "sha256": "a71e23471d750dc105f89087a196d2cfb283b7403155b3dcf93789274d5438da",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "old_mark-05",
+      "scene": "old_mark",
+      "asset": "assets/story/pages/old_mark-05.webp",
+      "sha256": "60159737f77d5fea33f0c82cff4babf07bccc3efa86c26341adaaeec1cd0a635",
+      "status": "pass"
+    },
+    {
+      "id": "old_mark-06",
+      "scene": "old_mark",
+      "asset": "assets/story/pages/old_mark-06.webp",
+      "sha256": "bbca9e346887b0ae4294a7a69fb6b36415b447fd6b10d8179689f6d3250fa594",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "old_mark-07",
+      "scene": "old_mark",
+      "asset": "assets/story/pages/old_mark-07.webp",
+      "sha256": "0f7a46e7305c4d66cd3a615457f7dca96d5a3cdabe1adb8c4631a2069359ed85",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "old_mark-08",
+      "scene": "old_mark",
+      "asset": "assets/story/pages/old_mark-08.webp",
+      "sha256": "742190ed100654c48677cfd26d69911ef49c84b6f08b5ed39a5e5ef6801487bd",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "council-05-road",
+      "scene": "council",
+      "asset": "assets/story/pages/council-05-road.webp",
+      "sha256": "efba22c4ecc5ef66625b78b8d560a26cea6935b2a52c08220d96450322cc29c4",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "council-15-beside",
+      "scene": "council",
+      "asset": "assets/story/pages/council-15-beside.webp",
+      "sha256": "50b1dc899f68e40939fc32bdc9b4800c2b8b1ffae15a4908718f69393d3ffc10",
+      "status": "pass",
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+    },
+    {
+      "id": "after-road-release",
+      "scene": "after",
+      "asset": "assets/story/pages/after-road-release.webp",
+      "sha256": "147be47b1e6f9dcaef7eaa3aefff6a6b7ec2a2907aa5becb90c530a67575156f",
+      "status": "pass"
+    },
+    {
+      "id": "council-15-apart",
+      "scene": "council",
+      "asset": "assets/story/pages/council-15-apart.webp",
+      "sha256": "a481f405dad69b7f3dbcb975a7ab6e4ba43c6aab543573d13b251e151df7a361",
+      "status": "pass"
+    },
+    {
+      "id": "after-witness-private",
+      "scene": "after",
+      "asset": "assets/story/pages/after-witness-private.webp",
+      "sha256": "63756e7e25c79bb66c88c6482f0112d5d3286d5f36cf821f07df2b1153f795f7",
+      "status": "pass"
+    },
+    {
+      "id": "after-room-release",
+      "scene": "after",
+      "asset": "assets/story/pages/after-room-release.webp",
+      "sha256": "d6289b5f57cefc2bd75c3318ee2225a896ff23491e9e5051e26275549ff75369",
+      "status": "pass"
+    },
+    {
+      "id": "after-01-road",
+      "scene": "after",
+      "asset": "assets/story/pages/after-01-road.webp",
+      "sha256": "3d8e62dadceb3ccb6fae521a28a68ba0080bd17ce9002d065937650ca9e48c81",
+      "status": "pass"
+    },
+    {
+      "id": "after-road-remember",
+      "scene": "after",
+      "asset": "assets/story/pages/after-road-remember.webp",
+      "sha256": "2ccbf1ae8fbf2c7e37e7dce4c6b1593af24666e72db9af23658836b886765db1",
+      "status": "pass"
+    },
+    {
+      "id": "council-05-private",
+      "scene": "council",
+      "asset": "assets/story/pages/council-05-private.webp",
+      "sha256": "35eed2be1f8116b90618da732cb5d6b8facec36ed3e4185780e26345dfea51b3",
+      "status": "pass"
+    },
+    {
+      "id": "after-room-remember",
+      "scene": "after",
+      "asset": "assets/story/pages/after-room-remember.webp",
+      "sha256": "534015718112740f4c14330d70b8a33a7eb94d4357cbf2943d065d5716df36c6",
+      "status": "pass"
+    },
+    {
+      "id": "after-witness-share",
+      "scene": "after",
+      "asset": "assets/story/pages/after-witness-share.webp",
+      "sha256": "d93cf7e6968dd310b26512e8a0e7360c27386f18371cd2def379c0a89dca43f5",
+      "status": "pass"
+    },
+    {
+      "id": "after-01-private",
+      "scene": "after",
+      "asset": "assets/story/pages/after-01-private.webp",
+      "sha256": "2f54ef733c81d2f802a5bad80b41d2cc63140af288390417190cecef342a4c0d",
+      "status": "pass"
+    },
+    {
+      "id": "cup-recollection",
+      "scene": "cup",
+      "asset": "assets/story/pages/cup-recollection.webp",
+      "sha256": "ff4f2d19a2bf124290e70c795f7813ed4b235e764c8dfa27c98141af283b68ee",
+      "status": "pass"
+    },
+    {
+      "id": "echo-recollection",
+      "scene": "echo",
+      "asset": "assets/story/pages/echo-recollection.webp",
+      "sha256": "bf8407bf6c7aaa0c93c5111579afd84ebac99bd31843cc51d241b641ff9b5fa6",
+      "status": "pass"
+    },
+    {
+      "id": "witness-recollection",
+      "scene": "witness",
+      "asset": "assets/story/pages/witness-recollection.webp",
+      "sha256": "b23f470eb37dc0e6622332d3eb00daa7fd214c23e6ac75be3becf2864f66ce98",
+      "status": "pass"
+    },
+    {
+      "id": "supper-recollection",
+      "scene": "supper",
+      "asset": "assets/story/pages/supper-recollection.webp",
+      "sha256": "c35ad36ad18fd5940221e15b081bb330ca58d03b37f0b211e60f00282722f5ef",
+      "status": "pass"
+    },
+    {
+      "id": "plan-recollection",
+      "scene": "plan",
+      "asset": "assets/story/pages/plan-recollection.webp",
+      "sha256": "de029aacbd017ced58a737f2d367195bba59542c5873aa418e8f0cbc0cd6d5ba",
+      "status": "pass"
+    },
+    {
+      "id": "shelter-recollection",
+      "scene": "shelter",
+      "asset": "assets/story/pages/shelter-recollection.webp",
+      "sha256": "e54c25d2b276ebf0605297d9440150bf0c633972774beb80acdd16ede3236c48",
+      "status": "pass"
+    },
+    {
+      "id": "plum-recollection",
+      "scene": "plum",
+      "asset": "assets/story/pages/plum-recollection.webp",
+      "sha256": "3e53ff14dddf50e4a8476e822674fb54502f733391a12a122f1b684390e25f63",
+      "status": "pass"
+    },
+    {
+      "id": "plum_recruited-recollection",
+      "scene": "plum_recruited",
+      "asset": "assets/story/pages/plum_recruited-recollection.webp",
+      "sha256": "e0896f551582e04139a380ed956685e2a9d1778211eec16031c35033482d9f40",
+      "status": "pass"
+    },
+    {
+      "id": "record-recollection",
+      "scene": "record",
+      "asset": "assets/story/pages/record-recollection.webp",
+      "sha256": "ac799f80a91f161d1df1005773a532c2c8bf45b9ee4c2c16623a270ae2d8d602",
+      "status": "pass"
+    },
+    {
+      "id": "seeds-recollection",
+      "scene": "seeds",
+      "asset": "assets/story/pages/seeds-recollection.webp",
+      "sha256": "aab1db2bdfdd2ef7add15ec1bd15a0362eead156f3b5a987348039a7d1b06ef1",
+      "status": "pass"
+    },
+    {
+      "id": "promise-recollection",
+      "scene": "promise",
+      "asset": "assets/story/pages/promise-recollection.webp",
+      "sha256": "16c25f63b4440bea47814999dfd3a5f8d2f1c3a1e39a98c5f5008a987cc18e59",
+      "status": "pass"
+    },
+    {
+      "id": "returned-recollection",
+      "scene": "returned",
+      "asset": "assets/story/pages/returned-recollection.webp",
+      "sha256": "e16c3daf71d4d8159aa4a865a0ef97f097855519fd389d2365cfbdf1c82839ca",
+      "status": "pass"
+    },
+    {
+      "id": "council-recollection",
+      "scene": "council",
+      "asset": "assets/story/pages/council-recollection.webp",
+      "sha256": "977238408ef939f64a9f3195bf6f3b0eddc764dcf11272a8e265a7f8abf97888",
+      "status": "pass"
+    },
+    {
+      "id": "after-recollection",
+      "scene": "after",
+      "asset": "assets/story/pages/after-recollection.webp",
+      "sha256": "16c6be1beacae323019df2079cab431fe1213a9a9c901ec3affa8d48b30a7d2f",
+      "status": "pass"
+    },
+    {
+      "id": "reply-recollection",
+      "scene": "reply",
+      "asset": "assets/story/pages/reply-recollection.webp",
+      "sha256": "19a5d695afcb5e5dae5c1a0a91dac3204d90f4f41fa450c8bcefd23a2b7220e8",
+      "status": "pass"
+    },
+    {
+      "id": "old_mark-recollection",
+      "scene": "old_mark",
+      "asset": "assets/story/pages/old_mark-recollection.webp",
+      "sha256": "6f9cb42c09da292422222c303da54c2c3c6a63ab2e72ce93ab0c24d2207e6b4a",
+      "status": "pass"
+    }
+  ]
+}

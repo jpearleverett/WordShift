@@ -1,6 +1,6 @@
 # WordShift — Store Listing Kit
 
-> **Android copy superseded September 7, 2026:** use the [current Google Play launch pack](../mobile/docs/store-launch/README.md) and [finished artwork upload guide](../mobile/assets/Play_store/launch-2026-09/README.md). The material below is retained for historical context and iOS reference; do not paste its older Android campaign into Play Console.
+> **Android refresh approved September 17, 2026:** use the [revised copy](../mobile/docs/store-launch/README.md) and [refresh production status](../mobile/assets/Play_store/launch-2026-09-v2/README.md). Fresh screenshots and trailer footage are still pending; the refresh is not published. The [September 7 campaign](../mobile/assets/Play_store/launch-2026-09/README.md) remains the rollback snapshot. The material below is historical and for iOS reference.
 
 > **September 13 source review:** the current configuration and release checks
 > are in [CURRENT_BUILD.md](CURRENT_BUILD.md). The September 7 image pack has

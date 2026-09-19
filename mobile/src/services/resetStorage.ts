@@ -1,5 +1,5 @@
 import storage, { recoverPendingStorageTransaction, runStorageTransaction, StorageRecoveryRequiredError } from './persistenceStorage';
-import { SYNC_KEYS, SYNC_KEY_PREFIXES, invalidateRestoredServiceCaches, refreshRestoredServiceCaches } from './cloudSave';
+import { SYNC_KEYS, SYNC_KEY_PREFIXES, invalidateRestoredServiceCaches, refreshRestoredServiceCaches, detachCloudBackupForReset } from './cloudSave';
 import { canStartNewCycle, getFullProgress, startNewCycle } from './amberCurrency';
 import { beginStoryCycle } from './storySpine';
 import { ACQUAINTANCE_STORAGE_KEY } from './animalAcquaintance';
@@ -19,11 +19,14 @@ const RESET_DEVICE_KEYS = new Set([
 const RESET_DEVICE_KEY_PREFIXES = ['wordshift_cosmetic_receipt_'];
 
 /** Commit the entire local wipe + reset marker together before clearing live
- * service mirrors. Install/cloud identity, paid-grant intents and sticky mercy
- * flags deliberately survive. A failed commit keeps a journal for Retry/boot. */
+ * service mirrors. The new game gets a separate cloud owner in that same
+ * commit so future autosaves cannot overwrite the pre-reset backup. Install
+ * identity, paid-grant intents and sticky mercy flags deliberately survive.
+ * A failed commit keeps a journal for Retry/boot. */
 export async function commitFullLocalReset(): Promise<void> {
   await recoverPendingStorageTransaction();
   await runStorageTransaction('full_reset', async () => {
+    await detachCloudBackupForReset();
     const keys = (await storage.getAllKeys()).filter(key => SYNC_KEYS.includes(key) ||
       SYNC_KEY_PREFIXES.some(prefix => key.startsWith(prefix)) || RESET_DEVICE_KEYS.has(key) ||
       RESET_DEVICE_KEY_PREFIXES.some(prefix => key.startsWith(prefix)));

@@ -27,7 +27,7 @@ import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import * as Application from 'expo-application';
 import { isSupabaseConfigured } from '../services/supabaseClient';
-import { getOrCreateRecoveryCode, restoreFromRecoveryCode, CloudRecoveryError, downloadFromCloud, clearSyncStatus, uploadToCloud, getSyncStatus } from '../services/cloudSave';
+import { getOrCreateRecoveryCode, restoreFromRecoveryCode, CloudRecoveryError, downloadFromCloud, clearSyncStatus, uploadToCloud, getSyncStatus, resetWithPreservedCloudBackup } from '../services/cloudSave';
 import { showGameAlert } from '../services/gameAlert';
 import { SURFACE, getSurfaceTheme, getModalInSpring, SurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
@@ -145,114 +145,88 @@ const BUNDLE_SOURCE = getBundleSource();
 /**
  * Device-local "this device was deliberately reset at T" stamp, read by
  * cloudSave.maybeAutoRestoreOnFreshInstall so a post-reset relaunch cannot
- * silently download the pre-reset save when the reset's own upload failed
- * (offline). Only the FRESH-INSTALL auto-restore consults it: the deliberate
+ * silently download an older save. Reset also gives the fresh game its own
+ * cloud identity. Only the FRESH-INSTALL auto-restore consults this marker: the deliberate
  * paths — Backup & Restore, a recovery code, the sync-conflict banner's "use
  * the newer save" — must all stay unblocked.
  */
 export const LOCAL_RESET_MARKER_KEY = 'wordshift_local_reset_at';
 
 /**
- * Reset All Progress — the full local wipe, exported for regression testing.
- *
- * Root-cause notes for the "Reset All doesn't reset" player report:
- *  1. The clears used to run under Promise.all: a single rejection abandoned
- *     the batch mid-flight and skipped the restart flow entirely.
- *     Promise.allSettled makes every clear independent; failures are logged
- *     and returned, never fatal.
- *  2. With cloud save configured, the pre-reset save survived in the backend.
- *     The wipe clears `wordshift_home_progress` — the very key
- *     maybeAutoRestoreOnFreshInstall() uses as its fresh-install sentinel — so
- *     the next launch looked like a reinstall and silently restored the OLD
- *     cloud save. The reset must therefore overwrite the cloud row with the
- *     cleared state (uploadToCloud below) before the app reloads.
- *
- * Every service clear also resets its in-memory cache, so services report
- * virgin state immediately (no process restart required).
- *
- * Returns the names of any clears that failed (empty array on full success).
+ * Reset All Progress starts a separate game. Preserve the old recovery backup
+ * before the wipe and hold cloud operations until every local cache is cleared.
+ * Existing codes continue to restore the pre-reset game; the fresh game gets a
+ * new owner atomically with the wipe. No cloud request overwrites the old row.
  */
 export async function performFullReset(): Promise<string[]> {
-  // Commit all durable deletions and the anti-resurrection marker first.
-  // Failure is retryable and must never proceed to a partially reset session.
-  await commitFullLocalReset();
-  const clears: [string, () => Promise<unknown>][] = [
-    ['victoryIntent', clearPendingVictory],
-    ['stats', clearStats],
-    ['achievements', clearAchievements],
-    ['dailyChallenge', clearDailyProgress],
-    ['progress', clearProgress],
-    ['wordHistory', clearWordHistory],
-    ['dialogueSessions', clearAllSessions],
-    ['events', clearEvents],
-    ['tutorial', resetTutorial],
-    ['onboarding', resetOnboarding],
-    ['settings', resetSettings],
-    ['puzzleState', clearPuzzleState],
-    ['harvest', clearHarvestState],
-    ['sacrifice', clearSacrificeState],
-    ['weeklyQuests', clearWeeklyQuests],
-    ['whisperGallery', clearWhisperGallery],
-    ['dialogueChoices', clearChoiceState],
-    ['story', clearStoryState],
-    ['narrativeDelivery', clearNarrativeDeliveryState],
-    ['microBeats', resetMicroBeats],
-    ['notificationPrefs', resetNotificationPrefs],
-    ['roomUpgrades', clearRoomUpgrades],
-    ['entitlements', clearEntitlements],
-    ['cosmetics', clearCosmetics],
-    ['adPacing', clearAdPacing],
-    ['tending', clearTendingState],
-    ['hints', clearHints],
-    ['monetPrompts', clearMonetPrompts],
-    ['sharePrompts', clearSharePrompts],
-    ['cosmeticReceipts', clearCosmeticReceipts],
-    ['dailyLogin', clearDailyLoginReward],
-    ['dailyAmber', clearDailyAmberReward],
-    ['supporterStipend', clearSupporterState],
-    ['seasonPass', clearSeasonPass],
-    ['masteryRecords', clearMasteryRecords],
-    ['dailyLadder', clearDailyLadder],
-    ['offeringRequests', clearOfferingRequests],
-    ['reviewPrompt', clearReviewPrompt],
-    ['syncStatus', clearSyncStatus],
-    // The preview-graduation card is a TEACHING beat about a rules change that
-    // recurs at solve 12 after any reset, so unlike the device-sticky mercy/
-    // pointer flags (first-stuck, swift-hint) it must re-arm with progress —
-    // observed on-device: a Reset All replay hit the neutral handoff with the
-    // beat still consumed from the prior run. Literal key mirrors
-    // PREVIEW_GRADUATION_SEEN_KEY in App.tsx (drift pinned by appIntegration).
-    ['previewGraduation', () => AsyncStorage.removeItem('wordshift_preview_graduation_seen_v2')],
-  ];
+  return resetWithPreservedCloudBackup(async () => {
+    await commitFullLocalReset();
+    const clears: [string, () => Promise<unknown>][] = [
+      ['victoryIntent', clearPendingVictory],
+      ['stats', clearStats],
+      ['achievements', clearAchievements],
+      ['dailyChallenge', clearDailyProgress],
+      ['progress', clearProgress],
+      ['wordHistory', clearWordHistory],
+      ['dialogueSessions', clearAllSessions],
+      ['events', clearEvents],
+      ['tutorial', resetTutorial],
+      ['onboarding', resetOnboarding],
+      ['settings', resetSettings],
+      ['puzzleState', clearPuzzleState],
+      ['harvest', clearHarvestState],
+      ['sacrifice', clearSacrificeState],
+      ['weeklyQuests', clearWeeklyQuests],
+      ['whisperGallery', clearWhisperGallery],
+      ['dialogueChoices', clearChoiceState],
+      ['story', clearStoryState],
+      ['narrativeDelivery', clearNarrativeDeliveryState],
+      ['microBeats', resetMicroBeats],
+      ['notificationPrefs', resetNotificationPrefs],
+      ['roomUpgrades', clearRoomUpgrades],
+      ['entitlements', clearEntitlements],
+      ['cosmetics', clearCosmetics],
+      ['adPacing', clearAdPacing],
+      ['tending', clearTendingState],
+      ['hints', clearHints],
+      ['monetPrompts', clearMonetPrompts],
+      ['sharePrompts', clearSharePrompts],
+      ['cosmeticReceipts', clearCosmeticReceipts],
+      ['dailyLogin', clearDailyLoginReward],
+      ['dailyAmber', clearDailyAmberReward],
+      ['supporterStipend', clearSupporterState],
+      ['seasonPass', clearSeasonPass],
+      ['masteryRecords', clearMasteryRecords],
+      ['dailyLadder', clearDailyLadder],
+      ['offeringRequests', clearOfferingRequests],
+      ['reviewPrompt', clearReviewPrompt],
+      ['syncStatus', clearSyncStatus],
+      // The preview-graduation card is a TEACHING beat about a rules change that
+      // recurs at solve 12 after any reset, so unlike the device-sticky mercy/
+      // pointer flags (first-stuck, swift-hint) it must re-arm with progress —
+      // observed on-device: a Reset All replay hit the neutral handoff with the
+      // beat still consumed from the prior run. Literal key mirrors
+      // PREVIEW_GRADUATION_SEEN_KEY in App.tsx (drift pinned by appIntegration).
+      ['previewGraduation', () => AsyncStorage.removeItem('wordshift_preview_graduation_seen_v2')],
+    ];
 
-  // The async wrapper converts a synchronous throw (e.g. a broken import
-  // making `fn` undefined) into a rejection, so one bad entry can never
-  // abort the remaining clears.
-  const results = await Promise.allSettled(clears.map(async ([, fn]) => fn()));
-  const failures: string[] = [];
-  results.forEach((result, i) => {
-    if (result.status === 'rejected') {
-      failures.push(clears[i][0]);
-      console.warn(`Reset All: clearing "${clears[i][0]}" failed:`, result.reason);
-    }
+    // The async wrapper converts a synchronous throw (e.g. a broken import
+    // making `fn` undefined) into a rejection, so one bad entry can never
+    // abort the remaining clears.
+    const results = await Promise.allSettled(clears.map(async ([, fn]) => fn()));
+    const failures: string[] = [];
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        failures.push(clears[i][0]);
+        console.warn(`Reset All: clearing "${clears[i][0]}" failed:`, result.reason);
+      }
+    });
+
+    // The commit above already stamped the reset atomically with the wipe.
+    // Cache/system-notification cleanup failures do not undo that durable reset.
+
+    return failures;
   });
-
-  // The commit above already stamped the reset atomically with the wipe.
-  // Cache/system-notification cleanup failures do not undo that durable reset.
-
-  // Overwrite the cloud row with the now-empty local state so the bootstrap's
-  // fresh-install auto-restore can't resurrect the pre-reset save after the
-  // reload. NoOp provider (cloud unconfigured) makes this a harmless no-op;
-  // an offline failure must never block the reset itself.
-  try {
-    // cloudSave acknowledges only the marker captured by this upload. An
-    // unconditional deletion here could erase a later reset's protection.
-    await uploadToCloud(true);
-  } catch {
-    // Non-fatal: the local wipe already succeeded, and the marker stands.
-  }
-
-  return failures;
 }
 
 /**
@@ -370,6 +344,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   // Cloud backup & restore
   const cloudEnabled = isSupabaseConfigured();
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [showRestore, setShowRestore] = useState(false);
   const [restoreInput, setRestoreInput] = useState('');
   const [restoreBusy, setRestoreBusy] = useState(false);
@@ -472,12 +448,31 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   };
 
   const handleShowRecoveryCode = async () => {
+    if (backupBusy) return;
     hapticLight();
+    setBackupBusy(true);
+    setCodeCopied(false);
     try {
       const code = await getOrCreateRecoveryCode();
       setRecoveryCode(code);
     } catch (error) {
       showGameAlert('Backup', error instanceof CloudRecoveryError ? error.message : 'Could not back up your progress right now. Please try again.');
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleCopyRecoveryCode = async () => {
+    if (!recoveryCode) return;
+    hapticLight();
+    try {
+      // Lazy load keeps service-only reset tests free of native module imports.
+      const Clipboard = await import('expo-clipboard');
+      const copied = await Clipboard.setStringAsync(recoveryCode);
+      if (!copied) throw new Error('Clipboard is unavailable');
+      setCodeCopied(true);
+    } catch {
+      showGameAlert('Copy recovery code', 'Could not copy automatically. Touch and hold the code, then choose Copy.');
     }
   };
 
@@ -487,9 +482,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     setRestoreBusy(true);
     try {
       const restored = await restoreFromRecoveryCode(code);
-      setShowRestore(false);
-      setRestoreInput('');
       if (restored) {
+        setShowRestore(false);
+        setRestoreInput('');
         // Same reason runCloudRestore does it: the restore invalidated the
         // service caches but NOT React state, so without this the session keeps
         // rendering the pre-restore phase (bright candy chrome, bright victory
@@ -498,7 +493,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         onCloudRestored?.();
         showGameAlert('Restored', 'Your progress was restored. The app will use it from now on.');
       } else {
-        showGameAlert('Restore', 'No saved progress was found for that code yet.');
+        showGameAlert('Restore', 'Could not load a backup for that code. Check the complete code and your internet connection, then try again.');
       }
     } catch (error) {
       if (error instanceof StorageRecoveryRequiredError) { setRestoreRecoveryRequired(true); return; }
@@ -748,21 +743,36 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   const handleResetData = () => {
     showGameAlert(
       'Reset All Progress',
-      'This erases everything on this device, and it replaces the cloud backup linked to your recovery code with the empty start, so another device using that code will be offered the reset save too. Your house and every room, all your animal friends, and all your amber are lost, along with achievements, statistics, streaks, and daily challenge history. The game starts over from the very beginning. This cannot be undone.',
+      'This starts a fresh game on this device, clearing your house, animals, amber, achievements, statistics, streaks, and daily history. If you have a recovery code, copy it before continuing: its backup will be kept, and that code can restore your old game. The fresh game will have a different code. Without a saved recovery code, the old game cannot be restored.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reset Everything',
           style: 'destructive',
           onPress: async () => {
-            await saveWithPlayerRetry(async () => {
+            const resetResult = await saveWithPlayerRetry(async () => {
               onSessionTransitionChange?.('saving');
               try { return await performFullReset(); }
-              catch (error) { onSessionTransitionChange?.('waiting'); throw error; }
+              catch (error) {
+                if (error instanceof CloudRecoveryError) {
+                  // No wipe occurred. Return to Settings so a player can get
+                  // online or resolve the conflict, rather than trap them in
+                  // the storage-recovery retry loop.
+                  onSessionTransitionChange?.(null);
+                  setSyncConflict(error.reason === 'conflict');
+                  showGameAlert('Save your backup first', error.message);
+                  return null;
+                }
+                onSessionTransitionChange?.('waiting');
+                throw error;
+              }
             }, {
               title: 'Reset is waiting',
               message: 'Your device could not finish saving the reset. Free some storage if it is full, then retry.',
             });
+            if (resetResult === null) return;
+            setRecoveryCode(null);
+            setCodeCopied(false);
             // Refresh may fail after the reset already committed. Retry only
             // the refresh so the player never repeats a completed reset.
             await saveWithPlayerRetry(async () => {
@@ -1029,17 +1039,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         {cloudEnabled && (
           <PanelCard phase={phase} kind="panel" style={styles.section}>
             <PixelPlaque phase={phase} label={'BACKUP & RESTORE'} style={styles.sectionPlaque} />
-            <TouchableOpacity style={styles.aboutRow} onPress={handleShowRecoveryCode} accessibilityRole="button" accessibilityLabel="Show recovery code">
-              <Text style={[styles.linkText, { color: t.secondaryText }]}>{recoveryCode ? 'Your recovery code' : 'Show recovery code'}</Text>
+            <TouchableOpacity style={styles.aboutRow} onPress={handleShowRecoveryCode} disabled={backupBusy} accessibilityRole="button" accessibilityLabel="Back up and show recovery code" accessibilityState={{ busy: backupBusy, disabled: backupBusy }}>
+              <Text style={[styles.linkText, { color: t.secondaryText }]}>{backupBusy ? 'Saving backup…' : recoveryCode ? 'Update backup' : 'Back up & show recovery code'}</Text>
+              {backupBusy && <ActivityIndicator color={t.secondaryText} />}
             </TouchableOpacity>
             {recoveryCode && (
               <View style={[styles.recoveryCodeBox, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
-                <Text style={[styles.recoveryCodeText, { color: t.title }]} accessibilityLabel={`Recovery code ${recoveryCode}`}>{recoveryCode}</Text>
-                <Text style={[styles.recoveryCodeHint, { color: t.muted }]}>Backup saved. Keep this code private: anyone with it can restore your progress. Enter it on a new device to continue.</Text>
+                <Text selectable style={[styles.recoveryCodeText, { color: t.title }]} accessibilityLabel={`Recovery code ${recoveryCode}`}>{recoveryCode}</Text>
+                <CandyButton label={codeCopied ? 'Copied!' : 'Copy code'} onPress={handleCopyRecoveryCode} phase={phase} variant="quiet" accessibilityLabel={codeCopied ? 'Recovery code copied' : 'Copy recovery code'} />
+                <Text style={[styles.recoveryCodeHint, { color: t.muted }]} accessibilityLiveRegion="polite">{codeCopied ? 'Code copied. Keep it somewhere private.' : 'Backup saved. This code stays the same as your game progresses; it restores your latest saved backup, including after a reset. Keep it private: anyone with it can restore your game.'}</Text>
               </View>
             )}
-            <TouchableOpacity style={[styles.aboutRow, rowTint]} onPress={() => { hapticLight(); setRestoreVisible(true); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore from another device">
-              <Text style={[styles.linkText, { color: t.secondaryText }]}>Restore from another device</Text>
+            <TouchableOpacity style={[styles.aboutRow, rowTint]} onPress={() => { hapticLight(); setRestoreVisible(true); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore with a recovery code">
+              <Text style={[styles.linkText, { color: t.secondaryText }]}>Restore with a recovery code</Text>
             </TouchableOpacity>
             {syncConflict && (
               <View style={[styles.recoveryCodeBox, { backgroundColor: t.rowBg, borderColor: t.amberTintBorder }]}>
@@ -1079,21 +1091,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
         <PanelCard phase={phase} kind="panel" style={styles.section}>
           <PixelPlaque phase={phase} label={'DATA'} style={styles.sectionPlaque} />
-          {/* The app's only irreversible control, and the one row in this file
-              that announced as two static Texts with no button role: a screen
-              reader read the warning as advice, and a stray double-tap fired
-              the wipe. The explicit label also stops the reader welding the
-              title and the whole warning paragraph into one announcement. */}
+          {/* Keep the destructive local reset explicit for screen readers;
+              the warning explains how a saved code preserves recovery. */}
           <TouchableOpacity
             style={styles.dangerRow}
             onPress={handleResetData}
             accessibilityRole="button"
             accessibilityLabel="Reset All Progress"
-            accessibilityHint="Erases your house, animals, amber, statistics, achievements, and daily challenge history. Cannot be undone."
+            accessibilityHint="Starts a fresh game on this device. Keep your current recovery code to restore its backup later."
           >
             <Text style={[styles.dangerText, { color: t.dangerText }]}>Reset All Progress</Text>
             <Text style={[styles.dangerDescription, { color: t.muted }]}>
-              Erases your house, animals, and amber, plus statistics, achievements, and daily challenge history. Cannot be undone.
+              Starts a fresh game. Copy your recovery code first to keep access to your old backup; the new game gets a different code.
             </Text>
           </TouchableOpacity>
         </PanelCard>
@@ -1208,7 +1217,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
           <Animated.View style={{ opacity: restoreBackdrop, transform: [{ scale: restoreScale }] }}>
             <PanelCard phase={phase} kind="panel" style={styles.restoreCard}>
               <Text style={[styles.restoreTitle, { color: t.title }]}>Restore progress</Text>
-              <Text style={[styles.restoreHint, { color: t.body }]}>Enter the recovery code from your other device. This replaces the data currently on this device.</Text>
+              <Text style={[styles.restoreHint, { color: t.body }]}>Enter your saved recovery code to return to that game, on this device or another one. This replaces the game currently on this device.</Text>
               <TextInput
                 style={[styles.restoreInput, { borderColor: t.sectionBorder, backgroundColor: t.sectionBg, color: t.title }]}
                 value={restoreInput}

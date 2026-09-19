@@ -74,11 +74,11 @@ describe('the reveal tap-to-skip pointer renders under the first reveal', () => 
 });
 
 describe('Reset All tells the truth about the linked cloud backup', () => {
-  test('the confirmation names the cloud overwrite, not only this device', () => {
+  test('the confirmation explains how to preserve and restore the old game', () => {
     const at = SETTINGS.indexOf("'Reset All Progress'");
     const prompt = SETTINGS.slice(at, at + 900);
-    expect(prompt).toContain('replaces the cloud backup linked to your recovery code');
-    expect(prompt).toContain('another device using that code');
+    expect(prompt).toContain('its backup will be kept');
+    expect(prompt).toContain('fresh game will have a different code');
     expect(prompt).not.toMatch(/[—–]/);
   });
 });

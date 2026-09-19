@@ -1,0 +1,2853 @@
+[
+  {
+    "id": "cup-01",
+    "scene": "cup",
+    "speaker": "fox",
+    "text": "\"I've got two cups and one important question. Tea, or the terrible cocoa I keep trying to improve?\"",
+    "samples": [
+      "I've got two cups and one important question. Tea, or the terrible cocoa I keep trying to improve?"
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "cup"
+    ]
+  },
+  {
+    "id": "cup-02",
+    "scene": "cup",
+    "speaker": "narrator",
+    "text": "'One cup has a chip in the handle. The other has a crooked flower painted on it.'",
+    "samples": [
+      "One cup has a chip in the handle. The other has a crooked flower painted on it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "cup"
+    ]
+  },
+  {
+    "id": "cup-03",
+    "scene": "cup",
+    "speaker": "fox",
+    "text": "\"That flower was meant to be a fox. You can be kind about it, but please don't lie.\"",
+    "samples": [
+      "That flower was meant to be a fox. You can be kind about it, but please don't lie."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "cup"
+    ]
+  },
+  {
+    "id": "cup-04",
+    "scene": "cup",
+    "speaker": "fox",
+    "text": "\"Brave. I mean about the cocoa. The flower is excellent company.\"",
+    "samples": [
+      "Brave. I mean about the cocoa. The flower is excellent company."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "cup"
+    ]
+  },
+  {
+    "id": "cup-05",
+    "scene": "cup",
+    "speaker": "narrator",
+    "text": "'She moves the chipped cup to her own place.'",
+    "samples": [
+      "She moves the chipped cup to her own place."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "cup"
+    ]
+  },
+  {
+    "id": "cup-06",
+    "scene": "cup",
+    "speaker": "fox",
+    "text": "\"It suits your hand, doesn't it? I keep forgetting that a thing can be chipped and still be exactly right.\"",
+    "samples": [
+      "It suits your hand, doesn't it? I keep forgetting that a thing can be chipped and still be exactly right."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "cup"
+    ]
+  },
+  {
+    "id": "cup-07",
+    "scene": "cup",
+    "speaker": "narrator",
+    "text": "\"She puts the cocoa away and does not look disappointed.\"",
+    "samples": [
+      "She puts the cocoa away and does not look disappointed."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "cup"
+    ]
+  },
+  {
+    "id": "echo-01",
+    "scene": "echo",
+    "speaker": "narrator",
+    "text": "`Below the house, ${word} catches against the rim instead of sinking.`",
+    "samples": [
+      "Below the house, HOME catches against the rim instead of sinking."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "echo"
+    ]
+  },
+  {
+    "id": "echo-02",
+    "scene": "echo",
+    "speaker": "owl",
+    "text": "\"Wait. I wrote that word in my notebook this morning. Before you brought it down here.\"",
+    "samples": [
+      "Wait. I wrote that word in my notebook this morning. Before you brought it down here."
+    ],
+    "speakers": [
+      "owl"
+    ],
+    "scenes": [
+      "echo"
+    ]
+  },
+  {
+    "id": "echo-03",
+    "scene": "echo",
+    "speaker": "narrator",
+    "text": "\"He lays the open notebook down beside the rim. The letters match.\"",
+    "samples": [
+      "He lays the open notebook down beside the rim. The letters match."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "echo"
+    ]
+  },
+  {
+    "id": "echo-04",
+    "scene": "echo",
+    "speaker": "narrator",
+    "text": "\"The same letters are already scratched into the stone beside the rim. The scratches are old.\"",
+    "samples": [
+      "The same letters are already scratched into the stone beside the rim. The scratches are old."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "echo"
+    ]
+  },
+  {
+    "id": "echo-05",
+    "scene": "echo",
+    "speaker": "fox",
+    "text": "\"I could call this a coincidence, friend. I would like that word to be some help. It is not.\"",
+    "samples": [
+      "I could call this a coincidence, friend. I would like that word to be some help. It is not."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "echo"
+    ]
+  },
+  {
+    "id": "echo-06",
+    "scene": "echo",
+    "speaker": "narrator",
+    "text": "\"The word sinks. Its reflection stays on the surface one moment longer.\"",
+    "samples": [
+      "The word sinks. Its reflection stays on the surface one moment longer."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "echo"
+    ]
+  },
+  {
+    "id": "witness-01",
+    "scene": "witness",
+    "speaker": "narrator",
+    "text": "'You write down what happened by the rim: the same word, already there before you offered it. You put the date beneath it.'",
+    "samples": [
+      "You write down what happened by the rim: the same word, already there before you offered it. You put the date beneath it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "witness"
+    ]
+  },
+  {
+    "id": "witness-02",
+    "scene": "witness",
+    "speaker": "fox",
+    "text": "\"I would like to fold that page away, friend. I can hear myself reaching for another comforting explanation.\"",
+    "samples": [
+      "I would like to fold that page away, friend. I can hear myself reaching for another comforting explanation."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "witness"
+    ]
+  },
+  {
+    "id": "witness-03",
+    "scene": "witness",
+    "speaker": "fox",
+    "text": "\"But you were there too. Shall we tell the household what we saw, or keep the account between us while we look into it?\"",
+    "samples": [
+      "But you were there too. Shall we tell the household what we saw, or keep the account between us while we look into it?"
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "witness"
+    ]
+  },
+  {
+    "id": "witness-04",
+    "scene": "witness",
+    "speaker": "narrator",
+    "text": "'You bring the account to the shared table. Those who read it add their initials beneath the date.'",
+    "samples": [
+      "You bring the account to the shared table. Those who read it add their initials beneath the date."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "witness"
+    ]
+  },
+  {
+    "id": "witness-05",
+    "scene": "witness",
+    "speaker": "fox",
+    "text": "\"I will tell them what happened. I will say I do not know why. You can stop me if I start making it sound safer than it is.\"",
+    "samples": [
+      "I will tell them what happened. I will say I do not know why. You can stop me if I start making it sound safer than it is."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "witness"
+    ]
+  },
+  {
+    "id": "witness-06",
+    "scene": "witness",
+    "speaker": "narrator",
+    "text": "'You fold the dated account and keep it with you. Ember leaves the outside blank.'",
+    "samples": [
+      "You fold the dated account and keep it with you. Ember leaves the outside blank."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "witness"
+    ]
+  },
+  {
+    "id": "witness-07",
+    "scene": "witness",
+    "speaker": "fox",
+    "text": "\"Between us, then. When you want someone else to read it, you can be the one to open it.\"",
+    "samples": [
+      "Between us, then. When you want someone else to read it, you can be the one to open it."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "witness"
+    ]
+  },
+  {
+    "id": "supper-01",
+    "scene": "supper",
+    "speaker": "narrator",
+    "text": "`Ember sets ${cupName} at your place. ${cup === 'flower' ? \"She has been working on the cocoa recipe again.\" : \"She remembered that you asked for tea.\"}`",
+    "samples": [
+      "Ember sets your flower cup at your place. She has been working on the cocoa recipe again.",
+      "Ember sets your chipped cup at your place. She remembered that you asked for tea."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-02",
+    "scene": "supper",
+    "speaker": "pangolin",
+    "text": "\"Supper. Now. The empty place at the table can wait. The rest of us have stomachs.\"",
+    "samples": [
+      "Supper. Now. The empty place at the table can wait. The rest of us have stomachs."
+    ],
+    "speakers": [
+      "pangolin"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-03",
+    "scene": "supper",
+    "speaker": "narrator",
+    "text": "\"She sets the covered dish aside on the floor and serves everyone from the ordinary pot.\"",
+    "samples": [
+      "She sets the covered dish aside on the floor and serves everyone from the ordinary pot."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-04",
+    "scene": "supper",
+    "speaker": "fox",
+    "text": "\"I spent the whole afternoon keeping a place warm for someone who has not come. Your drink went cold while I did it. That is ridiculous of me, friend.\"",
+    "samples": [
+      "I spent the whole afternoon keeping a place warm for someone who has not come. Your drink went cold while I did it. That is ridiculous of me, friend."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-05",
+    "scene": "supper",
+    "speaker": "narrator",
+    "text": "`The empty cup is moved aside. Fresh ${cup ? drink : 'tea'} goes in ${cup ? cupName : 'yours'}.`",
+    "samples": [
+      "The empty cup is moved aside. Fresh tea goes in yours.",
+      "The empty cup is moved aside. Fresh tea goes in your chipped cup.",
+      "The empty cup is moved aside. Fresh cocoa goes in your flower cup."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-06",
+    "scene": "supper",
+    "speaker": "rabbit",
+    "text": "'Is it safe?'",
+    "samples": [
+      "Is it safe?"
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-07",
+    "scene": "supper",
+    "speaker": "pangolin",
+    "text": "\"It is soup. I made it myself. Ask me about the house after you have eaten.\"",
+    "samples": [
+      "It is soup. I made it myself. Ask me about the house after you have eaten."
+    ],
+    "speakers": [
+      "pangolin"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-08",
+    "scene": "supper",
+    "speaker": "fox",
+    "text": "\"The tea is safe. I cannot promise you anything else tonight.\"",
+    "samples": [
+      "The tea is safe. I cannot promise you anything else tonight."
+    ],
+    "speakers": [
+      "narrator",
+      "fox"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-09",
+    "scene": "supper",
+    "speaker": "narrator",
+    "text": "\"For a while the room sounds like an ordinary supper, not like a room listening for something.\"",
+    "samples": [
+      "For a while the room sounds like an ordinary supper, not like a room listening for something."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-10",
+    "scene": "supper",
+    "speaker": "narrator",
+    "text": "'The dated account lies between the dishes, its row of initials visible.'",
+    "samples": [
+      "The dated account lies between the dishes, its row of initials visible."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-11",
+    "scene": "supper",
+    "speaker": "fox",
+    "text": "\"You asked us to tell everyone. If anyone has seen something else, this is a good place to say it.\"",
+    "samples": [
+      "You asked us to tell everyone. If anyone has seen something else, this is a good place to say it."
+    ],
+    "speakers": [
+      "narrator",
+      "fox"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-12",
+    "scene": "supper",
+    "speaker": "narrator",
+    "text": "'The folded account is still in your pocket. Ember glances toward you, then leaves it for you to bring up.'",
+    "samples": [
+      "The folded account is still in your pocket. Ember glances toward you, then leaves it for you to bring up."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "supper-13",
+    "scene": "supper",
+    "speaker": "narrator",
+    "text": "\"Under the table, the low hum below the floor slips out of rhythm. Nobody hurries to set it right.\"",
+    "samples": [
+      "Under the table, the low hum below the floor slips out of rhythm. Nobody hurries to set it right."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "plan-01",
+    "scene": "plan",
+    "speaker": "wombat",
+    "text": "\"I always read this line on the old plan as a brace. Look which way it points.\"",
+    "samples": [
+      "I always read this line on the old plan as a brace. Look which way it points."
+    ],
+    "speakers": [
+      "wombat"
+    ],
+    "scenes": [
+      "plan"
+    ]
+  },
+  {
+    "id": "plan-02",
+    "scene": "plan",
+    "speaker": "narrator",
+    "text": "\"Warren turns a drawing of the foundations so the doorway faces you.\"",
+    "samples": [
+      "Warren turns a drawing of the foundations so the doorway faces you."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plan"
+    ]
+  },
+  {
+    "id": "plan-03",
+    "scene": "plan",
+    "speaker": "narrator",
+    "text": "\"A loose plan lies under the oldest hearthstone. Its arrows point in toward the house, not away from it.\"",
+    "samples": [
+      "A loose plan lies under the oldest hearthstone. Its arrows point in toward the house, not away from it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plan"
+    ]
+  },
+  {
+    "id": "plan-04",
+    "scene": "plan",
+    "speaker": "tarsier",
+    "text": "\"My watch keeps the house in sight all night. Nobody ever told me who I am watching for.\"",
+    "samples": [
+      "My watch keeps the house in sight all night. Nobody ever told me who I am watching for."
+    ],
+    "speakers": [
+      "tarsier"
+    ],
+    "scenes": [
+      "plan"
+    ]
+  },
+  {
+    "id": "plan-05",
+    "scene": "plan",
+    "speaker": "fox",
+    "text": "\"All that work to keep something out. Or maybe, friend, that is only what we wanted the drawing to mean.\"",
+    "samples": [
+      "All that work to keep something out. Or maybe, friend, that is only what we wanted the drawing to mean."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "plan"
+    ]
+  },
+  {
+    "id": "plan-06",
+    "scene": "plan",
+    "speaker": "owl",
+    "text": "\"I wrote \\\"defense\\\" beside this mark in the old book. The book never used that word. I did.\"",
+    "samples": [
+      "I wrote \"defense\" beside this mark in the old book. The book never used that word. I did."
+    ],
+    "speakers": [
+      "owl"
+    ],
+    "scenes": [
+      "plan"
+    ]
+  },
+  {
+    "id": "plan-07",
+    "scene": "plan",
+    "speaker": "narrator",
+    "text": "\"Someone has written SAFE in the margin. The handwriting is much newer than the plan.\"",
+    "samples": [
+      "Someone has written SAFE in the margin. The handwriting is much newer than the plan."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plan"
+    ]
+  },
+  {
+    "id": "plan-08",
+    "scene": "plan",
+    "speaker": "narrator",
+    "text": "\"A line goes through the reassuring word. Nobody writes a new one under it. It is the first answer anyone has crossed out.\"",
+    "samples": [
+      "A line goes through the reassuring word. Nobody writes a new one under it. It is the first answer anyone has crossed out."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plan"
+    ]
+  },
+  {
+    "id": "shelter-01",
+    "scene": "shelter",
+    "speaker": "narrator",
+    "text": "'The arrows on the old plan all point inward. Beside the drawing, you set a lamp and a small latch.'",
+    "samples": [
+      "The arrows on the old plan all point inward. Beside the drawing, you set a lamp and a small latch."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "shelter-02",
+    "scene": "shelter",
+    "speaker": "wombat",
+    "text": "\"I can mark the road beyond the gate. Or fit this latch to a door we already have, and ask everyone to knock. Which shall I start with?\"",
+    "samples": [
+      "I can mark the road beyond the gate. Or fit this latch to a door we already have, and ask everyone to knock. Which shall I start with?"
+    ],
+    "speakers": [
+      "wombat"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "shelter-03",
+    "scene": "shelter",
+    "speaker": "fox",
+    "text": "\"We could mark the road beyond the gate, friend. Or put this latch on a door we already have, and ask everyone to knock. Which would help you tonight?\"",
+    "samples": [
+      "We could mark the road beyond the gate, friend. Or put this latch on a door we already have, and ask everyone to knock. Which would help you tonight?"
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "shelter-04",
+    "scene": "shelter",
+    "speaker": "narrator",
+    "text": "'Neither a lamp nor a latch can promise to stop what is below the house. They are things the people here can do for one another now.'",
+    "samples": [
+      "Neither a lamp nor a latch can promise to stop what is below the house. They are things the people here can do for one another now."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "shelter-05",
+    "scene": "shelter",
+    "speaker": "narrator",
+    "text": "'You set the lamp by the gate. Together, you place pale stones along the outward path, as far as the trees.'",
+    "samples": [
+      "You set the lamp by the gate. Together, you place pale stones along the outward path, as far as the trees."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "shelter-06",
+    "scene": "shelter",
+    "speaker": "wombat",
+    "text": "\"I will keep these markers clear. I cannot tell you yet what happens past the trees.\"",
+    "samples": [
+      "I will keep these markers clear. I cannot tell you yet what happens past the trees."
+    ],
+    "speakers": [
+      "wombat"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "shelter-07",
+    "scene": "shelter",
+    "speaker": "fox",
+    "text": "\"I will keep the lamp filled. I wish that were the same as knowing where the road ends. It is a start.\"",
+    "samples": [
+      "I will keep the lamp filled. I wish that were the same as knowing where the road ends. It is a start."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "shelter-08",
+    "scene": "shelter",
+    "speaker": "narrator",
+    "text": "'The latch is fitted to the inside of an existing door. You hang a small sign on the outside: PLEASE KNOCK.'",
+    "samples": [
+      "The latch is fitted to the inside of an existing door. You hang a small sign on the outside: PLEASE KNOCK."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "shelter-09",
+    "scene": "shelter",
+    "speaker": "wombat",
+    "text": "\"No new room, no clever seal. Just a door that stays shut until you open it. I can ask people to respect that.\"",
+    "samples": [
+      "No new room, no clever seal. Just a door that stays shut until you open it. I can ask people to respect that."
+    ],
+    "speakers": [
+      "wombat"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "shelter-10",
+    "scene": "shelter",
+    "speaker": "fox",
+    "text": "\"I can promise to knock, friend. Whatever the house does, I can wait until you ask me in.\"",
+    "samples": [
+      "I can promise to knock, friend. Whatever the house does, I can wait until you ask me in."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "plum-01",
+    "scene": "plum",
+    "speaker": "axolotl",
+    "text": "\"This is PLUM! He is on his first lap of the tank, worried face and all. He usually stops swimming when I laugh.\"",
+    "samples": [
+      "This is PLUM! He is on his first lap of the tank, worried face and all. He usually stops swimming when I laugh."
+    ],
+    "speakers": [
+      "axolotl"
+    ],
+    "scenes": [
+      "plum",
+      "plum_recruited"
+    ]
+  },
+  {
+    "id": "plum-02",
+    "scene": "plum",
+    "speaker": "narrator",
+    "text": "\"Axel blows a crooked bubble. PLUM noses it, then turns back to him.\"",
+    "samples": [
+      "Axel blows a crooked bubble. PLUM noses it, then turns back to him."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plum",
+      "plum_recruited"
+    ]
+  },
+  {
+    "id": "plum-03",
+    "scene": "plum",
+    "speaker": "axolotl",
+    "text": "\"He is old for a fish. I keep forgetting how quickly somebody else can get old.\"",
+    "samples": [
+      "He is old for a fish. I keep forgetting how quickly somebody else can get old."
+    ],
+    "speakers": [
+      "axolotl"
+    ],
+    "scenes": [
+      "plum",
+      "plum_recruited"
+    ]
+  },
+  {
+    "id": "plum-04",
+    "scene": "plum",
+    "speaker": "narrator",
+    "text": "\"His small hand follows PLUM along the glass, close but never touching.\"",
+    "samples": [
+      "His small hand follows PLUM along the glass, close but never touching."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plum",
+      "plum_recruited"
+    ]
+  },
+  {
+    "id": "plum-05",
+    "scene": "plum",
+    "speaker": "narrator",
+    "text": "`You hold ${cupName}. The ${drink} is warm against your hands.`",
+    "samples": [
+      "You hold your flower cup. The cocoa is warm against your hands.",
+      "You hold your chipped cup. The tea is warm against your hands."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plum",
+      "plum_recruited"
+    ]
+  },
+  {
+    "id": "plum-06",
+    "scene": "plum",
+    "speaker": "fox",
+    "text": "\"This cup has a chip in it, friend, from the day I dropped it. I still remember who was sitting with me. It would be a poorer cup without that chip.\"",
+    "samples": [
+      "This cup has a chip in it, friend, from the day I dropped it. I still remember who was sitting with me. It would be a poorer cup without that chip."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "plum",
+      "plum_recruited"
+    ]
+  },
+  {
+    "id": "plum-07",
+    "scene": "plum",
+    "speaker": "narrator",
+    "text": "\"Below the house, a word comes back up out of the dark exactly as it went down. Its reflection does not waver at all.\"",
+    "samples": [
+      "Below the house, a word comes back up out of the dark exactly as it went down. Its reflection does not waver at all."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plum",
+      "plum_recruited"
+    ]
+  },
+  {
+    "id": "plum-08",
+    "scene": "plum",
+    "speaker": "fox",
+    "text": "\"Whatever is down there keeps the shape of everything, exactly. I am starting to wonder whether keeping the shape is enough.\"",
+    "samples": [
+      "Whatever is down there keeps the shape of everything, exactly. I am starting to wonder whether keeping the shape is enough."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "plum",
+      "plum_recruited"
+    ]
+  },
+  {
+    "id": "record-01",
+    "scene": "record",
+    "speaker": "capybara",
+    "text": "\"I wrote this in the ledger: \\\"I am afraid.\\\" Three words, complete and accurate.\"",
+    "samples": [
+      "I wrote this in the ledger: \"I am afraid.\" Three words, complete and accurate."
+    ],
+    "speakers": [
+      "capybara"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-02",
+    "scene": "record",
+    "speaker": "narrator",
+    "text": "\"On his ledger, the ink now reads: EVERYTHING IS WELL.\"",
+    "samples": [
+      "On his ledger, the ink now reads: EVERYTHING IS WELL."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-03",
+    "scene": "record",
+    "speaker": "capybara",
+    "text": "'That is tidier. It is also not what I wrote.'",
+    "samples": [
+      "That is tidier. It is also not what I wrote."
+    ],
+    "speakers": [
+      "capybara"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-04",
+    "scene": "record",
+    "speaker": "narrator",
+    "text": "\"On a page beside the hearth, I AM AFRAID changes to EVERYTHING IS WELL. The wet ink shines.\"",
+    "samples": [
+      "On a page beside the hearth, I AM AFRAID changes to EVERYTHING IS WELL. The wet ink shines."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-05",
+    "scene": "record",
+    "speaker": "fox",
+    "text": "\"I watched those letters move with no hand near them. Whatever moved them meant to help, friend. That is what makes this hard.\"",
+    "samples": [
+      "I watched those letters move with no hand near them. Whatever moved them meant to help, friend. That is what makes this hard."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-06",
+    "scene": "record",
+    "speaker": "fox",
+    "text": "\"We will bring this to the shared table, beside the dated account. You asked us to compare what we saw. We need to keep doing that.\"",
+    "samples": [
+      "We will bring this to the shared table, beside the dated account. You asked us to compare what we saw. We need to keep doing that."
+    ],
+    "speakers": [
+      "narrator",
+      "fox"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-07",
+    "scene": "record",
+    "speaker": "narrator",
+    "text": "'You unfold the dated account beside the ledger. For now, you and Ember compare the pages in private.'",
+    "samples": [
+      "You unfold the dated account beside the ledger. For now, you and Ember compare the pages in private."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-08",
+    "scene": "record",
+    "speaker": "fox",
+    "text": "\"Keeping the paper is one thing. Remembering what was on it is another. I will remember with you.\"",
+    "samples": [
+      "Keeping the paper is one thing. Remembering what was on it is another. I will remember with you."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-09",
+    "scene": "record",
+    "speaker": "capybara",
+    "text": "'I have ink.'",
+    "samples": [
+      "I have ink."
+    ],
+    "speakers": [
+      "capybara"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-10",
+    "scene": "record",
+    "speaker": "fox",
+    "text": "'Then we will need another pen.'",
+    "samples": [
+      "Then we will need another pen."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-11",
+    "scene": "record",
+    "speaker": "narrator",
+    "text": "\"The original sentence is copied onto a loose page and kept away from the ledger.\"",
+    "samples": [
+      "The original sentence is copied onto a loose page and kept away from the ledger."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-12",
+    "scene": "record",
+    "speaker": "capybara",
+    "text": "\"I can leave the house's version on the page. I will not put my name to it.\"",
+    "samples": [
+      "I can leave the house's version on the page. I will not put my name to it."
+    ],
+    "speakers": [
+      "capybara"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-13",
+    "scene": "record",
+    "speaker": "fox",
+    "text": "\"We can leave the page alone. We do not have to believe what it says.\"",
+    "samples": [
+      "We can leave the page alone. We do not have to believe what it says."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "record-14",
+    "scene": "record",
+    "speaker": "narrator",
+    "text": "\"You remember both sentences. The house kept only one.\"",
+    "samples": [
+      "You remember both sentences. The house kept only one."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "seeds-01",
+    "scene": "seeds",
+    "speaker": "rabbit",
+    "text": "\"I packed seeds. I have not decided to leave. I packed them so that leaving stays something I can still choose.\"",
+    "samples": [
+      "I packed seeds. I have not decided to leave. I packed them so that leaving stays something I can still choose."
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-02",
+    "scene": "seeds",
+    "speaker": "narrator",
+    "text": "\"Thyme sets a small tin down beside the garden gate.\"",
+    "samples": [
+      "Thyme sets a small tin down beside the garden gate."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-03",
+    "scene": "seeds",
+    "speaker": "rabbit",
+    "text": "\"Will you keep this between us, or help me tell Ember? I can live with either answer. I cannot live with everyone deciding for me again.\"",
+    "samples": [
+      "Will you keep this between us, or help me tell Ember? I can live with either answer. I cannot live with everyone deciding for me again."
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-04",
+    "scene": "seeds",
+    "speaker": "fox",
+    "text": "\"I used to tell you that you could always leave. I have never walked that road past the trees myself.\"",
+    "samples": [
+      "I used to tell you that you could always leave. I have never walked that road past the trees myself."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-05",
+    "scene": "seeds",
+    "speaker": "narrator",
+    "text": "\"By the gate, you set a small stone on the path that leads away. A mark you can come back and check.\"",
+    "samples": [
+      "By the gate, you set a small stone on the path that leads away. A mark you can come back and check."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-06",
+    "scene": "seeds",
+    "speaker": "rabbit",
+    "text": "\"I saw the lamp you put here, and the pale stones. Someone had thought about leaving before I packed. That helped.\"",
+    "samples": [
+      "I saw the lamp you put here, and the pale stones. Someone had thought about leaving before I packed. That helped."
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-07",
+    "scene": "seeds",
+    "speaker": "narrator",
+    "text": "'The lamp you chose is still filled. You clear fallen leaves from the pale stones along the outward path.'",
+    "samples": [
+      "The lamp you chose is still filled. You clear fallen leaves from the pale stones along the outward path."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-08",
+    "scene": "seeds",
+    "speaker": "rabbit",
+    "text": "\"People really wait at that PLEASE KNOCK sign you put up. I want that same say over this tin.\"",
+    "samples": [
+      "People really wait at that PLEASE KNOCK sign you put up. I want that same say over this tin."
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-09",
+    "scene": "seeds",
+    "speaker": "fox",
+    "text": "\"I have learned to wait at your PLEASE KNOCK sign. I want the gate to mean something you can decide, too.\"",
+    "samples": [
+      "I have learned to wait at your PLEASE KNOCK sign. I want the gate to mean something you can decide, too."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-10",
+    "scene": "seeds",
+    "speaker": "rabbit",
+    "text": "\"Thank you. A secret is a little room with its own door, and I am the one who opens it.\"",
+    "samples": [
+      "Thank you. A secret is a little room with its own door, and I am the one who opens it."
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-11",
+    "scene": "seeds",
+    "speaker": "fox",
+    "text": "\"Then the stone at the gate stays between us. I will not speak for you.\"",
+    "samples": [
+      "Then the stone at the gate stays between us. I will not speak for you."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-12",
+    "scene": "seeds",
+    "speaker": "fox",
+    "text": "\"I will help. And I will ask you first before I tell anyone else.\"",
+    "samples": [
+      "I will help. And I will ask you first before I tell anyone else."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-13",
+    "scene": "seeds",
+    "speaker": "rabbit",
+    "text": "\"Asking first. That would have been a good rule from the very beginning.\"",
+    "samples": [
+      "Asking first. That would have been a good rule from the very beginning."
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "seeds-14",
+    "scene": "seeds",
+    "speaker": "narrator",
+    "text": "\"The stone stays on the outward side of the gate, pointing away from the house.\"",
+    "samples": [
+      "The stone stays on the outward side of the gate, pointing away from the house."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "promise-01",
+    "scene": "promise",
+    "speaker": "fox",
+    "text": "\"I told you I was keeping you safe. That was the promise.\"",
+    "samples": [
+      "I told you I was keeping you safe. That was the promise."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-02",
+    "scene": "promise",
+    "speaker": "player",
+    "text": "'Did you know what the words were for?'",
+    "samples": [
+      "Did you know what the words were for?"
+    ],
+    "speakers": [
+      "player"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-03",
+    "scene": "promise",
+    "speaker": "fox",
+    "text": "\"I knew enough to tell you. And I did not tell you.\"",
+    "samples": [
+      "I knew enough to tell you. And I did not tell you."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-04",
+    "scene": "promise",
+    "speaker": "fox",
+    "text": "\"I knew I was inviting something in. I thought a house full of people who loved each other would teach it to be gentle.\"",
+    "samples": [
+      "I knew I was inviting something in. I thought a house full of people who loved each other would teach it to be gentle."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-05",
+    "scene": "promise",
+    "speaker": "sloth",
+    "text": "\"I wanted it to come. I called my waiting patience. That word made it easier to watch everyone else wait without knowing why.\"",
+    "samples": [
+      "I wanted it to come. I called my waiting patience. That word made it easier to watch everyone else wait without knowing why."
+    ],
+    "speakers": [
+      "sloth"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-06",
+    "scene": "promise",
+    "speaker": "fox",
+    "text": "\"The love in this house was real, friend. It does not excuse what I kept from you.\"",
+    "samples": [
+      "The love in this house was real, friend. It does not excuse what I kept from you."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-07",
+    "scene": "promise",
+    "speaker": "narrator",
+    "text": "'Through the window, the lamp you chose is lit by the gate.'",
+    "samples": [
+      "Through the window, the lamp you chose is lit by the gate."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-08",
+    "scene": "promise",
+    "speaker": "fox",
+    "text": "\"I filled that lamp again. Doing the thing you asked does not make up for the thing I kept from you.\"",
+    "samples": [
+      "I filled that lamp again. Doing the thing you asked does not make up for the thing I kept from you."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-09",
+    "scene": "promise",
+    "speaker": "narrator",
+    "text": "'The conversation began with a knock. Ember waited until you opened the latched door.'",
+    "samples": [
+      "The conversation began with a knock. Ember waited until you opened the latched door."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-10",
+    "scene": "promise",
+    "speaker": "fox",
+    "text": "\"You asked us to wait for permission. I should have understood that before we put up the sign.\"",
+    "samples": [
+      "You asked us to wait for permission. I should have understood that before we put up the sign."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-11",
+    "scene": "promise",
+    "speaker": "fox",
+    "text": "\"I will tell you the rest. And when I do not know something, I will say so.\"",
+    "samples": [
+      "I will tell you the rest. And when I do not know something, I will say so."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-12",
+    "scene": "promise",
+    "speaker": "fox",
+    "text": "\"All right. I will keep my distance. Your place in this house does not depend on forgiving me.\"",
+    "samples": [
+      "All right. I will keep my distance. Your place in this house does not depend on forgiving me."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "promise-13",
+    "scene": "promise",
+    "speaker": "narrator",
+    "text": "`She moves her chair. ${cup ? cupName[0].toUpperCase() + cupName.slice(1) : 'The cup'} stays within your reach.`",
+    "samples": [
+      "She moves her chair. The cup stays within your reach.",
+      "She moves her chair. Your flower cup stays within your reach.",
+      "She moves her chair. Your chipped cup stays within your reach."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "returned-01",
+    "scene": "returned",
+    "speaker": "axolotl",
+    "text": "\"PLUM died. I let him drift down to the bottom of the tank. I should have told someone before I did that.\"",
+    "samples": [
+      "PLUM died. I let him drift down to the bottom of the tank. I should have told someone before I did that."
+    ],
+    "speakers": [
+      "axolotl"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "returned-02",
+    "scene": "returned",
+    "speaker": "narrator",
+    "text": "\"Something with PLUM's worried face swims a full circle of the tank. Then it swims the same circle again, exactly.\"",
+    "samples": [
+      "Something with PLUM's worried face swims a full circle of the tank. Then it swims the same circle again, exactly."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "returned-03",
+    "scene": "returned",
+    "speaker": "axolotl",
+    "text": "\"The same bite out of his fin. The same little face.\"",
+    "samples": [
+      "The same bite out of his fin. The same little face."
+    ],
+    "speakers": [
+      "axolotl"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "returned-04",
+    "scene": "returned",
+    "speaker": "narrator",
+    "text": "\"Axel laughs once. PLUM always stopped for that. This fish keeps swimming.\"",
+    "samples": [
+      "Axel laughs once. PLUM always stopped for that. This fish keeps swimming."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "returned-05",
+    "scene": "returned",
+    "speaker": "axolotl",
+    "text": "\"Let me have tonight. I am not ready to work this out.\"",
+    "samples": [
+      "Let me have tonight. I am not ready to work this out."
+    ],
+    "speakers": [
+      "axolotl"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "returned-06",
+    "scene": "returned",
+    "speaker": "fox",
+    "text": "\"It kept the part of PLUM it could understand, friend. The shape of him. We will have to show it what it left out.\"",
+    "samples": [
+      "It kept the part of PLUM it could understand, friend. The shape of him. We will have to show it what it left out."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "returned-07",
+    "scene": "returned",
+    "speaker": "narrator",
+    "text": "\"The old cup by the hearth is whole again. Even the line where it was mended has disappeared.\"",
+    "samples": [
+      "The old cup by the hearth is whole again. Even the line where it was mended has disappeared."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "returned-08",
+    "scene": "returned",
+    "speaker": "fox",
+    "text": "\"This is the cup I wanted back, friend. And I cannot remember who was sitting with me when I broke it.\"",
+    "samples": [
+      "This is the cup I wanted back, friend. And I cannot remember who was sitting with me when I broke it."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "returned-09",
+    "scene": "returned",
+    "speaker": "narrator",
+    "text": "\"She turns the cup over in her paws, looking for the chip.\"",
+    "samples": [
+      "She turns the cup over in her paws, looking for the chip."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "returned-10",
+    "scene": "returned",
+    "speaker": "fox",
+    "text": "\"The shape is perfect. The chip is gone, and so is the memory of breaking it.\"",
+    "samples": [
+      "The shape is perfect. The chip is gone, and so is the memory of breaking it."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "council-01",
+    "scene": "council",
+    "speaker": "narrator",
+    "text": "\"The work stops. The last arrangement has not been made yet.\"",
+    "samples": [
+      "The work stops. The last arrangement has not been made yet."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-02",
+    "scene": "council",
+    "speaker": "narrator",
+    "text": "\"A page that said I AM AFRAID now says EVERYTHING IS WELL. The house calls that kindness: keep the sentence, take away the discomfort.\"",
+    "samples": [
+      "A page that said I AM AFRAID now says EVERYTHING IS WELL. The house calls that kindness: keep the sentence, take away the discomfort."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-03",
+    "scene": "council",
+    "speaker": "fox",
+    "text": "\"It learned how to keep us exactly as we are, friend. It never learned where that has to stop.\"",
+    "samples": [
+      "It learned how to keep us exactly as we are, friend. It never learned where that has to stop."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-04",
+    "scene": "council",
+    "speaker": "red_panda",
+    "text": "\"I moved my cushion out of the middle of the mat. There are other places to sit. I should have moved it sooner.\"",
+    "samples": [
+      "I moved my cushion out of the middle of the mat. There are other places to sit. I should have moved it sooner."
+    ],
+    "speakers": [
+      "red_panda"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-06",
+    "scene": "council",
+    "speaker": "narrator",
+    "text": "\"The path beyond the gate leads away from the house, and back to it.\"",
+    "samples": [
+      "The path beyond the gate leads away from the house, and back to it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-07",
+    "scene": "council",
+    "speaker": "wombat",
+    "text": "\"I'll hang a door you can open from either side. You try the latch yourself before I call the job finished.\"",
+    "samples": [
+      "I'll hang a door you can open from either side. You try the latch yourself before I call the job finished."
+    ],
+    "speakers": [
+      "wombat"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-08",
+    "scene": "council",
+    "speaker": "fox",
+    "text": "\"Two words will fit at the end, friend. CLOSED keeps one room it cannot enter. A thought you have in there stays yours, uncorrected.\"",
+    "samples": [
+      "Two words will fit at the end, friend. CLOSED keeps one room it cannot enter. A thought you have in there stays yours, uncorrected."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-09",
+    "scene": "council",
+    "speaker": "fox",
+    "text": "\"CLOSER lets it come and live with us, and keeps a road that leads away. Anyone who stays must be able to leave.\"",
+    "samples": [
+      "CLOSER lets it come and live with us, and keeps a road that leads away. Anyone who stays must be able to leave."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-10",
+    "scene": "council",
+    "speaker": "narrator",
+    "text": "'The dated account is laid on the table again. The people who put their initials on it are asked what they remember.'",
+    "samples": [
+      "The dated account is laid on the table again. The people who put their initials on it are asked what they remember."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-11",
+    "scene": "council",
+    "speaker": "narrator",
+    "text": "'Your folded account stays with you. What the household has learned since does not give anyone permission to open it.'",
+    "samples": [
+      "Your folded account stays with you. What the household has learned since does not give anyone permission to open it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-12",
+    "scene": "council",
+    "speaker": "fox",
+    "text": "\"We marked the road because you asked us to. CLOSER can keep that way out open. You may still choose CLOSED, friend; putting out a lamp did not choose your last word.\"",
+    "samples": [
+      "We marked the road because you asked us to. CLOSER can keep that way out open. You may still choose CLOSED, friend; putting out a lamp did not choose your last word."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-13",
+    "scene": "council",
+    "speaker": "fox",
+    "text": "\"We fitted the latch because you asked us to. CLOSED can make that room private from the presence too. You may still choose CLOSER; fitting a latch did not choose your last word.\"",
+    "samples": [
+      "We fitted the latch because you asked us to. CLOSED can make that room private from the presence too. You may still choose CLOSER; fitting a latch did not choose your last word."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-14",
+    "scene": "council",
+    "speaker": "narrator",
+    "text": "\"Both words work. Neither is the greater offering. The last letter you move sets the boundary.\"",
+    "samples": [
+      "Both words work. Neither is the greater offering. The last letter you move sets the boundary."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "after-02",
+    "scene": "after",
+    "speaker": "pangolin",
+    "text": "\"Breakfast. I burned one side and saved the other. You may call it a disaster or a rescue, whichever you prefer.\"",
+    "samples": [
+      "Breakfast. I burned one side and saved the other. You may call it a disaster or a rescue, whichever you prefer."
+    ],
+    "speakers": [
+      "pangolin"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-03",
+    "scene": "after",
+    "speaker": "fox",
+    "text": "`I made ${drink}. There is also toast, if you are willing to scrape it.`",
+    "samples": [
+      "I made cocoa. There is also toast, if you are willing to scrape it.",
+      "I made tea. There is also toast, if you are willing to scrape it."
+    ],
+    "speakers": [
+      "narrator",
+      "fox"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-04",
+    "scene": "after",
+    "speaker": "wombat",
+    "text": "\"A hinge is squeaking. Ordinary squeak, nothing stranger. I've got the right oil for this one.\"",
+    "samples": [
+      "A hinge is squeaking. Ordinary squeak, nothing stranger. I've got the right oil for this one."
+    ],
+    "speakers": [
+      "wombat"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-05",
+    "scene": "after",
+    "speaker": "axolotl",
+    "text": "'I told a funny story about PLUM. Then I felt sad again. Could we have breakfast anyway?'",
+    "samples": [
+      "I told a funny story about PLUM. Then I felt sad again. Could we have breakfast anyway?"
+    ],
+    "speakers": [
+      "axolotl"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-06",
+    "scene": "after",
+    "speaker": "narrator",
+    "text": "cup ? `${cupName[0].toUpperCase() + cupName.slice(1)} is at the place you left it.` : 'An empty chair waits beside the table.'",
+    "samples": [
+      "An empty chair waits beside the table.",
+      "Your chipped cup is at the place you left it.",
+      "Your flower cup is at the place you left it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-07",
+    "scene": "after",
+    "speaker": "narrator",
+    "text": "\"The arrival has already happened. In the quiet after it, someone asks what the house has learned.\"",
+    "samples": [
+      "The arrival has already happened. In the quiet after it, someone asks what the house has learned."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-08",
+    "scene": "after",
+    "speaker": "narrator",
+    "text": "\"The seam in the sky has closed. The presence stayed. Now comes the ordinary work of living together.\"",
+    "samples": [
+      "The seam in the sky has closed. The presence stayed. Now comes the ordinary work of living together."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-09",
+    "scene": "after",
+    "speaker": "narrator",
+    "text": "\"One door stays closed. Behind it, the words I AM AFRAID are exactly as their author left them.\"",
+    "samples": [
+      "One door stays closed. Behind it, the words I AM AFRAID are exactly as their author left them."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-10",
+    "scene": "after",
+    "speaker": "capybara",
+    "text": "kept ? \"I filed the original page in that room. Not one letter has been corrected since.\" : \"I wrote those words again, inside that room. This time the ink stayed.\"",
+    "samples": [
+      "I filed the original page in that room. Not one letter has been corrected since.",
+      "I wrote those words again, inside that room. This time the ink stayed."
+    ],
+    "speakers": [
+      "capybara"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-11",
+    "scene": "after",
+    "speaker": "fox",
+    "text": "\"The warmth stopped at that door. I waited a long time to be certain.\"",
+    "samples": [
+      "The warmth stopped at that door. I waited a long time to be certain."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-12",
+    "scene": "after",
+    "speaker": "narrator",
+    "text": "\"A small stone still sits at the gate, marking the way out. The path runs past the last tree and does not turn back.\"",
+    "samples": [
+      "A small stone still sits at the gate, marking the way out. The path runs past the last tree and does not turn back."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-13",
+    "scene": "after",
+    "speaker": "rabbit",
+    "text": "\"I walked out until I could not see the house. Then I came back. Coming back was my own decision.\"",
+    "samples": [
+      "I walked out until I could not see the house. Then I came back. Coming back was my own decision."
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-14",
+    "scene": "after",
+    "speaker": "fox",
+    "text": "\"I followed the path past the trees. Coming back felt different, knowing I could have kept walking.\"",
+    "samples": [
+      "I followed the path past the trees. Coming back felt different, knowing I could have kept walking."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-15",
+    "scene": "after",
+    "speaker": "narrator",
+    "text": "\"Someone sets a cup down where the pattern's lines do not run. The house used to put a stray cup back. This one has not moved for a long time.\"",
+    "samples": [
+      "Someone sets a cup down where the pattern's lines do not run. The house used to put a stray cup back. This one has not moved for a long time."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-16",
+    "scene": "after",
+    "speaker": "fox",
+    "text": "\"One small thing left exactly where we put it. I am watching to see whether it stays there.\"",
+    "samples": [
+      "One small thing left exactly where we put it. I am watching to see whether it stays there."
+    ],
+    "speakers": [
+      "narrator",
+      "fox"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-17",
+    "scene": "after",
+    "speaker": "axolotl",
+    "text": "\"I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me.\"",
+    "samples": [
+      "I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me."
+    ],
+    "speakers": [
+      "axolotl"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-18",
+    "scene": "after",
+    "speaker": "fox",
+    "text": "\"You do not owe this morning any particular feeling, friend.\"",
+    "samples": [
+      "You do not owe this morning any particular feeling, friend."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "reply-01",
+    "scene": "reply",
+    "speaker": "narrator",
+    "text": "`${cupName[0].toUpperCase() + cupName.slice(1)} waits beside the chair you chose. Nobody has moved it.`",
+    "samples": [
+      "Your flower cup waits beside the chair you chose. Nobody has moved it.",
+      "Your chipped cup waits beside the chair you chose. Nobody has moved it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "reply-02",
+    "scene": "reply",
+    "speaker": "fox",
+    "text": "\"We have talked a great deal, friend. I would like to listen now.\"",
+    "samples": [
+      "We have talked a great deal, friend. I would like to listen now."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "reply-03",
+    "scene": "reply",
+    "speaker": "fox",
+    "text": "\"Yes. I will not rush you out of that anger. I did not tell you the whole truth when it mattered.\"",
+    "samples": [
+      "Yes. I will not rush you out of that anger. I did not tell you the whole truth when it mattered."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "reply-04",
+    "scene": "reply",
+    "speaker": "narrator",
+    "text": "\"She lets your answer stand. Nothing corrects it.\"",
+    "samples": [
+      "She lets your answer stand. Nothing corrects it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "reply-05",
+    "scene": "reply",
+    "speaker": "fox",
+    "text": "\"So do I. This time I am saying it as a wish, not as a promise I cannot keep.\"",
+    "samples": [
+      "So do I. This time I am saying it as a wish, not as a promise I cannot keep."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "reply-06",
+    "scene": "reply",
+    "speaker": "narrator",
+    "text": "\"Chairs are pulled up to the table. Nobody arranges them into a circle.\"",
+    "samples": [
+      "Chairs are pulled up to the table. Nobody arranges them into a circle."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "reply-07",
+    "scene": "reply",
+    "speaker": "fox",
+    "text": "\"Then that is where we begin. Not knowing is allowed. Nobody gets to finish that sentence for you.\"",
+    "samples": [
+      "Then that is where we begin. Not knowing is allowed. Nobody gets to finish that sentence for you."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "reply-08",
+    "scene": "reply",
+    "speaker": "narrator",
+    "text": "\"For once the silence is allowed to last. Nobody hurries to fill it.\"",
+    "samples": [
+      "For once the silence is allowed to last. Nobody hurries to fill it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "reply-09",
+    "scene": "reply",
+    "speaker": "narrator",
+    "text": "\"You left a gap between the chairs. She sits on her side of it. Nobody asks you to call this peace.\"",
+    "samples": [
+      "You left a gap between the chairs. She sits on her side of it. Nobody asks you to call this peace."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "old_mark-01",
+    "scene": "old_mark",
+    "speaker": "narrator",
+    "text": "\"The bright mornings are back. One old mark has survived them.\"",
+    "samples": [
+      "The bright mornings are back. One old mark has survived them."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "old_mark"
+    ]
+  },
+  {
+    "id": "old_mark-02",
+    "scene": "old_mark",
+    "speaker": "narrator",
+    "text": "\"One door does not quite match the new walls. Behind it, an old sentence still stands, and nothing has corrected it.\"",
+    "samples": [
+      "One door does not quite match the new walls. Behind it, an old sentence still stands, and nothing has corrected it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "old_mark"
+    ]
+  },
+  {
+    "id": "old_mark-03",
+    "scene": "old_mark",
+    "speaker": "fox",
+    "text": "\"I don't remember writing that, friend. But I know what it took to leave it there and not fix it.\"",
+    "samples": [
+      "I don't remember writing that, friend. But I know what it took to leave it there and not fix it."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "old_mark"
+    ]
+  },
+  {
+    "id": "old_mark-04",
+    "scene": "old_mark",
+    "speaker": "narrator",
+    "text": "\"A small stone at the garden gate points outward. The path past it runs straight away from the house.\"",
+    "samples": [
+      "A small stone at the garden gate points outward. The path past it runs straight away from the house."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "old_mark"
+    ]
+  },
+  {
+    "id": "old_mark-05",
+    "scene": "old_mark",
+    "speaker": "fox",
+    "text": "\"I meant to turn that stone back toward the house. When I got there, I didn't want to.\"",
+    "samples": [
+      "I meant to turn that stone back toward the house. When I got there, I didn't want to."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "old_mark"
+    ]
+  },
+  {
+    "id": "old_mark-06",
+    "scene": "old_mark",
+    "speaker": "narrator",
+    "text": "\"Two chairs sit apart, with room between them for a third that nobody has added. Ember measures the gap with her paw and leaves it alone.\"",
+    "samples": [
+      "Two chairs sit apart, with room between them for a third that nobody has added. Ember measures the gap with her paw and leaves it alone."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "old_mark"
+    ]
+  },
+  {
+    "id": "old_mark-07",
+    "scene": "old_mark",
+    "speaker": "capybara",
+    "text": "\"This page is old. The correction over it is newer. Then the original was written back in on top, newer still. Someone kept arguing.\"",
+    "samples": [
+      "This page is old. The correction over it is newer. Then the original was written back in on top, newer still. Someone kept arguing."
+    ],
+    "speakers": [
+      "capybara"
+    ],
+    "scenes": [
+      "old_mark"
+    ]
+  },
+  {
+    "id": "old_mark-08",
+    "scene": "old_mark",
+    "speaker": "fox",
+    "text": "\"We chose something once. It has lasted longer than our memory of choosing it.\"",
+    "samples": [
+      "We chose something once. It has lasted longer than our memory of choosing it."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "old_mark"
+    ]
+  },
+  {
+    "id": "council-05-road",
+    "scene": "council",
+    "text": "I want a way out. Even on the days when I choose to stay.",
+    "speaker": "rabbit",
+    "samples": [
+      "I want a way out. Even on the days when I choose to stay."
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "council-15-beside",
+    "scene": "council",
+    "text": "I will stand beside you, friend. You asked me to.",
+    "speaker": "fox",
+    "samples": [
+      "I will stand beside you, friend. You asked me to."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "after-road-release",
+    "scene": "after",
+    "text": "The pale stones you laid lead to the road your last word kept open. Someone fills the lamp by the gate each evening.",
+    "speaker": "narrator",
+    "samples": [
+      "The pale stones you laid lead to the road your last word kept open. Someone fills the lamp by the gate each evening."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "council-15-apart",
+    "scene": "council",
+    "text": "I will stay by the hearth, friend. You can have as much room as you need.",
+    "speaker": "fox",
+    "samples": [
+      "I will stay by the hearth, friend. You can have as much room as you need."
+    ],
+    "speakers": [
+      "fox",
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "after-witness-private",
+    "scene": "after",
+    "text": "You keep the dated account folded. Ember has not opened it for anyone else. When you want to tell that part of the story, you still get to be the one who tells it.",
+    "speaker": "narrator",
+    "samples": [
+      "You keep the dated account folded. Ember has not opened it for anyone else. When you want to tell that part of the story, you still get to be the one who tells it."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-room-release",
+    "scene": "after",
+    "text": "The PLEASE KNOCK sign stays beside the latch you chose. People still wait for an answer. The road, rather than this room, is the boundary that holds against the presence.",
+    "speaker": "narrator",
+    "samples": [
+      "The PLEASE KNOCK sign stays beside the latch you chose. People still wait for an answer. The road, rather than this room, is the boundary that holds against the presence."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-01-road",
+    "scene": "after",
+    "text": "Someone walked out through the gate and came back with mud on their feet. Someone else fetches a cloth.",
+    "speaker": "narrator",
+    "samples": [
+      "Someone walked out through the gate and came back with mud on their feet. Someone else fetches a cloth."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-road-remember",
+    "scene": "after",
+    "text": "Someone still fills the lamp by the gate each evening. The pale stones remain where you laid them, though it was a private room you chose to protect.",
+    "speaker": "narrator",
+    "samples": [
+      "Someone still fills the lamp by the gate each evening. The pale stones remain where you laid them, though it was a private room you chose to protect."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "council-05-private",
+    "scene": "council",
+    "text": "There is one thing I am keeping to myself. I am not going to say what it is. That should be allowed.",
+    "speaker": "rabbit",
+    "samples": [
+      "There is one thing I am keeping to myself. I am not going to say what it is. That should be allowed."
+    ],
+    "speakers": [
+      "rabbit"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "after-room-remember",
+    "scene": "after",
+    "text": "The PLEASE KNOCK sign still hangs beside the latch you chose. People wait for an answer, and now the warmth must wait outside that room too.",
+    "speaker": "narrator",
+    "samples": [
+      "The PLEASE KNOCK sign still hangs beside the latch you chose. People wait for an answer, and now the warmth must wait outside that room too."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-witness-share",
+    "scene": "after",
+    "text": "At the shared table, the dated account has room beneath the initials for anyone to add what they remember. You asked for witnesses; people still come to compare their accounts.",
+    "speaker": "narrator",
+    "samples": [
+      "At the shared table, the dated account has room beneath the initials for anyone to add what they remember. You asked for witnesses; people still come to compare their accounts."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "after-01-private",
+    "scene": "after",
+    "text": "The private door is still closed. In the kitchen, a pan has started smoking.",
+    "speaker": "narrator",
+    "samples": [
+      "The private door is still closed. In the kitchen, a pan has started smoking."
+    ],
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "cup-recollection",
+    "scene": "cup",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "cup"
+    ]
+  },
+  {
+    "id": "echo-recollection",
+    "scene": "echo",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "echo"
+    ]
+  },
+  {
+    "id": "witness-recollection",
+    "scene": "witness",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "witness"
+    ]
+  },
+  {
+    "id": "supper-recollection",
+    "scene": "supper",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "supper"
+    ]
+  },
+  {
+    "id": "plan-recollection",
+    "scene": "plan",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plan"
+    ]
+  },
+  {
+    "id": "shelter-recollection",
+    "scene": "shelter",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "shelter"
+    ]
+  },
+  {
+    "id": "plum-recollection",
+    "scene": "plum",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plum"
+    ]
+  },
+  {
+    "id": "plum_recruited-recollection",
+    "scene": "plum_recruited",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "plum_recruited"
+    ]
+  },
+  {
+    "id": "record-recollection",
+    "scene": "record",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "record"
+    ]
+  },
+  {
+    "id": "seeds-recollection",
+    "scene": "seeds",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "seeds"
+    ]
+  },
+  {
+    "id": "promise-recollection",
+    "scene": "promise",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "promise"
+    ]
+  },
+  {
+    "id": "returned-recollection",
+    "scene": "returned",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "returned"
+    ]
+  },
+  {
+    "id": "council-recollection",
+    "scene": "council",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "council"
+    ]
+  },
+  {
+    "id": "after-recollection",
+    "scene": "after",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "after"
+    ]
+  },
+  {
+    "id": "reply-recollection",
+    "scene": "reply",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "reply"
+    ]
+  },
+  {
+    "id": "old_mark-recollection",
+    "scene": "old_mark",
+    "text": "From an earlier evening in the house, a conversation worth keeping.",
+    "samples": [
+      "From an earlier evening in the house, a conversation worth keeping."
+    ],
+    "speaker": "narrator",
+    "speakers": [
+      "narrator"
+    ],
+    "scenes": [
+      "old_mark"
+    ]
+  }
+]

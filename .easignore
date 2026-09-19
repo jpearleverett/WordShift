@@ -119,3 +119,6 @@ coverage/
 /mobile/ios/Pods/
 /eas-build-inspect/
 /mobile/eas-build-inspect/
+
+# Local store export cache and packaged delivery bundles
+/mobile/store-output/

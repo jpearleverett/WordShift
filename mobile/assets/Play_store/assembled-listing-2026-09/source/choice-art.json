@@ -1,0 +1,14 @@
+{
+  "scene": "cup",
+  "page": 2,
+  "artId": "cup-03",
+  "file": "assets/story/pages/cup-03.webp",
+  "description": "The early cup scene’s third page: Ember’s crooked flower painting was meant to be a fox.",
+  "source": "src/components/storyPageArt.ts",
+  "choiceLabels": [
+    "The flower cup. Cocoa, please.",
+    "The chipped cup. Tea, please."
+  ],
+  "portrait": "assets/characters/fox/talk.png",
+  "note": "Uses the same page-specific illustration as the updated game. Source-asset promotional assembly, not a native screenshot."
+}

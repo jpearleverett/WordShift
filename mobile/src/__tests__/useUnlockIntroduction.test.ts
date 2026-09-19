@@ -18,6 +18,7 @@ jest.mock('react', () => ({
   },
   useCallback: (fn: unknown) => fn,
   useEffect: (fn: () => void | (() => void)) => effects.push(fn),
+  useLayoutEffect: (fn: () => void | (() => void)) => effects.push(fn),
 }));
 
 jest.mock('../services/homeWorldData', () => ({
@@ -26,8 +27,18 @@ jest.mock('../services/homeWorldData', () => ({
   reserveNextUnlock: jest.fn(async () => ({ success: true })),
   skipUnlockGate: jest.fn(async () => ({ success: true })),
   skipReservedUnlock: jest.fn(async () => ({ success: true })),
+  getNextUnlock: jest.fn(),
+  getUnlockStatus: jest.fn(async () => []),
+  isUnlockAvailable: jest.fn(async () => ({ available: true })),
+  canReserveUnlock: jest.fn(async () => false),
+  canSkipUnlockGate: jest.fn(async () => false),
+  getReservedSpeedUpState: jest.fn(async () => 'none'),
 }));
-jest.mock('../services/amberCurrency', () => ({ getAmberBalance: jest.fn(async () => 20), invalidateProgressCache: jest.fn() }));
+jest.mock('../services/amberCurrency', () => ({
+  getAmberBalance: jest.fn(async () => 20),
+  getReservedUnlockId: jest.fn(async () => null),
+  invalidateProgressCache: jest.fn(),
+}));
 jest.mock('../services/persistenceStorage', () => ({
   ...jest.requireActual('../services/persistenceStorage'),
   recoverPendingStorageTransaction: jest.fn(async () => true),
@@ -37,8 +48,8 @@ jest.mock('../services/haptics', () => ({ hapticError: jest.fn(), hapticLight: j
 jest.mock('../services/uiSound', () => ({ playUiSound: jest.fn() }));
 
 import { useUnlockFlow } from '../hooks/useUnlockFlow';
-import { Animal } from '../types/homeWorld';
-import { purchaseUnlock, reserveNextUnlock, skipUnlockGate, skipReservedUnlock } from '../services/homeWorldData';
+import { Animal, Room } from '../types/homeWorld';
+import { getNextUnlock, purchaseUnlock, reserveNextUnlock, skipUnlockGate, skipReservedUnlock } from '../services/homeWorldData';
 import { hapticError } from '../services/haptics';
 import { recoverPendingStorageTransaction, StorageRecoveryRequiredError } from '../services/persistenceStorage';
 import { saveWithPlayerRetry } from '../services/saveRetry';
@@ -50,16 +61,19 @@ const setShowIntroDialogue = jest.fn();
 const resetIntroOverrides = jest.fn();
 const setShowCelebration = jest.fn();
 const characterUnlock = { id: 'character_rabbit', type: 'character', targetId: 'rabbit', cost: 0 };
+const emptyDen = { id: 'cozy_den', isUnlocked: true } as Room;
+const waitingFox = { id: 'fox', type: 'fox', roomId: 'cozy_den', isUnlocked: false } as Animal;
+const foxInvite = { id: 'character_fox', type: 'character', targetId: 'fox', cost: 0 };
 
-function render(onAnimalIntroduction?: (animal: Animal) => Promise<void>) {
+function render(onAnimalIntroduction?: (animal: Animal) => Promise<void>, deferAutomaticInvite = false) {
   stateIndex = 0;
   refIndex = 0;
   const effectStart = effects.length;
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const hook = useUnlockFlow({
-    progress: null, animals: [], loadAllData, setShowCelebration,
+    progress: null, animals: [waitingFox], loadAllData, setShowCelebration,
     setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue, resetIntroOverrides,
-    onAnimalIntroduction,
+    onAnimalIntroduction, deferAutomaticInvite,
   });
   effects.slice(effectStart).forEach(effect => effect());
   return hook;
@@ -70,9 +84,43 @@ beforeEach(() => {
   refStore.clear();
   effects = [];
   jest.clearAllMocks();
+  (getNextUnlock as jest.Mock).mockResolvedValue(foxInvite);
   jest.useFakeTimers();
 });
 afterEach(() => { jest.useRealTimers(); });
+
+it('leaves the first invite to the home reveal, without closing an invite already opened there', async () => {
+  const hook = render(undefined, true);
+  await hook.refreshUnlockData([emptyDen], [waitingFox]);
+  expect(render(undefined, true).nextUnlock).toEqual(foxInvite);
+  expect(render(undefined, true).showInvitePrompt).toBe(false);
+  // HomeScreen's reveal timer owns this opening; a subsequent data refresh
+  // must not hide the modal or expose the underlying greeting again.
+  hook.setShowInvitePrompt(true);
+  await hook.refreshUnlockData([emptyDen], [waitingFox]);
+  expect(render(undefined, true).showInvitePrompt).toBe(true);
+});
+
+it('still opens a waiting free invite automatically outside the home reveal', async () => {
+  await render().refreshUnlockData([emptyDen], [waitingFox]);
+  expect(render().showInvitePrompt).toBe(true);
+});
+
+it('lets a deliberate den tap open the invite during the home reveal', async () => {
+  await render(undefined, true).refreshUnlockData([emptyDen], [waitingFox]);
+  render(undefined, true).handleRoomPress(emptyDen);
+  expect(render(undefined, true).showInvitePrompt).toBe(true);
+});
+
+it('uses the current reveal policy when an earlier unlock read finishes', async () => {
+  let finish!: (value: typeof foxInvite) => void;
+  (getNextUnlock as jest.Mock).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  const pending = render().refreshUnlockData([emptyDen], [waitingFox]);
+  render(undefined, true);
+  finish(foxInvite);
+  await pending;
+  expect(render(undefined, true).showInvitePrompt).toBe(false);
+});
 
 it('uses the latest intro callback after the purchase refresh, without opening the generic intro', async () => {
   const stale = jest.fn(async () => {});

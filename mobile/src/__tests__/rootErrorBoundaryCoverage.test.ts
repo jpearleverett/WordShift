@@ -49,9 +49,9 @@ describe('root ErrorBoundary coverage', () => {
     expect(rootAppStart).toBeGreaterThan(bootHoldStart);
   });
 
-  test('App() mounts MainApp inside a root ErrorBoundary (Sentry.wrap is not one)', () => {
+  test('App() mounts the drag host and MainApp inside a root ErrorBoundary (Sentry.wrap is not one)', () => {
     expect(ROOT_APP_BODY).toMatch(
-      /<ErrorBoundary\s+fallbackMessage="[^"]+"\s+onReset=\{resetAfterRootRenderError\}\s*>\s*<MainApp \/>\s*<\/ErrorBoundary>/
+      /<ErrorBoundary\s+fallbackMessage="[^"]+"\s+onReset=\{resetAfterRootRenderError\}\s*>\s*<DragOverlayProvider>\s*<MainApp \/>\s*<\/DragOverlayProvider>\s*<\/ErrorBoundary>/
     );
     expect(APP_TSX).toMatch(/export default Sentry\.wrap\(App\);/);
   });

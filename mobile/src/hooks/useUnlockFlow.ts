@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { Animal, Room, Unlockable, HomeWorldProgress } from '../types/homeWorld';
 import {
   ANIMALS,
@@ -48,6 +48,8 @@ interface UseUnlockFlowParams {
   animals: Animal[];
   onAmberChange?: (newBalance: number) => void;
   loadAllData: () => Promise<void>;
+  /** HomeScreen owns the readable greeting and invite timing during home_empty. */
+  deferAutomaticInvite?: boolean;
   setShowCelebration: (show: boolean) => void;
   setIntroAnimal: (animal: Animal | null) => void;
   setIntroDialogueIndex: (index: number) => void;
@@ -132,6 +134,7 @@ export function useUnlockFlow({
   animals,
   onAmberChange,
   loadAllData,
+  deferAutomaticInvite = false,
   setShowCelebration,
   setIntroAnimal,
   setIntroDialogueIndex,
@@ -158,6 +161,12 @@ export function useUnlockFlow({
   } | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const introTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Read the current policy after asynchronous storage reads without changing
+  // refreshUnlockData's identity (and restarting the host's loading effects).
+  const deferAutomaticInviteRef = useRef(deferAutomaticInvite);
+  useLayoutEffect(() => {
+    deferAutomaticInviteRef.current = deferAutomaticInvite;
+  }, [deferAutomaticInvite]);
   // loadAllData updates phase/intro state before the delay fires. Always call
   // the latest host callback so a just-unlocked animal gets the current visit.
   const introCallbacksRef = useRef({ onAnimalIntroduction, resetIntroOverrides,
@@ -244,7 +253,10 @@ export function useUnlockFlow({
     });
 
     if (hasEmptyRoom && unlock && unlock.type === 'character' && unlock.cost === 0) {
-      setShowInvitePrompt(true);
+      // The first home visit must let Ember's greeting appear before the
+      // visitor takes over. Preserve an invite already opened by the host's
+      // reveal timer or a deliberate room tap while this refresh was pending.
+      if (!deferAutomaticInviteRef.current) setShowInvitePrompt(true);
     } else {
       setShowInvitePrompt(false);
     }
