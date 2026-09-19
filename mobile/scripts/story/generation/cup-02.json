@@ -1,0 +1,9 @@
+{
+  "id": "cup-02",
+  "tool": "built-in image_gen",
+  "sourceImage": "exec-867885ac-6f2d-41a1-82ba-fd1944d70e78.png",
+  "width": 960,
+  "height": 540,
+  "bytes": 104840,
+  "sha256": "f456cbcf33ae7667f5570c20156e5745f058ee92057723f10155e14895752385"
+}

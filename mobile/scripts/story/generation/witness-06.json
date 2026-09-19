@@ -1,0 +1,9 @@
+{
+  "id": "witness-06",
+  "tool": "built-in image_gen",
+  "sourceImage": "exec-1c402475-6950-427f-8404-1ee126878252.png",
+  "width": 960,
+  "height": 540,
+  "bytes": 85848,
+  "sha256": "a0d3bb252f96fd7eab8439ebdfba7451a2a9bb06139f32e619e851579780457d"
+}
