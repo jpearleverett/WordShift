@@ -1,0 +1,9 @@
+{
+  "id": "echo-03",
+  "tool": "built-in image_gen",
+  "sourceImage": "exec-7cd545a2-bbfa-4514-ba64-1379214f82c2.png",
+  "width": 960,
+  "height": 540,
+  "bytes": 111580,
+  "sha256": "5b65f94026ec144418f5014ad5704fce71316f577109669e5d850fa9d9e76827"
+}

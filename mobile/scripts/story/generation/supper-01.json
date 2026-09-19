@@ -1,0 +1,9 @@
+{
+  "id": "supper-01",
+  "tool": "built-in image_gen",
+  "sourceImage": "exec-fc2e0cd0-2b96-4935-963b-503cf1b2633c.png",
+  "width": 960,
+  "height": 540,
+  "bytes": 122602,
+  "sha256": "aa2e1ef3323e908e9ac1bad0d9e96f5f8764b382c6eda522977eb247e4a7478e"
+}
