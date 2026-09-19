@@ -966,6 +966,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     animals,
     onAmberChange,
     loadAllData: () => loadAllDataRef.current(),
+    deferAutomaticInvite: onboardingStep === 'home_empty',
     setShowCelebration,
     setIntroAnimal,
     setIntroDialogueIndex,
@@ -2255,7 +2256,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => clearTimeout(timer);
   }, [pendingHouseCompletion, localOverlayActive, storyOverlayActive, quietLanding, onHouseCompleted]);
 
-  useEffect(() => {
+  // Publish before paint so App can hide its underlying onboarding guide
+  // in the same frame that a native home modal (e.g. the visitor) opens.
+  useLayoutEffect(() => {
     onOverlayActivityChange?.(localOverlayActive);
     return () => onOverlayActivityChange?.(false);
   }, [localOverlayActive, onOverlayActivityChange]);

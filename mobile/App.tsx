@@ -2,7 +2,7 @@ import { DAILY_BOARD_VERSION } from './src/services/dailyBoardVersion';
 import { PracticeModal } from './src/components/puzzle/PracticeModal';
 import type { PracticeLessonId } from './src/services/practiceLessons';
 import { saveWithPlayerRetry } from './src/services/saveRetry';
-import { createCeremonyPlayback, consumePreviewGraduationDeferral } from './src/services/ceremonyPlayback';
+import { createCeremonyPlayback } from './src/services/ceremonyPlayback';
 import { subscribeBillingChanges } from './src/services/iap';
 import { useLaunchIntents } from './src/hooks/useLaunchIntents';
 import { useInitialGameRoute } from './src/hooks/useInitialGameRoute';
@@ -32,6 +32,7 @@ import {
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
+import { DragOverlayProvider } from './src/components/DragOverlay';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
 import { BlindJudgmentOverlay, type BlindJudgmentSignal } from './src/components/BlindJudgmentOverlay';
@@ -655,6 +656,9 @@ function MainApp() {
   // screen consumes (pans to the room, pulses it) and then clears.
   const [homeFocusRoomId, setHomeFocusRoomId] = useState<string | null>(null);
   const [homeOverlayActive, setHomeOverlayActive] = useState(false);
+  const [graduationAcknowledged, setGraduationAcknowledged] = useState(false);
+  const graduationCheckedRef = useRef(false);
+  const graduationGenerationRef = useRef(0);
   const [homeQuietReady, setHomeQuietReady] = useState(false);
   useEffect(() => {
     setHomeQuietReady(false);
@@ -2170,6 +2174,9 @@ function MainApp() {
     setShowPatronModal(false);
     setPracticeLesson(null);
     setHomeOverlayActive(false);
+    graduationGenerationRef.current += 1;
+    graduationCheckedRef.current = false;
+    setGraduationAcknowledged(false);
     setHomeQuietReady(false);
     pendingEndgameEventRef.current = false;
     ceremonyPlayback.reset();
@@ -3710,9 +3717,14 @@ function MainApp() {
   // (not previewValidityVisible or the raw solve count) so a hidden-preview
   // rescue board can't consume it early. Blind Offering and onboarding excluded.
   // One time EVER via the device flag; the session ref keeps one storage read.
-  const graduationCheckedRef = useRef(false);
+  // The first ungraded board is inert even while the persisted flag is being
+  // read, so a fast tap cannot beat the explanation onto that board.
+  const previewGraduationBlocked = currentScreen === 'puzzle' &&
+    boardIdentity !== null && puzzle.gameState === GameState.PLAYING &&
+    puzzle.previewGradingMode === 'neutral' && !puzzle.blindMode &&
+    !puzzle.isFinalBoard && !onboardingFlow.isOnboarding && !graduationAcknowledged;
   useEffect(() => {
-    if (boardIdentity === null) return;
+    if (currentScreen !== 'puzzle' || boardIdentity === null) return;
     if (puzzle.gameState !== GameState.PLAYING) return;
     if (puzzle.previewGradingMode !== 'neutral' || puzzle.blindMode) return;
     if (onboardingFlow.isOnboarding) return;
@@ -3722,14 +3734,19 @@ function MainApp() {
     // teaching beat may touch. Returning BEFORE the session latch keeps the
     // beat alive for the next ordinary neutral board.
     if (puzzle.isFinalBoard) return;
-    // One board of quiet after an acknowledged phase ceremony (ftue-2): the
-    // card opens on the next neutral board instead. Before the latch, so the
-    // beat is not spent.
-    if (consumePreviewGraduationDeferral()) return;
+    // Ceremony playback may precede this card, but must never postpone the
+    // explanation to a SECOND board after the actual grading rule changed.
     if (graduationCheckedRef.current) return;
     graduationCheckedRef.current = true;
+    const generation = graduationGenerationRef.current;
     (async () => {
-      if (await hasSeenOneTimeFlag(PREVIEW_GRADUATION_SEEN_KEY)) return;
+      const seen = await hasSeenOneTimeFlag(PREVIEW_GRADUATION_SEEN_KEY);
+      if (generation !== graduationGenerationRef.current) return;
+      if (seen) { setGraduationAcknowledged(true); return; }
+      if (currentScreenRef.current !== 'puzzle') {
+        graduationCheckedRef.current = false;
+        return;
+      }
       const phase = persistence.currentPhase;
       // Seen = ACKNOWLEDGED (the mandatory-harvest contract): the flag commits
       // when the player dismisses the card, not when we decide to show it — a
@@ -3740,7 +3757,11 @@ function MainApp() {
         getPreviewGraduationMessage(phase),
         [{
           text: getPreviewGraduationConfirm(phase),
-          onPress: () => { markOneTimeFlagSeen(PREVIEW_GRADUATION_SEEN_KEY).catch(() => {}); },
+          onPress: () => {
+            if (generation !== graduationGenerationRef.current) return;
+            setGraduationAcknowledged(true);
+            markOneTimeFlagSeen(PREVIEW_GRADUATION_SEEN_KEY).catch(() => {});
+          },
         }],
         // "The rules just changed" — an authored narrative beat, not a mundane
         // utility confirm. The 'beat' tone deepens the scrim, pops from further
@@ -3749,7 +3770,7 @@ function MainApp() {
       );
     })().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per fresh board; actions/phase read at fire time
-  }, [boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, puzzle.isFinalBoard, onboardingFlow.isOnboarding]);
+  }, [currentScreen, boardIdentity, puzzle.gameState, puzzle.previewGradingMode, puzzle.blindMode, puzzle.isFinalBoard, onboardingFlow.isOnboarding]);
 
   // First-stuck mercy — the ONLY consumer of puzzle.isStuck. Stuck detection
   // stays silent by product decision (discovering a dead end and choosing
@@ -4881,8 +4902,8 @@ function MainApp() {
     timeUp: currentScreen === 'puzzle' && puzzle.gameState === GameState.GAME_OVER,
   }, { dailyLogin: dailyLoginGrantVisible, ceremony: phaseTransitionEvent !== null && !ceremonyWaiting && !(currentScreen === 'home' && homeOverlayActive) });
   useLayoutEffect(() => {
-    setSpeedTimerOverlayPaused(overlayOwner !== null || currentScreen !== 'puzzle');
-  }, [overlayOwner, currentScreen, setSpeedTimerOverlayPaused]);
+    setSpeedTimerOverlayPaused(overlayOwner !== null || previewGraduationBlocked || currentScreen !== 'puzzle');
+  }, [overlayOwner, previewGraduationBlocked, currentScreen, setSpeedTimerOverlayPaused]);
   useEffect(() => {
     if (overlayOwner !== 'victory' || !victoryReceipt) return;
     const acknowledge = victoryReceiptAcknowledgmentRef.current;
@@ -5135,12 +5156,12 @@ function MainApp() {
             />
             {/* Achievement toast overlay */}
             <AchievementToast
-              achievement={achievementState.currentAchievement}
+              achievement={homeOverlayActive ? null : achievementState.currentAchievement}
               onDismiss={achievementActions.dismissAchievement}
               phase={persistence.currentPhase}
             />
             {/* Fox Guide overlay — shown during onboarding on home screen */}
-            {onboardingFlow.isOnboarding && currentScreen === 'home' && (
+            {onboardingFlow.isOnboarding && currentScreen === 'home' && !homeOverlayActive && (
               (onboardingFlow.onboardingStep === 'home_empty' ||
                onboardingFlow.onboardingStep === 'fox_invited' ||
                onboardingFlow.onboardingStep === 'unlock_explained') && (
@@ -6075,7 +6096,7 @@ function MainApp() {
   // overlay, or a phase-transition cinematic) is up: the screen underneath is
   // visually occluded, so it must be hidden from the screen reader too, or
   // VoiceOver/TalkBack focus leaks into the board/home behind the overlay.
-  const blockingOverlayActive = sessionTransition !== null || overlayOwner !== null;
+  const blockingOverlayActive = sessionTransition !== null || overlayOwner !== null || previewGraduationBlocked;
 
   // Render screen with global overlays on top
   return (
@@ -6086,7 +6107,7 @@ function MainApp() {
           the player home instead of crashing the entire app. */}
       <Animated.View
         style={screenRevealStyle}
-        pointerEvents={storageBusy || sessionTransition !== null || navigationBusy || postVictoryIntro !== null ? 'none' : 'auto'}
+        pointerEvents={storageBusy || sessionTransition !== null || navigationBusy || postVictoryIntro !== null || previewGraduationBlocked ? 'none' : 'auto'}
         accessibilityElementsHidden={blockingOverlayActive}
         importantForAccessibility={blockingOverlayActive ? 'no-hide-descendants' : 'auto'}
       >
@@ -6510,7 +6531,7 @@ function App() {
           fallbackMessage="Something went wrong. Tap to return home."
           onReset={resetAfterRootRenderError}
         >
-          <MainApp />
+          <DragOverlayProvider><MainApp /></DragOverlayProvider>
         </ErrorBoundary>
       ) : (
         <BootHold

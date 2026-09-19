@@ -117,6 +117,14 @@ const WALK_MATCH_SCALE = 1.1;
 const WALK_FEET_FROM_CENTER = WALK_SPRITE_BOX * (0.81 - 0.5); // ~28px
 const WALK_FEET_CORRECTION = -WALK_FEET_FROM_CENTER * (WALK_MATCH_SCALE - 1);
 
+// Axel's broad gills and tail fill much more of his source frame than the
+// other residents. Shrink the whole art stack by 12%, preserving the measured
+// foot baseline (407 / 500 of the 90dp box). The enclosing hit area, movement
+// coordinates and atlas viewport stay intact, so outfits/poses cannot jump.
+export const HOUSE_SPRITE_SCALE: Partial<Record<AnimalType, number>> = { axolotl: 0.88 };
+const AXOLOTL_FEET_FROM_CENTER = WALK_SPRITE_BOX * (407 / 500 - 0.5);
+const AXOLOTL_SCALE_CORRECTION = AXOLOTL_FEET_FROM_CENTER * (1 - HOUSE_SPRITE_SCALE.axolotl!);
+
 export type SpritePose = 'idle' | 'talk' | 'robed' | 'robedTalk' | 'walk' | 'robedWalk';
 export type SpriteFacing = 'left' | 'right';
 
@@ -663,7 +671,7 @@ const FLOOR_OFFSET: Record<AnimalType, number> = {
 // right = 80 - centreX and top = centreY - 10. Values are the idle/robed
 // average, rounded to whole dp.
 const BADGE_ANCHOR: Record<AnimalType, { top: number; right: number }> = {
-  axolotl: { top: 0, right: -1 },
+  axolotl: { top: 8, right: 3 },
   aye_aye: { top: -4, right: 6 },
   capybara: { top: 6, right: 17 },
   fennec_fox: { top: 3, right: 6 },
@@ -1592,7 +1600,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                     />
                   ) : null;
                 return (
-                  <View style={styles.spriteImage}>
+                  <View
+                    testID="animal-sprite-art"
+                    style={[styles.spriteImage, animal.type === 'axolotl' && styles.axolotlArt]}
+                  >
                     {/* Idle/robed base — hidden (not unmounted) while walking */}
                     <View
                       key={`static-${animal.type}-${staticPose}`}
@@ -1850,6 +1861,12 @@ const styles = StyleSheet.create({
   spriteImage: {
     width: 90,
     height: 90,
+  },
+  axolotlArt: {
+    transform: [
+      { translateY: AXOLOTL_SCALE_CORRECTION },
+      { scale: HOUSE_SPRITE_SCALE.axolotl! },
+    ],
   },
   // Stacked sprite layers: absolute + EXPLICIT '100%' size (never inset-only —
   // on Fabric an Image sized only by insets collapses to its intrinsic size).

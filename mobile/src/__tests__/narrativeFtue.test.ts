@@ -1,9 +1,6 @@
 /**
  * Launch-readiness narrative/FTUE package regressions:
- *  - ftue-2: the preview-graduation card waits one board after a phase
- *    ceremony is acknowledged (ceremonyPlayback deferral) and the first
- *    exit nudge cannot land on the graduation board (EXIT_NUDGE 14, pinned
- *    in monetizationPrompts.test.ts).
+ *  - The first exit nudge cannot land on the preview-graduation board.
  *  - ftue-5: the post-victory home nudge speaks at most once per app session
  *    and draws from a five-line phase-aware pool.
  *  - ftue-6: the dialogue typewriter is quick through Phase 1 and slow from
@@ -18,13 +15,6 @@ import fs from 'fs';
 import path from 'path';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EXIT_NUDGE_MIN_PUZZLES, PREVIEW_GRADING_FULL_LIMIT } from '../constants/gameBalance';
-import {
-  consumePreviewGraduationDeferral,
-  createCeremonyPlayback,
-  notePhaseCeremonyAcknowledged,
-  resetPreviewGraduationDeferral,
-  shouldDeferPreviewGraduation,
-} from '../services/ceremonyPlayback';
 import {
   HOME_NUDGE_MIN_PUZZLES_AWAY,
   resetHomeNudgeSession,
@@ -50,8 +40,6 @@ import {
   resolveImperfectStarCause,
 } from '../services/phaseNarrative';
 import { DialoguePhase } from '../types/homeWorld';
-import type { PendingCeremony } from '../types/homeWorld';
-import type { PhaseTransitionEvent } from '../services/phaseEvents';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
@@ -82,54 +70,11 @@ const NO_DASHES = /[–—]/;
 const NO_CURLY = /[‘’“”]/;
 const src = (rel: string) => fs.readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
 
-describe('ftue-2: graduation card spacing after a phase ceremony', () => {
-  beforeEach(() => resetPreviewGraduationDeferral());
-
-  test('the first exit nudge cannot land on the graduation board exit', () => {
-    // Graduation opens on board FULL_LIMIT + 1; the nudge gate must sit past
-    // that board's own exit (win FULL_LIMIT + 1).
-    // The graduation card can defer to board 14 and the challenge intro lands
-    // at 15, so the first exit nudge must clear both.
+describe('graduation card pacing', () => {
+  test('the first exit nudge cannot land on the first neutral board exit', () => {
+    // The first neutral board is FULL_LIMIT + 1. Challenge intro is at 15;
+    // the nudge still waits beyond both, without deferring the rules notice.
     expect(EXIT_NUDGE_MIN_PUZZLES).toBeGreaterThan(PREVIEW_GRADING_FULL_LIMIT + 3);
-  });
-
-  test('nothing is deferred until a phase ceremony is acknowledged', () => {
-    expect(shouldDeferPreviewGraduation()).toBe(false);
-    expect(consumePreviewGraduationDeferral()).toBe(false);
-  });
-
-  test('an acknowledged phase ceremony defers the card for exactly one board', () => {
-    notePhaseCeremonyAcknowledged();
-    expect(shouldDeferPreviewGraduation()).toBe(true);
-    expect(consumePreviewGraduationDeferral()).toBe(true); // board 13: skipped, beat kept
-    expect(consumePreviewGraduationDeferral()).toBe(false); // board 14: the card shows
-    expect(shouldDeferPreviewGraduation(true)).toBe(true);
-    expect(shouldDeferPreviewGraduation(false)).toBe(false);
-  });
-
-  test('completing a PHASE ceremony through the playback arms it; a house ceremony does not', async () => {
-    const authored: PhaseTransitionEvent = {
-      title: 'A scene', phase: 1, bgColor: '#000', textColor: '#fff', accentColor: '#f00',
-      scenes: [{ text: 'A passage.', delay: 0, duration: 100 }],
-    };
-    const run = async (record: PendingCeremony) => {
-      let durable: PendingCeremony[] = [record];
-      let current: PhaseTransitionEvent | null = null;
-      const playback = createCeremonyPlayback({
-        read: async () => durable.map(entry => ({ ...entry })),
-        acknowledge: async id => { durable = durable.filter(entry => entry.id !== id); },
-        build: async () => authored,
-        onEvent: event => { current = event; },
-        onWaiting: () => {},
-      });
-      await playback.refresh();
-      await playback.complete(current);
-      playback.reset();
-    };
-    await run({ id: '0:house:4', kind: 'house', phase: 4, cycle: 0 });
-    expect(shouldDeferPreviewGraduation()).toBe(false);
-    await run({ id: '0:phase:1', kind: 'phase', phase: 1, cycle: 0, previousPhase: 0 });
-    expect(shouldDeferPreviewGraduation()).toBe(true);
   });
 });
 

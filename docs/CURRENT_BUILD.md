@@ -1,5 +1,13 @@
 # Current build and documentation
 
+## September 19 screenshot and store follow-up
+
+Draft [PR #450](https://github.com/jpearleverett/WordShift/pull/450), on `feature/play-store-refresh`, fixes the reported recovery/reset behavior, clipboard access, tutorial timing and modal overlap, drag clipping, axolotl scale, duplicate streak badge and victory layouts. It also adds 185 individually reviewed page illustrations with continuous resident portraits. See the [change and validation report](SCREENSHOT_FIXES_2026-09-19.md) and [art coverage review](ART_COVERAGE_REVIEW_2026-09-19.md).
+
+All 222 collected Jest suites have passing results across the integrated and focused runs; typecheck and zero-warning lint passed. The production Android Hermes JavaScript/assets export passed, including all 185 final story images, and the strict image validator found no missing or invalid assets. `expo-clipboard` is a new native dependency. This work is not a signed Android build or a Play upload, and the next internal-testing build still needs device verification.
+
+The [complete store campaign](../mobile/assets/Play_store/assembled-listing-2026-09/README.md) contains eight 1080 × 1920 portrait images, the feature graphic, icon alternatives, listing copy and a self-contained review. It uses source-asset assembly, including the complete pit path and updated choice art; the separate real-capture workflow remains available. Editing these files does not update the live Play listing.
+
 ## September 17 walking follow-up
 
 [PR #449](https://github.com/jpearleverett/WordShift/pull/449), on `feature/alternating-animal-walks` based on main `3b7ec4e`, supplies 12 refreshed normal cycles and 13 robed cycles; the original ten-frame normal fox walk remains. Outfit selection, loading fallbacks, facing and interrupted travel are covered, with reduced-motion and device-tier limits retained. [The walking review](ANIMAL_WALK_REVIEW_2026-09-17.md) records all 25 atlas checks, 5,161 unit tests and 43 browser journeys passing. This follow-up awaits owner merge and does not represent a new signed Android build or Play upload.

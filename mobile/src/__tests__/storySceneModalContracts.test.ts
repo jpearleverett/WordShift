@@ -77,23 +77,19 @@ describe('StorySceneModal saving affordance is delayed, never per-page', () => {
     expect(flat).not.toMatch(/statusRow: \{[^}]*flexWrap/);
   });
 
-  it('keeps the card frame stable from page to page', () => {
-    // The card is content-sized and centred, so a mount or unmount between
-    // pages moves both of its edges. Header art stays for the whole scene, the
-    // portrait slot is reserved on narrator / player pages of a scene where an
-    // animal speaks, and the previous-page bevel holds its slot from page one.
-    expect(flat).not.toMatch(/visiblePage === 0 && presentationPhase < 3/);
-    expect(flat).toContain('{showHeaderArt && <Image source={STORY_ART.tableHeader}');
-    expect(flat).toContain('{reservePortrait && <View style={styles.portraitSlot}');
-    expect(flat).toMatch(/const reservePortrait = !portraitSpeaker && pages\.some\(/);
+  it('keeps artwork and the resident on every page, including compact screens', () => {
+    expect(flat).toContain('const illustration = memory && line ? getStoryPageArt(memory, visiblePage) : null;');
+    expect(flat).toContain('const portraitSpeaker = memory ? getStoryPortraitSpeaker(memory, visiblePage) : null;');
+    expect(flat).toContain('{illustration && <Image source={illustration.source}');
+    expect(flat).toContain('speaking={line?.speaker === portraitSpeaker}');
+    expect(flat).not.toContain('HEADER_ART_MIN_CARD_DP');
+    expect(flat).not.toContain('SCENES_WITH_HEADER_ART');
+    expect(flat).not.toContain('reservePortrait');
+    expect(flat).not.toContain('STORY_ART.tableHeader');
+    expect(flat).toContain("aspectRatio: 16 / 9");
     expect(flat).toMatch(/style=\{visiblePage === 0 \? styles\.hiddenAction : undefined\}/);
     expect(flat).toMatch(/importantForAccessibility=\{visiblePage === 0 \? 'no-hide-descendants' : 'auto'\}/);
     expect(flat).toMatch(/hiddenAction: \{ opacity: 0 \}/);
-    // The slot is the portrait's own footprint, by construction not by copy.
-    expect(flat).toContain('const PORTRAIT_SLOT_DP = STORY_PORTRAIT_SIZE + STORY_PORTRAIT_MARGIN_BOTTOM;');
-    // Art is decided per scene from the card's available height, never per page.
-    expect(flat).toMatch(/const showHeaderArt = [^;]*availableHeight >= HEADER_ART_MIN_CARD_DP;/);
-    expect(flat).not.toMatch(/showHeaderArt = [^;]*visiblePage/);
   });
 
   it('keeps the error, retry and accessibility paths intact', () => {

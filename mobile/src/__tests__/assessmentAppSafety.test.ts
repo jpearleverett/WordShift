@@ -12,12 +12,12 @@ test('boot retries retain the alert host while hydration is held', () => {
   expect(app.match(/<GameAlertModal key="game-alert-host"/g)).toHaveLength(2);
 });
 
-test('the overlay scheduler holds the speed clock across practice, alerts and the store', () => {
+test('the overlay scheduler holds the speed clock across practice, alerts, rule teaching and the store', () => {
   const overlays = between('const overlayOwner = useGlobalOverlays', 'const [presentedPhaseEvent');
   for (const request of ['practice: practiceLesson !== null', 'alert: alertPending', 'store: showStoreModal']) {
     expect(overlays).toContain(request);
   }
-  expect(overlays).toContain("setSpeedTimerOverlayPaused(overlayOwner !== null || currentScreen !== 'puzzle')");
+  expect(overlays).toContain("setSpeedTimerOverlayPaused(overlayOwner !== null || previewGraduationBlocked || currentScreen !== 'puzzle')");
 });
 
 test('leaving a live board resets the speed ladder and daily identity only at the screen swap', () => {

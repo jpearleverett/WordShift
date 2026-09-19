@@ -549,3 +549,31 @@ describe('packed animal walk cycles', () => {
     } finally { harness.dispose(); }
   });
 });
+
+
+describe('house character sizing', () => {
+  test('Axel keeps one grounded size across static, talking, walking and robed layers', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.9);
+    const harness = createHarness('axolotl');
+    try {
+      const idle = harness.render(0);
+      const art = find(idle, 'animal-sprite-art')!;
+      const sizing = flattenStyle(art.props.style);
+      const scale = sizing.transform.find((item: { scale?: number }) => item.scale != null).scale;
+      const offset = sizing.transform.find((item: { translateY?: number }) => item.translateY != null).translateY;
+      expect(scale).toBeGreaterThanOrEqual(0.85);
+      expect(scale).toBeLessThanOrEqual(0.9);
+      const originalFootY = 90 * 407 / 500;
+      expect(45 + (originalFootY - 45) * scale + offset).toBeCloseTo(originalFootY);
+      expect(find(art, 'animal-sprite-static')).toBeDefined();
+      expect(find(art, 'animal-sprite-talk')).toBeDefined();
+      jest.advanceTimersByTime(5000);
+      const moving = harness.render(0);
+      expect(find(find(moving, 'animal-sprite-art'), 'animal-sprite-walk-atlas')).toBeDefined();
+      expect(flattenStyle(find(moving, 'animal-sprite-art')!.props.style)).toEqual(sizing);
+      const robed = harness.render(4);
+      expect(flattenStyle(find(robed, 'animal-sprite-art')!.props.style)).toEqual(sizing);
+      expect(find(find(robed, 'animal-sprite-art'), 'animal-sprite-walk-atlas')).toBeDefined();
+    } finally { harness.dispose(); }
+  });
+});

@@ -204,6 +204,12 @@ describe('onboarding skip clean exit', () => {
     expect(APP_TSX).toMatch(/clearBoard: puzzleActions\.clearBoard/);
   });
 
+  test('visitor invitation suspends the onboarding guide without advancing its page', () => {
+    expect(APP_TSX).toMatch(/onboardingFlow\.isOnboarding && currentScreen === 'home' && !homeOverlayActive/);
+    expect(APP_TSX).toContain('onOverlayActivityChange={setHomeOverlayActive}');
+    expect(APP_TSX).toContain('achievement={homeOverlayActive ? null : achievementState.currentAchievement}');
+  });
+
   test('tutorial FoxGuides stay wired to the skip handler', () => {
     expect(APP_TSX).toMatch(/onSkip=\{onboardingActions\.handleSkipOnboarding\}/);
   });
@@ -259,7 +265,7 @@ describe('verb-depth preview gate threading', () => {
     expect(APP_TSX).toMatch(/showGameAlert\(\s*getPreviewGraduationTitle\(phase\),\s*getPreviewGraduationMessage\(phase\)/);
     // Seen = ACKNOWLEDGED: the flag commits in the card's button onPress, never
     // at decision time (the old toast burned the beat invisibly on real devices).
-    expect(APP_TSX).toMatch(/onPress: \(\) => \{ markOneTimeFlagSeen\(PREVIEW_GRADUATION_SEEN_KEY\)/);
+    expect(APP_TSX).toMatch(/onPress: \(\) => \{[\s\S]*?setGraduationAcknowledged\(true\);\s*markOneTimeFlagSeen\(PREVIEW_GRADUATION_SEEN_KEY\)/);
     // "The rules just changed" is an authored narrative beat, not a mundane
     // utility confirm: the card must request the 'beat' tone (deepened scrim,
     // further pop, accent glow) so it never reads as identical to a stock alert.
@@ -272,13 +278,14 @@ describe('verb-depth preview gate threading', () => {
     // the finale return must come BEFORE the session latch so the beat still
     // fires on the next ordinary neutral board.
     expect(APP_TSX).toMatch(/if \(puzzle\.isFinalBoard\) return;[\s\S]{0,400}graduationCheckedRef\.current = true;/);
-    // ftue-2: the board right after an acknowledged phase ceremony is a quiet
-    // one; the deferral is consumed BETWEEN the finale return and the session
-    // latch, so skipping that board never spends the beat.
-    expect(APP_TSX).toMatch(
-      /if \(puzzle\.isFinalBoard\) return;[\s\S]{0,300}if \(consumePreviewGraduationDeferral\(\)\) return;\s*\n\s*if \(graduationCheckedRef\.current\) return;\s*\n\s*graduationCheckedRef\.current = true;/
-    );
-    expect(APP_TSX).toMatch(/import \{ createCeremonyPlayback, consumePreviewGraduationDeferral \} from '\.\/src\/services\/ceremonyPlayback';/);
+    // The explanation belongs to the SAME board that loses the checks, even
+    // immediately after a phase ceremony. Input and accessibility are held
+    // while the flag is read, and until the player acknowledges the card.
+    expect(APP_TSX).not.toContain('consumePreviewGraduationDeferral');
+    expect(APP_TSX).toMatch(/const previewGraduationBlocked =[\s\S]*?puzzle\.previewGradingMode === 'neutral'[\s\S]*?!graduationAcknowledged/);
+    expect(APP_TSX).toMatch(/pointerEvents=\{[^}]*previewGraduationBlocked \? 'none' : 'auto'\}/);
+    expect(APP_TSX).toMatch(/const blockingOverlayActive =[^;]*previewGraduationBlocked/);
+    expect(APP_TSX).toMatch(/setSpeedTimerOverlayPaused\([^;]*previewGraduationBlocked/);
   });
 
   test('Reset All re-arms the graduation beat and both files agree on the key', () => {

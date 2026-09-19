@@ -6,10 +6,9 @@
  *   1. The clears ran under Promise.all — a single rejection abandoned the
  *      batch and skipped the restart flow. performFullReset now runs every
  *      clear independently (Promise.allSettled) and reports failures.
- *   2. With cloud save configured, the pre-reset save survived in the backend
- *      and the next launch's fresh-install auto-restore silently brought it
- *      back. performFullReset now overwrites the cloud row with the cleared
- *      state (a no-op under the NoOp provider used here).
+ *   2. A reset marker prevents automatic resurrection, and the fresh game now
+ *      gets a separate cloud identity. The old code must still recover the
+ *      completed pre-reset backup instead of an overwritten empty game.
  *
  * This test drives the REAL reset routine (exported from SettingsScreen) and
  * asserts key services report virgin state afterwards — from both their
@@ -55,6 +54,8 @@ jest.mock('react-native', () => ({
   },
   Easing: { inOut: jest.fn(() => jest.fn()), sin: jest.fn(), out: jest.fn(() => jest.fn()) },
 }));
+
+jest.mock('@react-native-async-storage/async-storage', () => require('./helpers/mockAsyncStorage').createMockAsyncStorage());
 
 jest.mock('react-native-gesture-handler', () => ({ TouchableOpacity: 'TouchableOpacity' }));
 
@@ -124,10 +125,36 @@ import {
   loadAnimalAcquaintanceState, openAnimalAcquaintance,
 } from '../services/animalAcquaintance';
 import { STARTING_FREE_HINTS } from '../constants/gameBalance';
+import {
+  CloudProvider, CloudSaveData, clearSyncStatus, getCloudOwnerId, getCloudProvider,
+  getOrCreateRecoveryCode, getSyncStatus, restoreFromRecoveryCode, setCloudProvider, uploadToCloud,
+} from '../services/cloudSave';
+import { parseSecureRecoveryCode } from '../services/secureIdentity';
+
+const unconfiguredProvider = getCloudProvider();
+function backupServer(rows: Map<string, CloudSaveData>): CloudProvider {
+  return {
+    getName: () => 'Test backup', isReady: async () => true,
+    upload: async () => false, hasNewerSave: async () => false,
+    download: async owner => rows.get(owner ?? await getCloudOwnerId()) ?? null,
+    uploadConditional: async (data, expected, force, owner) => {
+      const key = owner ?? await getCloudOwnerId();
+      const previous = rows.get(key);
+      if (previous && !force && expected !== previous.revision) {
+        return { status: 'conflict', revision: previous.revision };
+      }
+      const revision = (previous?.revision ?? 0) + 1;
+      rows.set(key, { ...data, data: { ...data.data }, revision });
+      return { status: 'saved', revision };
+    },
+  };
+}
 
 describe('performFullReset', () => {
   beforeEach(async () => {
     await (AsyncStorage.clear as jest.Mock)();
+    setCloudProvider(unconfiguredProvider);
+    await clearSyncStatus();
     // Reset the in-memory service caches too (shared module state across tests)
     await clearProgress();
     await clearStats();
@@ -185,13 +212,6 @@ describe('performFullReset', () => {
     expect((await loadAnimalAcquaintanceState()).animals).toEqual({});
   });
 
-  // The post-reset upload is the ONLY thing keeping the bootstrap's
-  // fresh-install auto-restore from pulling the pre-reset save straight back
-  // down after Updates.reloadAsync — and it is a single 8s RPC fired at the
-  // exact moment a player deliberately wipes their save, with no retry. Under
-  // the NoOp provider used here (and offline in the wild) it does not succeed,
-  // so the reset must leave a local stamp behind for cloudSave to refuse a
-  // cloud row older than the reset.
   test('New Cycle preserves the chosen boundary while resetting the live story', async () => {
     const progress = await getFullProgress();
     await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify({ ...progress,
@@ -211,7 +231,7 @@ describe('performFullReset', () => {
     expect((await loadAnimalAcquaintanceState()).animals).toEqual({});
   });
 
-  test('stamps a local reset marker when the post-reset upload does not land', async () => {
+  test('stamps a local reset marker without requiring an empty cloud overwrite', async () => {
     await awardBonusAmber(120, 'test_seed');
     const before = Date.now();
     await performFullReset();
@@ -252,4 +272,110 @@ describe('performFullReset', () => {
     expect(await getAmberBalance()).toBe(0);
     expect(await getOnboardingStep()).toBe('not_started');
   });
+
+  test('the stable original code restores the latest pre-reset game after the fresh game uploads', async () => {
+    const rows = new Map<string, CloudSaveData>();
+    setCloudProvider(backupServer(rows));
+    await awardBonusAmber(120, 'test_seed');
+    await setOnboardingStep('complete');
+    const originalCode = await getOrCreateRecoveryCode();
+    const originalOwner = parseSecureRecoveryCode(originalCode)!;
+    expect(await getOrCreateRecoveryCode()).toBe(originalCode);
+    // Changes made after the player wrote down their code must be included in
+    // the final backup, not merely the snapshot from code-reveal time.
+    await awardBonusAmber(37, 'test_later_progress');
+    await updateSetting('soundEnabled', false);
+    await performFullReset();
+    const freshOwner = await getCloudOwnerId();
+    expect(freshOwner).not.toBe(originalOwner);
+    expect(await getAmberBalance()).toBe(0);
+    expect(await AsyncStorage.getItem('wordshift_cloud_legacy_owner')).toBeNull();
+    await awardBonusAmber(5, 'test_new_game');
+    const freshCode = await getOrCreateRecoveryCode();
+    expect(freshCode).not.toBe(originalCode);
+    expect(JSON.parse(rows.get(originalOwner)!.data.wordshift_home_progress).amber).toBe(157);
+    expect(JSON.parse(rows.get(freshOwner)!.data.wordshift_home_progress).amber).toBe(5);
+    expect(await restoreFromRecoveryCode(originalCode)).toBe(true);
+    expect(await getAmberBalance()).toBe(157);
+    expect(await getOnboardingStep()).toBe('complete');
+    expect((await getSettings()).soundEnabled).toBe(false);
+    expect(await getCloudOwnerId()).toBe(originalOwner);
+    expect(await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY)).toBeNull();
+  });
+
+  test('an unavailable final backup leaves the existing game and its recovery code intact', async () => {
+    const rows = new Map<string, CloudSaveData>();
+    const provider = backupServer(rows);
+    setCloudProvider(provider);
+    await awardBonusAmber(120, 'test_seed');
+    const code = await getOrCreateRecoveryCode();
+    const owner = parseSecureRecoveryCode(code)!;
+    await awardBonusAmber(25, 'test_unsynced');
+    provider.uploadConditional = async () => ({ status: 'unavailable' });
+    await expect(performFullReset()).rejects.toMatchObject({ reason: 'unavailable' });
+    expect(await getAmberBalance()).toBe(145);
+    expect(await getCloudOwnerId()).toBe(owner);
+    expect(await AsyncStorage.getItem(LOCAL_RESET_MARKER_KEY)).toBeNull();
+    expect(JSON.parse(rows.get(owner)!.data.wordshift_home_progress).amber).toBe(120);
+  });
+
+  test('a cloud conflict blocks Reset without replacing the newer remote or current local game', async () => {
+    const rows = new Map<string, CloudSaveData>();
+    setCloudProvider(backupServer(rows));
+    await awardBonusAmber(120, 'test_seed');
+    const code = await getOrCreateRecoveryCode();
+    const owner = parseSecureRecoveryCode(code)!;
+    const remote = rows.get(owner)!;
+    rows.set(owner, { ...remote, revision: remote.revision! + 1,
+      data: { ...remote.data, wordshift_home_progress: JSON.stringify({ amber: 999 }) } });
+    await expect(performFullReset()).rejects.toMatchObject({ reason: 'conflict' });
+    expect(await getAmberBalance()).toBe(120);
+    expect(JSON.parse(rows.get(owner)!.data.wordshift_home_progress).amber).toBe(999);
+    expect(await getCloudOwnerId()).toBe(owner);
+    expect((await getSyncStatus()).conflictDetected).toBe(true);
+  });
+
+  test('a fresh game without a prior backup can still reset when the configured backend is offline', async () => {
+    setCloudProvider({ ...backupServer(new Map()), uploadConditional: async () => ({ status: 'unavailable' }) });
+    await awardBonusAmber(8, 'test_new_offline_game');
+    const owner = await getCloudOwnerId();
+    expect(await performFullReset()).toEqual([]);
+    expect(await getAmberBalance()).toBe(0);
+    expect(await getCloudOwnerId()).not.toBe(owner);
+  });
+
+  test('Reset waits for an in-flight upload and queued later autosaves cannot overwrite the old backup', async () => {
+    const rows = new Map<string, CloudSaveData>();
+    const provider = backupServer(rows);
+    setCloudProvider(provider);
+    await awardBonusAmber(120, 'test_seed');
+    const code = await getOrCreateRecoveryCode();
+    const owner = parseSecureRecoveryCode(code)!;
+    let release!: () => void;
+    let started!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const reached = new Promise<void>(resolve => { started = resolve; });
+    const upload = provider.uploadConditional!;
+    let delayed = true;
+    provider.uploadConditional = async (...args) => {
+      if (delayed) { delayed = false; started(); await pending; }
+      return upload(...args);
+    };
+    await awardBonusAmber(25, 'test_unsynced');
+    const earlierUpload = uploadToCloud();
+    await reached;
+    const reset = performFullReset();
+    const laterUpload = uploadToCloud();
+    // The original game is still present while its upload is outstanding.
+    expect(await getAmberBalance()).toBe(145);
+    release();
+    expect(await earlierUpload).toBe(true);
+    expect(await reset).toEqual([]);
+    expect(await laterUpload).toBe(true);
+    expect(await getCloudOwnerId()).not.toBe(owner);
+    expect(JSON.parse(rows.get(owner)!.data.wordshift_home_progress).amber).toBe(145);
+    expect(await restoreFromRecoveryCode(code)).toBe(true);
+    expect(await getAmberBalance()).toBe(145);
+  });
+
 });

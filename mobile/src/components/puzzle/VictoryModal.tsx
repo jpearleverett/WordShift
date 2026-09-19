@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
-import { getVictoryTitle, getVictoryFeedback, getPhaseChangeNarrative, getRitualEchoHeader, getRitualEchoFooter, getWordsOfferedText, getPitHarvestLabel, getPitMandatoryText, getPitMandatoryCTA, getAutoCollectCaption, getMandatoryHarvestText, getMandatoryHarvestCTA, getNextStreakMilestoneText, getFlawlessHonorific, getUnbrokenWeaveRankUpLine, getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel, getResonanceBonusLabel, isSilentVictoryBeat, getSwiftVictoriesToggleLabel, getSwiftVictoriesToggledMessage } from '../../services/phaseNarrative';
+import { getVictoryTitle, getVictoryFeedback, getPhaseChangeNarrative, getRitualEchoHeader, getRitualEchoFooter, getPitMandatoryText, getPitMandatoryCTA, getAutoCollectCaption, getMandatoryHarvestText, getMandatoryHarvestCTA, getNextStreakMilestoneText, getFlawlessHonorific, getUnbrokenWeaveRankUpLine, getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel, getResonanceBonusLabel, isSilentVictoryBeat, getSwiftVictoriesToggleLabel, getSwiftVictoriesToggledMessage } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
 import { AMBER_REWARDS, AUTO_COLLECT_PUZZLE_LIMIT } from '../../constants/gameBalance';
@@ -160,15 +160,12 @@ interface VictoryModalProps {
   gameMode?: string;
 }
 
-// Phase-aware 3D button colors — matches LetterTile's phase palette.
+// Phase-aware optional reward and streak colors.
 // Text/background pairs are WCAG AA-checked (>=4.5:1) against the phase's
 // modal background (see getPhaseTheme) — ratios noted inline where a color
-// was tuned for contrast. `secondary`/`share` are consumed ONLY by the compact
-// Swift-Victories strip (the full modal's buttons are cottage CandyButtons on
-// the pixel skin), and both are flat fills with no overlay, so the pair below
-// is the final rendered one. Exported so victoryModal.test.ts can re-measure
-// every phase instead of trusting these comments — the share pair shipped
-// carrying a hand-written ratio that was 0.5 off and under the bar.
+// was tuned for contrast. Both result presentations use cottage CandyButtons
+// for their actions; these tokens also retain the legacy button colors for
+// contrast checks and the phase-aware optional reward pills.
 export function getButtonTheme(phase: DialoguePhase) {
   if (phase >= 4) return {
     primary:   { bg: '#7C3AED', edge: '#5B21B6', shadow: '#5B21B6' },
@@ -510,11 +507,18 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         accessibilityViewIsModal
         accessibilityLabel="Results"
       >
-        <View style={styles.compactWrap}>
-          <View style={[styles.compactCard, {
-            backgroundColor: phaseTheme.modalBgColor,
-            borderColor: btn.modalBorder,
-          }]}>
+        <ScrollView
+          contentContainerStyle={styles.victoryScrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          <View style={styles.compactCard}>
+            <NineSliceFrame
+              skin={victorySkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={phaseTheme.modalBgColor}
+            />
             <View
               style={styles.compactStarsRow}
               accessible
@@ -643,89 +647,46 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity
+            <CandyButton
+              label="NEXT LEVEL"
               onPress={onNextLevel}
-              activeOpacity={0.85}
+              phase={phase}
+              hostDark={victoryHostDark}
+              variant="primary"
+              size="lg"
+              soundKind="none"
               accessibilityLabel="Next level"
-              accessibilityRole="button"
-              style={{ width: '100%' }}
-            >
-              <View style={[styles.btn3dWrapper, { width: '100%' }]}>
-                <View style={[styles.btn3dBody, {
-                  backgroundColor: btn.primary.bg,
-                  shadowColor: btn.primary.shadow,
-                  width: '100%',
-                }]}>
-                  <View style={styles.btn3dBevel} />
-                  <View style={styles.btn3dGlossy} />
-                  <Text style={styles.btn3dPrimaryText}>NEXT LEVEL</Text>
-                </View>
-                <View style={[styles.btn3dEdge, {
-                  backgroundColor: btn.primary.edge,
-                }]} />
-              </View>
-            </TouchableOpacity>
+              style={styles.victoryCtaButton}
+            />
 
             <View style={styles.victoryButtonRowSecondary}>
-              <TouchableOpacity
+              <CandyButton
+                label={shareBonusAvailable ? `Share +${DAILY_SHARE_BONUS_AMBER}` : 'Share'}
                 onPress={onShare}
-                activeOpacity={0.8}
-                hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
+                phase={phase}
+                hostDark={victoryHostDark}
+                variant="secondary"
+                icon={SHARE_ICON}
+                soundKind="none"
                 accessibilityLabel={shareBonusAvailable
                   ? `Share result, earns ${DAILY_SHARE_BONUS_AMBER} amber for the first share today`
                   : 'Share result'}
-                accessibilityRole="button"
-                style={{ flex: 1 }}
-              >
-                <View style={[styles.btnFlat, {
-                  backgroundColor: btn.share.bg,
-                  borderColor: btn.share.edge,
-                }]}>
-                  <View style={styles.shareBtnRow}>
-                    <Image
-                      source={SHARE_ICON}
-                      style={styles.shareBtnIcon}
-                      importantForAccessibility="no"
-                      accessibilityElementsHidden
-                    />
-                    <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
-                      Share
-                    </Text>
-                    {shareBonusAvailable && (
-                      <>
-                        <Image
-                          source={AMBER_ICON}
-                          style={styles.shareBonusIcon}
-                          importantForAccessibility="no"
-                          accessibilityElementsHidden
-                        />
-                        <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
-                          {`+${DAILY_SHARE_BONUS_AMBER}`}
-                        </Text>
-                      </>
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
+                style={styles.victorySecondaryButton}
+              />
+              <CandyButton
+                label="Home"
                 onPress={onReturnHome}
-                activeOpacity={0.8}
-                hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
+                phase={phase}
+                hostDark={victoryHostDark}
+                variant="secondary"
+                icon={HOME_ICON}
+                soundKind="none"
                 accessibilityLabel="Return home"
-                accessibilityRole="button"
-                style={{ flex: 1 }}
-              >
-                <View style={[styles.btnFlat, {
-                  backgroundColor: btn.secondary.bg,
-                  borderColor: btn.secondary.edge,
-                }]}>
-                  <Text style={[styles.btnFlatUniform, { color: btn.secondary.text }]}>{'\uD83C\uDFE0'} Home</Text>
-                </View>
-              </TouchableOpacity>
+                style={styles.victorySecondaryButton}
+              />
             </View>
           </View>
-        </View>
+        </ScrollView>
       </View>
     );
   }
@@ -892,25 +853,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 against an indefinite parent, and left the echo/incantation block
                 sitting on a narrower axis than the amber panel below it. */}
             <Animated.View style={{ opacity: contentOpacity1, width: '100%', alignItems: 'center', transform: [{ translateY: contentTranslateY1 }] }}>
-            {/* Harvested words (queued for the pit) */}
-            {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
-              <View
-                style={[styles.harvestWordContainer, {
-                  backgroundColor: btn.harvestPill.bg,
-                  borderColor: btn.harvestPill.border,
-                }]}
-                // The label speaks the count and verb once; the pit sprite is
-                // decorative and matches the harvest destination elsewhere.
-                accessible
-                accessibilityLabel={`${victoryData.harvestedWords.length} ${victoryData.harvestedWords.length === 1 ? 'word' : 'words'} ${getPitHarvestLabel(phase).toLowerCase()}`}
-              >
-                <Image source={PIT_ICON} style={styles.harvestWordIcon} resizeMode="contain" accessible={false} importantForAccessibility="no" accessibilityElementsHidden />
-                <Text style={[styles.harvestWordText, { color: btn.harvestPill.text }]}>
-                  {victoryData.harvestedWords.length} {victoryData.harvestedWords.length === 1 ? 'word' : 'words'} {getPitHarvestLabel(phase).toLowerCase()}
-                </Text>
-              </View>
-            )}
-
             {/* Streak display */}
             {victoryData && victoryData.currentStreak > 1 && (() => {
               const nextMilestoneText = getNextStreakMilestoneText(phase, victoryData.currentStreak);
@@ -1093,17 +1035,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   </Text>
                 )}
               </View>
-            )}
-
-            {/* Words Offered — ritual word count (all phases) */}
-            {victoryData && victoryData.totalWordsFormed != null && victoryData.totalWordsFormed > 0 && (
-              <Text style={[
-                styles.wordsOfferedText,
-                { color: phaseTheme.modalSecondaryTextColor },
-                phase >= 3 && styles.wordsOfferedTextDark,
-              ]}>
-                {getWordsOfferedText(victoryData.totalWordsFormed, phase)}
-              </Text>
             )}
 
             {/* Community line — a global daily stat, kept quiet and low in the
@@ -1575,26 +1506,15 @@ const styles = StyleSheet.create({
   },
 
   // === Compact result strip (Swift Victories, routine wins) ===
-  compactWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
+  // Same cottage panel clearance as the full ceremony, with smaller stars
+  // and fewer rows. The scroll host keeps every action reachable at large
+  // system font sizes and on short screens.
   compactCard: {
-    borderRadius: 24,
-    paddingTop: 18,
-    paddingHorizontal: 16,
-    paddingBottom: 18,
+    paddingVertical: SURFACE.panelPadY,
+    paddingHorizontal: SURFACE.panelPadX,
     alignItems: 'center',
     width: '100%',
     maxWidth: 360,
-    borderWidth: 1.5,
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 14,
     overflow: 'hidden',
   },
   compactStarsRow: {
@@ -2146,37 +2066,6 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
 
-  // === Harvest info pill ===
-  harvestWordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 6,
-  },
-  harvestWordIcon: {
-    width: 22,
-    height: 22,
-    marginRight: 8,
-  },
-  harvestWordText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.large,
-    fontWeight: '900',
-  },
-  harvestBonusHint: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.caption,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 8,
-    fontStyle: 'italic',
-  },
-
   // === Other info rows ===
   // Streak chip colors come from getButtonTheme().streakChip — the old fixed
   // orange-on-orange (orange.dark on orange.light) measured 1.6:1.
@@ -2462,23 +2351,11 @@ const styles = StyleSheet.create({
   ritualEchoFooterDark: {
     color: CandyColors.gray[400], // 5.6:1 on the Phase 3+ containers
   },
-  wordsOfferedText: {
-    fontFamily: PIXEL_FONT_BOLD,
-    fontSize: FONT_SIZE.caption,
-    fontWeight: '600',
-    marginBottom: 12,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
   ritualEchoArrowBright: {
     color: '#C21E63',
   },
   ritualEchoFooterBright: {
     color: CandyColors.pink.shadow,
   },
-  wordsOfferedTextDark: {
-    fontFamily: BODY_FONT_ITALIC,
-    color: '#C8809A', // 5.1:1 on the Phase 3 modal (old rgba value was 2.8:1)
-    fontStyle: 'italic',
-  },
+
 });

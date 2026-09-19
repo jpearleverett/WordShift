@@ -187,14 +187,11 @@ describe('SettingsScreen: the destructive control and the deliberate restores', 
     expect(handler).toContain('onCloudRestored?.();');
   });
 
-  test('the reset marker is stamped before the upload and cleared only when it lands', () => {
+  test('Reset preserves the original backup instead of force-uploading an empty game', () => {
     const reset = SETTINGS.slice(SETTINGS.indexOf('export async function performFullReset'), SETTINGS.indexOf('export async function performNewCycle'));
-    const stampAt = reset.indexOf('await commitFullLocalReset()');
-    const uploadAt = reset.indexOf('await uploadToCloud(true)');
-    expect(stampAt).toBeGreaterThan(-1);
-    expect(uploadAt).toBeGreaterThan(stampAt);
-    // Only the cloud owner can acknowledge the exact marker it uploaded.
-    // A second unconditional clear here could erase a newer reset.
+    expect(reset).toContain('resetWithPreservedCloudBackup');
+    expect(reset).toContain('await commitFullLocalReset()');
+    expect(reset).not.toContain('uploadToCloud(true)');
     expect(reset).not.toContain('removeItem(LOCAL_RESET_MARKER_KEY)');
   });
 });

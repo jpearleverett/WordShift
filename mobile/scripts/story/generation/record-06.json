@@ -1,0 +1,13 @@
+{
+  "id": "record-06",
+  "tool": "built-in image_gen",
+  "sourceImage": "exec-87cbc6f7-c3da-43f4-b9ba-2b705eab3a7d.png",
+  "width": 960,
+  "height": 540,
+  "bytes": 97768,
+  "sha256": "d48af50e86ae171775f1365e32fd074a9cc73ee46849f8ed9b77ead05a103582",
+  "prompt": "Edit this WordShift landscape storybook pixel-art illustration. Preserve the exact table, two handwritten-looking unlettered records, lamp, moonlit window, warm light, cool shadows, pixel-art style, and the partial animal paw at the lower left. Remove the fox face/head in the background chair entirely: replace that head with continuous dark moss-green chair upholstery and folded green blanket. Remove the small fox-shaped figurine on the windowsill: leave ordinary wood sill. There must be no animal heads, faces, bodies, humans, characters or figurines anywhere, only the partial animal paw at lower left. No added text, letters, captions or symbols. Everything else unchanged.",
+  "promptSha256": "223d3b1f3d9b80da151f0563f929dc49bae386aa6fdc0af6563e8d97fed7f49a",
+  "referenceImage": "exec-a6199606-041d-4810-8e8b-5c95d8fc665c.png",
+  "correctionReason": "Remove background character and figurine while preserving the ledger comparison and animal paw"
+}
