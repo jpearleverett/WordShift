@@ -115,6 +115,9 @@ test('a fresh install is walked from the cold-open board to a complete onboardin
   const denChip = page.getByRole('button', { name: 'Invite animal to Cozy Den for free', exact: true });
   const welcome = page.getByRole('button', { name: 'Welcome friend', exact: true });
   await expect(welcome).toBeVisible({ timeout: 10_000 });
+  // The greeting gets its own readable beat, then yields to the invitation.
+  // It must not remain mounted as a second card beneath the visitor modal.
+  await expect(page.getByText(/Hello up there/)).toHaveCount(0);
   await expect(denChip).toHaveCount(0);
   // The nameplate upper-cases its label.
   await expect(page.getByText('A VISITOR APPROACHES!', { exact: true })).toBeVisible();

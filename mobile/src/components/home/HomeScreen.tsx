@@ -966,6 +966,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     animals,
     onAmberChange,
     loadAllData: () => loadAllDataRef.current(),
+    deferAutomaticInvite: onboardingStep === 'home_empty',
     setShowCelebration,
     setIntroAnimal,
     setIntroDialogueIndex,

@@ -42,6 +42,12 @@ The production **Android Hermes JavaScript/assets export passed**. All 185 final
 
 `expo-clipboard` uses the SDK-matched version. Its native implementation requires a new signed Android build. Source tests and assembled previews do not establish native clipboard behavior, drag rendering, or Android lifecycle behavior. The device check should exercise the reported flows on the next Play internal-testing build.
 
+### CI follow-up: first-home greeting
+
+[CI run 528](https://github.com/jpearleverett/WordShift/actions/runs/35464067358), on `ac62738`, passed all 222 Jest suites / 5,217 tests and the other source gates, but failed one of 43 rendered journeys. The empty-home onboarding journey could not find Ember's “Hello up there” greeting. The unlock-data refresh opened the free visitor invite immediately, bypassing HomeScreen's 2.6-second reveal delay; the new modal-overlap protection then hid the greeting before it could be read.
+
+The correction defers automatic invite opening specifically during `home_empty`, so HomeScreen owns the existing reveal and recovery timers. Manual den taps and normal later auto-invites still work. A late refresh uses the current policy and does not close an invitation already opened by the timer or the player. Five focused suites / 176 tests passed, including four new behavioral regressions. The rendered journey retains its greeting assertion and additionally checks that the greeting is unmounted while the visitor modal is visible. The feature branch's GitHub checks remain the gate for the complete rendered journey.
+
 ## Listing assets
 
 The complete listing campaign is assembled from the game's source art and UI specifications in `mobile/assets/Play_store/assembled-listing-2026-09/`. All eight portrait exports use opaque RGB PNG at 1080 × 1920 (9:16). The house composition includes the entire foundation-to-pit path and 70 pixels of bottom breathing room. The package also includes a 1024 × 500 feature graphic, 512-pixel icon options, an alternate opener, listing copy, provenance, and a self-contained review.
