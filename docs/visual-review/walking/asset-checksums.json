@@ -290,7 +290,7 @@
     },
     {
       "path": "mobile/assets/characters/owl/walk.png",
-      "sha256": "45f83a9ba076dd4f9456ffb77176b5e1d0732991c2b551e13867ab37e5e1336b"
+      "sha256": "cef56f4505363e66287ea378e6801a580a85e8c24d9d5917b3631c0acf34dc15"
     },
     {
       "path": "mobile/assets/characters/owl/robed_walk.png",
@@ -314,7 +314,7 @@
     },
     {
       "path": "mobile/assets/characters/capybara/walk.png",
-      "sha256": "ddaa2c8ccb981ce685d18b3f72ebf7f8fb320de6cf64468cbf6bd8e74983eb7d"
+      "sha256": "e02a1e27c5a58d2f58767b1d1a1caa23bc66e1140e809bbef8a3bb20fec8fc82"
     },
     {
       "path": "mobile/assets/characters/capybara/robed_walk.png",
@@ -322,7 +322,7 @@
     },
     {
       "path": "mobile/assets/characters/fennec_fox/walk.png",
-      "sha256": "c5cea8ba353b132a83f3761dc015c62baafc68f71d868dd8d1acb50daca28d56"
+      "sha256": "ced4ca5975f3ac6b0d9860dd7b5c7db6f410a75b10c82ccad2d81f5ffeb2d866"
     },
     {
       "path": "mobile/assets/characters/fennec_fox/robed_walk.png",
@@ -330,27 +330,27 @@
     },
     {
       "path": "mobile/assets/characters/sloth/walk.png",
-      "sha256": "72fbb122627eb90ed679a8e1e6a83cfecca8c002165847a3d5b64c7ea0b4680e"
+      "sha256": "4a734bfdd0c5d0318f5609a71145d1ef3c6f31413dd18acb30e07993a221a9bc"
     },
     {
       "path": "mobile/assets/characters/sloth/robed_walk.png",
-      "sha256": "eb7154708fe509875fe79d0a8a754ffc0914edeef9e901d3c682d4dd3858914f"
+      "sha256": "853cbe52ca3a3a8f0a8c28b5ef9177e9545d474000a809b5d207c4e72794ef2a"
     },
     {
       "path": "mobile/assets/characters/wombat/walk.png",
-      "sha256": "195c4610c41f649e825fefa03a92f6a421598a6098b8ebe4673d2a847d1788ba"
+      "sha256": "87f6c3ee287cbf136275fa381859323145b600e2a73939e99ac3fd3ac88efbb8"
     },
     {
       "path": "mobile/assets/characters/wombat/robed_walk.png",
-      "sha256": "ebe12108aa11af2488ada375e03d06a7bf173948b7c3d69dac127352918b430d"
+      "sha256": "b33db1823b9ef488088da1a5e33050e929a6ce3968aac49a7f7048fe6c4ceeca"
     },
     {
       "path": "mobile/assets/characters/rabbit/walk.png",
-      "sha256": "42a430da4a252659459ead5484334f60adeaf1299e87c35d6f910aa28efe286c"
+      "sha256": "c8086a7af22fb74136e962da201b81cad9dfa8096cb9ad2178a39fc5e48093d1"
     },
     {
       "path": "mobile/assets/characters/rabbit/robed_walk.png",
-      "sha256": "fee5f395564eee2c4e9c231caadee4a40bba608f256128866aee9e9240f45882"
+      "sha256": "5b08710112e114cbd07ffc0b14e57b743a6c158e9f86763f5af47fa8403199c3"
     },
     {
       "path": "mobile/assets/characters/red_panda/walk.png",
@@ -362,19 +362,19 @@
     },
     {
       "path": "mobile/assets/characters/tarsier/walk.png",
-      "sha256": "4c34d6d4ce759e547f56ec720cff15a33251314ca121415f62c9cf088b76b7db"
+      "sha256": "32aa787eb2e9718c75cc96a0cfca68278c69baa4d01b5a47f9b8ae9d0b41ff6a"
     },
     {
       "path": "mobile/assets/characters/tarsier/robed_walk.png",
-      "sha256": "15ad3676e59dbd3de47639508c683a5d5395d43fe12909351c75b2f387f75ba8"
+      "sha256": "77db674ecdd9c8deff6e800e0b7109c8387f3efa97ad7c958836475268855dcd"
     },
     {
       "path": "mobile/assets/characters/aye_aye/walk.png",
-      "sha256": "de5f40ef3f28916655422691a448d1e054166cbb29b1627124bf8af69c5d1f39"
+      "sha256": "c3488251b8669c523b5c9e7f82cb6fbaee9b0bb34e170564955d9d241d9f4310"
     },
     {
       "path": "mobile/assets/characters/aye_aye/robed_walk.png",
-      "sha256": "0f13d1a8dd0438543192954849fef993160411bd723698bf46f3703486ebe28f"
+      "sha256": "7c0db3f3767e6cc680a83cedcba4dc7abc76b62ada6ba46294718f57654cfa0f"
     },
     {
       "path": "mobile/assets/characters/kakapo/walk.png",
@@ -382,7 +382,7 @@
     },
     {
       "path": "mobile/assets/characters/kakapo/robed_walk.png",
-      "sha256": "7c0455c6b283af7b9f0ae11d82bb3b44fa2835986d8a6b977f5de0801e1e86fa"
+      "sha256": "05f3d5709199021b1927bcde8f1290892d11334cd8fb97e511d5064a34add904"
     }
   ]
 }

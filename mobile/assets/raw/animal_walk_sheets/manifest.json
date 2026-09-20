@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "description": "Alternating two-step walks in both outfits. Each record identifies original generated sheets or recovered prepared outputs explicitly.",
   "atlas": {
     "columns": 4,
@@ -23,14 +23,37 @@
     {
       "type": "owl",
       "pose": "normal",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/owl-normal.png",
       "sourceSha256": "45f83a9ba076dd4f9456ffb77176b5e1d0732991c2b551e13867ab37e5e1336b",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/owl/idle.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "baseProvenance": {
+        "type": "owl",
+        "pose": "normal",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/owl-normal.png",
+        "sourceSha256": "45f83a9ba076dd4f9456ffb77176b5e1d0732991c2b551e13867ab37e5e1336b",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/owl/idle.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "layout": "single-frame",
+          "replaceBelowY": 169,
+          "replaceFromX": 0,
+          "prompt": "Use case: precise-object-edit. Asset type: a SINGLE transparent 256x256 pixel-art owl animation frame.\nInput image 1 is the EDIT TARGET: owl walk frame 6. Image 2 is a SUPPORTING POSE reference only: opposite-foot passing frame 2.\nRepair image 1's leg pose only. Keep its complete original owl head/body/face/green scarf/wings/tail, scale, position and genuine transparency.\nImage 1 currently has the LIGHTER near foot lifted behind on the LEFT and DARKER far foot planted on the right; the lifted near foot should instead be swinging FORWARD to the RIGHT at this point of the cycle.\nMake the same passing-stage geometry as image 2 with the OPPOSITE leg identity: DARKER far leg planted under the belly, ankle centered approximately x=127, sole y=190 in the 256x256 canvas, toes pointing RIGHT; LIGHTER near leg bent and lifted forward, its knee around x=150 y=166 and its foot centered approximately x=158 y=179, clear of the ground, toes/claws pointing RIGHT. The brighter near leg is the one moving forward, and the darker far leg remains behind it in depth. The planted far foot must be beneath the belly around x=127, NOT far left around x=108. Preserve a natural bent raised knee; do not draw a two-planted-feet wide contact stance. Keep owl's compact short-leg proportions and distinctive two-toe bird feet. No whole-body flip, no left-facing toes, no extra leg or foot, no labels. Do not recolor two stationary feet: move the light near foot forward to make a true opposite-foot passing pose.\nOnly pixels below approximately y=160 may change; all upper owl details must remain unchanged. Return only the corrected SINGLE frame on transparent background, with the same original owl size and placement in a square canvas.",
+          "frame": 6,
+          "source": "foot_direction/edits/owl-normal.png",
+          "sourceSha256": "d3de8acb9a827bcfe13693f85a98815b6d29af533c198ddbd5b95f2d30796f8e"
+        }
+      ]
     },
     {
       "type": "owl",
@@ -95,14 +118,36 @@
     {
       "type": "capybara",
       "pose": "normal",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/capybara-normal.png",
       "sourceSha256": "ddaa2c8ccb981ce685d18b3f72ebf7f8fb320de6cf64468cbf6bd8e74983eb7d",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/capybara/idle.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "baseProvenance": {
+        "type": "capybara",
+        "pose": "normal",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/capybara-normal.png",
+        "sourceSha256": "ddaa2c8ccb981ce685d18b3f72ebf7f8fb320de6cf64468cbf6bd8e74983eb7d",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/capybara/idle.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "layout": "single-frame",
+          "replaceBelowY": 193,
+          "prompt": "Use case: precise-object-edit. Correct this one walking sprite frame. Both of this character's feet were accidentally drawn pointing LEFT. Redraw the two FEET BELOW THE ANKLES to point to SCREEN RIGHT, toward the character's nose. The LIGHT TAN foot on the left must have its HEEL at its LEFT edge and its long TOE protrusion at its RIGHT edge, pointing into the gap between the legs. Its current left-facing toe protrusion must disappear. Likewise the DARK BROWN foot on the right must have its long TOE protrusion on the RIGHT edge, projecting toward the right edge of the image, instead of into the gap. Each foot is essentially an L shape facing right (vertical shin on the LEFT of the foot, horizontal toe extending RIGHT). Keep the light near leg trailing spatially to the left and the dark far leg leading spatially right. Do NOT swap leg colors. Keep knees, ankles and upper legs in place. Keep ALL pixels ABOVE the ankles unchanged: identical face, head, ears, shirt, overalls, arms, silhouette, size and position. Same centered sprite, scale, floor baseline, transparent background and pixel art finish. This is one isolated frame of an animation, so make only the local toe-direction repair, no whole-character pose change. Output same 1024x1024 transparent canvas, no shadow or text.",
+          "frame": 4,
+          "source": "foot_direction/edits/capybara-normal.png",
+          "sourceSha256": "d49a3be7d4c05808840af83033e3bf9060bbf294b03e43f30615a945ed07a814"
+        }
+      ]
     },
     {
       "type": "capybara",
@@ -119,14 +164,37 @@
     {
       "type": "fennec_fox",
       "pose": "normal",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/fennec_fox-normal.png",
       "sourceSha256": "c5cea8ba353b132a83f3761dc015c62baafc68f71d868dd8d1acb50daca28d56",
       "sourceFacing": "right",
       "idleFacing": "left",
       "reference": "../../characters/fennec_fox/idle.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "baseProvenance": {
+        "type": "fennec_fox",
+        "pose": "normal",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/fennec_fox-normal.png",
+        "sourceSha256": "c5cea8ba353b132a83f3761dc015c62baafc68f71d868dd8d1acb50daca28d56",
+        "sourceFacing": "right",
+        "idleFacing": "left",
+        "reference": "../../characters/fennec_fox/idle.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "layout": "atlas",
+          "replaceBelowY": 192,
+          "replaceFromX": 105,
+          "prompt": "Use case: precise-object-edit. Asset type: production pixel-art game animation atlas. The attached image is the EDIT TARGET, a transparent 1024x512 eight-frame fennec fox walk sheet, exactly four columns and two rows. Frames are zero indexed row-major: top row 0,1,2,3; bottom row 4,5,6,7.\nFix ONLY frame 2, the third cell of the top row. Currently it repeats frame 1 with the lifted DARKER far leg behind to the LEFT. Instead make frame 2 the opposite-foot passing pose corresponding to frame 6's stage of motion: the DARKER far leg lifts its bent knee and foot FORWARD to the RIGHT, emerging forward of the planted leg, while the LIGHTER near leg supports the fox planted almost under the body. Preserve dark-far/light-near identity: existing frame 6 lifts the LIGHT near leg forward, but repaired frame 2 must lift the DARK far leg forward. Both planted and raised feet/toes must point RIGHT. Do not copy frame 6 literally or merely recolor a stationary pose. Frame 1 far leg is behind; frame 2 far leg passes forward; frame 3 far foot lands forward.\nAll other seven frames and all pixels above the hip/shorts junction must stay unchanged. Preserve the large tail, safari hat, ears, face, jacket, arms, shorts, color palette, pixel style, original sprite sizing and placement, 4x2 cell grid and transparent background. No body/foot mirror, left-facing toes, extra limbs, labels, borders or watermark. Return only the corrected complete 4x2 atlas with genuine alpha transparency.",
+          "frame": 2,
+          "source": "foot_direction/edits/fennec_fox-normal.png",
+          "sourceSha256": "6adf8b37bf4d92c4b4af74bf2e3f1584ddf14f2515040255e5032c92acd6e925"
+        }
+      ]
     },
     {
       "type": "fennec_fox",
@@ -143,74 +211,252 @@
     {
       "type": "sloth",
       "pose": "normal",
-      "sourceFormat": "sheet",
-      "source": "sloth.png",
-      "sourceSha256": "5272aeb86a0e1d5882f669ff1c7783bc8603e3a30f26b0f678a5f2f405cfa892",
+      "sourceFormat": "frame-patches",
+      "source": "foot_direction/base/sloth-normal.png",
+      "sourceSha256": "72fbb122627eb90ed679a8e1e6a83cfecca8c002165847a3d5b64c7ea0b4680e",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/sloth/idle.png",
       "prompt": "Make a precise correction to ONLY THE TOP ROW THIRD AND FOURTH SLOTH'S LEGS in this transparent 8-frame sprite sheet. Keep all other cells EXACTLY unchanged, including every head, face, shirt, claw, pixel-art styling and background alpha.\nTOP ROW THIRD: This is a PASSING POSE. Light tan foreground leg is vertical, straight down beneath the belly and its foot planted underneath the hip. The dark brown far leg bends at the knee and its clawed foot is lifted a little off ground, passing the standing leg on its right. Two legs total. Do not draw a split-contact pose here.\nTOP ROW FOURTH: light tan foreground leg slopes diagonally DOWN LEFT, its ankle and foot to the LEFT/back, crossing in front of the dark thigh. Dark brown far leg extends DOWN RIGHT, its ankle and foot to the RIGHT/front. This is the opposite leading leg to top row first image. Two legs total.\nAll bottom-row images MUST remain unchanged, they are already correct. 4 columns x 2 rows with transparent alpha; no text, shadows or extra marks.",
-      "visualReview": "Accepted targeted top-row correction. Contact0 near light leg forward/right, contact4 near light leg back/left crossing in front of dark leg. Passing2 near light leg supports under body, far dark leg bends ahead; passing6 far dark supports while light near leg bends ahead. Eight right-facing complete sprites, original tropical shirt/cream face/claws retained, no extra limbs, transparent 4x2 cells."
+      "visualReview": "Accepted targeted top-row correction. Contact0 near light leg forward/right, contact4 near light leg back/left crossing in front of dark leg. Passing2 near light leg supports under body, far dark leg bends ahead; passing6 far dark supports while light near leg bends ahead. Eight right-facing complete sprites, original tropical shirt/cream face/claws retained, no extra limbs, transparent 4x2 cells.",
+      "baseProvenance": {
+        "type": "sloth",
+        "pose": "normal",
+        "sourceFormat": "sheet",
+        "source": "sloth.png",
+        "sourceSha256": "5272aeb86a0e1d5882f669ff1c7783bc8603e3a30f26b0f678a5f2f405cfa892",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/sloth/idle.png",
+        "prompt": "Make a precise correction to ONLY THE TOP ROW THIRD AND FOURTH SLOTH'S LEGS in this transparent 8-frame sprite sheet. Keep all other cells EXACTLY unchanged, including every head, face, shirt, claw, pixel-art styling and background alpha.\nTOP ROW THIRD: This is a PASSING POSE. Light tan foreground leg is vertical, straight down beneath the belly and its foot planted underneath the hip. The dark brown far leg bends at the knee and its clawed foot is lifted a little off ground, passing the standing leg on its right. Two legs total. Do not draw a split-contact pose here.\nTOP ROW FOURTH: light tan foreground leg slopes diagonally DOWN LEFT, its ankle and foot to the LEFT/back, crossing in front of the dark thigh. Dark brown far leg extends DOWN RIGHT, its ankle and foot to the RIGHT/front. This is the opposite leading leg to top row first image. Two legs total.\nAll bottom-row images MUST remain unchanged, they are already correct. 4 columns x 2 rows with transparent alpha; no text, shadows or extra marks.",
+        "visualReview": "Accepted targeted top-row correction. Contact0 near light leg forward/right, contact4 near light leg back/left crossing in front of dark leg. Passing2 near light leg supports under body, far dark leg bends ahead; passing6 far dark supports while light near leg bends ahead. Eight right-facing complete sprites, original tropical shirt/cream face/claws retained, no extra limbs, transparent 4x2 cells."
+      },
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "patches": [
+        {
+          "layout": "atlas",
+          "replaceBelowY": 200,
+          "replaceFromX": 0,
+          "prompt": "Use case: precise-object-edit. Asset type: production pixel-art game animation atlas. The attached image is the EDIT TARGET, a transparent 1024x512 eight-frame sloth walk sheet, exactly four columns and two rows. Frames are zero indexed row-major: top row 0,1,2,3; bottom row 4,5,6,7.\nFix ONLY the backward toes on frames 3 and 4 (top-right and bottom-left cells). In these two cells the LIGHTER near leg correctly trails backward toward the LEFT spatially, while the DARKER far leg correctly extends forward toward the RIGHT. KEEP that true opposite-foot contact pose and its distinct leg ownership. Currently the ivory claws on the trailing LIGHTER near foot point LEFT: redraw only its ankle/foot tip so the claws/toes point RIGHT, with its heel to the LEFT. The near foot must remain at the left/back of the stance, with its toes curving RIGHT; do not move it to the right/front. The dark far foot already points RIGHT and must remain unchanged. Both feet face RIGHT even though one leg extends backward.\nAll other six frames must remain exactly unchanged. Preserve all heads, faces, arms, Hawaiian shirts, skin colors, dark-far/light-near leg identity, stance widths, body positioning, pixel scale, cell alignment, canvas and transparent background. Do NOT mirror any whole leg or body, do NOT swap foot colors, and do NOT replace frames 3/4 with frame 0/7: that would destroy alternation. No new objects, labels, grid, text, border or watermark. Deliver only the corrected complete 4x2 sprite atlas with genuine transparency.",
+          "frame": 3,
+          "source": "foot_direction/edits/sloth-normal.png",
+          "sourceSha256": "980c292eda150a747f4863cc58a15b1e308efa004ff27ddd370dd440e9f84daa"
+        },
+        {
+          "layout": "atlas",
+          "replaceBelowY": 200,
+          "replaceFromX": 0,
+          "prompt": "Use case: precise-object-edit. Asset type: production pixel-art game animation atlas. The attached image is the EDIT TARGET, a transparent 1024x512 eight-frame sloth walk sheet, exactly four columns and two rows. Frames are zero indexed row-major: top row 0,1,2,3; bottom row 4,5,6,7.\nFix ONLY the backward toes on frames 3 and 4 (top-right and bottom-left cells). In these two cells the LIGHTER near leg correctly trails backward toward the LEFT spatially, while the DARKER far leg correctly extends forward toward the RIGHT. KEEP that true opposite-foot contact pose and its distinct leg ownership. Currently the ivory claws on the trailing LIGHTER near foot point LEFT: redraw only its ankle/foot tip so the claws/toes point RIGHT, with its heel to the LEFT. The near foot must remain at the left/back of the stance, with its toes curving RIGHT; do not move it to the right/front. The dark far foot already points RIGHT and must remain unchanged. Both feet face RIGHT even though one leg extends backward.\nAll other six frames must remain exactly unchanged. Preserve all heads, faces, arms, Hawaiian shirts, skin colors, dark-far/light-near leg identity, stance widths, body positioning, pixel scale, cell alignment, canvas and transparent background. Do NOT mirror any whole leg or body, do NOT swap foot colors, and do NOT replace frames 3/4 with frame 0/7: that would destroy alternation. No new objects, labels, grid, text, border or watermark. Deliver only the corrected complete 4x2 sprite atlas with genuine transparency.",
+          "frame": 4,
+          "source": "foot_direction/edits/sloth-normal.png",
+          "sourceSha256": "980c292eda150a747f4863cc58a15b1e308efa004ff27ddd370dd440e9f84daa"
+        }
+      ]
     },
     {
       "type": "sloth",
       "pose": "robed",
-      "sourceFormat": "sheet",
-      "source": "sloth_robed.png",
-      "sourceSha256": "256e84e808eb608e104bab620f7d7466d75edc0cdc29219b18ba963a90e4bac9",
+      "sourceFormat": "frame-patches",
+      "source": "foot_direction/base/sloth-robed.png",
+      "sourceSha256": "eb7154708fe509875fe79d0a8a754ffc0914edeef9e901d3c682d4dd3858914f",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/sloth/robed.png",
       "prompt": "Use case: identity-preserve. Make ONLY a COSTUME AND EYE COLOR change to Image1, preserving its eight exact walk poses.\nImage1 is the verified sloth walk cycle. KEEP EVERY LEG AND FOOT POSE EXACTLY AS IMAGE1. All foot locations, knee bends, near/far layering, ivory claws, frame spacing, face shape and character proportions must remain unchanged. It already alternates feet correctly; do not redesign any motion.\nImage2 shows the required costume: full charcoal-black ceremonial robe with thick folded black cowl, and pink/red glowing eyes. Replace the tropical shirt in every Image1 frame with that black robe/cowl; turn both eyes pink/red like Image2. Cloth drapes around the already-existing legs, splitting or lifting around them so both feet remain clearly visible at their ORIGINAL Image1 positions. No new feet or duplicate limbs.\nImportant: preserve the bottom-row first frame's LIGHT TAN foreground foot far LEFT/back and DARK far foot RIGHT/front; preserve top-row first's opposite legs. Frame2 keeps LIGHT planted and DARK lifted; frame6 keeps DARK planted and LIGHT lifted. The full walk is unchanged underneath the new clothing.\nSame 4 columns x 2 rows, eight equal square cells, transparent alpha background. Keep all faces RIGHT. No text, labels, outlines around cells, ground shadows or background. Exact pixel-art style.",
-      "visualReview": "Accepted clothing-only conversion of verified normal gait: opposite contacts0/4 and passing2/6 retained, two feet throughout and no duplicated limbs. Black robe/cowl and pink/red eyes present all8 frames. Flexible hem parts/folds around each bent knee so the two alternating steps remain visible. Face/claws preserved, right-facing, transparent 4x2 with safe margins."
+      "visualReview": "Accepted clothing-only conversion of verified normal gait: opposite contacts0/4 and passing2/6 retained, two feet throughout and no duplicated limbs. Black robe/cowl and pink/red eyes present all8 frames. Flexible hem parts/folds around each bent knee so the two alternating steps remain visible. Face/claws preserved, right-facing, transparent 4x2 with safe margins.",
+      "baseProvenance": {
+        "type": "sloth",
+        "pose": "robed",
+        "sourceFormat": "sheet",
+        "source": "sloth_robed.png",
+        "sourceSha256": "256e84e808eb608e104bab620f7d7466d75edc0cdc29219b18ba963a90e4bac9",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/sloth/robed.png",
+        "prompt": "Use case: identity-preserve. Make ONLY a COSTUME AND EYE COLOR change to Image1, preserving its eight exact walk poses.\nImage1 is the verified sloth walk cycle. KEEP EVERY LEG AND FOOT POSE EXACTLY AS IMAGE1. All foot locations, knee bends, near/far layering, ivory claws, frame spacing, face shape and character proportions must remain unchanged. It already alternates feet correctly; do not redesign any motion.\nImage2 shows the required costume: full charcoal-black ceremonial robe with thick folded black cowl, and pink/red glowing eyes. Replace the tropical shirt in every Image1 frame with that black robe/cowl; turn both eyes pink/red like Image2. Cloth drapes around the already-existing legs, splitting or lifting around them so both feet remain clearly visible at their ORIGINAL Image1 positions. No new feet or duplicate limbs.\nImportant: preserve the bottom-row first frame's LIGHT TAN foreground foot far LEFT/back and DARK far foot RIGHT/front; preserve top-row first's opposite legs. Frame2 keeps LIGHT planted and DARK lifted; frame6 keeps DARK planted and LIGHT lifted. The full walk is unchanged underneath the new clothing.\nSame 4 columns x 2 rows, eight equal square cells, transparent alpha background. Keep all faces RIGHT. No text, labels, outlines around cells, ground shadows or background. Exact pixel-art style.",
+        "visualReview": "Accepted clothing-only conversion of verified normal gait: opposite contacts0/4 and passing2/6 retained, two feet throughout and no duplicated limbs. Black robe/cowl and pink/red eyes present all8 frames. Flexible hem parts/folds around each bent knee so the two alternating steps remain visible. Face/claws preserved, right-facing, transparent 4x2 with safe margins."
+      },
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "patches": [
+        {
+          "layout": "atlas",
+          "replaceBelowY": 200,
+          "replaceFromX": 0,
+          "prompt": "Use case: precise-object-edit. Asset type: production pixel-art game animation atlas. The attached image is the EDIT TARGET, a transparent 1024x512 eight-frame robed sloth walk sheet, exactly four columns and two rows. Frames are zero indexed row-major: top row 0,1,2,3; bottom row 4,5,6,7.\nFix ONLY the backward toes on frames 3 and 4 (top-right and bottom-left cells). In these two cells the LIGHTER near leg correctly trails backward toward the LEFT spatially under its moving robe panel, while the DARKER far leg correctly extends forward toward the RIGHT. KEEP that true opposite-foot contact pose, exact garment hem silhouette, and distinct leg ownership. Currently the ivory claws on the trailing LIGHTER near foot point LEFT: redraw only its exposed ankle/foot tip so claws/toes point RIGHT, with heel to the LEFT. The near foot must remain at the left/back of the stance, with toes curving RIGHT; do not move it to the right/front. Dark far foot already points RIGHT and must remain unchanged. Both feet face RIGHT even when one leg extends backward.\nAll other six frames must remain exactly unchanged. Preserve all heads, red eyes, faces, arms, black robes, brown colors, dark-far/light-near leg identity, stance widths, body positioning, pixel scale, cell alignment, canvas and transparent background. Do NOT mirror a whole leg or body, do NOT swap foot colors, and do NOT replace frames 3/4 with frame 0/7: that would destroy alternation. No new objects, labels, grid, text, border or watermark. Deliver only the corrected complete 4x2 sprite atlas with genuine transparency.",
+          "frame": 3,
+          "source": "foot_direction/edits/sloth-robed.png",
+          "sourceSha256": "2fd10de7a337458e43e04be25bba10b3be23976ed566a775d86c165304be92db"
+        },
+        {
+          "layout": "atlas",
+          "replaceBelowY": 200,
+          "replaceFromX": 0,
+          "prompt": "Use case: precise-object-edit. Asset type: production pixel-art game animation atlas. The attached image is the EDIT TARGET, a transparent 1024x512 eight-frame robed sloth walk sheet, exactly four columns and two rows. Frames are zero indexed row-major: top row 0,1,2,3; bottom row 4,5,6,7.\nFix ONLY the backward toes on frames 3 and 4 (top-right and bottom-left cells). In these two cells the LIGHTER near leg correctly trails backward toward the LEFT spatially under its moving robe panel, while the DARKER far leg correctly extends forward toward the RIGHT. KEEP that true opposite-foot contact pose, exact garment hem silhouette, and distinct leg ownership. Currently the ivory claws on the trailing LIGHTER near foot point LEFT: redraw only its exposed ankle/foot tip so claws/toes point RIGHT, with heel to the LEFT. The near foot must remain at the left/back of the stance, with toes curving RIGHT; do not move it to the right/front. Dark far foot already points RIGHT and must remain unchanged. Both feet face RIGHT even when one leg extends backward.\nAll other six frames must remain exactly unchanged. Preserve all heads, red eyes, faces, arms, black robes, brown colors, dark-far/light-near leg identity, stance widths, body positioning, pixel scale, cell alignment, canvas and transparent background. Do NOT mirror a whole leg or body, do NOT swap foot colors, and do NOT replace frames 3/4 with frame 0/7: that would destroy alternation. No new objects, labels, grid, text, border or watermark. Deliver only the corrected complete 4x2 sprite atlas with genuine transparency.",
+          "frame": 4,
+          "source": "foot_direction/edits/sloth-robed.png",
+          "sourceSha256": "2fd10de7a337458e43e04be25bba10b3be23976ed566a775d86c165304be92db"
+        }
+      ]
     },
     {
       "type": "wombat",
       "pose": "normal",
-      "sourceFormat": "sheet",
-      "source": "wombat.png",
-      "sourceSha256": "be026268d4455a2dee61cbf90ccd991c6383d6b5a8301a7ca37c627c3c2722f5",
+      "sourceFormat": "frame-patches",
+      "source": "foot_direction/base/wombat-normal.png",
+      "sourceSha256": "195c4610c41f649e825fefa03a92f6a421598a6098b8ebe4673d2a847d1788ba",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/wombat/idle.png",
       "prompt": "Use case: identity-preserve. Make a production pixel-art game walk cycle with transparent alpha.\nImage1 is the EXACT 8-frame MOTION, grid layout and limb-layering reference. Image2 is the CHARACTER IDENTITY reference.\nReplace every capybara in Image1 with the SAME squat round tan-brown wombat with short angular ears, dark bead eyes, large charcoal nose, yellow T-shirt and blue denim overalls with gold buttons and large belly pocket from Image2. Preserve the complete alternating two-step motion in Image1 frame by frame; do not copy the still pose from Image2. Preserve Image2's precise face, fur, colors and outfit, with all eight characters facing RIGHT in the same three-quarter side direction as Image1. Do not inherit the capybara head or outfit.\n\nOutput FOUR columns by TWO rows of EIGHT equal square cells, 2:1 landscape canvas, transparent PNG. Each entire character fits inside its cell with comfortable margins; stable center of pelvis, scale, ground line. No text, numbering, boxes, shadows or background.\nThe motion is one FULL TWO-STEP BIPEDAL WALK. Two legs, never one. LIGHTER foreground leg stays in front; DARKER background leg stays behind throughout the whole cycle.\nTop row: frame0 LIGHT near foot FORWARD RIGHT / DARK far foot BACK LEFT; frame1 light stance moves back while dark foot lifts from behind; frame2 LIGHT foot planted UNDER HIP and DARK bent foot passing forward just off ground; frame3 LIGHT leg reaches BACK LEFT while DARK leg reaches FORWARD RIGHT.\nBottom row: frame4 LIGHT near foot BACK LEFT / DARK far foot FORWARD RIGHT, opposite frame0; frame5 DARK stance moves back and LIGHT foot lifts behind; frame6 DARK foot planted UNDER HIP and LIGHT bent foot passing forward just off ground; frame7 LIGHT leg reaches FORWARD RIGHT while DARK leg goes BACK LEFT.\nTherefore frames0/4 have opposite leading legs, and frames2/6 have opposite lifted legs. Copy Image1's successful alternating foreground/background layering exactly. Keep the same outfit in every frame.\nCrisp pixel-art; no extra limbs; no drift or redesign.",
-      "visualReview": "Accepted full rightward two-step cycle following capybara motion reference. Contact0 has foreground foot forward/right; contact4 foreground foot trails left with opposite far-leg lead. Frame2 and6 exchange planted/passing legs; leg shading is subtler in the normal outfit than the robe but contact poses and layering distinguish the half-cycles. Yellow shirt and blue overalls remain consistent. Transparent 4x2, safe cell margins."
+      "visualReview": "Accepted full rightward two-step cycle following capybara motion reference. Contact0 has foreground foot forward/right; contact4 foreground foot trails left with opposite far-leg lead. Frame2 and6 exchange planted/passing legs; leg shading is subtler in the normal outfit than the robe but contact poses and layering distinguish the half-cycles. Yellow shirt and blue overalls remain consistent. Transparent 4x2, safe cell margins.",
+      "baseProvenance": {
+        "type": "wombat",
+        "pose": "normal",
+        "sourceFormat": "sheet",
+        "source": "wombat.png",
+        "sourceSha256": "be026268d4455a2dee61cbf90ccd991c6383d6b5a8301a7ca37c627c3c2722f5",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/wombat/idle.png",
+        "prompt": "Use case: identity-preserve. Make a production pixel-art game walk cycle with transparent alpha.\nImage1 is the EXACT 8-frame MOTION, grid layout and limb-layering reference. Image2 is the CHARACTER IDENTITY reference.\nReplace every capybara in Image1 with the SAME squat round tan-brown wombat with short angular ears, dark bead eyes, large charcoal nose, yellow T-shirt and blue denim overalls with gold buttons and large belly pocket from Image2. Preserve the complete alternating two-step motion in Image1 frame by frame; do not copy the still pose from Image2. Preserve Image2's precise face, fur, colors and outfit, with all eight characters facing RIGHT in the same three-quarter side direction as Image1. Do not inherit the capybara head or outfit.\n\nOutput FOUR columns by TWO rows of EIGHT equal square cells, 2:1 landscape canvas, transparent PNG. Each entire character fits inside its cell with comfortable margins; stable center of pelvis, scale, ground line. No text, numbering, boxes, shadows or background.\nThe motion is one FULL TWO-STEP BIPEDAL WALK. Two legs, never one. LIGHTER foreground leg stays in front; DARKER background leg stays behind throughout the whole cycle.\nTop row: frame0 LIGHT near foot FORWARD RIGHT / DARK far foot BACK LEFT; frame1 light stance moves back while dark foot lifts from behind; frame2 LIGHT foot planted UNDER HIP and DARK bent foot passing forward just off ground; frame3 LIGHT leg reaches BACK LEFT while DARK leg reaches FORWARD RIGHT.\nBottom row: frame4 LIGHT near foot BACK LEFT / DARK far foot FORWARD RIGHT, opposite frame0; frame5 DARK stance moves back and LIGHT foot lifts behind; frame6 DARK foot planted UNDER HIP and LIGHT bent foot passing forward just off ground; frame7 LIGHT leg reaches FORWARD RIGHT while DARK leg goes BACK LEFT.\nTherefore frames0/4 have opposite leading legs, and frames2/6 have opposite lifted legs. Copy Image1's successful alternating foreground/background layering exactly. Keep the same outfit in every frame.\nCrisp pixel-art; no extra limbs; no drift or redesign.",
+        "visualReview": "Accepted full rightward two-step cycle following capybara motion reference. Contact0 has foreground foot forward/right; contact4 foreground foot trails left with opposite far-leg lead. Frame2 and6 exchange planted/passing legs; leg shading is subtler in the normal outfit than the robe but contact poses and layering distinguish the half-cycles. Yellow shirt and blue overalls remain consistent. Transparent 4x2, safe cell margins."
+      },
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as base; only declared frame rectangles replaced. All other decoded pixels preserved exactly. Generated sources and exact final prompts retained below.",
+      "patches": [
+        {
+          "frame": 4,
+          "source": "foot_direction/edits/wombat-normal-f4.png",
+          "sourceSha256": "0d8a0c9e5bc7b4214d047e769eeebae24ebabb711d3b5ef60e1bc3bfb5218fa7",
+          "layout": "atlas",
+          "replaceBelowY": 171,
+          "replaceFromX": 65,
+          "replaceToX": 178,
+          "prompt": "The last edit FAILED to correct bottom-left sprite frame 4: its feet still face left. Redraw the lower foot shapes decisively. Keep the LIGHT TAN leg at the BACK/LEFT, and the DARK BROWN leg at the FRONT/RIGHT. Each foot must have its HEEL on the LEFT end and TOES projecting to the RIGHT end. The light rear foot must look like a short right-pointing boot, despite being behind the body. The dark forward foot must also look like a right-pointing boot. Do not swap their shades. In bottom-third sprite frame 6, replace the oval light raised foot with a short bent shin and small right-pointing boot, light toes on the RIGHT of its ankle. Keep dark foot planted. Only frames 4 and 6 change; all faces, bodies, clothes, other six frames and positions remain exactly as input. Preserve 4x2 grid, aspect ratio and transparent background."
+        },
+        {
+          "frame": 6,
+          "source": "foot_direction/edits/wombat-normal-f6.png",
+          "sourceSha256": "1674ecef7090ccc55368eef9a659069cae298e8fa211a74b1ef93a4687283351",
+          "layout": "single-frame",
+          "replaceBelowY": 167,
+          "replaceFromX": 120,
+          "replaceToX": 174,
+          "prompt": "Use case: precise-object-edit. This single transparent pixel-art wombat sprite is the edit target, an isolated walking frame. Keep every pixel of the head, face, nose, arms, yellow shirt, blue overalls, overall location and size unchanged.\nRepair ONLY the two feet below the overalls. The foot at image LEFT is the grounded DARK BROWN far foot; keep it grounded in the same place with toe pointing RIGHT. The lifted LIGHT TAN near foot is at image RIGHT, currently an awkward oval; replace that oval with a small natural right-facing foot plus a SHORT ankle. Its HEEL is at the LEFT end of that oval; its TOES must protrude to the RIGHT end of the oval. The light lifted foot must stay on image RIGHT of the dark grounded foot, not move under the arm on image LEFT. The light foot's sole sits slightly higher than the grounded foot; create a small bent-knee forward swing, not a high step. Keep light/dark near/far ownership and exactly two legs. Genuinely transparent background, same 1024-square canvas, crisp pixel art, no labels."
+        }
+      ]
     },
     {
       "type": "wombat",
       "pose": "robed",
-      "sourceFormat": "sheet",
-      "source": "wombat_robed.png",
-      "sourceSha256": "db7c496e3dab167ccf755ac8cfea0c2e68db1202d427a2f24a376f5739ffeb84",
+      "sourceFormat": "frame-patches",
+      "source": "foot_direction/base/wombat-robed.png",
+      "sourceSha256": "ebe12108aa11af2488ada375e03d06a7bf173948b7c3d69dac127352918b430d",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/wombat/robed.png",
       "prompt": "Use case: identity-preserve. Make a production pixel-art game walk cycle with transparent alpha.\nImage1 is the EXACT 8-frame MOTION, grid layout and limb-layering reference. Image2 is the CHARACTER IDENTITY reference.\nReplace every capybara in Image1 with the SAME squat round tan-brown wombat with short angular ears, large charcoal nose, eerie pink/red glowing eyes, black full-length ceremonial robe and thick folded black cowl from Image2. Preserve the complete alternating two-step motion in Image1 frame by frame; do not copy the still pose from Image2. Preserve Image2's precise face, fur, colors and outfit, with all eight characters facing RIGHT in the same three-quarter side direction as Image1. Do not inherit the capybara head or outfit.\n\nOutput FOUR columns by TWO rows of EIGHT equal square cells, 2:1 landscape canvas, transparent PNG. Each entire character fits inside its cell with comfortable margins; stable center of pelvis, scale, ground line. No text, numbering, boxes, shadows or background.\nThe motion is one FULL TWO-STEP BIPEDAL WALK. Two legs, never one. LIGHTER foreground leg stays in front; DARKER background leg stays behind throughout the whole cycle.\nTop row: frame0 LIGHT near foot FORWARD RIGHT / DARK far foot BACK LEFT; frame1 light stance moves back while dark foot lifts from behind; frame2 LIGHT foot planted UNDER HIP and DARK bent foot passing forward just off ground; frame3 LIGHT leg reaches BACK LEFT while DARK leg reaches FORWARD RIGHT.\nBottom row: frame4 LIGHT near foot BACK LEFT / DARK far foot FORWARD RIGHT, opposite frame0; frame5 DARK stance moves back and LIGHT foot lifts behind; frame6 DARK foot planted UNDER HIP and LIGHT bent foot passing forward just off ground; frame7 LIGHT leg reaches FORWARD RIGHT while DARK leg goes BACK LEFT.\nTherefore frames0/4 have opposite leading legs, and frames2/6 have opposite lifted legs. Copy Image1's successful alternating foreground/background layering exactly. Keep both pink/red eyes and full black robe/cowl on EVERY frame. Robe hem bends around alternating feet and knees; feet remain visible and the cloth moves with the gait.\nCrisp pixel-art; no extra limbs; no drift or redesign.",
-      "visualReview": "Accepted full rightward two-step cycle following capybara motion reference. Contact0 has foreground foot forward/right; contact4 foreground foot trails left with opposite far-leg lead. Frame2 and6 exchange planted/passing legs; leg shading is subtler in the normal outfit than the robe but contact poses and layering distinguish the half-cycles. Pink eyes and black cowl retained throughout; hem bends around alternating legs. Transparent 4x2, safe cell margins."
+      "visualReview": "Accepted full rightward two-step cycle following capybara motion reference. Contact0 has foreground foot forward/right; contact4 foreground foot trails left with opposite far-leg lead. Frame2 and6 exchange planted/passing legs; leg shading is subtler in the normal outfit than the robe but contact poses and layering distinguish the half-cycles. Pink eyes and black cowl retained throughout; hem bends around alternating legs. Transparent 4x2, safe cell margins.",
+      "baseProvenance": {
+        "type": "wombat",
+        "pose": "robed",
+        "sourceFormat": "sheet",
+        "source": "wombat_robed.png",
+        "sourceSha256": "db7c496e3dab167ccf755ac8cfea0c2e68db1202d427a2f24a376f5739ffeb84",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/wombat/robed.png",
+        "prompt": "Use case: identity-preserve. Make a production pixel-art game walk cycle with transparent alpha.\nImage1 is the EXACT 8-frame MOTION, grid layout and limb-layering reference. Image2 is the CHARACTER IDENTITY reference.\nReplace every capybara in Image1 with the SAME squat round tan-brown wombat with short angular ears, large charcoal nose, eerie pink/red glowing eyes, black full-length ceremonial robe and thick folded black cowl from Image2. Preserve the complete alternating two-step motion in Image1 frame by frame; do not copy the still pose from Image2. Preserve Image2's precise face, fur, colors and outfit, with all eight characters facing RIGHT in the same three-quarter side direction as Image1. Do not inherit the capybara head or outfit.\n\nOutput FOUR columns by TWO rows of EIGHT equal square cells, 2:1 landscape canvas, transparent PNG. Each entire character fits inside its cell with comfortable margins; stable center of pelvis, scale, ground line. No text, numbering, boxes, shadows or background.\nThe motion is one FULL TWO-STEP BIPEDAL WALK. Two legs, never one. LIGHTER foreground leg stays in front; DARKER background leg stays behind throughout the whole cycle.\nTop row: frame0 LIGHT near foot FORWARD RIGHT / DARK far foot BACK LEFT; frame1 light stance moves back while dark foot lifts from behind; frame2 LIGHT foot planted UNDER HIP and DARK bent foot passing forward just off ground; frame3 LIGHT leg reaches BACK LEFT while DARK leg reaches FORWARD RIGHT.\nBottom row: frame4 LIGHT near foot BACK LEFT / DARK far foot FORWARD RIGHT, opposite frame0; frame5 DARK stance moves back and LIGHT foot lifts behind; frame6 DARK foot planted UNDER HIP and LIGHT bent foot passing forward just off ground; frame7 LIGHT leg reaches FORWARD RIGHT while DARK leg goes BACK LEFT.\nTherefore frames0/4 have opposite leading legs, and frames2/6 have opposite lifted legs. Copy Image1's successful alternating foreground/background layering exactly. Keep both pink/red eyes and full black robe/cowl on EVERY frame. Robe hem bends around alternating feet and knees; feet remain visible and the cloth moves with the gait.\nCrisp pixel-art; no extra limbs; no drift or redesign.",
+        "visualReview": "Accepted full rightward two-step cycle following capybara motion reference. Contact0 has foreground foot forward/right; contact4 foreground foot trails left with opposite far-leg lead. Frame2 and6 exchange planted/passing legs; leg shading is subtler in the normal outfit than the robe but contact poses and layering distinguish the half-cycles. Pink eyes and black cowl retained throughout; hem bends around alternating legs. Transparent 4x2, safe cell margins."
+      },
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as base; only declared frame rectangles replaced. All other decoded pixels preserved exactly. Generated sources and exact final prompts retained below.",
+      "patches": [
+        {
+          "frame": 6,
+          "source": "foot_direction/edits/wombat-robed-f6.png",
+          "sourceSha256": "feef9b4437ccc74aec92ea7c0f0b7341f613de3e1326f454d492b57004c75269",
+          "layout": "atlas",
+          "replaceBelowY": 165,
+          "replaceFromX": 135,
+          "replaceToX": 185,
+          "prompt": "Make one decisive small correction in bottom-third sprite, frame 6 ONLY: the raised LIGHT TAN foot must be a small RIGHT-FACING FOOT, with identifiable heel at LEFT, toes sticking out RIGHT from the ankle. Replace the current detached oval/diamond shape with that foot and a short connected ankle emerging from under the robe. Keep the DARK BROWN planted far foot directly under the body/left of lifted foot. Preserve every other pixel/pose, heads, red eyes, robes, frame4 light back-left leg/dark front-right leg, 4x2 grid and transparent background."
+        }
+      ]
     },
     {
       "type": "rabbit",
       "pose": "normal",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/rabbit-normal.png",
       "sourceSha256": "42a430da4a252659459ead5484334f60adeaf1299e87c35d6f910aa28efe286c",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/rabbit/idle.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "baseProvenance": {
+        "type": "rabbit",
+        "pose": "normal",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/rabbit-normal.png",
+        "sourceSha256": "42a430da4a252659459ead5484334f60adeaf1299e87c35d6f910aa28efe286c",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/rabbit/idle.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "layout": "atlas",
+          "replaceBelowY": 172,
+          "prompt": "Use case: precise-object-edit. Asset type: pixel-art game walk-animation sprite atlas.\nInput image is the edit target: a transparent 1024x512 atlas of the same anthropomorphic brown rabbit in blue overalls and striped shirt, 8 walk frames laid out in an exact 4-column, 2-row grid, each 256x256 square cell; frames numbered 0\u20137 left-to-right top then bottom.\nPrimary request: fix the malformed backward-facing foot in frame 6 ONLY (bottom row, third cell). In that frame the pale near-side leg should have its knee swung FORWARD toward screen RIGHT, with the lower leg and long rabbit paw lifted beneath it and the toes pointing screen RIGHT. It is the forward recovery passing pose between the near leg trailing in frame 4 and leading in the next frame 0. The dark far-side leg stays planted beneath the body. Do not leave the near knee and dangling paw behind the body pointing down/left.\nPreserve absolutely everything else: all other seven frames, exact character identity, head/face/ears, torso, arms, overalls, striped shirt, pixel texture, black/brown outlines, palette, sprite scale, spacing, placement and transparency. Make the minimum possible correction only to the legs and foot in bottom-row third cell; keep the near-leg lighter shading and far-leg darker shading. Do not mirror any frame or entire character. Do not duplicate the first half-cycle in the second half-cycle. Keep the 2:1 canvas with exactly 4 columns and 2 rows and genuinely transparent background. No text, borders or visible grid.",
+          "frame": 6,
+          "source": "foot_direction/edits/rabbit-normal.png",
+          "sourceSha256": "4729e855e5bd97e28a3ac03ce3b6d5f61e5db350257097b429e4e65544c36a50"
+        }
+      ]
     },
     {
       "type": "rabbit",
       "pose": "robed",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/rabbit-robed.png",
       "sourceSha256": "fee5f395564eee2c4e9c231caadee4a40bba608f256128866aee9e9240f45882",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/rabbit/robed.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "baseProvenance": {
+        "type": "rabbit",
+        "pose": "robed",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/rabbit-robed.png",
+        "sourceSha256": "fee5f395564eee2c4e9c231caadee4a40bba608f256128866aee9e9240f45882",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/rabbit/robed.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "layout": "atlas",
+          "replaceBelowY": 180,
+          "prompt": "Use case: precise-object-edit. Asset type: pixel-art game walk-animation sprite atlas.\nInput image is the edit target: a transparent 1024x512 atlas of the same anthropomorphic brown rabbit with red eyes in a charcoal hooded robe, 8 walk frames laid out in an exact 4-column, 2-row grid, each 256x256 square cell; frames numbered 0\u20137 left-to-right top then bottom.\nPrimary request: fix the malformed backward-facing foot in frame 6 ONLY (bottom row, third cell). In that frame the pale near-side leg should have its knee swung FORWARD toward screen RIGHT, with the lower leg and long rabbit paw lifted beneath it in front of the robe and the toes pointing screen RIGHT. It is the forward recovery passing pose between the near leg trailing in frame 4 and leading in the next frame 0. The dark far-side leg stays planted beneath the body. Do not leave the near knee and dangling paw behind the body pointing down/left.\nPreserve absolutely everything else: all other seven frames, exact character identity, head/face/ears/red eyes, torso, arms, robe, pixel texture, dark outlines, palette, sprite scale, spacing, placement and transparency. Make the minimum possible correction only to the near leg and foot in bottom-row third cell and immediately adjacent robe hem to accommodate the forward knee; keep the near-leg lighter shading and far-leg darker shading. Do not mirror any frame or entire character. Do not duplicate the first half-cycle in the second half-cycle. Keep the 2:1 canvas with exactly 4 columns and 2 rows and genuinely transparent background. No text, borders or visible grid.",
+          "frame": 6,
+          "source": "foot_direction/edits/rabbit-robed.png",
+          "sourceSha256": "bb6cb0695ed427ea6f856772e032671dce8ab761416853ba583cce3ad35795c1",
+          "preserveRects": [
+            {
+              "x": 120,
+              "y": 180,
+              "width": 23,
+              "height": 8
+            }
+          ]
+        }
+      ]
     },
     {
       "type": "red_panda",
@@ -239,50 +485,146 @@
     {
       "type": "tarsier",
       "pose": "normal",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/tarsier-normal.png",
       "sourceSha256": "4c34d6d4ce759e547f56ec720cff15a33251314ca121415f62c9cf088b76b7db",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/tarsier/idle.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "baseProvenance": {
+        "type": "tarsier",
+        "pose": "normal",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/tarsier-normal.png",
+        "sourceSha256": "4c34d6d4ce759e547f56ec720cff15a33251314ca121415f62c9cf088b76b7db",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/tarsier/idle.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "layout": "atlas",
+          "replaceBelowY": 154,
+          "prompt": "Use case: precise-object-edit. Asset type: pixel-art game walk-animation sprite atlas.\nInput image is the edit target: a transparent 1024x512 atlas of the same anthropomorphic golden-brown tarsier with large brown eyes in a tan explorer vest and dark trousers, 8 walk frames laid out in an exact 4-column, 2-row grid, each 256x256 square cell; frames numbered 0\u20137 left-to-right top then bottom.\nPrimary request: fix the malformed backward-facing foot in frame 6 ONLY (bottom row, third cell). In that frame the pale near-side leg has its knee swinging FORWARD toward screen RIGHT; correct its dangling toes so its lifted foot points screen RIGHT in a natural forward recovery pose. Position the lower leg and lifted long-toed tarsier foot beneath and slightly ahead of that forward knee, with ankle at the left and toes extending RIGHT. It is the forward recovery passing pose between the pale near leg trailing in frame 4 and leading in the next frame 0. The dark far-side leg stays planted beneath the body. Do not leave the near foot pointing down/left like a hand or backwards flipper.\nPreserve absolutely everything else: all other seven frames, exact character identity, head/face/ears/large eyes, tail, torso, arms/hands, vest, green neck scarf, trousers, pixel texture, brown outlines, palette, sprite scale, spacing, placement and transparency. Make the minimum possible correction only to the near lower leg and foot in bottom-row third cell; keep the near-leg lighter shading and far-leg darker shading. Do not mirror any frame or entire character. Do not duplicate the first half-cycle in the second half-cycle. Keep the 2:1 canvas with exactly 4 columns and 2 rows and genuinely transparent background. No text, borders or visible grid.",
+          "frame": 6,
+          "source": "foot_direction/edits/tarsier-normal.png",
+          "sourceSha256": "86708dc589a0c02b9673223c9f8809fdc9d31589348fca14a6abafacd4b83ab3",
+          "replaceFromX": 119,
+          "replaceToX": 180
+        }
+      ]
     },
     {
       "type": "tarsier",
       "pose": "robed",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/tarsier-robed.png",
       "sourceSha256": "15ad3676e59dbd3de47639508c683a5d5395d43fe12909351c75b2f387f75ba8",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/tarsier/robed.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "baseProvenance": {
+        "type": "tarsier",
+        "pose": "robed",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/tarsier-robed.png",
+        "sourceSha256": "15ad3676e59dbd3de47639508c683a5d5395d43fe12909351c75b2f387f75ba8",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/tarsier/robed.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "layout": "atlas",
+          "replaceBelowY": 164,
+          "prompt": "Use case: precise-object-edit. Asset type: pixel-art game walk-animation sprite atlas.\nInput image is the edit target: a transparent 1024x512 atlas of the same anthropomorphic golden-brown tarsier with large red-brown eyes in a dark charcoal-purple hooded robe, 8 walk frames laid out in an exact 4-column, 2-row grid, each 256x256 square cell; frames numbered 0\u20137 left-to-right top then bottom.\nPrimary request: fix the malformed backward-facing foot in frame 6 ONLY (bottom row, third cell). In that frame the pale near-side leg should have its knee swung FORWARD toward screen RIGHT, with the lower leg and long-toed tarsier foot lifted beneath it in front of the robe. Correct the dangling hand-like toes so the lifted foot points screen RIGHT in a natural forward recovery passing pose. Ankle is at the left of this foot and toes extend RIGHT. It is the forward recovery pose between the pale near leg trailing in frame 4 and leading in the next frame 0. The dark far-side leg stays planted beneath the body. Do not leave the near knee/foot behind the body pointing down/left.\nPreserve absolutely everything else: all other seven frames, exact character identity, head/face/ears/large eyes, tail, torso, arms/hands, robe, pixel texture, dark outlines, palette, sprite scale, spacing, placement and transparency. Make the minimum possible correction only to the near leg and foot in bottom-row third cell and immediately adjacent robe hem to accommodate the forward knee; keep the near-leg lighter shading and far-leg darker shading. Do not mirror any frame or entire character. Do not duplicate the first half-cycle in the second half-cycle. Keep the 2:1 canvas with exactly 4 columns and 2 rows and genuinely transparent background. No text, borders or visible grid.",
+          "frame": 6,
+          "source": "foot_direction/edits/tarsier-robed.png",
+          "sourceSha256": "3255e4b812dbef8948ab96e5400beff5f2a384da7a3a3660547dbe08df4ba460",
+          "replaceFromX": 118,
+          "replaceToX": 180
+        }
+      ]
     },
     {
       "type": "aye_aye",
       "pose": "normal",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/aye_aye-normal.png",
       "sourceSha256": "de5f40ef3f28916655422691a448d1e054166cbb29b1627124bf8af69c5d1f39",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/aye_aye/idle.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as base; only declared frame rectangles replaced. All other decoded pixels preserved exactly. Generated sources and exact final prompts retained below.",
+      "baseProvenance": {
+        "type": "aye_aye",
+        "pose": "normal",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/aye_aye-normal.png",
+        "sourceSha256": "de5f40ef3f28916655422691a448d1e054166cbb29b1627124bf8af69c5d1f39",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/aye_aye/idle.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "frame": 6,
+          "source": "foot_direction/edits/aye_aye-normal-f6.png",
+          "sourceSha256": "a2926bbf2b641655bddc8578b2d547e751ec4ef9a28aeb1fa1f58eaf44d44c24",
+          "layout": "atlas",
+          "replaceBelowY": 153,
+          "replaceFromX": 116,
+          "replaceToX": 176,
+          "prompt": "In bottom-third sprite frame 6 ONLY, replace the oversized exposed light shin with a much shorter, lower, natural bent-leg walking pose. Critical: EXTEND THE PURPLE SHORTS/TUNIC HEM DOWN to match the other frames, so no exposed skin appears above the other sprites' trouser hems. Light near shin and right-facing foot must emerge BELOW that normal hem; the light raised foot should be only about 6-10 original sprite pixels above the dark planted foot's sole. Keep the light foot to the RIGHT/front of the planted dark foot. Heel left, toes right. This is a small gentle walking step, not a high knee lift. The current shin rising into the belly area is the error; delete that high shin and restore purple cloth there. Preserve other seven frames exactly, including light rear-left leg in frame4 and dark front-right leg. Preserve heads, costumes, palette, positions, 4x2 grid and transparent background."
+        }
+      ]
     },
     {
       "type": "aye_aye",
       "pose": "robed",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/aye_aye-robed.png",
       "sourceSha256": "0f13d1a8dd0438543192954849fef993160411bd723698bf46f3703486ebe28f",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/aye_aye/robed.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as base; only declared frame rectangles replaced. All other decoded pixels preserved exactly. Generated sources and exact final prompts retained below.",
+      "baseProvenance": {
+        "type": "aye_aye",
+        "pose": "robed",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/aye_aye-robed.png",
+        "sourceSha256": "0f13d1a8dd0438543192954849fef993160411bd723698bf46f3703486ebe28f",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/aye_aye/robed.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "frame": 6,
+          "source": "foot_direction/edits/aye_aye-robed-f6.png",
+          "sourceSha256": "ae1b6f85363d34cc1a9b06a4fb418e1866e098620186755d7741f3719a708e1a",
+          "layout": "atlas",
+          "replaceBelowY": 153,
+          "replaceFromX": 116,
+          "replaceToX": 176,
+          "prompt": "In bottom-third sprite frame 6 ONLY, replace the oversized exposed light shin with a much shorter, lower, natural bent-leg walking pose. Critical: EXTEND THE CHARCOAL ROBE HEM DOWN to match the other frames, so no exposed skin appears above the other sprites' robe hems. Light near ankle and right-facing foot must emerge BELOW that normal hem; the light raised foot should be only about 6-10 original sprite pixels above the dark planted foot's sole. Keep the light foot to the RIGHT/front of the planted dark foot. Heel left, toes right. This is a small gentle walking step, not a high knee lift. The current shin rising into the belly area is the error; delete that high shin and restore charcoal robe there. Preserve other seven frames exactly, including light rear-left leg in frame4 and dark front-right leg. Preserve heads, red eyes, robes, palette, positions, 4x2 grid and transparent background."
+        }
+      ]
     },
     {
       "type": "kakapo",
@@ -299,14 +641,38 @@
     {
       "type": "kakapo",
       "pose": "robed",
-      "sourceFormat": "prepared-atlas",
+      "sourceFormat": "frame-patches",
       "source": "recovered/kakapo-robed.png",
       "sourceSha256": "7c0455c6b283af7b9f0ae11d82bb3b44fa2835986d8a6b977f5de0801e1e86fa",
       "sourceFacing": "right",
       "idleFacing": "right",
       "reference": "../../characters/kakapo/robed.png",
       "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
-      "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      "provenance": "Lower-limb corrections made with built-in image generation. Original prepared atlas retained as the base; only declared frame rectangles are replaced, with all other decoded pixels preserved exactly. Generated sources and exact edit prompts retained below.",
+      "baseProvenance": {
+        "type": "kakapo",
+        "pose": "robed",
+        "sourceFormat": "prepared-atlas",
+        "source": "recovered/kakapo-robed.png",
+        "sourceSha256": "7c0455c6b283af7b9f0ae11d82bb3b44fa2835986d8a6b977f5de0801e1e86fa",
+        "sourceFacing": "right",
+        "idleFacing": "right",
+        "reference": "../../characters/kakapo/robed.png",
+        "promptSummary": "Preserve the reference character and outfit in eight chronological right-facing poses. Near foot leads at frame0 and trails at frame4; far foot does the opposite. Alternate supporting and swinging feet at frames2 and6. Stable head/body scale, no extra limbs, consistent clothing and eyes, transparent background.",
+        "provenance": "Built-in image generation; accepted normalized output recovered after automatic workspace cleanup. The original larger generated sheet and exact per-call prompt were lost; this record retains the unchanged reviewed atlas, not a claimed original source."
+      },
+      "patches": [
+        {
+          "layout": "atlas",
+          "replaceBelowY": 183,
+          "replaceFromX": 80,
+          "replaceToX": 210,
+          "prompt": "Use case: precise-object-edit. Edit this pixel-art kakapo bird in a dark robe walk sprite atlas. Keep the exact 4-column x2-row layout and transparent background, all head/body/robe/wing art identical. Repair ONLY frame 6 (BOTTOM ROW, THIRD CELL): the raised LIGHT TAN NEAR foot incorrectly stays BEHIND the body on the screen-left side, repeating frame5. Make this the near-leg FORWARD passing pose instead: the light near knee swings toward SCREEN RIGHT, and its small three front toes point SCREEN RIGHT, lightly raised above the floor IN FRONT OF the planted dark far foot. Near ankle at front/right under the robe, small compact bird foot not human boot. Far DARK BROWN foot remains planted below the robe at its existing floor baseline. The raised near toes should extend right of the planted foot; they must never point backward/down. Keep the near/light and far/dark identities throughout, with near foot behind at frame4, starting to lift at5, swinging forward at6 and approaching contact7/0. All other SEVEN CELLS must retain their exact current poses and colors. No new feet, no double images, no legs crossing awkwardly. Preserve the original pixel brushwork, size, fixed camera and canvas padding. Output one transparent 4x2 sheet, 1536x768; no text, no numbering or shadows.",
+          "frame": 6,
+          "source": "foot_direction/edits/kakapo-robed.png",
+          "sourceSha256": "528aea640278b5c4e593c4a0ae02faf54513e657bf5058232cc13b6532220de6"
+        }
+      ]
     }
   ]
 }

@@ -11,7 +11,7 @@ trails at frame 4, with opposite passing legs at frames 2 and 6. A set of eight
 different images alone does not prove that the legs alternate. Inspect the full
 loop, direction, costume and contact poses after any artwork change.
 
-`manifest.json` retains checksums and distinguishes two source formats:
+`manifest.json` retains checksums and distinguishes three source formats:
 
 - `sheet`: original generated 4×2 image plus its exact generation prompt. The
   builder removes backing/fringe, uses one scale and horizontal anchor for the
@@ -22,10 +22,26 @@ loop, direction, costume and contact poses after any artwork change.
   explicitly labelled prompt summary and provenance. The builder checks its
   geometry and checksum, then restores it byte-for-byte. It is not represented
   as the original image-generation output.
+- `frame-patches`: a retained prepared base atlas plus checksummed generated
+  corrections. The builder extracts the selected cell (or single-frame source),
+  nearest-resizes it to 256px, aligns its floor, and replaces only the declared
+  lower rectangle. All other decoded pixels stay identical to the base. The
+  exact edit prompt and original source provenance are retained in the manifest.
 
 The older unreferenced sheets remain historical art; the manifest identifies the
 inputs used for current builds. Raw sources are excluded from EAS archives; only
 prepared runtime character assets ship.
+
+The September 20 foot-direction repairs are under `foot_direction/`. Patch
+indices are zero-based. `replaceBelowY` is inclusive; optional `replaceFromX`
+and exclusive `replaceToX` default to 0 and 256. Optional integer `offsetX` and
+`offsetY` are translations in 256px cell coordinates; explicit `offsetY`
+overrides automatic floor alignment. Final geometry must still pass. These
+rectangles preserve faces, hands, tails, and untouched frames while repairing
+reversed toes or an incorrectly folded passing foot. Inspect seams as well as
+foot direction and alternating leg ownership before accepting a new rectangle.
+Optional `preserveRects` (`x`, `y`, `width`, `height`) retain original islands
+inside a patch, such as the rabbit's hand overlapping the lower robe.
 
 From `mobile/`:
 
