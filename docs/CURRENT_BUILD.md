@@ -14,7 +14,9 @@ All 222 collected Jest suites have passing results across the integrated and foc
 
 The [complete store campaign](../mobile/assets/Play_store/assembled-listing-2026-09/README.md) contains eight 1080 × 1920 portrait images, the feature graphic, icon alternatives, listing copy and a self-contained review. It uses source-asset assembly, including the complete pit path and updated choice art; the separate real-capture workflow remains available. Editing these files does not update the live Play listing.
 
-## September 17 walking follow-up
+## Animal walking follow-ups
+
+`feature/walk-foot-direction` corrects seventeen lower-limb frames across fourteen normal/robed walk atlases after reviewing all thirteen animals. Forward toes and alternating leg identity are preserved; the original fox walk is unchanged. The deterministic patch builder retains every pixel outside each selected lower-limb rectangle. See the [repair and validation report](ANIMAL_WALK_REPAIR_2026-09-20.md). This is a feature-branch artwork follow-up, not a new signed Android build or Play upload.
 
 [PR #449](https://github.com/jpearleverett/WordShift/pull/449), on `feature/alternating-animal-walks` based on main `3b7ec4e`, supplies 12 refreshed normal cycles and 13 robed cycles; the original ten-frame normal fox walk remains. Outfit selection, loading fallbacks, facing and interrupted travel are covered, with reduced-motion and device-tier limits retained. [The walking review](ANIMAL_WALK_REVIEW_2026-09-17.md) records all 25 atlas checks, 5,161 unit tests and 43 browser journeys passing. This follow-up awaits owner merge and does not represent a new signed Android build or Play upload.
 

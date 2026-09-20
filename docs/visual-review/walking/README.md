@@ -2,6 +2,8 @@
 
 These chronological strips show both outfits using the exact runtime PNGs. Each new cycle has eight frames; the original normal fox keeps ten. Contact poses are 0/4 and passing poses 2/6 (approximately 0/5 and 2/7 for the original fox).
 
+Updated September 20 for the [foot-direction repair](../../ANIMAL_WALK_REPAIR_2026-09-20.md): seventeen lower-limb frames across fourteen atlases. The strips and checksums reflect these corrected assets. Earlier CI evidence linked below documents the preceding version; the new report records this follow-up's validation.
+
 | Animal | Complete frame strips |
 | --- | --- |
 | Fox | [Normal and robed](fox-frames.png) |

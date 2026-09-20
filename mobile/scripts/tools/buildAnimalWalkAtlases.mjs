@@ -10,6 +10,11 @@
  * Existing portraits and the fox's original normal walk are retained.
  * --pose normal|robed selects one outfit. Recovered prepared sources are copied
  * byte-for-byte after the same framing, baseline and frame-uniqueness checks.
+ * A frame-patches record retains a prepared base atlas and generated frame
+ * corrections. Only each declared lower rectangle is replaced; other pixels
+ * remain exactly as authored. replaceFromX/replaceToX optionally limit its
+ * columns (exclusive end); preserveRects retain original islands inside it.
+ * Patch offsets and preservation rectangles use the 256px cell coordinates.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -130,6 +135,99 @@ function assertGeometry(atlas, targetBaseline, name) {
   return boxes;
 }
 
+/** Pack generated corrections without redrawing, warping or mirroring limbs. */
+async function applyFramePatches(base, patches, name) {
+  if (!Array.isArray(patches) || patches.length === 0) throw new Error(`${name}: frame-patches requires at least one patch`);
+  const atlas = new PNG({ width: base.width, height: base.height });
+  base.data.copy(atlas.data);
+  const patchedFrames = new Set();
+  for (const patch of patches) {
+    const label = `${name}: frame ${patch.frame}`;
+    if (!Number.isInteger(patch.frame) || patch.frame < 0 || patch.frame >= COLUMNS * ROWS) {
+      throw new Error(`${label}: invalid patch frame index`);
+    }
+    if (patchedFrames.has(patch.frame)) throw new Error(`${label}: duplicate patch`);
+    patchedFrames.add(patch.frame);
+    if (!Number.isInteger(patch.replaceBelowY) || patch.replaceBelowY < 0 || patch.replaceBelowY >= CELL_SIZE) {
+      throw new Error(`${label}: replaceBelowY must be a row in the 256px cell`);
+    }
+    const replaceFromX = patch.replaceFromX ?? 0;
+    const replaceToX = patch.replaceToX ?? CELL_SIZE;
+    if (!Number.isInteger(replaceFromX) || !Number.isInteger(replaceToX)
+      || replaceFromX < 0 || replaceFromX >= replaceToX || replaceToX > CELL_SIZE) {
+      throw new Error(`${label}: replacement columns must satisfy 0 <= replaceFromX < replaceToX <= 256`);
+    }
+    if (patch.preserveRects !== undefined && !Array.isArray(patch.preserveRects)) {
+      throw new Error(`${label}: preserveRects must be an array`);
+    }
+    const preserveRects = patch.preserveRects ?? [];
+    for (const rect of preserveRects) {
+      if (!rect || !['x', 'y', 'width', 'height'].every(key => Number.isInteger(rect[key]))
+        || rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0
+        || rect.x + rect.width > CELL_SIZE || rect.y + rect.height > CELL_SIZE) {
+        throw new Error(`${label}: preservation rectangles must be positive integer regions within the 256px cell`);
+      }
+    }
+    if (!['single-frame', 'atlas'].includes(patch.layout)) throw new Error(`${label}: invalid patch layout`);
+    if (typeof patch.prompt !== 'string' || !patch.prompt.trim()) throw new Error(`${label}: retain the generated patch prompt`);
+    for (const key of ['offsetX', 'offsetY']) {
+      if (patch[key] !== undefined && (!Number.isInteger(patch[key]) || Math.abs(patch[key]) >= CELL_SIZE)) {
+        throw new Error(`${label}: ${key} must be an integer translation smaller than one cell`);
+      }
+    }
+    const bytes = fs.readFileSync(path.join(RAW_DIR, patch.source));
+    if (sha256(bytes) !== patch.sourceSha256) throw new Error(`${label}: generated patch checksum changed`);
+    const generated = PNG.sync.read(bytes);
+    let frame = generated;
+    if (patch.layout === 'atlas') {
+      if (Math.abs(generated.width / generated.height - 2) > 0.01) throw new Error(`${label}: patch atlas must have 4×2 square cells`);
+      const column = patch.frame % COLUMNS;
+      const row = Math.floor(patch.frame / COLUMNS);
+      const left = Math.round(column * generated.width / COLUMNS);
+      const top = Math.round(row * generated.height / ROWS);
+      const width = Math.round((column + 1) * generated.width / COLUMNS) - left;
+      const height = Math.round((row + 1) * generated.height / ROWS) - top;
+      frame = new PNG({ width, height });
+      PNG.bitblt(generated, frame, left, top, width, height, 0, 0);
+    }
+    // Retain the full source cell and its horizontal anchor. A nearest resize
+    // accounts only for generation resolution; there is no silhouette fitting.
+    const normalized = new PNG({ width: CELL_SIZE, height: CELL_SIZE });
+    normalized.data = await sharp(PNG.sync.write(frame))
+      .resize(CELL_SIZE, CELL_SIZE, { kernel: 'nearest', fit: 'fill' })
+      .ensureAlpha().raw().toBuffer();
+    for (let p = 0; p < normalized.data.length; p += 4) {
+      // Match the binary-alpha pixel-art contract without changing RGB colors.
+      if (normalized.data[p + 3] < 128) normalized.data.fill(0, p, p + 4);
+      else normalized.data[p + 3] = 255;
+    }
+    const startX = patch.frame % COLUMNS * CELL_SIZE;
+    const startY = Math.floor(patch.frame / COLUMNS) * CELL_SIZE;
+    const original = new PNG({ width: CELL_SIZE, height: CELL_SIZE });
+    PNG.bitblt(base, original, startX, startY, CELL_SIZE, CELL_SIZE, 0, 0);
+    const xOffset = patch.offsetX ?? 0;
+    // An explicit offsetY overrides automatic floor alignment, so a reviewed
+    // placement can be reproduced exactly. Final geometry must still pass.
+    const yOffset = patch.offsetY ?? bounds(original).bottom - bounds(normalized).bottom;
+    for (let y = patch.replaceBelowY; y < CELL_SIZE; y++) {
+      const targetRow = ((startY + y) * atlas.width + startX) * 4;
+      atlas.data.fill(0, targetRow + replaceFromX * 4, targetRow + replaceToX * 4);
+      const sourceY = y - yOffset;
+      if (sourceY < 0 || sourceY >= CELL_SIZE) continue;
+      const targetX = Math.max(replaceFromX, xOffset);
+      const sourceX = targetX - xOffset;
+      const copyWidth = Math.min(replaceToX, CELL_SIZE + xOffset) - targetX;
+      if (copyWidth <= 0) continue;
+      const sourceRow = (sourceY * CELL_SIZE + sourceX) * 4;
+      normalized.data.copy(atlas.data, targetRow + targetX * 4, sourceRow, sourceRow + copyWidth * 4);
+    }
+    for (const rect of preserveRects) {
+      PNG.bitblt(original, atlas, rect.x, rect.y, rect.width, rect.height, startX + rect.x, startY + rect.y);
+    }
+  }
+  return atlas;
+}
+
 async function build(record, check) {
   const pose = record.pose ?? 'normal';
   const name = `${record.type}/${pose}`;
@@ -141,6 +239,19 @@ async function build(record, check) {
   const idle = PNG.sync.read(idleBytes);
   const idleBox = bounds(idle);
   const outputPath = path.join(ROOT, 'assets/characters', record.type, pose === 'robed' ? 'robed_walk.png' : 'walk.png');
+  if (record.sourceFormat === 'frame-patches') {
+    if (sheet.width !== CELL_SIZE * COLUMNS || sheet.height !== CELL_SIZE * ROWS) throw new Error(`${name}: invalid patch base dimensions`);
+    const baseline = Math.round((idleBox.bottom + 1) / idle.height * CELL_SIZE) - 1;
+    assertGeometry(sheet, baseline, `${name} base`);
+    const atlas = await applyFramePatches(sheet, record.patches, name);
+    const boxes = assertGeometry(atlas, baseline, name);
+    const encoded = PNG.sync.write(atlas, { colorType: 6, inputColorType: 6 });
+    if (check) {
+      if (!fs.existsSync(outputPath) || !fs.readFileSync(outputPath).equals(encoded)) throw new Error(`${name}: patched atlas is stale; rerun the atlas builder`);
+    } else fs.writeFileSync(outputPath, encoded);
+    console.log(`${name}: ${check ? 'verified' : 'patched'} ${record.patches.length} frames; baseline=${baseline}; heights=${boxes.map(b => b.height).join(',')}`);
+    return;
+  }
   if (record.sourceFormat === 'prepared-atlas') {
     if (sheet.width !== CELL_SIZE * COLUMNS || sheet.height !== CELL_SIZE * ROWS) throw new Error(`${name}: invalid prepared atlas dimensions`);
     const baseline = Math.round((idleBox.bottom + 1) / idle.height * CELL_SIZE) - 1;
