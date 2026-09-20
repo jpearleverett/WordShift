@@ -129,7 +129,7 @@ describe('the house-completion cinematic survives an interrupted delivery', () =
   });
 
   test('the overlay completion acknowledges the owned record before marking the house celebrated', () => {
-    expect(APP).toContain('await ceremonyPlayback.complete(phaseTransitionEvent)');
+    expect(APP).toContain('await ceremonyPlayback.complete(cinematicEvent)');
     const complete = CEREMONY_PLAYBACK.slice(CEREMONY_PLAYBACK.indexOf('function complete('), CEREMONY_PLAYBACK.indexOf('function reset('));
     expect(complete).toContain('active?.event !== expectedEvent');
     expect(complete).toContain('await acknowledge(finished.record.id)');

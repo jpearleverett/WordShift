@@ -552,11 +552,10 @@ test('a real house ceremony remains readable and can finish at 320px with enlarg
   });
   await page.setViewportSize({ width: 320, height: 568 });
   await page.reload({ waitUntil: 'domcontentloaded' });
-  // Continue must be available before the player discovers the optional
-  // tap-to-hold gesture. Advancing once takes over the authored pacing.
+  // Every passage waits for Continue, and Back shares the fixed footer.
   await expect(page.getByTestId('phase-transition-next')).toBeVisible({ timeout: 30_000 });
   for (let scene = 0; scene < 5; scene++) {
-    const advance = page.getByRole('button', { name: scene === 4 ? 'Return to the house' : 'Continue the scene', exact: true });
+    const advance = page.getByRole('button', { name: scene === 4 ? 'Finish the scene' : 'Continue the scene', exact: true });
     await expect(advance).toBeVisible();
     await enlargeBrowserText(page);
     const art = page.getByTestId('phase-transition-art');
@@ -565,7 +564,8 @@ test('a real house ceremony remains readable and can finish at 320px with enlarg
     const skip = page.getByRole('button', { name: 'Skip transition', exact: true });
     // Do not scroll the controls into view: they must already fit, including
     // the complete button hit areas, on every page at the enlarged text size.
-    for (const element of [art, footer, advance, skip]) {
+    const back = page.getByTestId('phase-transition-back');
+    for (const element of [art, footer, advance, back, skip]) {
       await expect(element).toBeInViewport();
       const bounds = await element.boundingBox();
       expect(bounds).not.toBeNull();

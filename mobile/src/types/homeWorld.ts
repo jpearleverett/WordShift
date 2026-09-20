@@ -289,7 +289,7 @@ export interface Unlockable {
 /** A story ceremony remains owed until its last page is acknowledged. */
 export interface PendingCeremony {
   id: string;
-  kind: 'phase' | 'house' | 'arrival' | 'post_arrival' | 'new_cycle';
+  kind: 'phase' | 'phase_reaction' | 'house' | 'arrival' | 'post_arrival' | 'new_cycle';
   phase: DialoguePhase;
   cycle: number;
   /** Kept for an interrupted pit confirmation to return the same result. */

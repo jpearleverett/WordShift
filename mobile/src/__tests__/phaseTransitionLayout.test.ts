@@ -16,6 +16,7 @@ let mockDimensions = { width: 400, height: 800, fontScale: 1, scale: 1 };
 let mockAppStateListener: ((state: string) => void) | undefined;
 let mockBackListener: (() => boolean) | undefined;
 let mockInsets = { top: 20, right: 0, bottom: 20, left: 0 };
+let mockReducedMotion = true;
 
 jest.mock('react', () => ({
   ...jest.requireActual('react'),
@@ -39,6 +40,7 @@ jest.mock('react-native', () => {
     } },
     useWindowDimensions: () => mockDimensions,
     Dimensions: { get: () => mockDimensions },
+    Easing: { out: (easing: unknown) => easing, cubic: 'cubic' },
     StyleSheet: { absoluteFill: { position: 'absolute' }, create: (styles: unknown) => styles },
     Animated: {
       View: 'AnimatedView',
@@ -51,8 +53,8 @@ jest.mock('react-native', () => {
   };
 });
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => mockInsets }));
-jest.mock('../hooks/useReducedMotion', () => ({ useReducedMotion: () => true }));
-jest.mock('../services/settings', () => ({ getSettingsSync: () => ({ reducedMotion: true }) }));
+jest.mock('../hooks/useReducedMotion', () => ({ useReducedMotion: () => mockReducedMotion }));
+jest.mock('../services/settings', () => ({ getSettingsSync: () => ({ reducedMotion: mockReducedMotion }) }));
 jest.mock('../services/uiSound', () => ({
   createCeremonySoundScope: () => ({ play: jest.fn(), stop: jest.fn() }),
   stopCeremonyMusic: jest.fn(),
@@ -72,6 +74,8 @@ import {
   getPhaseTransitionEvent,
   POST_REVELATION_EVENT,
   NEW_CYCLE_EVENT,
+  HOUSE_COMPLETION_EVENT,
+  FINAL_PUZZLE_EVENT,
   buildPostRevelationEvent,
   PhaseTransitionEvent,
 } from '../services/phaseEvents';
@@ -149,7 +153,7 @@ function mount(event: PhaseTransitionEvent, onComplete = jest.fn()) {
     return tree;
   };
   render();
-  jest.advanceTimersByTime(0);
+  jest.advanceTimersByTime(mockReducedMotion ? 0 : 600);
   return {
     render,
     onComplete,
@@ -164,6 +168,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   mockDimensions = { width: 400, height: 800, fontScale: 1, scale: 1 };
   mockInsets = { top: 20, right: 0, bottom: 20, left: 0 };
+  mockReducedMotion = true;
 });
 afterEach(() => {
   mockHooks = null;
@@ -173,6 +178,9 @@ afterEach(() => {
 const phaseEvents = [
   ...([1, 2, 3, 4] as const).map(phase => getPhaseTransitionEvent(phase)!),
   POST_REVELATION_EVENT,
+  HOUSE_COMPLETION_EVENT,
+  FINAL_PUZZLE_EVENT,
+  NEW_CYCLE_EVENT,
 ];
 
 test.each([
@@ -191,6 +199,7 @@ test.each([
         const reading = byId(tree, 'phase-transition-reading');
         const footer = byId(tree, 'phase-transition-footer');
         const next = byId(tree, 'phase-transition-next');
+        const back = byId(tree, 'phase-transition-back');
         expect(art).toBeDefined();
         expect(find(art, node => node.type === 'Image')).toBeDefined();
         // A text-only passage used to collapse its entire illustrated stage.
@@ -200,9 +209,15 @@ test.each([
         expect(byId(reading, 'phase-transition-art')).toBeUndefined();
         expect(byId(reading, 'phase-transition-footer')).toBeUndefined();
         expect(byId(reading, 'phase-transition-next')).toBeUndefined();
+        expect(byId(reading, 'phase-transition-back')).toBeUndefined();
         expect(byId(footer, 'phase-transition-next')).toBe(next);
+        expect(byId(footer, 'phase-transition-back')).toBe(back);
+        expect(back?.props?.accessibilityLabel).toBe('Previous passage');
+        expect(back?.props?.disabled).toBe(page === 0);
+        expect(flatStyle(back?.props?.style).minHeight).toBeGreaterThanOrEqual(48);
+        expect(flatStyle(next?.props?.style).minHeight).toBeGreaterThanOrEqual(48);
         expect(next?.props?.accessibilityLabel).toBe(page === event.scenes.length - 1
-          ? 'Return to the house' : 'Continue the scene');
+          ? 'Finish the scene' : 'Continue the scene');
         expect(find(tree, node => node.props?.accessibilityLabel === 'Skip transition')).toBeDefined();
         press(next);
         jest.advanceTimersByTime(350);
@@ -214,7 +229,7 @@ test.each([
   }
 });
 
-test('Continue is available during autoplay and takes over pacing without a delayed extra advance', () => {
+test('Continue advances exactly one page and the final page waits for an explicit Continue', () => {
   const event: PhaseTransitionEvent = {
     ...getPhaseTransitionEvent(1)!,
     readAtOwnPace: false,
@@ -249,25 +264,35 @@ test('Continue is available during autoplay and takes over pacing without a dela
   }
 });
 
-test('Continue at an autoplay deadline cannot skip the next unread passage before React commits', () => {
-  const event: PhaseTransitionEvent = {
-    ...getPhaseTransitionEvent(1)!,
-    readAtOwnPace: false,
-    scenes: ['First passage.', 'Second passage.', 'Last passage.'].map((passage, index) => ({
-      text: passage, image: 'private_room', delay: index * 1000, duration: 1000,
-    })),
-  };
-  const harness = mount(event);
+test('Back revisits the previous passage and invalidates callbacks from an earlier visit', () => {
+  const harness = mount(shortEvent());
   try {
-    const tree = harness.render();
-    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
-    press(byId(tree, 'phase-transition-next'));
-    // Let the old autoplay callback run before the next render can commit its
-    // passive-effect cleanup. A state-only guard used to advance twice here.
-    jest.advanceTimersByTime(1);
-    const nextPage = harness.render();
-    expect(text(nextPage)).toContain('Second passage.');
-    expect(text(nextPage)).not.toContain('Last passage.');
+    const first = harness.render();
+    press(byId(first, 'phase-transition-back'));
+    expect(text(harness.render())).toContain('First passage.');
+    press(byId(first, 'phase-transition-next'));
+    jest.advanceTimersByTime(350);
+    const second = harness.render();
+    press(byId(second, 'phase-transition-next'));
+    jest.advanceTimersByTime(350);
+    const last = harness.render();
+    expect(text(last)).toContain('Last passage.');
+    press(byId(last, 'phase-transition-back'));
+    press(byId(last, 'phase-transition-back'));
+    jest.advanceTimersByTime(350);
+    expect(text(harness.render())).toContain('Second passage.');
+    // Index equality alone is insufficient after Back returns to this index.
+    press(byId(second, 'phase-transition-next'));
+    press(byId(second, 'phase-transition-back'));
+    expect(text(harness.render())).toContain('Second passage.');
+    press(byId(harness.render(), 'phase-transition-back'));
+    jest.advanceTimersByTime(350);
+    expect(text(harness.render())).toContain('First passage.');
+    press(byId(first, 'phase-transition-next'));
+    expect(text(harness.render())).toContain('First passage.');
+    expect(byId(harness.render(), 'phase-transition-back')?.props?.accessibilityState).toEqual({ disabled: true });
+    press(byId(harness.render(), 'phase-transition-next'));
+    expect(text(harness.render())).toContain('Second passage.');
     expect(harness.onComplete).not.toHaveBeenCalled();
   } finally {
     harness.dispose();
@@ -318,12 +343,6 @@ test('a personalized environmental backdrop remains behind the foreground scene'
 });
 
 
-// A 1000 ms scene auto-advances after the ceremony stretch: 1.1x for the
-// phase 1-2 events these fixtures use (the first long pauses a new player
-// meets), 1.25x from phase 3 on.
-const EARLY_AUTOPLAY_MS = 1100;
-const FULL_AUTOPLAY_MS = 1250;
-
 function shortEvent(readAtOwnPace = false): PhaseTransitionEvent {
   return {
     ...getPhaseTransitionEvent(1)!, readAtOwnPace,
@@ -341,7 +360,7 @@ test('Skip requires a separate confirmation and cancelling keeps the same page a
   const harness = mount(shortEvent());
   try {
     const original = harness.render();
-    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
+    jest.advanceTimersByTime(1000);
     // Two callbacks from the original button cannot confirm the second action.
     press(skipButton(original));
     press(skipButton(original));
@@ -382,11 +401,25 @@ test('Android Back asks before skipping and Back from that prompt returns to the
   expect(mockBackListener).toBeUndefined();
 });
 
-test('backgrounding at an autoplay deadline preserves the unread page until the app is active again', () => {
+test('Android Back navigates to the previous passage without opening Skip confirmation', () => {
+  const harness = mount(shortEvent());
+  try {
+    press(byId(harness.render(), 'phase-transition-next'));
+    jest.advanceTimersByTime(350);
+    expect(text(harness.render())).toContain('Second passage.');
+    expect(mockBackListener?.()).toBe(true);
+    const tree = harness.render();
+    expect(text(tree)).toContain('First passage.');
+    expect(byId(tree, 'phase-transition-skip-confirmation')).toBeUndefined();
+    expect(harness.onComplete).not.toHaveBeenCalled();
+  } finally { harness.dispose(); }
+});
+
+test('backgrounding preserves the unread page and foregrounding still waits for Continue', () => {
   const harness = mount(shortEvent());
   try {
     const original = harness.render();
-    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
+    jest.advanceTimersByTime(1000);
     mockAppStateListener?.('background');
     // Native AppState can change before React commits the pause and its cleanup.
     jest.advanceTimersByTime(60_000);
@@ -396,40 +429,61 @@ test('backgrounding at an autoplay deadline preserves the unread page until the 
     expect(harness.onComplete).not.toHaveBeenCalled();
     mockAppStateListener?.('active');
     expect(text(harness.render())).toContain('First passage.');
-    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
+    jest.advanceTimersByTime(60_000);
     expect(text(harness.render())).toContain('First passage.');
-    jest.advanceTimersByTime(1);
+    press(byId(harness.render(), 'phase-transition-next'));
     expect(text(harness.render())).toContain('Second passage.');
   } finally { harness.dispose(); }
   expect(mockAppStateListener).toBeUndefined();
 });
 
-test('phase 1-2 ceremonies auto-advance on the shorter early stretch; phase 3 keeps the full breath', () => {
-  const early = mount(shortEvent());
-  try {
-    early.render();
-    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
-    expect(text(early.render())).toContain('First passage.');
-    jest.advanceTimersByTime(1);
-    expect(text(early.render())).toContain('Second passage.');
-  } finally { early.dispose(); }
-
-  const late = mount({ ...shortEvent(), ...getPhaseTransitionEvent(3)!, readAtOwnPace: false, scenes: shortEvent().scenes });
-  try {
-    late.render();
-    jest.advanceTimersByTime(FULL_AUTOPLAY_MS - 1);
-    expect(text(late.render())).toContain('First passage.');
-    jest.advanceTimersByTime(1);
-    expect(text(late.render())).toContain('Second passage.');
-  } finally { late.dispose(); }
+test.each([false, true])('all ceremonies wait indefinitely on every page with reduced motion %s', reducedMotion => {
+  mockReducedMotion = reducedMotion;
+  for (const event of phaseEvents) {
+    const harness = mount(event);
+    try {
+      for (let page = 0; page < event.scenes.length; page++) {
+        harness.render();
+        jest.advanceTimersByTime(600_000);
+        const tree = harness.render();
+        expect(text(byId(tree, 'phase-transition-reading'))).toContain(event.scenes[page].text);
+        expect(harness.onComplete).not.toHaveBeenCalled();
+        press(byId(tree, 'phase-transition-next'));
+      }
+      expect(harness.onComplete).toHaveBeenCalledTimes(1);
+    } finally { harness.dispose(); }
+  }
 });
 
-test('scrolling a long passage takes over playback before the pending timer can advance', () => {
+test('reading text and scrolling are passive; only navigation controls change the passage', () => {
   const harness = mount(shortEvent());
   try {
     const tree = harness.render();
-    jest.advanceTimersByTime(EARLY_AUTOPLAY_MS - 1);
-    (byId(tree, 'phase-transition-reading')!.props!.onScrollBeginDrag as () => void)();
+    const reading = byId(tree, 'phase-transition-reading');
+    expect(find(reading, node => node.type === 'Pressable')).toBeUndefined();
+    (reading!.props!.onScroll as (event: unknown) => void)({ nativeEvent: { contentOffset: { y: 80 } } });
+    jest.advanceTimersByTime(60_000);
+    expect(text(harness.render())).toContain('First passage.');
+    expect(harness.onComplete).not.toHaveBeenCalled();
+  } finally { harness.dispose(); }
+});
+
+test('suspension preserves a revisited passage and ignores queued navigation until resumed', () => {
+  const harness = mount(shortEvent());
+  try {
+    press(byId(harness.render(), 'phase-transition-next'));
+    jest.advanceTimersByTime(350);
+    const second = harness.render();
+    expect(harness.render(true)).toBeNull();
+    press(byId(second, 'phase-transition-next'));
+    press(byId(second, 'phase-transition-back'));
+    jest.advanceTimersByTime(60_000);
+    expect(text(harness.render())).toContain('Second passage.');
+    press(byId(harness.render(), 'phase-transition-back'));
+    jest.advanceTimersByTime(350);
+    const first = harness.render();
+    harness.render(true);
+    press(byId(first, 'phase-transition-next'));
     jest.advanceTimersByTime(60_000);
     expect(text(harness.render())).toContain('First passage.');
     expect(harness.onComplete).not.toHaveBeenCalled();

@@ -36,6 +36,7 @@ async function seedCeremonySave(page: Page, pendingWard = false) {
       amber: 300, totalAmberEarned: 500, currentPhase: ward ? 1 : 2, phaseProgress: 55, puzzlesSolved: 32,
       unlockedAnimals: ['fox'], unlockedRooms: ['cozy_den'], introsSeen: ['fox'],
       lastDialogueRead: { fox: 32 }, pendingPhaseTransition: ward ? 2 : null,
+      conversationReadVersion: 1, conversationReadIds: { fox: ['fx_0_1', 'fx_0_2'] },
       pendingVariantTutorials: [], seenVariantTutorials: ['reverse', 'double_shift'],
       pendingCeremonies: ward ? [] : [{ id, kind: 'phase', phase: 2, cycle: 0, previousPhase: 1 }],
       cycleCount: 0, houseCompleted: false, houseCompletionCelebrated: false,
@@ -73,6 +74,53 @@ async function pendingIds(page: Page): Promise<string[]> {
   });
 }
 
+async function finishPhaseReaction(page: Page) {
+  await expect(page.getByTestId('phase-reaction-dialogue')).toBeVisible();
+  await expect(page.getByTestId('phase-reaction-text')).not.toBeEmpty();
+  await expect.poll(() => pendingIds(page)).toEqual(['0:phase_reaction:2']);
+  await page.getByRole('button', { name: "Continue after Ember's response", exact: true }).click();
+  await expect(page.getByTestId('phase-reaction-dialogue')).toHaveCount(0);
+  await expect.poll(() => pendingIds(page)).toEqual([]);
+}
+
+for (const reducedMotion of [false, true]) {
+  test(`phase scenes wait for Continue and support Back with reduced motion ${reducedMotion}`, async ({ page }) => {
+    await seedCeremonySave(page);
+    await page.evaluate(reduced => {
+      const settings = JSON.parse(localStorage.getItem('wordshift_settings')!);
+      localStorage.setItem('wordshift_settings', JSON.stringify({ ...settings, reducedMotion: reduced }));
+    }, reducedMotion);
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const reading = page.getByTestId('phase-transition-reading');
+    const next = page.getByTestId('phase-transition-next');
+    const back = page.getByTestId('phase-transition-back');
+    await expect(reading).toContainText(passages[0]);
+    await expect(back).toBeDisabled();
+    // Longer than the old scene timer, with no text tap or scroll that could
+    // have enabled the former opt-in manual mode.
+    await page.waitForTimeout(8_000);
+    await expect(reading).toContainText(passages[0]);
+    expect(await pendingIds(page)).toEqual([pendingId]);
+    await next.click();
+    await expect(reading).toContainText(passages[1]);
+    await back.click();
+    await expect(reading).toContainText(passages[0]);
+    await expect(back).toBeDisabled();
+    for (const control of [next, back]) {
+      await expect(control).toBeInViewport();
+      expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    }
+    for (let index = 0; index < passages.length - 1; index++) await next.click();
+    await expect(reading).toContainText(passages.at(-1)!);
+    await page.waitForTimeout(8_000);
+    await expect(reading).toContainText(passages.at(-1)!);
+    expect(await pendingIds(page)).toEqual([pendingId]);
+    await back.click();
+    await expect(reading).toContainText(passages.at(-2)!);
+  });
+}
+
 test('an interrupted ceremony replays after relaunch and one accidental Skip never consumes it', async ({ page }) => {
   await openInterruptedCeremony(page);
   await page.getByTestId('phase-transition-next').click();
@@ -98,7 +146,7 @@ test('an interrupted ceremony replays after relaunch and one accidental Skip nev
   await skip.click();
   await page.getByRole('button', { name: 'Skip scene', exact: true }).click();
   await expect(page.getByTestId('phase-transition-next')).toHaveCount(0);
-  await expect.poll(() => pendingIds(page)).toEqual([]);
+  await finishPhaseReaction(page);
   await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
@@ -120,7 +168,7 @@ test('rapid Continue input advances one passage and the final acknowledgement du
     await next.click();
   }
   await expect(page.getByTestId('phase-transition-next')).toHaveCount(0);
-  await expect.poll(() => pendingIds(page)).toEqual([]);
+  await finishPhaseReaction(page);
   await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
 });
 
@@ -139,7 +187,7 @@ test('a successful pit ward ceremony leaves the same pit navigation usable', asy
     await page.getByTestId('phase-transition-next').click();
   }
   await expect(page.getByTestId('phase-transition-next')).toHaveCount(0);
-  await expect.poll(() => pendingIds(page)).toEqual([]);
+  await finishPhaseReaction(page);
   // No reload or intermediate navigation: the successful cinematic leaves
   // OfferingPitScreen mounted, which is where the old busy ref stayed stuck.
   await page.getByRole('button', { name: 'Open utility menu', exact: true }).click();
@@ -179,6 +227,52 @@ test('a ceremony read failure during boot exposes Retry save and resumes its sav
   await expect(page.getByTestId('phase-transition-reading')).toContainText(passages[0]);
   await page.getByRole('button', { name: 'Skip transition', exact: true }).click();
   await page.getByRole('button', { name: 'Skip scene', exact: true }).click();
-  await expect.poll(() => pendingIds(page)).toEqual([]);
+  await finishPhaseReaction(page);
   await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
+});
+
+test('the immediate animal reaction survives relaunch without consuming ordinary conversations', async ({ page }, testInfo) => {
+  await openInterruptedCeremony(page);
+  const readProgress = () => page.evaluate(() => {
+    const progress = JSON.parse(localStorage.getItem('wordshift_home_progress')!);
+    return { read: progress.conversationReadIds, intros: progress.introsSeen, legacy: progress.lastDialogueRead };
+  });
+  const before = await readProgress();
+  for (const passage of passages) {
+    await expect(page.getByTestId('phase-transition-reading')).toContainText(passage);
+    await page.getByTestId('phase-transition-next').click();
+  }
+  await expect(page.getByTestId('phase-reaction-dialogue')).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.locator('[data-testid="phase-reaction-dialogue"] div[dir="auto"]').evaluateAll(elements => {
+    for (const element of elements) {
+      const node = element as HTMLElement;
+      const style = getComputedStyle(node);
+      node.style.fontSize = `${parseFloat(style.fontSize) * 1.5}px`;
+      const lineHeight = parseFloat(style.lineHeight);
+      if (Number.isFinite(lineHeight)) node.style.lineHeight = `${lineHeight * 1.5}px`;
+    }
+  });
+  const continueButton = page.getByRole('button', { name: "Continue after Ember's response", exact: true });
+  await expect(continueButton).toBeInViewport();
+  const bounds = (await continueButton.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(320);
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(568);
+  expect(bounds.height).toBeGreaterThanOrEqual(44);
+  await page.getByTestId('phase-reaction-scroll').evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect(continueButton).toBeInViewport();
+  await page.screenshot({ path: testInfo.outputPath('phase-reaction-small-large-text.png') });
+  const reaction = await page.getByTestId('phase-reaction-text').innerText();
+  expect(reaction.trim().length).toBeGreaterThan(20);
+  expect(await readProgress()).toEqual(before);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('phase-reaction-text')).toHaveText(reaction);
+  await expect(page.getByTestId('phase-transition-reading')).toHaveCount(0);
+  await finishPhaseReaction(page);
+  expect(await readProgress()).toEqual(before);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toBeVisible();
+  await expect(page.getByTestId('phase-reaction-dialogue')).toHaveCount(0);
+  expect(await readProgress()).toEqual(before);
 });

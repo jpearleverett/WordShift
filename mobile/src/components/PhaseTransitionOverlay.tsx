@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useEffect, useRef, useState } from 'react';
 import { FONT_SIZE } from '../theme/typeScale';
-import { View, StyleSheet, Animated, Easing, Pressable, TouchableOpacity, Image, ScrollView, useWindowDimensions, AppState, BackHandler } from 'react-native';
+import { View, StyleSheet, Animated, Easing, TouchableOpacity, Image, ScrollView, useWindowDimensions, AppState, BackHandler } from 'react-native';
 import { AppText } from './ui/AppText';
 import { PhaseTransitionEvent, PhaseScene, SceneImage, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryPortrait } from './StoryPortrait';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { getStorySpeakerName } from '../services/storyArchive';
-import { getCeremonyHoldHint } from '../services/phaseNarrative';
 import { STORY_ART } from './storyArt';
 
 
@@ -107,8 +106,8 @@ function getFlashColor(phase: number): string {
   return '#FFFFFF'; // bright
 }
 
-/** Authored scene timings (duration, gaps, effects) stretch by this factor so
- *  a ceremony page breathes rather than snapping past. */
+/** Authored visual effects retain their pacing; passage navigation always
+ *  waits for the reader, independently of these animation durations. */
 const CEREMONY_TIME_SCALE = 1.25;
 /** The Phase 1-2 ceremonies are the first long pauses a new player meets and
  *  the ones testers called slightly slow, so they stretch less. The Phase 3+
@@ -338,13 +337,13 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const effectiveReducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const [activeSceneIndex, setActiveSceneIndex] = useState(-1);
-  const [manualPlayback, setManualPlayback] = useState(false);
-  const manualPlaybackRef = useRef(false);
   const [skipConfirmation, setSkipConfirmation] = useState(false);
   const skipConfirmationRef = useRef(false);
   const [appActive, setAppActive] = useState(() => AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
   const appActiveRef = useRef(appActive);
   const activeSceneRef = useRef(-1);
+  const sceneVisitRef = useRef(0);
+  const sceneVisit = sceneVisitRef.current;
   const advanceLockedRef = useRef(false);
   const [advanceLocked, setAdvanceLocked] = useState(false);
   const currentEventRef = useRef(event);
@@ -378,6 +377,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const suspendedRef = useRef(suspended);
   const wasPausedRef = useRef(false);
   const deliveredSceneRef = useRef<{ event: PhaseTransitionEvent; index: number } | null>(null);
+  const deliveredCueIndicesRef = useRef(new Set<number>());
   useLayoutEffect(() => { onCompleteRef.current = onComplete; currentEventRef.current = event; });
   useLayoutEffect(() => { suspendedRef.current = suspended; });
   useEffect(() => {
@@ -576,10 +576,11 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   };
   const finishRef = useRef(finish);
   useLayoutEffect(() => { finishRef.current = finish; });
-  const next = () => {
+  const moveScene = (direction: -1 | 1) => {
     if (!event || visibleEventRef.current !== event || currentEventRef.current !== event || suspendedRef.current || !appActiveRef.current ||
         skipConfirmationRef.current || activeSceneIndex < 0 || activeSceneRef.current !== activeSceneIndex ||
-        hasSkipped.current || advanceLockedRef.current) return;
+        sceneVisitRef.current !== sceneVisit || hasSkipped.current || advanceLockedRef.current ||
+        (direction === -1 && activeSceneIndex === 0)) return;
     // A second tap from the same gesture must not consume the newly drawn page.
     // This brief guard affects input only, including with reduced motion enabled.
     advanceLockedRef.current = true;
@@ -588,30 +589,21 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       advanceLockedRef.current = false;
       setAdvanceLocked(false);
     }, 350));
-    // Once a reader takes the controls, subsequent pages wait for them too.
-    manualPlaybackRef.current = true;
-    setManualPlayback(true);
-    if (activeSceneIndex === event.scenes.length - 1) finishRef.current();
+    if (direction === 1 && activeSceneIndex === event.scenes.length - 1) finishRef.current();
     else {
-      activeSceneRef.current = activeSceneIndex + 1;
-      setActiveSceneIndex(activeSceneIndex + 1);
+      // Visiting the same page again must not reactivate a callback captured
+      // before Back. One gesture can navigate only its own visible visit.
+      sceneVisitRef.current += 1;
+      activeSceneRef.current = activeSceneIndex + direction;
+      setActiveSceneIndex(activeSceneIndex + direction);
     }
   };
-  // The passage itself is the hold control: a tap on the words the reader is
-  // already looking at cancels the pending advance (the timer effect below
-  // clears it) and hands over playback. Idempotent, so a tap in a
-  // ceremony that already waits for the reader does nothing at all.
-  const holdForReading = () => {
-    if (!event || visibleEventRef.current !== event || currentEventRef.current !== event || suspendedRef.current || !appActiveRef.current || hasSkipped.current) return;
-    manualPlaybackRef.current = true;
-    if (!manualPlayback) setManualPlayback(true);
-  };
+  const next = () => moveScene(1);
+  const previous = () => moveScene(-1);
 
   const requestSkip = () => {
     if (!event || visibleEventRef.current !== event || currentEventRef.current !== event || suspendedRef.current || !appActiveRef.current ||
         skipConfirmationRef.current || hasSkipped.current) return;
-    // Stop the clock synchronously: it may expire before React opens the prompt.
-    holdForReading();
     skipConfirmationRef.current = true;
     setSkipConfirmation(true);
     announceForA11y('Skip the rest of this scene? Keep reading, or skip scene.');
@@ -623,11 +615,17 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   };
   const requestSkipRef = useRef(requestSkip);
   const cancelSkipRef = useRef(cancelSkip);
-  useLayoutEffect(() => { requestSkipRef.current = requestSkip; cancelSkipRef.current = cancelSkip; });
+  const previousRef = useRef(previous);
+  useLayoutEffect(() => {
+    requestSkipRef.current = requestSkip;
+    cancelSkipRef.current = cancelSkip;
+    previousRef.current = previous;
+  });
   useEffect(() => {
     if (!event || suspended) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (skipConfirmationRef.current) cancelSkipRef.current();
+      else if (activeSceneRef.current > 0) previousRef.current();
       else requestSkipRef.current();
       return true;
     });
@@ -639,6 +637,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   useEffect(() => {
     visibleEventRef.current = null;
     deliveredSceneRef.current = null;
+    deliveredCueIndicesRef.current.clear();
+    sceneVisitRef.current += 1;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- A new external event owns a fresh native animation timeline and its render layers.
     setVisibleEvent(null);
     hasSkipped.current = false;
@@ -647,8 +647,6 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     activeSceneRef.current = -1;
     advanceLockedRef.current = false;
     setAdvanceLocked(false);
-    manualPlaybackRef.current = event?.readAtOwnPace === true;
-    setManualPlayback(event?.readAtOwnPace === true);
     setActiveSceneIndex(-1);
     setActiveImage(null);
     setBurst(null);
@@ -665,7 +663,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     soundScope.current = createCeremonySoundScope();
     const appStateListener = AppState.addEventListener('change', state => {
       const active = state === 'active';
-      // Native lifecycle callbacks fence the timer before the state render runs.
+      // Native lifecycle callbacks fence queued input before the state render runs.
       appActiveRef.current = active;
       setAppActive(active);
       soundScope.current?.stop();
@@ -724,8 +722,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     }
   }, [event, playbackPaused, overlayOpacity, sceneOpacity, sceneTranslateY]);
 
-  // Only a newly visible scene speaks or plays its cue. Changing playback
-  // mode cannot replay the bell, the descent, or the screen-reader announcement.
+  // A newly visible passage announces its text. One-shot cues play only on
+  // its first visit; rereading with Back cannot replay the bell or arrival.
   useEffect(() => {
     const scene = event?.scenes[activeSceneIndex];
     if (!event || playbackPaused || visibleEventRef.current !== event || currentEventRef.current !== event || !scene || hasSkipped.current) return;
@@ -742,6 +740,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       return;
     }
     deliveredSceneRef.current = { event, index: activeSceneIndex };
+    const firstVisit = !deliveredCueIndicesRef.current.has(activeSceneIndex);
+    deliveredCueIndicesRef.current.add(activeSceneIndex);
     const reducedMotion = getSettingsSync().reducedMotion;
     const timeScale = ceremonyTimeScale(event);
     stopEffectAnims();
@@ -751,25 +751,25 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     setBurst(null);
     scrollOffsetRef.current = 0;
     scrollRef.current?.scrollTo({ y: 0, animated: false });
-    runSceneImage(scene, timeScale, reducedMotion);
+    runSceneImage(scene, timeScale, reducedMotion || !firstVisit);
     announceForA11y(
       scene.speaker ? getStorySpeakerName(scene.speaker) + '. ' + scene.text : scene.text
     );
-    if (scene.effect === 'descend') {
+    if (firstVisit && scene.effect === 'descend') {
       stopCeremonyMusic();
       soundScope.current?.play('arrival');
     }
-    if (scene.cue === 'bell') soundScope.current?.play('story_bell');
-    if (scene.cue === 'answer') soundScope.current?.play('story_answer');
+    if (firstVisit && scene.cue === 'bell') soundScope.current?.play('story_bell');
+    if (firstVisit && scene.cue === 'answer') soundScope.current?.play('story_answer');
     let settleTimer: ReturnType<typeof setTimeout> | undefined;
-    fireSceneHaptic(scene, event.shakeIntensity);
-    if (scene.effect === 'descend') {
+    if (firstVisit) fireSceneHaptic(scene, event.shakeIntensity);
+    if (firstVisit && scene.effect === 'descend') {
       settleTimer = setTimeout(() => {
         if (!hasSkipped.current && appActiveRef.current && !suspendedRef.current && !skipConfirmationRef.current) hapticHeavy();
       }, Math.min(scene.duration * 0.75, 3800) * timeScale);
       timersRef.current.push(settleTimer);
     }
-    if (!reducedMotion) {
+    if (!reducedMotion && firstVisit) {
       runSceneEffect(scene, event.shakeIntensity ?? 0);
       if (scene.effect === 'particles_rise' || scene.effect === 'particles_fall') {
         burstNonceRef.current += 1;
@@ -797,32 +797,8 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       sceneOpacity.stopAnimation();
       sceneTranslateY.stopAnimation();
     };
-    // Playback mode is deliberately absent: it only controls the timer below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, activeSceneIndex, playbackPaused]);
-
-  useEffect(() => {
-    const scene = event?.scenes[activeSceneIndex];
-    if (!event || visibleEventRef.current !== event || currentEventRef.current !== event || !scene ||
-        playbackPaused || manualPlayback || hasSkipped.current) return;
-    // Reduced motion changes movement, never the time available to read: the
-    // reading budget is not a motion preference, and holding a passage is now
-    // one tap on the words for every reader, whatever their motion setting.
-    const nextScene = event.scenes[activeSceneIndex + 1];
-    const authoredGap = nextScene ? Math.max(0, nextScene.delay - scene.delay - scene.duration) : 350;
-    const timer = setTimeout(() => {
-      // A tap can land just before the state commit clears this timeout.
-      if (hasSkipped.current || manualPlaybackRef.current || suspendedRef.current || !appActiveRef.current ||
-          skipConfirmationRef.current || visibleEventRef.current !== event || currentEventRef.current !== event || activeSceneRef.current !== activeSceneIndex) return;
-      if (activeSceneIndex >= event.scenes.length - 1) finishRef.current();
-      else {
-        activeSceneRef.current = activeSceneIndex + 1;
-        setActiveSceneIndex(activeSceneIndex + 1);
-      }
-    }, (scene.duration + authoredGap) * ceremonyTimeScale(event));
-    timersRef.current.push(timer);
-    return () => clearTimeout(timer);
-  }, [event, activeSceneIndex, manualPlayback, playbackPaused]);
 
   if (!event || suspended) return null;
   const eventIsVisible = visibleEvent === event;
@@ -835,6 +811,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   // The card sizes to its content. Only the passage yields space on a short
   // screen; art and controls remain visible, even with larger system text.
   const compact = availableHeight < 640 || fontScale > 1.2;
+  const stackedFooter = contentWidth < 480 || fontScale > 1.2;
   const hasStageContent = !!(activeScene?.image || event.backdrop);
   const heroHeight = hasStageContent
     ? Math.max(72, Math.min(contentWidth / 1.5, availableHeight * (compact ? 0.23 : 0.4), 340))
@@ -915,7 +892,6 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
               {activeScene && <ScrollView ref={scrollRef} testID="phase-transition-reading"
                 style={styles.readingScroll}
                 contentContainerStyle={[styles.sceneContent, compact && styles.sceneContentCompact]} bounces={false}
-                onScrollBeginDrag={holdForReading}
                 onScroll={scrollEvent => { scrollOffsetRef.current = scrollEvent.nativeEvent.contentOffset.y; }}
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
@@ -927,22 +903,15 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
                     <View style={[styles.speakerRule, { backgroundColor: event.accentColor }]} />
                   </View>
                 </View>}
-                <Pressable
-                  style={styles.readingContent}
-                  onPress={manualPlayback ? undefined : holdForReading}
-                  accessible={!manualPlayback}
-                  accessibilityRole={manualPlayback ? undefined : 'button'}
-                  accessibilityLabel={manualPlayback ? undefined : activeScene.text}
-                  accessibilityHint={manualPlayback ? undefined : getCeremonyHoldHint()}
-                >
+                <View style={styles.readingContent}>
                   <AppText textRole="reading" style={styles.sceneText}>{activeScene.text}</AppText>
-                </Pressable>
+                </View>
               </ScrollView>}
             </Animated.View>
 
             {activeScene && <View testID="phase-transition-footer"
-              style={[styles.footer, fontScale > 1.2 && styles.footerStacked]}>
-              <View style={[styles.progressGroup, fontScale > 1.2 && styles.progressGroupWide]} accessible
+              style={[styles.footer, stackedFooter && styles.footerStacked]}>
+              <View style={[styles.progressGroup, stackedFooter && styles.progressGroupWide]} accessible
                 accessibilityLabel={`Passage ${activeSceneIndex + 1} of ${event.scenes.length}`}>
                 <View style={styles.progressMarks} accessible={false} accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants">
@@ -957,11 +926,21 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
                   {activeSceneIndex + 1} / {event.scenes.length}
                 </AppText>
               </View>
-              <TouchableOpacity testID="phase-transition-next" onPress={next} disabled={advanceLocked}
-                accessibilityState={{ disabled: advanceLocked }} style={[styles.continueButton, advanceLocked && styles.continueButtonSettling]}
-                accessibilityRole="button" accessibilityLabel={lastScene ? 'Return to the house' : 'Continue the scene'}>
-                <AppText textRole="label" style={styles.continueText}>{lastScene ? 'Return' : 'Continue'}</AppText>
-              </TouchableOpacity>
+              <View style={[styles.navigationGroup, !stackedFooter && styles.navigationGroupWide]}>
+                <TouchableOpacity testID="phase-transition-back" onPress={previous}
+                  disabled={advanceLocked || activeSceneIndex === 0}
+                  accessibilityState={{ disabled: advanceLocked || activeSceneIndex === 0 }}
+                  style={[styles.backButton, (advanceLocked || activeSceneIndex === 0) && styles.continueButtonSettling]}
+                  accessibilityRole="button" accessibilityLabel="Previous passage">
+                  <AppText textRole="label" style={styles.backText}>Back</AppText>
+                </TouchableOpacity>
+                <TouchableOpacity testID="phase-transition-next" onPress={next} disabled={advanceLocked}
+                  accessibilityState={{ disabled: advanceLocked }}
+                  style={[styles.continueButton, styles.navigationNext, advanceLocked && styles.continueButtonSettling]}
+                  accessibilityRole="button" accessibilityLabel={lastScene ? 'Finish the scene' : 'Continue the scene'}>
+                  <AppText textRole="label" style={styles.continueText}>Continue</AppText>
+                </TouchableOpacity>
+              </View>
             </View>}
           </View>
         </View>
@@ -1026,11 +1005,18 @@ const styles = StyleSheet.create({
   progressMarkRead: { backgroundColor: '#B99A71' },
   progressMarkCurrent: { width: 20, backgroundColor: '#E7C796' },
   progressText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 10, letterSpacing: 2, color: '#D5C3A9' },
+  navigationGroup: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
+  navigationGroupWide: { flex: 1 },
+  navigationNext: { flex: 1.5, minWidth: 0, paddingHorizontal: 8 },
+  backButton: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 8, paddingVertical: 12, borderRadius: 3, borderWidth: 1,
+    borderColor: SKIP_BORDER_COLOR, backgroundColor: '#100B15' },
+  backText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, color: SKIP_INK_COLOR, textAlign: 'center' },
   continueButton: { minHeight: 48, minWidth: 136, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 20, paddingVertical: 12, borderRadius: 3, borderWidth: 1,
     borderColor: '#F2D6A7', backgroundColor: '#E7C796' },
   continueButtonSettling: { opacity: 0.65 },
-  continueText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, color: '#241C21' },
+  continueText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, color: '#241C21', textAlign: 'center' },
   skipButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16, borderRadius: 3,
     borderWidth: 1, borderColor: SKIP_BORDER_COLOR, backgroundColor: '#100B15', zIndex: 1000 },
   skipText: { fontFamily: BODY_FONT_BOLD, fontSize: FONT_SIZE.bodyLg, color: SKIP_INK_COLOR },
