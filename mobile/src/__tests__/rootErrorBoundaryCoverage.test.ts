@@ -27,7 +27,6 @@ const ROOT_APP_BODY = APP_TSX.slice(rootAppStart, APP_TSX.indexOf('const bootSty
 const ROOT_OVERLAYS = [
   'VictoryModal',
   'FoxGuide',
-  'Confetti',
   'PhaseTransitionOverlay',
   'StorySceneModal',
   'StoryJournalModal',
@@ -61,6 +60,14 @@ describe('root ErrorBoundary coverage', () => {
     // Nothing outside MainApp (BootHold, App) may mount an overlay: it would
     // sit outside the boundary again.
     expect(OUTSIDE_MAIN_APP).not.toMatch(tag);
+  });
+
+  test('victory confetti remains inside the root boundary through VictoryModal', () => {
+    const VICTORY = fs.readFileSync(path.resolve(__dirname, '../components/puzzle/VictoryModal.tsx'), 'utf8');
+    expect(MAIN_APP_BODY).toMatch(/<VictoryModal\s/);
+    expect(VICTORY).toMatch(/<Confetti\s/);
+    expect(VICTORY).toContain('{celebration}');
+    expect(APP_TSX).not.toMatch(/<Confetti[\s/>]/);
   });
 
   test('the inner screen boundaries survive so a screen-only error still returns home', () => {
