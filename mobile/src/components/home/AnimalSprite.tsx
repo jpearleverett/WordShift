@@ -647,7 +647,9 @@ const FLOOR_OFFSET: Record<AnimalType, number> = {
   fox: 0,
   owl: 15,
   capybara: 0,
-  wombat: 0,
+  // Warren's normal feet end at 413/500 (74.3dp), almost 5dp above
+  // Chill's grounded 439/500 baseline. Keep his shadow planted below.
+  wombat: 5,
   rabbit: 0,
   // Measured from the landed art (lowest-opaque-row): tarsier carries 21%
   // bottom padding (between fox's 18% -> 0 and owl's 24% -> 15); the other
@@ -1462,7 +1464,11 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   });
 
   // Per-animal nudge so feet land on the floor (some sprite art sits high in frame).
-  const floorOffset = FLOOR_OFFSET[animal.type] ?? 0;
+  // Warren's robe ends another 13 source pixels higher than his overalls.
+  // Each outfit's atlas shares its static foot baseline, so this also keeps
+  // walking and resting planted at the same height through the reveal.
+  const floorOffset = (FLOOR_OFFSET[animal.type] ?? 0)
+    + (animal.type === 'wombat' && staticPose === 'robed' ? 2 : 0);
 
   // Phase-aware cottage puff behind the ambient emote sprite.
   const emoteBubbleTheme = getEmoteBubbleTheme(currentPhase);
@@ -1508,6 +1514,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
           <Animated.View
             style={[
               styles.shadow,
+              // Lower Warren and his badge into the existing floor shadow.
+              // Moving this oval down with the artwork would preserve the
+              // visible gap beneath his feet and still read as floating.
+              animal.type === 'wombat' && { top: 78 - floorOffset },
               {
                 opacity: shadowLiftOpacity,
                 transform: [

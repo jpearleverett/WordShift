@@ -176,6 +176,9 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
       accessibilityState={{ disabled }}
     >
       <Animated.View
+        // Fade the icon with its face as one surface. Applying alpha to the
+        // transparent sprite separately exposes a dark box on Android.
+        needsOffscreenAlphaCompositing={disabled}
         style={[
           styles.actionButton,
           disabled && styles.actionButtonDisabled,

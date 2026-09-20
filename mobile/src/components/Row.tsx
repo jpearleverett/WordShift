@@ -1244,6 +1244,10 @@ export const Row: React.FC<RowProps> = memo(({
   return (
     <Animated.View
       testID={`puzzle-row-${rowIndex}`}
+      // Compose the tile faces, glyphs and shadows before fading the row.
+      // Android's default per-child alpha leaves dark rectangular patches
+      // around transparent text/image bounds in dimmed rows.
+      needsOffscreenAlphaCompositing
       // Board-serve entrance wrapper: fades + rises the whole row in on a fresh
       // board serve (staggered by rowIndex). Kept OUTSIDE the row-transition
       // wrapper so its opacity/translateY compose cleanly with the inner
@@ -1265,6 +1269,9 @@ export const Row: React.FC<RowProps> = memo(({
       ]}
     >
     <Animated.View
+      // This wrapper owns the persistent target/completed/future-row fade;
+      // the outer wrapper independently fades the initial board entrance.
+      needsOffscreenAlphaCompositing
       style={[
         styles.rowWrapper,
         {
