@@ -1434,7 +1434,24 @@ describe('getJournalIntroLines', () => {
   test('phase 4 uses arrangement language', () => {
     const joined = getJournalIntroLines(4).join(' ');
     expect(joined).toContain('arrangement');
-    expect(joined).toContain('offered');
+    expect(joined).toContain('record');
+  });
+
+  test('distinguishes memories, recent puzzle words, and collected whispers in every phase', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const [memories, ledger, gallery, quests, open] = getJournalIntroLines(phase);
+      expect(memories).toContain('Things We Kept');
+      expect(memories).toContain("conversations you've had");
+      expect(ledger).toContain('Word Ledger');
+      expect(ledger).toContain('Journal');
+      expect(ledger).toContain('quill');
+      expect(ledger).toContain('recent');
+      expect(gallery).toMatch(/whispers, replies, and keepsakes/i);
+      expect(gallery).not.toMatch(/every conversation|anything we say|nothing is lost/i);
+      expect(quests).toContain('daily and weekly');
+      expect(quests).toContain('Season Pass');
+      expect(open).toContain('Journal menu');
+    }
   });
 
   test('different phase ranges produce different content', () => {
@@ -1471,6 +1488,16 @@ describe('getJournalSpotlightSteps', () => {
   test('preserves the provided gallery title', () => {
     const steps = getJournalSpotlightSteps(2, 'Voices in the Walls');
     expect(steps[2].title).toBe('Voices in the Walls');
+  });
+
+  test('previews actual Journal destinations instead of another Journal cover', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const cards = getJournalSpotlightSteps(phase, 'Whisper Gallery').filter(step => step.showInPreview);
+      expect(cards.map(step => step.title)).toEqual([
+        'Things We Kept', 'Word Ledger', 'Whisper Gallery', 'Quests',
+      ]);
+      expect(new Set(cards.map(step => step.icon)).size).toBe(cards.length);
+    }
   });
 });
 

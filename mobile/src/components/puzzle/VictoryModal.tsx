@@ -36,6 +36,7 @@ import { getModeIconSprite, getPhaseIndicatorSprite } from './modeIcons';
 import { CHROME_ICONS } from '../ui/chromeIcons';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { SURFACE } from '../../theme/surfaces';
+import { Confetti } from '../Confetti';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -104,6 +105,8 @@ export interface VictoryData {
 
 interface VictoryModalProps {
   visible: boolean;
+  /** Enabled only while this result owns the active overlay. */
+  showConfetti?: boolean;
   earnedStars: number;
   difficulty: string;
   phase: DialoguePhase;
@@ -217,6 +220,7 @@ function getVictoryTitleShadowColor(phase: DialoguePhase): string {
 
 export const VictoryModal: React.FC<VictoryModalProps> = ({
   visible,
+  showConfetti = false,
   earnedStars,
   difficulty,
   phase,
@@ -486,6 +490,15 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
   if (!visible) return null;
 
+  // Share the results' stacking context. A high-z child in a separate root
+  // wrapper can still land behind this scrim on Android. Keep the effect out
+  // of the scrolling/clipped card and transparent to touch and screen readers.
+  const celebration = showConfetti && !hushedBeat ? (
+    <View testID="victory-confetti" style={styles.celebration} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Confetti active phase={phase} ritualEnergy={victoryData?.ritualEnergy ?? 0} />
+    </View>
+  ) : null;
+
   // ---------------------------------------------------------------------
   // Compact result strip (Swift Victories, routine wins only): instant
   // appearance, condensed content — title, stars, total amber (+ flawless
@@ -687,6 +700,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </View>
           </View>
         </ScrollView>
+        {celebration}
       </View>
     );
   }
@@ -1476,11 +1490,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             accessibilityLabel="Skip celebration animation"
           />
         )}
+        {celebration}
       </View>
   );
 };
 
 const styles = StyleSheet.create({
+  celebration: { ...StyleSheet.absoluteFill, zIndex: 1 },
   modalOverlay: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(76, 29, 149, 0.7)',

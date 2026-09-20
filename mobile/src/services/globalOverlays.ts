@@ -1,7 +1,7 @@
 /** One actionable global overlay at a time. Source state remains parked while
  * another owner is visible; a suspended reward, story or share is not consumed. */
 export const GLOBAL_OVERLAYS = [
-  'saving', 'navigation', 'ceremony', 'alert', 'postVictoryIntro', 'story', 'journal', 'share', 'practice',
+  'saving', 'navigation', 'ceremony', 'alert', 'postVictoryIntro', 'story', 'journal', 'share',
   'store', 'patron', 'notification', 'dailyLogin', 'victory', 'timeUp',
 ] as const;
 export type GlobalOverlay = typeof GLOBAL_OVERLAYS[number];

@@ -46,27 +46,16 @@ const contrast = (a: string, b: string): number => {
 };
 
 describe('the victory confetti is mounted ABOVE the results scrim', () => {
-  test('App mounts the showConfetti burst as a root sibling AFTER the VictoryModal wrapper', () => {
-    const modalAt = APP.indexOf('<VictoryModal');
-    const confettiAt = APP.indexOf('active={puzzle.showConfetti');
-    expect(modalAt).toBeGreaterThan(0);
-    expect(confettiAt).toBeGreaterThan(modalAt);
-    // Exactly one victory confetti mount: the old in-screen one (under the
-    // scrim) is gone.
-    expect(APP.match(/active=\{puzzle\.showConfetti/g)?.length).toBe(1);
-  });
-
-  test('the burst is pointer-transparent and sits below the game-alert host', () => {
-    const confettiAt = APP.indexOf('active={puzzle.showConfetti');
-    const wrapperAt = APP.lastIndexOf('pointerEvents="none"', confettiAt);
-    // The nearest pointerEvents="none" before the mount is its own wrapper
-    // (within a few lines), not some unrelated element far above.
-    expect(confettiAt - wrapperAt).toBeLessThan(200);
-    expect(APP.lastIndexOf('<GameAlertModal')).toBeGreaterThan(confettiAt);
+  test('App delegates the effect to the results and gates it on overlay ownership', () => {
+    const modal = APP.slice(APP.indexOf('<VictoryModal'), APP.indexOf('/>', APP.indexOf('<VictoryModal')));
+    expect(modal).toContain("showConfetti={puzzle.showConfetti && overlayOwner === 'victory'}");
+    // Native stacking is covered by the rendered full/compact component tests.
+    // No separate root wrapper can escape the results' stacking context.
+    expect(APP).not.toContain('<Confetti');
   });
 
   test('StarBurst stays on the puzzle screen (above the board, under the modals)', () => {
-    const starAt = APP.indexOf('<StarBurst active={starBurst.active}');
+    const starAt = APP.indexOf('<StarBurst key={starBurst.id}');
     expect(starAt).toBeGreaterThan(0);
     expect(starAt).toBeLessThan(APP.indexOf('<VictoryModal'));
   });
@@ -93,11 +82,13 @@ describe('spark palettes are readable', () => {
     expect(contrast(SPARK_THEMES.spark_ash.bg, '#2E3355')).toBeGreaterThanOrEqual(3);
   });
 
-  test('the burst grew: 16dp core, 28dp halo at 0.45, accent from combo tier 1', () => {
-    expect(CONFETTI).toMatch(/starCore:\s*\{\s*width:\s*16,\s*height:\s*16/);
+  test('live and still bursts share the shop particle design without a combo-gated accent', () => {
     expect(CONFETTI).toMatch(/const STAR_BOX_DP = 28;/);
-    expect(CONFETTI).toMatch(/starHalo:[\s\S]*?opacity:\s*0\.45/);
-    expect(CONFETTI).toMatch(/tier >= 1 && i % 2 === 1 \? palette\.accent/);
+    expect(CONFETTI.match(/<SparkGlyph /g)).toHaveLength(2);
+    expect(SHOP).toContain('<SparkGlyph ');
+    expect(CONFETTI).not.toContain('tier >= 1 && i % 2 === 1');
+    expect(SHOP).toContain('comboTier={0}');
+    expect(SHOP).toContain('sparkIdOverride={sparkDemo.sparkId}');
   });
 
   test('the burst lives longer and clears the thumb', () => {
@@ -106,7 +97,9 @@ describe('spark palettes are readable', () => {
     expect(STARBURST_ORIGIN_LIFT_DP).toBe(36);
     expect(CONFETTI).toMatch(/Animated\.delay\(STARBURST_FADE_DELAY_MS\)/);
     expect(APP).toMatch(/feedbackOrigin\.y - STARBURST_ORIGIN_LIFT_DP/);
-    expect(APP).toMatch(/setStarBurst\(\{ active: false, x: 0, y: 0, comboTier: 0 \}\), STARBURST_DURATION_MS\)/);
+    expect(APP).toContain('current.id === moveBurstId ? { ...current, active: false } : current');
+    expect(APP).toContain('current.id === midpointBurstId ? { ...current, active: false } : current');
+    expect(APP).toContain('<StarBurst key={starBurst.id}');
   });
 });
 

@@ -12,6 +12,7 @@ import { BODY_FONT, BODY_FONT_ITALIC } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { StoryPortrait } from './StoryPortrait';
 import { getStoryPageArt } from './storyPageArt';
+import { getStorySceneLayout } from './storySceneLayout';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 
@@ -34,7 +35,7 @@ export interface StorySceneModalProps {
 }
 export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase, onAdvance, onChoose, onClose }) => {
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const { width, height, fontScale } = useWindowDimensions();
   const theme = getSurfaceTheme(phase);
   const scroll = useRef<ScrollView>(null);
   const busy = useRef(false);
@@ -56,9 +57,9 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const speakerName = line ? getStorySpeakerName(line.speaker) : '';
   const options = memory && visiblePage === memory.page && !memory.choice && memory.page === memory.scene.lines.length - 1 ? memory.scene.options : undefined;
   const presentationPhase = memory ? getStoryPresentationPhase(memory) : phase;
-  // Every page retains its image and resident. Compact screens scroll the
-  // complete card instead of dropping the scene art or hiding the animal.
-  const availableHeight = height - insets.top - insets.bottom - 32;
+  // Bound both image dimensions explicitly: Android otherwise retains the
+  // asset's intrinsic height even with width + aspectRatio in a ScrollView.
+  const layout = getStorySceneLayout(width, height, insets.top, insets.bottom, fontScale);
   const illustration = memory && line ? getStoryPageArt(memory, visiblePage) : null;
   const portraitSpeaker = memory ? getStoryPortraitSpeaker(memory, visiblePage) : null;
   useEffect(() => {
@@ -91,13 +92,15 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const close = () => { void run(onClose); };
   return <Modal visible={!!memory && !!line} transparent animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'} onRequestClose={close}>
     <View style={[styles.overlay, { backgroundColor: theme.overlay, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} accessibilityViewIsModal>
-      <PanelCard phase={phase} kind="panel" style={{ width: '100%', maxWidth: 560, maxHeight: availableHeight }}>
-        <ScrollView ref={scroll} contentContainerStyle={styles.content} bounces={false} keyboardShouldPersistTaps="handled">
-          {illustration && <Image source={illustration.source} resizeMode="contain" style={styles.sceneArt} accessible={false} />}
+      <PanelCard phase={phase} kind="panel" style={{ width: layout.cardWidth, maxHeight: layout.cardMaxHeight, paddingVertical: SURFACE.panelPadY }}>
+        <ScrollView ref={scroll} testID="story-scene-scroll" style={{ flexShrink: 1, maxHeight: layout.scrollMaxHeight }} contentContainerStyle={[styles.content, { width: layout.cardWidth }]} bounces={false} keyboardShouldPersistTaps="handled">
+          {illustration && <Image source={illustration.source} testID="story-scene-art" resizeMode="contain" style={[styles.sceneArt, { width: layout.artWidth, height: layout.artHeight }]} accessible={false} />}
           <AppText textRole="title" accessibilityRole="header"  style={[styles.title, { color: theme.title }]}>{memory?.scene.title}</AppText>
-          {portraitSpeaker && <StoryPortrait speaker={portraitSpeaker} phase={presentationPhase} passage={`${memory?.scene.id}:${visiblePage}`} size={88} speaking={line?.speaker === portraitSpeaker} />}
-          <AppText textRole="label"  style={[styles.speaker, { color: theme.title }]}>{speakerName}</AppText>
-          <AppText textRole="reading"  style={[styles.body, line?.speaker === 'narrator' && styles.narration, { color: theme.body }]}>{line?.text}</AppText>
+          <View style={styles.speakerRow}>
+            {portraitSpeaker && <StoryPortrait speaker={portraitSpeaker} phase={presentationPhase} passage={`${memory?.scene.id}:${visiblePage}`} size={layout.portraitSize} speaking={line?.speaker === portraitSpeaker} />}
+            <AppText textRole="label" style={[styles.speaker, { color: theme.title }]}>{speakerName}</AppText>
+          </View>
+          <AppText testID="story-scene-text" textRole="reading" style={[styles.body, line?.speaker === 'narrator' && styles.narration, { color: theme.body }]}>{line?.text}</AppText>
           <View style={styles.actions}>
             {/* The counter and the slow-save caption share one line, so a
                 reveal never moves a button or re-sizes the card. */}
@@ -126,11 +129,12 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
 };
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
-  content: { paddingHorizontal: SURFACE.panelPadX, paddingVertical: 32 },
-  sceneArt: { width: '100%', aspectRatio: 16 / 9, marginBottom: 18 },
-  title: { ...TEXT_ROLE.title, textAlign: 'center', marginBottom: 18 },
-  speaker: { ...TEXT_ROLE.label, marginBottom: 10 },
-  body: { ...TEXT_ROLE.reading, marginBottom: 24 },
+  content: { paddingHorizontal: SURFACE.panelPadX },
+  sceneArt: { alignSelf: 'center', flexShrink: 0, marginBottom: 12 },
+  title: { ...TEXT_ROLE.title, textAlign: 'center', marginBottom: 8 },
+  speakerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+  speaker: { ...TEXT_ROLE.label, flex: 1 },
+  body: { ...TEXT_ROLE.reading, marginBottom: 16 },
   narration: { fontFamily: BODY_FONT_ITALIC },
   actions: { gap: 12 },
   option: { minHeight: 56, padding: 16, borderWidth: 1 },

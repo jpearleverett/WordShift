@@ -1,40 +1,60 @@
 import { AnimalType, DialoguePhase, getAnimalPhase } from '../types/homeWorld';
+import { getFullProgress, invalidateProgressCache } from './amberCurrency';
+import { getConversationReadIds } from './conversationProgress';
+import { runTransientStorageOperation } from './persistenceStorage';
 import { ANIMAL_INFO, getDialoguesForAnimal } from './dialogue/animalDialogueBase';
 import { lineMentionsLockedAnimal } from './dialogue/animalDialogueNarrative';
 import { StoryContext, StoryMemory, StorySpeaker, STORY_COPY, getStoryPages } from './storySpine';
 
+/** A snapshot of actual completed lines in one playthrough, never a phase unlock. */
+export interface StoryArchiveHistory {
+  cycleCount: number;
+  readIds: Readonly<Record<string, readonly string[]>>;
+}
+
 /**
- * One archive chapter is ONE ANIMAL: every earlier line they are allowed to
- * show, oldest first. The archive used to split each animal into a row per
- * stretch of the story, and each of those rows had to be titled with the mood
- * of that stretch ('By the warm hearth', 'While the shadows gathered'), which
- * is an era name by another name. A chapter is a speaker now, so the title is
- * a person and the order carries the rest.
+ * Wait for any in-flight completion/reset before reading its durable receipts.
+ * Old saves have no trustworthy receipt ledger: historical cursors jumped past
+ * unread lines, so they must never be used to reconstruct a reading history.
+ * Storage errors propagate to the journal's retry state instead of looking empty.
  */
+export function loadStoryArchiveHistory(): Promise<StoryArchiveHistory> {
+  return runTransientStorageOperation(async () => {
+    invalidateProgressCache();
+    const progress = await getFullProgress();
+    const ids = getConversationReadIds(progress);
+    return {
+      cycleCount: progress.cycleCount ?? 0,
+      readIds: Object.fromEntries(Object.entries(ids).map(([animal, lines]) => [animal, [...lines]])),
+    };
+  });
+}
+
+/** One chapter per resident, containing only their finished regular lines. */
 export interface StoryArchiveChapter { id: string; animal: AnimalType; count: number }
 export function getStorySpeakerName(speaker: StorySpeaker): string {
   return speaker === 'narrator' ? STORY_COPY.narrator : speaker === 'player' ? STORY_COPY.player : ANIMAL_INFO[speaker]?.name ?? STORY_COPY.narrator;
 }
-export function getStoryArchiveDialogues(context: StoryContext, animal: AnimalType, phase: DialoguePhase) {
-  if (!context.unlockedAnimals.includes(animal)) return [];
+export function getStoryArchiveDialogues(context: StoryContext, animal: AnimalType, phase: DialoguePhase, history: StoryArchiveHistory | null) {
+  if (!history || history.cycleCount !== context.cycleCount || !context.unlockedAnimals.includes(animal)) return [];
+  const completed = new Set(history.readIds[animal] ?? []);
   const availablePhase = context.phase >= 5 ? 4 : Math.min(context.phase, getAnimalPhase(context.phase, animal));
   if (phase > availablePhase || phase >= 5) return [];
   const unlocked = new Set(context.unlockedAnimals);
-  return getDialoguesForAnimal(animal, phase).filter(line => line.phase === phase &&
+  return getDialoguesForAnimal(animal, phase).filter(line => completed.has(line.id) && line.phase === phase &&
     !line.requiresAnimals?.some(required => !unlocked.has(required)) &&
     !lineMentionsLockedAnimal(line.text, animal, [...context.unlockedAnimals]));
 }
-/** Every earlier line one animal may show, oldest first. Same gating as the
- *  per-stretch reader it concatenates: nothing unreached and no locked speaker. */
-export function getStoryArchiveChapterLines(context: StoryContext, animal: AnimalType) {
+/** Finished lines in authored order. Merely opening a page earns no receipt. */
+export function getStoryArchiveChapterLines(context: StoryContext, animal: AnimalType, history: StoryArchiveHistory | null) {
   const lines: ReturnType<typeof getStoryArchiveDialogues> = [];
-  for (let phase = 0; phase <= 4; phase++) lines.push(...getStoryArchiveDialogues(context, animal, phase as DialoguePhase));
+  for (let phase = 0; phase <= 4; phase++) lines.push(...getStoryArchiveDialogues(context, animal, phase as DialoguePhase, history));
   return lines;
 }
-export function getStoryArchiveChapters(context: StoryContext): StoryArchiveChapter[] {
+export function getStoryArchiveChapters(context: StoryContext, history: StoryArchiveHistory | null): StoryArchiveChapter[] {
   const chapters: StoryArchiveChapter[] = [];
   for (const animal of Object.keys(ANIMAL_INFO) as AnimalType[]) {
-    const lines = getStoryArchiveChapterLines(context, animal);
+    const lines = getStoryArchiveChapterLines(context, animal, history);
     if (lines.length) chapters.push({ id: animal, animal, count: lines.length });
   }
   return chapters;

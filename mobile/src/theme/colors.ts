@@ -452,7 +452,7 @@ export function getTileFinish(): TileFinish {
 export interface SparkPalette {
   /** Core color of most stars. */
   bg: string;
-  /** Alternate core carried by every other star from combo tier 1 up. */
+  /** Alternate core present in every burst; the material sets its frequency. */
   accent: string;
   /** Optional halo tint. Defaults to the star's own core color. */
   halo?: string;
