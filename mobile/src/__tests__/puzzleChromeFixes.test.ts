@@ -193,6 +193,17 @@ beforeEach(() => {
 });
 
 describe('difficulty chip fallback (blank-pill regression)', () => {
+  test('the chip uses the current cottage surface for its fill, label and caret', () => {
+    const chip = APP_TSX.slice(APP_TSX.indexOf('ref={difficultyChipRef}'), APP_TSX.indexOf('<DifficultyMenu'));
+    expect(APP_TSX).toContain('const pauseSurface = getSurfaceTheme(persistence.currentPhase)');
+    expect(chip).toContain('backgroundColor: pauseSurface.cardBg, borderColor: pauseSurface.cardBorder');
+    expect(chip).toContain('styles.difficultyText, { color: pauseSurface.title }');
+    expect(chip).toContain('styles.difficultyArrowIcon, { tintColor: pauseSurface.title }');
+    expect(chip).not.toMatch(/difficultyButton(?:Dusk|Dark|Void|Shine)/);
+    const baseStyle = APP_STYLES.slice(APP_STYLES.indexOf('difficultyButton: {'), APP_STYLES.indexOf('difficultyButtonHighlighted: {'));
+    expect(baseStyle).not.toContain('backgroundColor:');
+  });
+
   test('helpers accept exactly the four real difficulties', () => {
     for (const d of DIFFICULTY_LEVELS) {
       expect(isValidDifficulty(d)).toBe(true);

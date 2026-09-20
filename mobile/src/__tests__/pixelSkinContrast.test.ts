@@ -108,3 +108,21 @@ describe('surface ink contrast on the cottage parchments', () => {
     },
   );
 });
+
+describe('difficulty chip parchment and ink', () => {
+  it.each([0, 1, 2, 3, 4, 5])('phase %i keeps its small label readable on its opaque fill', (phase) => {
+    const theme = getSurfaceTheme(phase);
+    expect(theme.cardBg).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(contrastRatio(theme.title, theme.cardBg)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('starts on light warm parchment and progresses through dusk, storm and dark skins', () => {
+    const themes = [0, 2, 3, 4, 5].map(getSurfaceTheme);
+    const [red, green, blue] = hexToRgb(themes[0].cardBg);
+    expect(relativeLuminance([red, green, blue])).toBeGreaterThan(0.65);
+    expect(red).toBeGreaterThan(blue);
+    expect(new Set(themes.map(theme => theme.cardBg)).size).toBe(5);
+    expect(relativeLuminance(hexToRgb(themes[2].cardBg))).toBeLessThan(relativeLuminance(hexToRgb(themes[1].cardBg)));
+    expect(relativeLuminance(hexToRgb(themes[3].cardBg))).toBeLessThan(relativeLuminance(hexToRgb(themes[2].cardBg)));
+  });
+});

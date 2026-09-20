@@ -32,7 +32,7 @@ import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { DragOverlayProvider } from './src/components/DragOverlay';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
-import { Confetti, StarBurst } from './src/components/Confetti';
+import { StarBurst } from './src/components/Confetti';
 import { BlindJudgmentOverlay, type BlindJudgmentSignal } from './src/components/BlindJudgmentOverlay';
 import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
 import { BadgeAppear } from './src/components/puzzle/BadgeAppear';
@@ -472,8 +472,9 @@ function MainApp() {
   // Cross-row flying ghost (audit F1): resolved endpoints for the tap-commit
   // tile flight. Set by the lastArrival effect below; cleared when it lands.
   const [tileFlight, setTileFlight] = useState<TileFlight | null>(null);
-  const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number; comboTier: number }>({
-    active: false, x: 0, y: 0, comboTier: 0,
+  const starBurstSequence = useRef(0);
+  const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number; comboTier: number; id: number }>({
+    active: false, x: 0, y: 0, comboTier: 0, id: 0,
   });
   // Cold-open first-move settle (F61): a one-shot warm success haptic so the
   // "Feel that?" line describes something the hands actually felt. Fires once.
@@ -3376,13 +3377,15 @@ function MainApp() {
       // tile (the old burst spawned directly under it, and roughly the first
       // half of its life was hidden). The synthetic board-centre origin is
       // not lifted. It stays live for STARBURST_DURATION_MS (750, was 600).
+      const moveBurstId = ++starBurstSequence.current;
       setStarBurst({
+        id: moveBurstId,
         active: true,
         x: feedbackOrigin?.x ?? SCREEN_WIDTH / 2,
         y: feedbackOrigin ? feedbackOrigin.y - STARBURST_ORIGIN_LIFT_DP : SCREEN_HEIGHT * 0.4,
         comboTier: result.comboTier ?? 0,
       });
-      addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0, comboTier: 0 }), STARBURST_DURATION_MS);
+      addVictoryTimeout(() => setStarBurst(current => current.id === moveBurstId ? { ...current, active: false } : current), STARBURST_DURATION_MS);
 
       // First-showing receipt for a newly equipped move spark: the first
       // spark-bearing commit after equipping replaces its move message with the
@@ -3434,13 +3437,15 @@ function MainApp() {
         // The descent->ascent turn gets a distinct VISUAL second act: re-fire a
         // top-tier star burst (bigger/denser than a move's) at the board center
         // so the chapter break is seen as well as felt/heard.
+        const midpointBurstId = ++starBurstSequence.current;
         setStarBurst({
+          id: midpointBurstId,
           active: true,
           x: SCREEN_WIDTH / 2,
           y: SCREEN_HEIGHT * 0.4,
           comboTier: 3,
         });
-        addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0, comboTier: 0 }), 700);
+        addVictoryTimeout(() => setStarBurst(current => current.id === midpointBurstId ? { ...current, active: false } : current), STARBURST_DURATION_MS);
       }
 
       // Dread word visual feedback — subtle dark pulse when a dread word is formed
@@ -5205,15 +5210,11 @@ function MainApp() {
         {/* Animated Background — darkens with narrative phase */}
         <AnimatedBackground phase={persistence.currentPhase} />
 
-        {/* The victory Confetti is NOT mounted here: the VictoryModal is a later
-            root-level sibling with a 70-85% scrim, so a burst inside the puzzle
-            screen was viewed through the scrim from its first frame and the
-            equipped palette was never seen. It mounts at the root, after the
-            modal wrapper (see below). StarBurst stays here on purpose: it must
-            sit above the board and UNDER the modals. */}
+        {/* Victory confetti lives in the results' own foreground layer.
+            Move sparks stay above the board and below the results. */}
 
         {/* Star burst effect on valid moves */}
-        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} comboTier={starBurst.comboTier} />
+        <StarBurst key={starBurst.id} active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} comboTier={starBurst.comboTier} />
         <FlyingTileGhost flight={tileFlight} onDone={handleFlightDone} />
 
         {/* Phase change dramatic flash overlay */}
@@ -5534,9 +5535,7 @@ function MainApp() {
             ref={difficultyChipRef}
             style={[
               styles.difficultyButton,
-              persistence.currentPhase === 2 && styles.difficultyButtonDusk,
-              persistence.currentPhase >= 3 && styles.difficultyButtonDark,
-              persistence.currentPhase >= 4 && styles.difficultyButtonVoid,
+              { backgroundColor: pauseSurface.cardBg, borderColor: pauseSurface.cardBorder },
               showSetupSelectorIntro && styles.difficultyButtonHighlighted,
             ]}
             onPress={() => {
@@ -5547,12 +5546,11 @@ function MainApp() {
             accessibilityLabel={`Difficulty ${chipDifficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
-            {persistence.currentPhase < 3 && <View style={styles.difficultyButtonShine} />}
             {/* The tier's wax-seal emblem (the same art the setup menu rows
                 and Stats wear) in place of a flat coloured dot. */}
             <Image source={DIFFICULTY_ART[chipDifficulty]} style={styles.difficultySealChip} resizeMode="contain" />
-            <Text style={styles.difficultyText}>{getDifficultyChipLabel(puzzle.difficulty)}</Text>
-            <Image source={CHROME_ICONS.chevron} style={styles.difficultyArrowIcon} resizeMode="contain" accessible={false} />
+            <Text style={[styles.difficultyText, { color: pauseSurface.title }]}>{getDifficultyChipLabel(puzzle.difficulty)}</Text>
+            <Image source={CHROME_ICONS.chevron} style={[styles.difficultyArrowIcon, { tintColor: pauseSurface.title }]} resizeMode="contain" accessible={false} />
           </TouchableOpacity>
 
           <DifficultyMenu
@@ -6186,6 +6184,7 @@ function MainApp() {
         <View style={StyleSheet.absoluteFill} pointerEvents={overlayOwner === 'victory' ? 'box-none' : 'none'} accessibilityElementsHidden={overlayOwner !== 'victory'} importantForAccessibility={overlayOwner === 'victory' ? 'auto' : 'no-hide-descendants'}>
         <VictoryModal
           visible={victoryModalVisible}
+          showConfetti={puzzle.showConfetti && overlayOwner === 'victory'}
           earnedStars={puzzle.earnedStars}
           difficulty={rewardDifficulty}
           phase={persistence.currentPhase}
@@ -6251,21 +6250,6 @@ function MainApp() {
             />
           </View>
         )}
-
-        {/* Victory confetti — mounted ABOVE the results scrim (a root sibling
-            after the VictoryModal wrapper) so the equipped palette is actually
-            seen; the dark-phase fall profiles (thinner ember counts, ash
-            physics) live inside Confetti, so phases 3-5 stay embers. Pointer-
-            transparent, so tap-to-skip and every modal button still receive
-            touches, and it mounts BEFORE the game-alert host so it can never
-            cover a card. Same showConfetti trigger as before. */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Confetti
-            active={puzzle.showConfetti && currentScreen === 'puzzle'}
-            phase={persistence.currentPhase}
-            ritualEnergy={victoryFlow.victoryData?.ritualEnergy ?? 0}
-          />
-        </View>
 
       {/* Screen transition overlay — solid cover that fades in/out during
           navigation. A memoized leaf on purpose: see ScreenTransitionOverlay. */}

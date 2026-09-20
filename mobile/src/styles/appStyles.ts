@@ -229,12 +229,9 @@ export const appStyles = StyleSheet.create({
   difficultyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    // Dark translucent fill (not translucent-white) so the white label reads
-    // >= 4.5:1 over the bright phase-0/1 board — a translucent-white pill left
-    // 12px white text at sub-3:1. Mirrors the overlay-banner container pattern.
-    backgroundColor: 'rgba(20, 10, 40, 0.55)',
+    // App supplies the phase's opaque cottage parchment and matching ink,
+    // shared with the setup menu. The board cannot darken the early chip.
     borderWidth: 1,
-    borderColor: 'rgba(180, 150, 220, 0.25)',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 16,
@@ -251,34 +248,6 @@ export const appStyles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  // Phase-aware darkening (matches the phaseBadge register): the setup pill
-  // cools from candy-translucent-white into the dread palette so it tracks the
-  // board instead of staying bright while everything around it darkens. The
-  // difficulty DOT keeps its meaningful color at every phase.
-  // Phase-2 dusk step — the intermediate cool the board already shows, so the
-  // setup pill doesn't hard-cut bright->dark at phase 3 (matches the other HUD
-  // badges' dusk tier).
-  difficultyButtonDusk: {
-    backgroundColor: 'rgba(45, 25, 70, 0.5)',
-  },
-  difficultyButtonDark: {
-    backgroundColor: 'rgba(60, 30, 80, 0.4)',
-  },
-  difficultyButtonVoid: {
-    backgroundColor: 'rgba(20, 10, 30, 0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(120, 40, 80, 0.4)',
-  },
-  difficultyButtonShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
   // The tier's wax-seal emblem in the setup chip (assets/ui/difficulty),
   // replacing the flat coloured dot family: the seal carries the hue itself.
   difficultySealChip: {
@@ -290,7 +259,6 @@ export const appStyles = StyleSheet.create({
     fontSize: FONT_SIZE.small,
     fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '800',
-    color: CandyColors.white,
     marginRight: 6,
   },
   // The carved chevron, turned to point down, as the setup chip's caret.

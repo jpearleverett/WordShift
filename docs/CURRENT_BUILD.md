@@ -4,6 +4,8 @@
 
 `feature/story-layout-journal-fixes`, based on main `45973ae`, fixes oversized decision illustrations, rewrites the Journal introduction with the real menu icons and destinations, limits earlier conversations to completed dialogue, and simplifies How to Play. The owner's **1.3.9 / Android 104** version is unchanged. TypeScript, zero-warning lint and **684 focused tests in 15 suites** passed. See the [change and validation report](UI_FOLLOWUP_2026-09-20.md); ordinary GitHub CI supplies the full-suite and browser results. Physical Android layout verification remains part of the next internal-testing build.
 
+The same follow-up also adds animal portraits to Journal entries, moves victory confetti into the result foreground, shares the Sparks design between gameplay and the shop's live preview, and makes the difficulty button follow the phase's cottage colors. [PR #454](https://github.com/jpearleverett/WordShift/pull/454) records the latest complete validation.
+
 ## September 19 screenshot and store follow-up
 
 This work landed through [PR #453](https://github.com/jpearleverett/WordShift/pull/453), replacing the closed [PR #450](https://github.com/jpearleverett/WordShift/pull/450). It fixes the reported recovery/reset behavior, clipboard access, tutorial timing and modal overlap, drag clipping, axolotl scale, duplicate streak badge and victory layouts. It also adds 185 individually reviewed page illustrations with continuous resident portraits. See the [change and validation report](SCREENSHOT_FIXES_2026-09-19.md) and [art coverage review](ART_COVERAGE_REVIEW_2026-09-19.md).

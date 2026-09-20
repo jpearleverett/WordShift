@@ -5,6 +5,7 @@ import { getMaxConfettiCount, shouldSimplifyAnimations } from '../services/devic
 import { getEquippedSync } from '../services/cosmetics';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { STARBURST_FADE_DELAY_MS } from '../constants/timing';
+import { SparkGlyph } from './effects/SparkGlyph';
 
 
 type ConfettiShape = 'rect' | 'square' | 'circle' | 'triangle' | 'spark';
@@ -391,10 +392,9 @@ export const Confetti: React.FC<ConfettiProps> = props => {
 };
 
 // Star burst effect for successful moves — colors shift with narrative phase.
-// `accent` is a second tint that appears on the higher combo tiers so a deep
-// streak reads as richer, not just bigger. An equipped 'spark' cosmetic
-// replaces this palette (pure expression); the count, spread and physics below
-// stay phase-owned and combo-owned.
+// Every burst includes the accent tint. An equipped 'spark' cosmetic replaces
+// the palette and chip material; count, spread and physics remain phase-owned
+// and combo-owned.
 const STAR_BURST_COLORS: Record<number, { bg: string; shadow: string; accent: string }> = {
   0: { bg: '#FFD700', shadow: '#FFD700', accent: '#FFFFFF' },
   1: { bg: '#F0C050', shadow: '#D4A030', accent: '#FFE9A8' },
@@ -417,7 +417,7 @@ const STAR_COUNT_BY_TIER = [8, 10, 12, 14];
 // Low-tier devices throw a reduced burst (six stars, no halo Views) on the
 // same timeline: the spark is sold for amber and must still render there.
 const REDUCED_STAR_COUNT = 6;
-// Reduced motion: one still frame of palette diamonds at this radius, fading
+// Reduced motion: one still frame of the same faceted chips at this radius, fading
 // out on opacity only. Nothing moves or scales.
 const STILL_STAR_COUNT = 8;
 const STILL_STAR_RADIUS_DP = 30;
@@ -429,7 +429,7 @@ interface StarBurstProps {
   x: number;
   y: number;
   phase?: number;
-  /** Clean-move combo tier (0-3) — scales the burst count, spread, and richness. */
+  /** Clean-move combo tier (0-3) — scales burst count and spread, never its colors. */
   comboTier?: number;
   /**
    * Explicit palette (mirrors Confetti's `colors`): the shop uses it so a row
@@ -437,9 +437,11 @@ interface StarBurstProps {
    * spark wins, else the phase default.
    */
   paletteOverride?: SparkPalette;
+  /** Shop previews use the row's own material; explicit null previews the default. */
+  sparkIdOverride?: string | null;
 }
 
-export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, comboTier = 0, paletteOverride }) => {
+export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, comboTier = 0, paletteOverride, sparkIdOverride }) => {
   const reducedMotion = useReducedMotion();
   // Low-tier devices get a reduced burst (fewer stars, no halos), never none:
   // the move still lands its haptic + sound, and its paid palette still shows.
@@ -530,7 +532,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
       runningAnims.push(anim);
     });
     return () => runningAnims.forEach(a => a.stop());
-  }, [active, reducedMotion, stars, tier, phase, stillOpacity]);
+  }, [active, x, y, reducedMotion, stars, tier, phase, stillOpacity]);
 
   // The paid effect is NEVER nulled: reduced motion renders a still frame,
   // low tier a reduced burst. Only an inactive burst renders nothing.
@@ -539,16 +541,13 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
   // An explicit palette wins (shop preview); else an equipped move spark; with
   // none equipped the burst stays phase-aware. The phase entries carry no
   // `halo`, so the halo falls back to the core color exactly as it always has.
-  const equippedSpark = getEquippedSync('spark');
-  const themedSpark = equippedSpark ? SPARK_THEMES[equippedSpark] : undefined;
+  const sparkId = sparkIdOverride !== undefined ? sparkIdOverride : paletteOverride ? null : getEquippedSync('spark');
+  const themedSpark = sparkId ? SPARK_THEMES[sparkId] : undefined;
   const palette: SparkPalette = paletteOverride ?? themedSpark ?? getPhaseSparkPalette(phase);
-  // From tier 1 up, alternate stars carry the accent, so a paid palette's
-  // second colour shows on the first clean pair, not only on a 4-move streak.
-  const coreFor = (i: number) => (tier >= 1 && i % 2 === 1 ? palette.accent : palette.bg);
   const containerStyle = [styles.starBurstContainer, { left: x - STAR_BURST_BOX_DP / 2, top: y - STAR_BURST_BOX_DP / 2 }];
 
   if (reducedMotion) {
-    // One static frame of palette diamonds around the origin. Positions are
+    // One static frame of the same material chips around the origin. Positions are
     // plain layout offsets (no transforms); only the opacity animates.
     const centre = STAR_BURST_BOX_DP / 2 - STAR_BOX_DP / 2;
     return (
@@ -564,7 +563,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
               },
             ]}
           >
-            <View style={[styles.starCore, { backgroundColor: coreFor(i) }]} />
+            <SparkGlyph sparkId={sparkId} palette={palette} index={i} simplified={simplify} halo={false} />
           </View>
         ))}
       </Animated.View>
@@ -573,9 +572,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
 
   return (
     <View style={containerStyle} pointerEvents="none">
-      {stars.map((star, i) => {
-        const coreColor = coreFor(i);
-        return (
+      {stars.map((star, i) => (
           <Animated.View
             key={i}
             style={[
@@ -590,15 +587,9 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0, c
               },
             ]}
           >
-            {/* Two-layer glow (Android-safe): a soft halo View behind a bright
-                core diamond, so the sparkle exists without an iOS-only shadow.
-                The low-tier reduced burst drops the halo Views (six stars, one
-                View each) to stay inside that tier's animation budget. */}
-            {!simplify && <View style={[styles.starHalo, { backgroundColor: palette.halo ?? coreColor }]} />}
-            <View style={[styles.starCore, { backgroundColor: coreColor }]} />
+            <SparkGlyph sparkId={sparkId} palette={palette} index={i} simplified={simplify} />
           </Animated.View>
-        );
-      })}
+      ))}
     </View>
   );
 };
@@ -641,23 +632,6 @@ const styles = StyleSheet.create({
     height: STAR_BOX_DP,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  // Soft 28dp halo so the sparkle reads on Android, where the old iOS-only
-  // shadowRadius glow drew nothing. Sized up from 20dp @ 0.32 (which vanished
-  // on the dusk/night boards) so the burst is readable, not subliminal.
-  starHalo: {
-    position: 'absolute',
-    width: STAR_BOX_DP,
-    height: STAR_BOX_DP,
-    borderRadius: STAR_BOX_DP / 2,
-    opacity: 0.45,
-  },
-  // Bright 16dp core diamond (was 12: too small to read under a thumb).
-  starCore: {
-    width: 16,
-    height: 16,
-    borderRadius: 2,
-    transform: [{ rotate: '45deg' }],
   },
 });
 

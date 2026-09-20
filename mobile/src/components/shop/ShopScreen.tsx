@@ -31,6 +31,7 @@ import { PanelCard } from '../ui/PanelCard';
 import { CHROME_ICONS } from '../ui/chromeIcons';
 import { AmberInline, AmberValue } from '../AmberInline';
 import { Confetti, StarBurst, getPhaseSparkPalette } from '../Confetti';
+import { SparkGlyph } from '../effects/SparkGlyph';
 import { STARBURST_DURATION_MS } from '../../constants/timing';
 import { RewardReveal, EntranceCascadeItem, getCascadeDelayMs } from '../ui/RewardReveal';
 import { getSettingsSync } from '../../services/settings';
@@ -151,6 +152,7 @@ function playPulse(values: Animated.Value[]): Animated.CompositeAnimation {
 
 interface PreviewProps {
   themeId: string | null;
+  phase?: number;
   /** Bumped by the parent on purchase/equip to celebrate this item; also self-plays on tap. */
   pulseToken?: number;
   /**
@@ -289,11 +291,6 @@ const ThemePreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
 
 const DEFAULT_CONFETTI = ['#FF6B9D', '#C44DFF', '#4DAFFF', '#FFD84D', '#4DE8C2', '#FF8C4D'];
 
-// Core + accent of the bright-days star burst, for the "no spark equipped" row.
-// With nothing equipped the real burst stays phase-aware and darkens with the
-// story (StarBurst's own phase table), which the default row's copy says.
-const DEFAULT_SPARK_CORES = ['#FFD700', '#FFFFFF'];
-
 /** A small scatter of dots previewing a confetti palette. Tappable to demo a mini-burst. */
 const ConfettiPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) => {
   const palette = themeId && CONFETTI_THEMES[themeId] ? CONFETTI_THEMES[themeId] : DEFAULT_CONFETTI;
@@ -335,11 +332,9 @@ const ConfettiPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0 }) =>
   );
 };
 
-/** Star diamonds previewing a move-spark palette: the same halo-behind-core
- *  build StarBurst throws on a committed move, held still. From combo tier 2 up
- *  alternate stars carry the accent, so the strip alternates core and accent. */
-const SparkPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0, onDemo }) => {
-  const palette = themeId ? SPARK_THEMES[themeId] : undefined;
+/** The exact material chips thrown on an ordinary move, held still. */
+const SparkPreview: React.FC<PreviewProps> = ({ themeId, phase = 0, pulseToken = 0, onDemo }) => {
+  const palette = (themeId && SPARK_THEMES[themeId]) || getPhaseSparkPalette(phase);
   const artKey = themeId ?? 'spark_default';
   const showArt = hasShopArt(artKey);
   const [scales] = useState(() => ([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(1))));
@@ -389,24 +384,12 @@ const SparkPreview: React.FC<PreviewProps> = ({ themeId, pulseToken = 0, onDemo 
       {showArt && <ShopArtThumb artKey={artKey} scale={scales[0]} />}
       <View ref={stripRef} collapsable={false} style={styles.previewSparkRow}>
         {[0, 1, 2, 3, 4].map(i => {
-          const core = palette
-            ? i % 2 === 1
-              ? palette.accent
-              : palette.bg
-            : DEFAULT_SPARK_CORES[i % DEFAULT_SPARK_CORES.length];
-          const halo = palette?.halo ?? core;
           return (
             <Animated.View
               key={i}
               style={[styles.previewSpark, { transform: [{ scale: scales[i + 1] }] }]}
             >
-              <View style={[styles.previewSparkHalo, { backgroundColor: halo }]} />
-              <View
-                style={[
-                  showArt ? styles.previewSparkCore : styles.previewSparkCoreLarge,
-                  { backgroundColor: core },
-                ]}
-              />
+              <SparkGlyph sparkId={themeId} palette={palette} index={i} size={18} halo={false} />
             </Animated.View>
           );
         })}
@@ -498,10 +481,10 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   // not-yet-owned row previews itself, not whatever is equipped; the nonce
   // remounts StarBurst so a second tap re-fires. Holds the same window App
   // holds a move's burst for.
-  const [sparkDemo, setSparkDemo] = useState<{ x: number; y: number; palette: SparkPalette; nonce: number } | null>(null);
+  const [sparkDemo, setSparkDemo] = useState<{ x: number; y: number; palette: SparkPalette; sparkId: string | null; nonce: number } | null>(null);
   const fireSparkDemo = useCallback((x: number, y: number, sparkId: string | null) => {
     const palette = (sparkId && SPARK_THEMES[sparkId]) || getPhaseSparkPalette(phase);
-    setSparkDemo({ x, y, palette, nonce: Date.now() });
+    setSparkDemo({ x, y, palette, sparkId, nonce: Date.now() });
   }, [phase]);
   useEffect(() => {
     if (!sparkDemo) return;
@@ -1016,7 +999,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
         {/* Default (free) option */}
         <PanelCard phase={phase} kind="card" style={styles.card}>
-          <Preview themeId={null} onDemo={demoFor(null)} />
+          <Preview themeId={null} phase={phase} onDemo={demoFor(null)} />
           <View style={styles.cardBody}>
             <Text style={[styles.cardName, { color: t.title }]}>{defaultName}</Text>
             <Text style={[styles.cardDesc, { color: t.body }]}>{getShopDefaultDescription(phase, category)}</Text>
@@ -1042,6 +1025,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           <PanelCard key={item.id} phase={phase} kind="card" style={styles.card}>
             <Preview
               themeId={item.id}
+              phase={phase}
               pulseToken={celebration?.id === item.id ? celebration.token : 0}
               onDemo={demoFor(item.id)}
             />
@@ -1466,7 +1450,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       />
 
       {/* The real move burst, at the spark row that was bought / equipped /
-          tapped, in that row's own palette. Combo tier 2 so the accent shows.
+          tapped, in that row's own palette and material at ordinary move size.
           Renders a still frame under reduced motion, a reduced burst on low
           tier: never nothing. */}
       {sparkDemo && (
@@ -1476,8 +1460,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           x={sparkDemo.x}
           y={sparkDemo.y}
           phase={phase}
-          comboTier={2}
+          comboTier={0}
           paletteOverride={sparkDemo.palette}
+          sparkIdOverride={sparkDemo.sparkId}
         />
       )}
     </View>
@@ -1652,20 +1637,17 @@ const styles = StyleSheet.create({
   },
   previewDot: { width: 10, height: 10, borderRadius: 3 },
   previewDotLarge: { width: 13, height: 13, borderRadius: 4 },
-  // Move sparks: the halo-behind-core diamond StarBurst throws, held still.
+  // The exact chips StarBurst throws, scaled down into the live shop strip.
   previewSparkRow: {
     width: 96,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    // 5 x 16 + 4 x 3 = 92, so the strip always clears the 96dp column.
-    gap: 3,
+    // Five 18dp glyphs + four 1.5dp gaps clear the 96dp column.
+    gap: 1.5,
     marginTop: 6,
   },
-  previewSpark: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
-  previewSparkHalo: { position: 'absolute', width: 16, height: 16, borderRadius: 8, opacity: 0.32 },
-  previewSparkCore: { width: 9, height: 9, borderRadius: 2, transform: [{ rotate: '45deg' }] },
-  previewSparkCoreLarge: { width: 12, height: 12, borderRadius: 2, transform: [{ rotate: '45deg' }] },
+  previewSpark: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
   actionSlot: { minWidth: 96 },
   houseCardBody: { flex: 1, paddingHorizontal: 8 },
   // Names the pixels a house upgrade actually adds, under the flavour copy.

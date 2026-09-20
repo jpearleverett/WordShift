@@ -158,6 +158,8 @@ jest.mock('../components/monetization/RewardedAdButton', () => ({
   RewardedAdButton: () => null,
 }));
 
+jest.mock('../components/Confetti', () => ({ Confetti: 'Confetti' }));
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -317,6 +319,34 @@ beforeEach(() => {
   resetHookState();
   mockSwiftVictories = false;
   mockUpdateSetting.mockClear();
+});
+
+describe('victory celebration foreground', () => {
+  it.each([false, true])('keeps confetti outside the card scroll and above it (swift=%s)', swift => {
+    mockSwiftVictories = swift;
+    const tree = render(baseProps({ showConfetti: true, phase: 2, victoryData: routineVictoryData({ ritualEnergy: 7 }) })) as El;
+    const children = (tree.props!.children as unknown[]).filter(Boolean) as El[];
+    const scroll = children.find(child => child.type === 'ScrollView')!;
+    const foreground = children.find(child => child.props?.testID === 'victory-confetti')!;
+    expect(foreground).toBeDefined();
+    expect(children.indexOf(foreground)).toBeGreaterThan(children.indexOf(scroll));
+    expect(flatStyle(foreground.props!.style).zIndex).toBeGreaterThan(Number(flatStyle(scroll.props!.style).zIndex ?? 0));
+    expect(foreground.props).toMatchObject({ pointerEvents: 'none', accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' });
+    expect(findAll(scroll, node => node.type === 'Confetti')).toHaveLength(0);
+    expect(findAll(foreground, node => node.type === 'Confetti')[0].props).toMatchObject({ active: true, phase: 2, ritualEnergy: 7 });
+    expect(findAll(tree, node => node.type === CandyButton).length).toBeGreaterThan(0);
+  });
+
+  it('does not show confetti while inactive, hidden or on the silent story beats', () => {
+    for (const overrides of [
+      { showConfetti: false },
+      { showConfetti: true, visible: false },
+      { showConfetti: true, victoryData: baseVictoryData({ finalBoard: true }) },
+      { showConfetti: true, victoryData: baseVictoryData({ puzzlesSolved: 104 }) },
+    ]) {
+      expect(findAll(render(baseProps(overrides)), node => node.type === 'Confetti')).toHaveLength(0);
+    }
+  });
 });
 
 // ===========================================================================

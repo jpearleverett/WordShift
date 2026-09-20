@@ -1,6 +1,6 @@
 import React, { ReactElement } from 'react';
 import { StoryArchiveHistory, loadStoryArchiveHistory } from '../services/storyArchive';
-import { StoryContext, StoryState, STORY_COPY, loadStoryState } from '../services/storySpine';
+import { StoryContext, StoryMemory, StoryState, STORY_COPY, loadStoryState } from '../services/storySpine';
 
 // Use the component's actual state and callbacks with inert native views. The
 // deferred reads below model opening the journal during slow/failing storage.
@@ -29,6 +29,7 @@ jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({
 jest.mock('../components/ui/AppText', () => ({ AppText: 'AppText' }));
 jest.mock('../components/ui/PanelCard', () => ({ PanelCard: 'PanelCard' }));
 jest.mock('../components/ui/CandyButton', () => ({ CandyButton: 'CandyButton' }));
+jest.mock('../components/StoryPortrait', () => ({ StoryPortrait: 'StoryPortrait' }));
 jest.mock('../services/settings', () => ({ getSettingsSync: () => ({ reducedMotion: true }) }));
 jest.mock('../services/storySpine', () => ({
   ...jest.requireActual('../services/storySpine'),
@@ -119,4 +120,61 @@ test('an unmounted journal ignores reads that finish after it closes', async () 
   receipts.resolve(history);
   await settle();
   expect(labels(render())).toContain(STORY_COPY.loading);
+});
+
+
+function memory(overrides: Partial<StoryMemory> = {}): StoryMemory {
+  return { scene: { id: 'cup', title: 'A place at the table', memory: 'The cup stayed by the fire.', lines: [{ speaker: 'fox', text: 'Your cup is waiting.' }] }, page: 0, completed: true, presentationPhase: 0, ...overrides };
+}
+async function loadedJournal(value: StoryState) {
+  jest.mocked(loadStoryState).mockResolvedValue(value);
+  jest.mocked(loadStoryArchiveHistory).mockResolvedValue(history);
+  render(); mockEffect!(); await settle();
+  return render();
+}
+
+test('current and earlier-cycle memory cards identify their resident in the original costume', async () => {
+  const current = memory();
+  const previous = memory({ scene: { id: 'record', title: 'A dated account', memory: 'An account was kept.', lines: [{ speaker: 'owl', text: 'I have written it down.' }] }, presentationPhase: 4 });
+  const tree = await loadedJournal({ ...state, memories: { cup: current }, previousCycles: [{ cycle: 0, memories: { record: previous } }] } as StoryState);
+  const portraits = tree.filter(node => node.type === 'StoryPortrait');
+  expect(portraits.map(node => ({ speaker: node.props.speaker, phase: node.props.phase }))).toEqual([
+    { speaker: 'fox', phase: 0 }, { speaker: 'owl', phase: 4 },
+  ]);
+  for (const portrait of portraits) {
+    expect(portrait.props.size).toBe(56);
+    expect(portrait.props.speaking).toBe(false);
+  }
+  const cards = tree.filter(node => node.props.accessibilityRole === 'button');
+  expect(cards.map(node => node.props.accessibilityLabel)).toEqual([
+    'A place at the table. Ember. The cup stayed by the fire.',
+    'A dated account. Archimedes. An account was kept.',
+  ]);
+  expect(labels(tree)).toEqual(expect.arrayContaining(['Ember', 'Archimedes']));
+  // Text can wrap beside the bounded portrait instead of being cut off.
+  expect(tree.some(node => node.type === 'View' && node.props.style?.flex === 1 && node.props.style?.minWidth === 0)).toBe(true);
+  cards[1].props.onPress();
+  expect(labels(render())).toContainEqual(['Cycle ', 1, '. This answer belongs to that earlier morning.']);
+});
+
+test('each earlier-conversation entry shows its own resident and still opens only completed lines', async () => {
+  await loadedJournal(state);
+  const list = openArchive();
+  const row = list.props.renderItem({ item: list.props.data[0] });
+  const expanded = expand(row);
+  const portrait = expanded.find(node => node.type === 'StoryPortrait')!;
+  expect(portrait.props).toMatchObject({ speaker: 'fox', phase: 3, size: 56, speaking: false });
+  expect(row.props.accessibilityLabel).toBe('Ember. One line kept');
+  row.props.onPress();
+  expect(render().find(node => node.type === 'FlatList')!.props.data).toEqual([foxLine]);
+});
+
+test('narrator-led memories use the established companion while locked residents stay concealed', async () => {
+  const narrator = memory({ scene: { id: 'old_mark', title: 'A mark in the wood', memory: 'The mark remained.', lines: [{ speaker: 'narrator', text: 'The window was open.' }] } });
+  const locked = memory({ scene: { id: 'seeds', title: 'Something kept', memory: 'A promise.', lines: [{ speaker: 'kakapo', text: 'This resident is still locked.' }] } });
+  const tree = await loadedJournal({ ...state, memories: { old_mark: narrator, seeds: locked } } as StoryState);
+  const portraits = tree.filter(node => node.type === 'StoryPortrait');
+  expect(portraits.map(node => node.props.speaker)).toEqual(['fox']);
+  expect(labels(tree)).toContain(STORY_COPY.narrator);
+  expect(tree.some(node => node.type === 'Image' && node.props.style?.width === 56 && node.props.style?.height === 56)).toBe(true);
 });
