@@ -86,7 +86,10 @@ describe('StorySceneModal saving affordance is delayed, never per-page', () => {
     expect(flat).not.toContain('SCENES_WITH_HEADER_ART');
     expect(flat).not.toContain('reservePortrait');
     expect(flat).not.toContain('STORY_ART.tableHeader');
-    expect(flat).toContain("aspectRatio: 16 / 9");
+    expect(flat).toContain('width: layout.artWidth, height: layout.artHeight');
+    expect(flat).toContain('resizeMode="contain"');
+    expect(flat).toContain('paddingVertical: SURFACE.panelPadY');
+    expect(flat).toContain('maxHeight: layout.scrollMaxHeight');
     expect(flat).toMatch(/style=\{visiblePage === 0 \? styles\.hiddenAction : undefined\}/);
     expect(flat).toMatch(/importantForAccessibility=\{visiblePage === 0 \? 'no-hide-descendants' : 'auto'\}/);
     expect(flat).toMatch(/hiddenAction: \{ opacity: 0 \}/);

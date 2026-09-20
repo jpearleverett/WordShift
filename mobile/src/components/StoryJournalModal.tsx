@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryContext, StoryMemory, StorySceneId, StoryState, STORY_COPY, canResumeStoryScene, loadStoryState, selectStoryScene } from '../services/storySpine';
-import { StoryArchiveChapter, getStoryArchiveChapterLines, getStoryArchiveChapterSummary, getStoryArchiveChapters, getStorySpeakerName, getVisibleStoryMemoryLines } from '../services/storyArchive';
+import { StoryArchiveChapter, StoryArchiveHistory, loadStoryArchiveHistory, getStoryArchiveChapterLines, getStoryArchiveChapterSummary, getStoryArchiveChapters, getStorySpeakerName, getVisibleStoryMemoryLines } from '../services/storyArchive';
 import { getSettingsSync } from '../services/settings';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
@@ -22,6 +22,7 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
   const phase = context?.phase ?? 0;
   const theme = getSurfaceTheme(phase);
   const [state, setState] = useState<StoryState | null>(null);
+  const [history, setHistory] = useState<StoryArchiveHistory | null>(null);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [tab, setTab] = useState<'memories' | 'archive'>('memories');
@@ -32,13 +33,19 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
   useEffect(() => {
     if (!visible || !context) return;
     let active = true;
-    loadStoryState(context).then(value => { if (active) setState(value); }).catch(() => { if (active) setError(true); });
+    Promise.all([loadStoryState(context), loadStoryArchiveHistory()])
+      .then(([value, completedLines]) => {
+        if (!active) return;
+        setHistory(completedLines);
+        setState(value);
+      })
+      .catch(() => { if (active) setError(true); });
     return () => { active = false; };
   }, [visible, contextKey, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
-  const chapters = useMemo(() => context ? getStoryArchiveChapters(context) : [], [contextKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const chapters = useMemo(() => context ? getStoryArchiveChapters(context, history) : [], [contextKey, history]); // eslint-disable-line react-hooks/exhaustive-deps
   const memories = state ? Object.values(state.memories).filter((value): value is StoryMemory => !!value) : [];
   const resumable = state && context ? selectStoryScene(context, state) : null;
-  const earlierLines = context && chapter ? getStoryArchiveChapterLines(context, chapter.animal) : [];
+  const earlierLines = context && chapter ? getStoryArchiveChapterLines(context, chapter.animal, history) : [];
   const memoryLines = context && selected ? getVisibleStoryMemoryLines(selected, context) : [];
   const answer = selected?.scene.options?.find(option => option.id === selected.choice)?.label;
   const back = () => { setSelected(null); setSelectedCycle(null); setChapter(null); };
@@ -54,7 +61,7 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
           {!selected && !chapter && <AppText textRole="caption" style={[styles.subtitle, { color: theme.muted }]}>{STORY_COPY.journalSubtitle}</AppText>}
           {(selected || chapter) && <CandyButton phase={phase} label={STORY_COPY.back} onPress={back} variant="quiet" />}
         </View>
-        {error ? <View style={styles.message}><AppText textRole="reading" style={[styles.body, { color: theme.body }]}>{STORY_COPY.saveError}</AppText><CandyButton phase={phase} label={STORY_COPY.retry} onPress={() => { setError(false); setAttempt(value => value + 1); }} /></View> : !state ? <AppText textRole="reading" style={[styles.message, styles.body, { color: theme.body }]}>{STORY_COPY.loading}</AppText> : selected ? <ScrollView style={styles.scroll} contentContainerStyle={styles.reading}>
+        {error ? <View style={styles.message}><AppText textRole="reading" style={[styles.body, { color: theme.body }]}>{STORY_COPY.journalLoadError}</AppText><CandyButton phase={phase} label={STORY_COPY.retry} onPress={() => { setError(false); setAttempt(value => value + 1); }} /></View> : !state ? <AppText textRole="reading" style={[styles.message, styles.body, { color: theme.body }]}>{STORY_COPY.loading}</AppText> : selected ? <ScrollView style={styles.scroll} contentContainerStyle={styles.reading}>
           {selectedCycle !== null && <AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>Cycle {selectedCycle + 1}. This answer belongs to that earlier morning.</AppText>}
           {selected.completed && <AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>{selected.scene.memory}</AppText>}
           {answer && <AppText textRole="label" style={[styles.answer, { color: theme.title }]}>{STORY_COPY.savedChoice}: {answer}</AppText>}

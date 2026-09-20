@@ -186,8 +186,7 @@ const MENU_ICON = require('../../../assets/ui/menu.png');
 const VOID_ICON = require('../../../assets/ui/void.png');
 // Journal-spotlight step sprites (generateUiIcons family) replace the old raw
 // emoji glyphs. Keyed on the step's stable id so the mapping never depends on
-// an emoji codepoint. JOURNAL_ICON (above) covers the cover + ledger steps.
-const SCROLL_ICON = require('../../../assets/ui/scroll.png');
+// an emoji codepoint. Each destination uses the same sprite as its hub row.
 const SPARKLE_ICON = require('../../../assets/ui/emote_sparkle.png');
 // The gallery's own mark (generateUiIcons drew whisper.png for exactly this);
 // the hub row used to borrow the streak flame.
@@ -197,16 +196,17 @@ const WHISPER_ICON = require('../../../assets/ui/whisper.png');
 const LEDGER_ICON = require('../../../assets/ui/ledger_quill.png');
 function getJournalSpotlightStepSprite(stepId: string) {
   switch (stepId) {
+    case 'ledger':
+      return LEDGER_ICON;
     case 'gallery':
-      return SCROLL_ICON;
+      return WHISPER_ICON;
     case 'quests':
       // The bullseye the quest pill and hub row wear, so the walkthrough
       // teaches the mark the player will actually tap (was the DAILY calendar).
       return QUEST_ICON;
     case 'open':
       return SPARKLE_ICON;
-    case 'cover':
-    case 'ledger':
+    case 'memories':
     default:
       return JOURNAL_ICON;
   }

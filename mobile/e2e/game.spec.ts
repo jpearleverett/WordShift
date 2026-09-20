@@ -363,20 +363,20 @@ test('repeating disclosed advice spends one hint and survives reload', async ({ 
   await expect(hint).toHaveAttribute('aria-label', 'Hint, 4 remaining');
 });
 
-test('optional practice can be played and closed without changing progress', async ({ page }) => {
+test('How to Play keeps only four illustrated steps and closes without changing progress', async ({ page }) => {
   await openFreshGame(page);
   const before = await page.evaluate(() => localStorage.getItem('wordshift_home_progress'));
   await page.getByRole('button', { name: 'How to play', exact: true }).click();
-  await page.getByRole('button', { name: 'Practice Double Shift', exact: true }).click();
-  await page.getByRole('button', { name: 'H, letter 1', exact: true }).click();
-  await page.getByRole('button', { name: 'Position 5, BEATHS', exact: true }).click();
-  await expect(page.getByText(/EART and BEATHS are allowed/)).toBeVisible();
-  await page.getByRole('button', { name: 'R, letter 3', exact: true }).click();
-  await page.getByRole('button', { name: 'Position 2, BREATHS', exact: true }).click();
-  await expect(page.getByText(/EAT and BREATHS both fit/)).toBeVisible();
-  await capture(page, 'updated-double-practice');
-  await page.getByRole('button', { name: 'Close practice', exact: true }).click();
+  for (const heading of ['Pick a Letter', 'Drop it Down', 'Make Real Words', 'Complete All Rows']) {
+    await expect(page.getByText(heading, { exact: true })).toBeVisible();
+  }
+  await expect(page.getByTestId(/^rules-step-art-/)).toHaveCount(4);
+  await expect(page.getByRole('button', { name: /^Practice / })).toHaveCount(0);
+  await expect(page.getByText(/^Stars:/)).toHaveCount(0);
+  await expect(page.getByText(/Words use standard English spellings/)).toHaveCount(0);
+  await page.getByRole('button', { name: "LET'S PLAY!", exact: true }).click();
   await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible();
+  await expect(page.getByText('HOW TO PLAY', { exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('wordshift_home_progress'))).toBe(before);
 });
 
@@ -665,11 +665,31 @@ test('an interrupted story resumes its saved page and commits the chosen memory 
     JSON.parse(localStorage.getItem('wordshift_story_spine')!).memories.cup.deferredAtPuzzle ?? null,
   )).toBeNull();
   await expect(page.getByRole('heading', { name: 'A place at the table', exact: true })).toBeVisible();
+  const storyArt = page.getByTestId('story-scene-art');
+  const storyScroll = page.getByTestId('story-scene-scroll');
+  const expectCompactStoryArt = async () => {
+    await expect.poll(async () => {
+      const art = await storyArt.boundingBox();
+      const viewport = await storyScroll.boundingBox();
+      if (!art || !viewport) return false;
+      return art.height > 0 && art.height <= 136.5
+        && Math.abs(art.width / art.height - 16 / 9) < 0.02
+        && art.x >= viewport.x + 27 && art.x + art.width <= viewport.x + viewport.width - 27
+        && art.y >= viewport.y - 1 && art.y + art.height <= viewport.y + viewport.height;
+    }).toBe(true);
+  };
+  await expectCompactStoryArt();
+  await expect(page.getByTestId('story-scene-text')).toBeInViewport();
   await page.setViewportSize({ width: 320, height: 568 });
+  await expectCompactStoryArt();
   await enlargeBrowserText(page);
   const continueStory = page.getByRole('button', { name: 'Continue', exact: true });
   await continueStory.scrollIntoViewIfNeeded();
   await expect(continueStory).toBeInViewport();
+  const continueBox = await continueStory.boundingBox();
+  const scrollBox = await storyScroll.boundingBox();
+  expect(continueBox!.y).toBeGreaterThanOrEqual(scrollBox!.y - 1);
+  expect(continueBox!.y + continueBox!.height).toBeLessThanOrEqual(scrollBox!.y + scrollBox!.height + 1);
   await capture(page, 'updated-story-small-large-text');
   await continueStory.click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('wordshift_story_spine')!).memories.cup.page)).toBe(1);

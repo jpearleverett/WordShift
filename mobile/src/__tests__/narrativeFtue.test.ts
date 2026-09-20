@@ -154,23 +154,25 @@ describe('ftue-6: dialogue reveal cadence and the tap-to-skip hint', () => {
   });
 });
 
-describe('ftue-7: the star rule is taught', () => {
-  test('How to Play carries a phase-aware star rule at every phase, steps stay at four', () => {
+describe('How to Play stays concise and star feedback belongs to the receipt', () => {
+  test('How to Play keeps its four steps and dismiss action at every phase', () => {
     for (const phase of PHASES) {
       const rules = getRulesText(phase);
       expect(rules.steps).toHaveLength(4);
-      expect(rules.starRule.toLowerCase()).toContain('star');
-      expect(rules.starRule.toLowerCase()).toContain('hint');
-      expect(rules.starRule).toContain('Flawless');
-      expect(rules.starRule).not.toMatch(NO_DASHES);
-      expect(rules.starRule).not.toMatch(NO_CURLY);
+      expect(rules.dismissLabel.length).toBeGreaterThan(0);
+      expect(rules).not.toHaveProperty('starRule');
     }
-    expect(getRulesText(0).starRule).not.toBe(getRulesText(4).starRule);
   });
 
-  test('RulesModal renders the star rule under the steps', () => {
+  test('RulesModal has the illustrated steps and dismiss button without extra notes or practice', () => {
     const modal = src('components/puzzle/RulesModal.tsx');
-    expect(modal).toContain('{rules.starRule}');
+    expect(modal).toContain('rules.steps.map');
+    expect(modal).toContain('getRulesStepArt');
+    expect(modal).toContain('label={rules.dismissLabel}');
+    expect(modal).not.toContain('starRule');
+    expect(modal).not.toContain('standard English spellings');
+    expect(modal).not.toContain('onPractice');
+    expect(modal).not.toContain('PRACTICE_LESSONS');
   });
 
   test('resolves the cause of a sub-3-star win from the star rule', () => {

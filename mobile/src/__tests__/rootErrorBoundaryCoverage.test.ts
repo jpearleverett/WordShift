@@ -36,7 +36,6 @@ const ROOT_OVERLAYS = [
   'NotificationPromptModal',
   'PatronModal',
   'StoreModal',
-  'PracticeModal',
   'GameAlertModal',
   'BlindJudgmentOverlay',
   'ScreenTransitionOverlay',

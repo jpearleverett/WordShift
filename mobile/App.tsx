@@ -1,6 +1,4 @@
 import { DAILY_BOARD_VERSION } from './src/services/dailyBoardVersion';
-import { PracticeModal } from './src/components/puzzle/PracticeModal';
-import type { PracticeLessonId } from './src/services/practiceLessons';
 import { saveWithPlayerRetry } from './src/services/saveRetry';
 import { createCeremonyPlayback } from './src/services/ceremonyPlayback';
 import { subscribeBillingChanges } from './src/services/iap';
@@ -386,7 +384,6 @@ function MainApp() {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT, fontScale } = useWindowDimensions();
   const compactPuzzleLayout = SCREEN_HEIGHT < 740 || fontScale > 1.15;
   const [alertPending, setAlertPending] = useState(false);
-  const [practiceLesson, setPracticeLesson] = useState<PracticeLessonId | null>(null);
   // Safe-area bases (notch / home indicator) — screens add breathing room on top
   const screenInsets = useScreenInsets();
   // Screen navigation
@@ -2172,7 +2169,6 @@ function MainApp() {
     setNotificationPrompt(null);
     setShowStoreModal(false);
     setShowPatronModal(false);
-    setPracticeLesson(null);
     setHomeOverlayActive(false);
     graduationGenerationRef.current += 1;
     graduationCheckedRef.current = false;
@@ -4893,7 +4889,6 @@ function MainApp() {
     story: activeStory !== null && postVictoryIntro === null,
     journal: storyFlow.journalContext !== null,
     share: shareResultData !== null,
-    practice: practiceLesson !== null,
     store: showStoreModal,
     patron: showPatronModal,
     notification: notificationPrompt !== null,
@@ -5826,7 +5821,6 @@ function MainApp() {
           visible={puzzle.showRules}
           phase={persistence.currentPhase}
           onClose={() => puzzleActions.setShowRules(false)}
-          onPractice={lesson => { puzzleActions.setShowRules(false); setPracticeLesson(lesson); }}
         />
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}
@@ -6360,7 +6354,6 @@ function MainApp() {
         onHintsChange={() => puzzleActions.refreshHintBalance()}
         onOpenPatron={() => { setShowStoreModal(false); setShowPatronModal(true); }}
       />
-      {overlayOwner === 'practice' && practiceLesson && <PracticeModal visible lessonId={practiceLesson} phase={persistence.currentPhase} onClose={() => setPracticeLesson(null)} />}
       {/* Cottage-skinned Alert.alert replacement — mounted last so it layers
           over every screen and modal (see services/gameAlert). */}
       <GameAlertModal key="game-alert-host" phase={persistence.currentPhase} suspended={overlayOwner !== 'alert'} onPendingChange={setAlertPending} />

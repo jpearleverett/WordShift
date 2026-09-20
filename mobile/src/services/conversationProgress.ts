@@ -19,7 +19,7 @@ export interface AnimalConversationCompletion {
   completed: boolean;
 }
 
-function readIds(progress: HomeWorldProgress): Record<string, string[]> {
+export function getConversationReadIds(progress: HomeWorldProgress): Record<string, string[]> {
   const value = progress.conversationReadIds;
   if (value === undefined) return {};
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
@@ -48,7 +48,7 @@ export function getNextAnimalConversation(
   phase: DialoguePhase = getAnimalPhase(progress.currentPhase, animalType),
   unlocked: Set<AnimalType> = new Set(progress.unlockedAnimals as AnimalType[]),
 ): AnimalConversationLine | null {
-  const completed = new Set(readIds(progress)[animalType] ?? []);
+  const completed = new Set(getConversationReadIds(progress)[animalType] ?? []);
   const maxPhase = Math.min(phase, 4) as DialoguePhase;
   const dialogues = getDialoguesForAnimal(animalType, maxPhase);
   for (let index = 0; index < dialogues.length; index++) {
@@ -64,7 +64,7 @@ function completion(progress: HomeWorldProgress, animalType: AnimalType, complet
   const phase = getAnimalPhase(progress.currentPhase, animalType);
   const total = getTotalDialogueCount(animalType, Math.min(phase, 4) as DialoguePhase);
   return {
-    conversationReadIds: copyIds(readIds(progress)),
+    conversationReadIds: copyIds(getConversationReadIds(progress)),
     next,
     nextIndex: next?.index ?? (phase === 5 ? Math.max(total, progress.lastDialogueRead[animalType] ?? 0) : total),
     cycleCount: progress.cycleCount ?? 0,
@@ -102,7 +102,7 @@ export async function completeAnimalConversationLine(
       if (!progress.unlockedAnimals.includes(animalId)) {
         throw new Error('Invite this resident before continuing their conversation.');
       }
-      const ids = readIds(progress);
+      const ids = getConversationReadIds(progress);
       const line = getDialoguesForAnimal(type, 4).find(dialogue => dialogue.id === lineId);
       if (!line) throw new Error('This conversation line is no longer available.');
       if (ids[animalId]?.includes(lineId)) return completion(progress, type, false);

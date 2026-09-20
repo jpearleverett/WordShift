@@ -1177,14 +1177,6 @@ export function getCeremonyHoldHint(): string {
 interface RulesText {
   title: string;
   steps: { heading: string; desc: string }[];
-  /**
-   * The star rule (ftue-7), rendered under the four steps: three stars for a
-   * solve with no hints and at most one slipped drop; a hint or a couple of
-   * slips costs one; a solve with no hints, slips or undos is Flawless. Kept
-   * out of the step list on purpose: each step has its own diagram
-   * (RULES_STEP_ART) and the step count is pinned at four.
-   */
-  starRule: string;
   dismissLabel: string;
 }
 
@@ -1203,7 +1195,6 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Make Real Words', desc: 'Both words must be valid English!' },
       { heading: 'Complete All Rows', desc: 'Work through every row to win!' },
     ],
-    starRule: 'Stars: three for a solve with no hints and no more than one slipped drop. A hint, or a couple of slips, costs one. No hints, slips or undos at all is a Flawless solve!',
     dismissLabel: "LET'S PLAY!",
   },
   1: {
@@ -1214,7 +1205,6 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Form Valid Words', desc: 'Both words must exist in the dictionary.' },
       { heading: 'Solve the Chain', desc: 'Complete each row to progress.' },
     ],
-    starRule: 'Stars: three for a chain solved without hints and at most one slipped drop. A hint or a couple of slips costs one. A solve with no hints, slips or undos is Flawless.',
     dismissLabel: 'UNDERSTOOD',
   },
   2: {
@@ -1225,7 +1215,6 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Words Must Be Valid', desc: 'The dictionary decides. Not you.' },
       { heading: 'Finish the Chain', desc: 'Row by row. There is no shortcut.' },
     ],
-    starRule: 'Stars: three when you needed no hint and slipped at most once. A hint, or more than one slip, takes one away. Nothing borrowed, nothing undone: Flawless.',
     dismissLabel: 'CONTINUE',
   },
   3: {
@@ -1236,7 +1225,6 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'Valid Words Only', desc: 'Some arrangements are forbidden.' },
       { heading: 'Complete the Sequence', desc: 'Keep a path open through the remaining rows.' },
     ],
-    starRule: 'Stars: three if you asked for nothing and slipped no more than once. Each hint, each second slip, dims one. A sequence with no hint, no slip and no undo is Flawless.',
     dismissLabel: 'PROCEED',
   },
   4: {
@@ -1247,7 +1235,6 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'The Words Must Be Real', desc: 'As real as anything here.' },
       { heading: 'Complete the Ritual', desc: 'Row by row. Closer and closer.' },
     ],
-    starRule: 'Stars: three when the hands needed no hint and faltered at most once. A hint, or a second falter, costs one. Unaided, unfaltering, undone by nothing: Flawless.',
     dismissLabel: '...',
   },
   5: {
@@ -1258,7 +1245,6 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
       { heading: 'The Words Are Real', desc: 'As real as the silence between them.' },
       { heading: 'Continue the Pattern', desc: 'Row by row. The weave holds.' },
     ],
-    starRule: 'Stars: three for a thread pulled without a hint and no more than one slip. A hint, or a second slip, lets one go. No hint, no slip, no undo: Flawless.',
     dismissLabel: 'Continue',
   },
 };
@@ -1454,57 +1440,58 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
 
 /**
  * Fox introduces the Journal when it first becomes available (~puzzle 6).
- * Five lines: concept intro, Word Ledger, Whisper Gallery, Weekly Quests, closing.
+ * Five lines: Things We Kept, Word Ledger, Whisper Gallery, quests, closing.
+ * These are separate destinations in the Journal hub, not tabs inside a memory.
  * Phase-aware so the tone matches wherever the player happens to be.
  */
 export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 4) {
     return [
-      "The arrangement speaks through many voices now. I have gathered them all into one record, and it keeps growing on its own.",
-      "The Word Ledger holds every word you have offered. Read through it and you will see the shape of what you have built.",
-      "The Whisper Gallery keeps every voice. Mine, the others', and the echoes that linger after each puzzle. Nothing is lost.",
-      "The quests are in there too, daily tasks and weekly ones. Complete them and more amber follows.",
-      "You will find it all behind the book icon. The pages have been filling themselves. They were always going to.",
+      "The arrangement leaves a record. Open the Journal, then Things We Kept, for the conversations you've had and the choices you've made.",
+      "Word Ledger is a separate entry in the Journal. Look for the quill to revisit the recent words you have formed.",
+      "The Whisper Gallery keeps the whispers, replies, and keepsakes you have collected. Some echoes linger longer than others.",
+      "Quests holds your daily and weekly tasks. Complete them and more amber follows. The Season Pass keeps its rewards nearby.",
+      "The book icon up top opens the Journal menu. Choose the record you want to read. It will be waiting.",
     ];
   }
   if (phase >= 3) {
     return [
-      "There's a record now. Every voice, every word, every echo that refused to fade. I've been keeping them all.",
-      "The Word Ledger keeps every word that's passed through your puzzles. Some of them stay with me longer than others.",
-      "The Whisper Gallery holds what we've said to you. Conversations, whispers, the things we say between puzzles.",
-      "Daily and weekly quests are in there too. Finish a few and there's amber waiting.",
-      "The book icon in the header opens it all. I think the house wants you to read what's been written.",
+      "The Journal keeps a record. Things We Kept holds the conversations you've had and the choices you've made. Some sound different now.",
+      "Word Ledger is another entry in the Journal menu. The quill marks your recent puzzle words. Some stay with me longer than others.",
+      "The Whisper Gallery keeps the whispers, replies, and keepsakes you've collected. The echoes that refused to fade.",
+      "Quests holds daily and weekly goals, with amber waiting when you finish. The Season Pass has its own rewards beside it.",
+      "The book icon up top opens the Journal menu. I think the house wants you to read what's been written.",
     ];
   }
   if (phase >= 2) {
     return [
-      "I've been writing things down, friend. The words, the whispers, everything that passes through this house.",
-      "The Word Ledger keeps a record of every word you've shifted. It's longer than you might expect.",
-      "The Whisper Gallery collects what we say to you. Every conversation, and every quiet thought after a puzzle.",
-      "There are daily and weekly quests in there too. New ones each day and each week, with amber waiting at the end.",
-      "Tap the book icon up top to open the journal. Some of it reads differently now than it did when it was first said.",
+      "I've been keeping a journal for this house. Things We Kept holds the conversations you've had and the choices you've made.",
+      "Back in the Journal menu, the quill opens Word Ledger. It keeps your recent puzzle words. Some look different on a second reading.",
+      "The Whisper Gallery saves the whispers, replies, and keepsakes you've collected. You can return to those quiet moments here.",
+      "Quests holds daily and weekly goals, with amber when you finish. You'll find Season Pass rewards in the Journal menu too.",
+      "Tap the book icon up top to open the Journal menu. Choose a place to look back, friend.",
     ];
   }
   if (phase >= 1) {
     return [
-      "I started keeping a journal. The words you shift, the things we say to you, it all gets written down.",
-      "There's a Word Ledger that keeps every word from your puzzles. It's nice to look back on where you've been.",
-      "The Whisper Gallery saves the conversations and the little whispers we share with you. I keep every one.",
-      "You'll also find daily and weekly quests. Little goals, new ones each day and each week, and amber when you finish.",
-      "Look for the book icon in the header. Take a peek when you have a quiet moment.",
+      "I started a journal for you. Things We Kept saves the conversations you've had and the choices you've made along the way.",
+      "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse your recent puzzle words.",
+      "The Whisper Gallery keeps the whispers, replies, and keepsakes you've collected. Little moments to read again when you like.",
+      "Quests has daily and weekly goals, and amber when you finish. You'll find the Season Pass and its rewards in this menu too.",
+      "The book icon up top brings you back to the Journal menu. Take a peek when you have a quiet moment.",
     ];
   }
   return [
-    "I've been keeping something for you... a journal! Let me show you what's inside.",
-    "See this first part? That's your Word Ledger. Every word you shift in a puzzle gets written down here. It's like a scrapbook of everywhere you've been.",
-    "And this is the Whisper Gallery. Anything we say to you, or whisper after a puzzle, gets saved here for you to read again.",
-    "There are daily and weekly quests in here too! Little goals, new ones each day and each week. Finish them and you'll earn extra amber.",
-    "Tap the book icon up top whenever you want to look back. It's yours, friend.",
+    "I've made you a journal! Things We Kept saves the conversations you've had and the choices you've made. A little scrapbook of us.",
+    "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse your recent puzzle words.",
+    "The Whisper Gallery keeps the whispers, replies, and keepsakes you've collected. Little moments you can read again whenever you like.",
+    "Quests has daily and weekly goals that earn extra amber. You'll find Season Pass rewards in the Journal menu too.",
+    "Tap the book icon up top to open the Journal menu, then choose what you'd like to revisit. It's yours, friend.",
   ];
 }
 
 export interface JournalSpotlightStep {
-  id: 'cover' | 'ledger' | 'gallery' | 'quests' | 'open';
+  id: 'memories' | 'ledger' | 'gallery' | 'quests' | 'open';
   icon: string;
   title: string;
   eyebrow: string;
@@ -1522,22 +1509,22 @@ export function getJournalSpotlightSteps(
   if (phase >= 4) {
     return [
       {
-        id: 'cover',
+        id: 'memories',
         icon: '📚',
-        title: 'Journal',
+        title: 'Things We Kept',
         eyebrow: 'THE RECORD OPENS',
-        preview: 'A single place for every word, voice, and task the arrangement keeps.',
+        preview: 'The conversations you have had. The choices you have made.',
         pointerText: 'The marked book up top opens all of this.',
-        cardLabel: 'Begin here',
+        cardLabel: 'Conversations',
         showInPreview: true,
         finalCtaLabel: 'Enter the Record',
       },
       {
         id: 'ledger',
-        icon: '📘',
+        icon: '🪶',
         title: 'Word Ledger',
         eyebrow: 'THE WORDS',
-        preview: 'Every offered word is written down and left to linger.',
+        preview: 'Your recent puzzle words, behind the quill in the Journal menu.',
         pointerText: 'The marked book up top opens all of this.',
         cardLabel: 'Words',
         showInPreview: true,
@@ -1548,7 +1535,7 @@ export function getJournalSpotlightSteps(
         icon: '📜',
         title: galleryTitle,
         eyebrow: 'THE VOICES',
-        preview: 'Conversations, whispers, and echoes remain waiting inside.',
+        preview: 'Collected whispers, replies, and keepsakes remain waiting.',
         pointerText: 'The marked book up top opens all of this.',
         cardLabel: 'Voices',
         showInPreview: true,
@@ -1557,9 +1544,9 @@ export function getJournalSpotlightSteps(
       {
         id: 'quests',
         icon: '🗓',
-        title: 'Weekly Quests',
+        title: 'Quests',
         eyebrow: 'THE TASKS',
-        preview: 'Fresh work arrives each week, with amber left at the end.',
+        preview: 'Daily and weekly tasks, with amber left at the end.',
         pointerText: 'The marked book up top opens all of this.',
         cardLabel: 'Tasks',
         showInPreview: true,
@@ -1568,9 +1555,9 @@ export function getJournalSpotlightSteps(
       {
         id: 'open',
         icon: '✨',
-        title: 'Open It From Here',
+        title: 'Open Your Journal',
         eyebrow: 'READY',
-        preview: 'The glowing book in the header is your way back in.',
+        preview: 'The book up top opens the menu. Choose a record inside.',
         pointerText: 'The journal lives here.',
         cardLabel: 'Return anytime',
         showInPreview: false,
@@ -1582,22 +1569,22 @@ export function getJournalSpotlightSteps(
   if (phase >= 2) {
     return [
       {
-        id: 'cover',
+        id: 'memories',
         icon: '📚',
-        title: 'Journal',
+        title: 'Things We Kept',
         eyebrow: 'NOW KEEPING WATCH',
-        preview: 'Your words, whispers, and weekly tasks all have a place here now.',
+        preview: 'Revisit the conversations you have had and choices you have made.',
         pointerText: 'The book up top opens all of this.',
-        cardLabel: 'Start here',
+        cardLabel: 'Conversations',
         showInPreview: true,
         finalCtaLabel: 'Open the Journal',
       },
       {
         id: 'ledger',
-        icon: '📘',
+        icon: '🪶',
         title: 'Word Ledger',
         eyebrow: 'THE WORDS',
-        preview: 'Every shifted word is saved, ready to be revisited.',
+        preview: 'Your recent puzzle words, behind the quill in the Journal menu.',
         pointerText: 'The book up top opens all of this.',
         cardLabel: 'Words',
         showInPreview: true,
@@ -1608,7 +1595,7 @@ export function getJournalSpotlightSteps(
         icon: '📜',
         title: galleryTitle,
         eyebrow: 'THE VOICES',
-        preview: 'Conversations and post-puzzle whispers stay with you.',
+        preview: 'Whispers, replies, and keepsakes you have collected.',
         pointerText: 'The book up top opens all of this.',
         cardLabel: 'Voices',
         showInPreview: true,
@@ -1617,9 +1604,9 @@ export function getJournalSpotlightSteps(
       {
         id: 'quests',
         icon: '🗓',
-        title: 'Weekly Quests',
-        eyebrow: 'FRESH EACH WEEK',
-        preview: 'Short goals, rotating challenges, and amber rewards.',
+        title: 'Quests',
+        eyebrow: 'DAILY AND WEEKLY',
+        preview: 'Daily and weekly goals with amber rewards.',
         pointerText: 'The book up top opens all of this.',
         cardLabel: 'Goals',
         showInPreview: true,
@@ -1628,9 +1615,9 @@ export function getJournalSpotlightSteps(
       {
         id: 'open',
         icon: '✨',
-        title: 'Open It From Here',
+        title: 'Open Your Journal',
         eyebrow: 'READY',
-        preview: 'The glowing book in the header is your shortcut back.',
+        preview: 'The book up top opens the menu. Choose a place to look back.',
         pointerText: 'The journal lives here.',
         cardLabel: 'Return anytime',
         showInPreview: false,
@@ -1641,22 +1628,22 @@ export function getJournalSpotlightSteps(
 
   return [
     {
-      id: 'cover',
+      id: 'memories',
       icon: '📚',
-      title: 'Journal',
+      title: 'Things We Kept',
       eyebrow: 'NEW IN THE HOUSE',
-      preview: 'One place for your words, whispers, and weekly tasks.',
+      preview: 'Revisit the conversations you have had and choices you have made.',
       pointerText: 'The book up top opens all of this.',
-      cardLabel: 'Start here',
+      cardLabel: 'Conversations',
       showInPreview: true,
       finalCtaLabel: 'Take a Look',
     },
     {
       id: 'ledger',
-      icon: '📘',
+      icon: '🪶',
       title: 'Word Ledger',
       eyebrow: 'RECORD',
-      preview: 'Every shifted word gets written down here.',
+      preview: 'Your recent puzzle words, behind the quill in the Journal menu.',
       pointerText: 'The book up top opens all of this.',
       cardLabel: 'Words',
       showInPreview: true,
@@ -1667,7 +1654,7 @@ export function getJournalSpotlightSteps(
       icon: '📜',
       title: galleryTitle,
       eyebrow: 'VOICES',
-      preview: 'Conversations and post-puzzle whispers stay with you.',
+      preview: 'Whispers, replies, and keepsakes you have collected.',
       pointerText: 'The book up top opens all of this.',
       cardLabel: 'Voices',
       showInPreview: true,
@@ -1676,9 +1663,9 @@ export function getJournalSpotlightSteps(
     {
       id: 'quests',
       icon: '🗓',
-      title: 'Weekly Quests',
-      eyebrow: 'FRESH EACH WEEK',
-      preview: 'Short goals, rotating challenges, and amber rewards.',
+      title: 'Quests',
+      eyebrow: 'DAILY AND WEEKLY',
+      preview: 'Daily and weekly goals with amber rewards.',
       pointerText: 'The book up top opens all of this.',
       cardLabel: 'Goals',
       showInPreview: true,
@@ -1687,9 +1674,9 @@ export function getJournalSpotlightSteps(
     {
       id: 'open',
       icon: '✨',
-      title: 'Open It From Here',
+      title: 'Open Your Journal',
       eyebrow: 'READY',
-      preview: 'The glowing book in the header is your shortcut back.',
+      preview: 'The book up top opens the menu. Choose a place to look back.',
       pointerText: 'The journal lives here.',
       cardLabel: 'Return anytime',
       showInPreview: false,

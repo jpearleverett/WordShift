@@ -1,6 +1,5 @@
 import { TEXT_ROLE } from '../../theme/typography';
 import { AppText } from '../ui/AppText';
-import { PRACTICE_LESSONS, type PracticeLessonId } from '../../services/practiceLessons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -56,14 +55,12 @@ interface RulesModalProps {
   visible: boolean;
   phase: DialoguePhase;
   onClose: () => void;
-  onPractice?: (lesson: PracticeLessonId) => void;
 }
 
 export const RulesModal: React.FC<RulesModalProps> = ({
   visible,
   phase,
   onClose,
-  onPractice,
 }) => {
   const rules = getRulesText(phase);
   const insets = useScreenInsets();
@@ -189,7 +186,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                         keeps the plain chip. */}
                     {getRulesStepArt(idx) ? (
                       <View style={styles.ruleArtWrap}>
-                        <Image source={getRulesStepArt(idx)!} style={styles.ruleArt} resizeMode="contain" accessible={false} />
+                        <Image testID={`rules-step-art-${idx + 1}`} source={getRulesStepArt(idx)!} style={styles.ruleArt} resizeMode="contain" accessible={false} />
                         <View
                           style={[
                             styles.ruleNumber,
@@ -218,19 +215,6 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                 );
               })}
 
-              {/* The star rule (ftue-7): the one rule no other surface taught.
-                  A framed note under the four diagrammed steps rather than a
-                  fifth step, which would need its own diagram. */}
-              <View style={[styles.starRule, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
-                <AppText style={[styles.starRuleText, { color: t.body }]}>{rules.starRule}</AppText>
-              </View>
-
-              <AppText style={{ color: t.body, fontSize: 15, lineHeight: 21, marginBottom: 12 }}>
-                Words use standard English spellings. Common regional spellings count. Rare valid discoveries can count too; new ordinary puzzles use a more familiar vocabulary.
-              </AppText>
-              {onPractice && (Object.keys(PRACTICE_LESSONS) as PracticeLessonId[]).map(lesson => (
-                <CandyButton key={lesson} label={PRACTICE_LESSONS[lesson].title} phase={phase} variant="quiet" onPress={() => onPractice(lesson)} />
-              ))}
               <CandyButton
                 label={rules.dismissLabel}
                 onPress={handleClose}
@@ -340,16 +324,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   ruleDesc: {
-    ...TEXT_ROLE.body,
-  },
-  starRule: {
-    borderWidth: 1,
-    borderRadius: SURFACE.cardRadius,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 14,
-  },
-  starRuleText: {
     ...TEXT_ROLE.body,
   },
   gotItButton: {

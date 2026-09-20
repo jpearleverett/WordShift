@@ -1,8 +1,12 @@
 # Current build and documentation
 
+## September 20 decision and Journal follow-up
+
+`feature/story-layout-journal-fixes`, based on main `45973ae`, fixes oversized decision illustrations, rewrites the Journal introduction with the real menu icons and destinations, limits earlier conversations to completed dialogue, and simplifies How to Play. The owner's **1.3.9 / Android 104** version is unchanged. TypeScript, zero-warning lint and **684 focused tests in 15 suites** passed. See the [change and validation report](UI_FOLLOWUP_2026-09-20.md); ordinary GitHub CI supplies the full-suite and browser results. Physical Android layout verification remains part of the next internal-testing build.
+
 ## September 19 screenshot and store follow-up
 
-Draft [PR #450](https://github.com/jpearleverett/WordShift/pull/450), on `feature/play-store-refresh`, fixes the reported recovery/reset behavior, clipboard access, tutorial timing and modal overlap, drag clipping, axolotl scale, duplicate streak badge and victory layouts. It also adds 185 individually reviewed page illustrations with continuous resident portraits. See the [change and validation report](SCREENSHOT_FIXES_2026-09-19.md) and [art coverage review](ART_COVERAGE_REVIEW_2026-09-19.md).
+This work landed through [PR #453](https://github.com/jpearleverett/WordShift/pull/453), replacing the closed [PR #450](https://github.com/jpearleverett/WordShift/pull/450). It fixes the reported recovery/reset behavior, clipboard access, tutorial timing and modal overlap, drag clipping, axolotl scale, duplicate streak badge and victory layouts. It also adds 185 individually reviewed page illustrations with continuous resident portraits. See the [change and validation report](SCREENSHOT_FIXES_2026-09-19.md) and [art coverage review](ART_COVERAGE_REVIEW_2026-09-19.md).
 
 All 222 collected Jest suites have passing results across the integrated and focused runs; typecheck and zero-warning lint passed. The production Android Hermes JavaScript/assets export passed, including all 185 final story images, and the strict image validator found no missing or invalid assets. `expo-clipboard` is a new native dependency. This work is not a signed Android build or a Play upload, and the next internal-testing build still needs device verification.
 
@@ -20,16 +24,16 @@ Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main`
 
 ## Build identity
 
-Current source builds on main `3b7ec4e`, which includes the assessment fixes and the September 17 version bump. App version is **1.3.7** and Android version code **102** (100 was set on 2026-09-14 with the 1.3.6 bump; 101 is the 2026-09-15 `expo-device` native build, bumped locally by the owner and committed the same day). `expo-device` is a new native module, so that artifact is a new binary and its OTA runtime moved with it; the owner confirmed it installs and runs, which is not the same as the device matrix. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source builds on main `45973ae`, including the September 19 fixes and the owner's subsequent version bump. App version is **1.3.9** and Android version code **104**. The September 20 follow-up does not change either value. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
-| App version | `1.3.7` | `mobile/app.json` |
-| Android package / version code | `com.wordshift.app` / `102` | `mobile/app.json` |
+| App version | `1.3.9` | `mobile/app.json` |
+| Android package / version code | `com.wordshift.app` / `104` | `mobile/app.json` |
 | iOS bundle / build number | `com.wordshift.app` / `3` | `mobile/app.json` |
 | Expo / React Native | SDK 57; lockfile resolves Expo `57.0.20`, RN `0.86.3` | `mobile/package-lock.json` |
 | Version management | Local; increase Android version code for each new Play upload | `mobile/eas.json` |
-| Resolved OTA runtime | `1.3.7-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
+| Resolved OTA runtime | `1.3.9-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
 | Android release optimization | R8 minification, resource shrinking, optimized ProGuard defaults and optimized resource shrinking enabled; PNG crunch disabled | `mobile/app.json`, `mobile/plugins/withAndroidOptimization.js` |
 
 `mobile/package.json` still has npm package version `1.3.1`; that field is tooling metadata, not the Expo app version or Android version code. Do not infer the installed app version from it. The current React Native Gradle plugin resolves AGP 8.12.0; the optimization configuration does not require an AGP 9 migration.
