@@ -105,7 +105,6 @@ import { PhaseTransitionOverlay } from '../components/PhaseTransitionOverlay';
 import { createCeremonySoundScope } from '../services/uiSound';
 import { announceForA11y } from '../services/a11yAnnounce';
 import { hapticLight } from '../services/haptics';
-import { getCeremonyHoldHint } from '../services/phaseNarrative';
 
 const ALL_EVENTS: PhaseTransitionEvent[] = [
   ...([1, 2, 3, 4] as DialoguePhase[]).map(p => getPhaseTransitionEvent(p)!),
@@ -176,19 +175,19 @@ type NodeLike = {
   };
 };
 
-/** First element of the given host type in a rendered tree, or null. */
-function findByType(node: unknown, type: string): NodeLike | null {
+/** First control with the given accessible label, or null. */
+function findByLabel(node: unknown, label: string): NodeLike | null {
   if (node == null || typeof node !== 'object') return null;
   if (Array.isArray(node)) {
     for (const child of node) {
-      const found = findByType(child, type);
+      const found = findByLabel(child, label);
       if (found) return found;
     }
     return null;
   }
   const element = node as NodeLike;
-  if (element.type === type) return element;
-  return findByType(element.props?.children, type);
+  if (element.props?.accessibilityLabel === label) return element;
+  return findByLabel(element.props?.children, label);
 }
 
 function collectText(node: unknown): string[] {
@@ -295,9 +294,9 @@ test('a suspended ceremony keeps its page and resumes without replaying delivere
     const resumedScope = jest.mocked(createCeremonySoundScope).mock.results[1].value;
     expect(resumedScope.play).not.toHaveBeenCalled();
 
-    jest.advanceTimersByTime(1249);
+    jest.advanceTimersByTime(60_000);
     expect(collectText(render())).toContain('The first page waits.');
-    jest.advanceTimersByTime(1);
+    (findByLabel(render(), 'Continue the scene')!.props!.onPress as () => void)();
     expect(collectText(render())).toContain('The next page answers.');
     expect(resumedScope.play).toHaveBeenCalledTimes(1);
     expect(resumedScope.play).toHaveBeenCalledWith('story_answer');
@@ -307,25 +306,15 @@ test('a suspended ceremony keeps its page and resumes without replaying delivere
   }
 });
 
-/**
- * The ceremony keeps its own pace on purpose, but the way out of that pace used
- * to be a borderless "Read at my pace" label inside the scrolling reading pane.
- * Continue is always visible now. Tapping the words remains a second way to
- * hold the current page without advancing it.
- *
- * The settings mock above reports reducedMotion: true, so this also pins that
- * the hold is not gated on a motion preference: a reader who has asked for
- * less movement gets the same escape from the authored pace as everyone else.
- */
-test('the passage is the hold control: pressing the words cancels the pending advance', () => {
+test('Back and Continue allow rereading without replaying ceremony sound or haptic cues', () => {
   jest.useFakeTimers();
   jest.clearAllMocks();
   const event: PhaseTransitionEvent = {
     ...HOUSE_COMPLETION_EVENT,
     readAtOwnPace: false,
     scenes: [
-      { text: 'The first page waits.', delay: 0, duration: 1000, effect: 'fade' },
-      { text: 'The next page answers.', delay: 1000, duration: 1000, effect: 'fade' },
+      { text: 'The first page waits.', delay: 0, duration: 1000, effect: 'fade', cue: 'bell' },
+      { text: 'The next page answers.', delay: 1000, duration: 1000, effect: 'fade', cue: 'answer' },
     ],
   };
   const onComplete = jest.fn();
@@ -333,37 +322,29 @@ test('the passage is the hold control: pressing the words cancels the pending ad
   try {
     render();
     jest.advanceTimersByTime(0);
-    const playing = render();
-    expect(collectText(playing)).toContain('The first page waits.');
-    // Players can advance immediately, without first discovering tap-to-hold.
-    expect(collectText(playing)).toContain('Continue');
-
-    const passage = findByType(playing, 'Pressable');
-    expect(passage).not.toBeNull();
-    expect(typeof passage!.props?.onPress).toBe('function');
-    expect(passage!.props?.accessibilityRole).toBe('button');
-    // The words stay the accessible label, with the gesture as a hint.
-    expect(passage!.props?.accessibilityLabel).toBe('The first page waits.');
-    expect(passage!.props?.accessibilityHint).toBe(getCeremonyHoldHint());
-    expect(collectText(passage)).toContain('The first page waits.');
-
-    // Partway through this page's 1250ms budget, the player taps the words.
-    jest.advanceTimersByTime(1000);
-    (passage!.props!.onPress as () => void)();
     render();
-    jest.advanceTimersByTime(60000);
-    const held = render();
+    const scope = jest.mocked(createCeremonySoundScope).mock.results[0].value;
+    expect(scope.play).toHaveBeenCalledWith('story_bell');
+    (findByLabel(render(), 'Continue the scene')!.props!.onPress as () => void)();
+    jest.advanceTimersByTime(350);
+    expect(collectText(render())).toContain('The next page answers.');
+    expect(scope.play).toHaveBeenCalledWith('story_answer');
+    expect(scope.play).toHaveBeenCalledTimes(2);
+    expect(hapticLight).toHaveBeenCalledTimes(2);
 
-    expect(collectText(held)).toContain('The first page waits.');
-    expect(collectText(held)).not.toContain('The next page answers.');
+    (findByLabel(render(), 'Previous passage')!.props!.onPress as () => void)();
+    jest.advanceTimersByTime(350);
+    expect(collectText(render())).toContain('The first page waits.');
+    expect(jest.mocked(announceForA11y).mock.calls.filter(([text]) => text === 'The first page waits.')).toHaveLength(2);
+    (findByLabel(render(), 'Continue the scene')!.props!.onPress as () => void)();
+    jest.advanceTimersByTime(350);
+    expect(collectText(render())).toContain('The next page answers.');
+    expect(scope.play).toHaveBeenCalledTimes(2);
+    expect(hapticLight).toHaveBeenCalledTimes(2);
+    jest.advanceTimersByTime(60_000);
     expect(onComplete).not.toHaveBeenCalled();
-    // Holding leaves the same visible Continue control as the way on.
-    expect(collectText(held)).toContain('Continue');
-
-    // Held is held: a second tap on the words is inert, not a second control.
-    const heldPassage = findByType(held, 'Pressable');
-    expect(heldPassage!.props?.onPress).toBeUndefined();
-    expect(heldPassage!.props?.accessibilityRole).toBeUndefined();
+    (findByLabel(render(), 'Finish the scene')!.props!.onPress as () => void)();
+    expect(onComplete).toHaveBeenCalledTimes(1);
   } finally {
     dispose();
     jest.useRealTimers();

@@ -1,4 +1,5 @@
 import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
+import { getPhaseTransitionReaction } from './phaseTransitionReactions';
 import { Difficulty, GameMode } from '../types';
 import { clearPlayedPuzzles } from './puzzleBank';
 import { getLocalDateString, daysAgoLocal, parseLocalDate } from './dateUtils';
@@ -1097,7 +1098,7 @@ function ceremonyId(cycle: number, kind: PendingCeremony['kind'], phase: Dialogu
 function readCeremonies(progress: HomeWorldProgress): PendingCeremony[] {
   const entries = progress.pendingCeremonies ?? [];
   if (!Array.isArray(entries) || entries.some(entry =>
-    !entry || !['phase', 'house', 'arrival', 'post_arrival', 'new_cycle'].includes(entry.kind) ||
+    !entry || !['phase', 'phase_reaction', 'house', 'arrival', 'post_arrival', 'new_cycle'].includes(entry.kind) ||
     !Number.isInteger(entry.phase) || entry.phase < 0 || entry.phase > 5 ||
     !Number.isInteger(entry.cycle) || entry.cycle < 0 ||
     entry.id !== ceremonyId(entry.cycle, entry.kind, entry.phase) ||
@@ -1166,6 +1167,19 @@ export async function acknowledgeCeremony(id: string): Promise<void> {
       const completed = entries.find(entry => entry.id === id);
       if (!completed) return;
       progress.pendingCeremonies = entries.filter(entry => entry.id !== id);
+      // Saving the completed scene and its immediate resident response is one
+      // durable handoff. A restart after this write opens the response, and a
+      // duplicate completion cannot enqueue it again. It precedes any already
+      // queued house ceremony without touching ordinary dialogue receipts.
+      if ((completed.kind === 'phase' || completed.kind === 'post_arrival') &&
+          getPhaseTransitionReaction(completed.phase, progress.unlockedAnimals)) {
+        const reaction: PendingCeremony = {
+          id: ceremonyId(completed.cycle, 'phase_reaction', completed.phase),
+          kind: 'phase_reaction', phase: completed.phase, cycle: completed.cycle,
+        };
+        progress.pendingCeremonies = [reaction,
+          ...progress.pendingCeremonies.filter(entry => entry.id !== reaction.id)];
+      }
       if (completed.kind === 'house') progress.houseCompletionCelebrated = true;
       if (completed.kind === 'new_cycle') progress.cycleOpeningSeen = completed.cycle;
       await saveProgress();

@@ -148,6 +148,28 @@ test('queued scenes are presented in order and only explicit completion drains e
   expect(save.dependencies.acknowledge.mock.calls.map(([id]) => id)).toEqual(queued.map(entry => entry.id));
 });
 
+test('the phase-to-response handoff retains the story layer while the next presentation loads', async () => {
+  const reaction: PendingCeremony = { id: '0:phase_reaction:2', kind: 'phase_reaction', phase: 2, cycle: 0 };
+  const save = fixture([record(2)]);
+  save.dependencies.acknowledge.mockImplementationOnce(async () => save.replace([reaction]));
+  const controller = createCeremonyPlayback(save.dependencies);
+  await controller.refresh();
+  const phaseEvent = save.current();
+  const reactionBuild = deferred<PhaseTransitionEvent>();
+  save.dependencies.build.mockImplementationOnce(() => reactionBuild.promise);
+  const completion = controller.complete(phaseEvent);
+  await settle();
+  expect(save.dependencies.build).toHaveBeenLastCalledWith(reaction);
+  expect(save.current()).toBe(phaseEvent);
+  expect(save.dependencies.onEvent).not.toHaveBeenCalledWith(null);
+  reactionBuild.resolve({ ...authoredEvent, presentation: 'dialogue' });
+  await completion;
+  expect(save.current()?.presentation).toBe('dialogue');
+  expect(save.dependencies.onEvent).not.toHaveBeenCalledWith(null);
+  await controller.complete(save.current());
+  expect(save.current()).toBeNull();
+});
+
 test('reset detaches an unfinished build so it cannot block or revive the next generation', async () => {
   const save = fixture();
   const oldBuild = deferred<PhaseTransitionEvent>();

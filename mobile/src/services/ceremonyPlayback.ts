@@ -87,7 +87,10 @@ export function createCeremonyPlayback({
         });
         if (owner !== generation) return null;
         active = null;
-        onEvent(null);
+        // Keep the story layer claimed while the next entry is built. In
+        // particular, phase -> resident response must not briefly release a
+        // home intro or promotional nudge between the two saved moments.
+        // readNext clears the event itself only when the queue is empty.
         await retry(() => readNext(owner), {
           title: 'Your next scene is waiting',
           message: 'We could not open the next saved scene. Please retry.',

@@ -232,6 +232,9 @@ test('an unknown or repeated completion cannot consume another queued ceremony',
   expect(await getPendingCeremonies()).toHaveLength(2);
   await acknowledgeCeremony('0:phase:4');
   await acknowledgeCeremony('0:phase:4');
+  expect((await getPendingCeremonies()).map(entry => entry.id)).toEqual(['0:phase_reaction:4', house!.id]);
+  await acknowledgeCeremony('0:phase_reaction:4');
+  await acknowledgeCeremony('0:phase:4');
   expect(await getPendingCeremonies()).toEqual([house]);
 });
 
@@ -302,8 +305,73 @@ test('cloud save preserves an owed ceremony with the phase that earned it', asyn
   await confirmPhaseTransition();
   const backup = await collectLocalSaveData();
   await acknowledgeCeremony('0:phase:2');
+  await acknowledgeCeremony('0:phase_reaction:2');
   expect(await getPendingCeremonies()).toEqual([]);
   expect(await restoreFromCloudData(backup)).toBe(true);
   expect((await getPendingCeremonies()).map(entry => entry.id)).toEqual(['0:phase:2']);
   expect((await saved()).currentPhase).toBe(2);
+});
+
+test('phase acknowledgement durably places its resident response before the held house ceremony', async () => {
+  await seed({ ...revealSeed, conversationReadVersion: 1, conversationReadIds: { fox: ['fx_0_1'] },
+    lastDialogueRead: { fox: 1 }, introsSeen: ['fox'] });
+  await confirmPhaseTransition();
+  const house = await queueHouseCeremony();
+  await acknowledgeCeremony('0:phase:4');
+  invalidateProgressCache();
+  expect((await getPendingCeremonies()).map(entry => entry.id)).toEqual(['0:phase_reaction:4', house!.id]);
+  await acknowledgeCeremony('0:phase_reaction:4');
+  expect(await getPendingCeremonies()).toEqual([house]);
+  expect(await saved()).toMatchObject({
+    conversationReadVersion: 1, conversationReadIds: { fox: ['fx_0_1'] },
+    lastDialogueRead: { fox: 1 }, introsSeen: ['fox'],
+  });
+});
+
+test('an interrupted phase completion recovers the resident response exactly once', async () => {
+  await seed();
+  await confirmPhaseTransition();
+  failNextWrite(KEY);
+  await expect(acknowledgeCeremony('0:phase:2')).rejects.toBeInstanceOf(StorageRecoveryRequiredError);
+  invalidateProgressCache();
+  expect((await getPendingCeremonies()).map(entry => entry.id)).toEqual(['0:phase_reaction:2']);
+  await acknowledgeCeremony('0:phase:2');
+  expect((await getPendingCeremonies()).map(entry => entry.id)).toEqual(['0:phase_reaction:2']);
+  await acknowledgeCeremony('0:phase_reaction:2');
+  await acknowledgeCeremony('0:phase:2');
+  expect(await getPendingCeremonies()).toEqual([]);
+});
+
+test('a failed response acknowledgement preserves the response until retry', async () => {
+  await seed();
+  await confirmPhaseTransition();
+  await acknowledgeCeremony('0:phase:2');
+  failNextWrite(STORAGE_COMMIT_KEY);
+  await expect(acknowledgeCeremony('0:phase_reaction:2')).rejects.toThrow('Storage unavailable');
+  invalidateProgressCache();
+  expect((await getPendingCeremonies()).map(entry => entry.id)).toEqual(['0:phase_reaction:2']);
+  await acknowledgeCeremony('0:phase_reaction:2');
+  expect(await getPendingCeremonies()).toEqual([]);
+});
+
+test('the phase-five response follows After without interrupting or duplicating the Arrival', async () => {
+  await seed({ currentPhase: 4, pendingPhaseTransition: null });
+  await markFinalPuzzleCompleted();
+  await markPostRevelation();
+  await acknowledgeCeremony('0:arrival:4');
+  expect((await getPendingCeremonies()).map(entry => entry.id)).toEqual(['0:post_arrival:5']);
+  await acknowledgeCeremony('0:post_arrival:5');
+  expect((await getPendingCeremonies()).map(entry => entry.id)).toEqual(['0:phase_reaction:5']);
+  await acknowledgeCeremony('0:phase_reaction:5');
+  expect(await getPendingCeremonies()).toEqual([]);
+});
+
+test('cloud restore carries the unread resident response without resurrecting its completed phase scene', async () => {
+  await seed();
+  await confirmPhaseTransition();
+  await acknowledgeCeremony('0:phase:2');
+  const backup = await collectLocalSaveData();
+  await acknowledgeCeremony('0:phase_reaction:2');
+  expect(await restoreFromCloudData(backup)).toBe(true);
+  expect((await getPendingCeremonies()).map(entry => entry.id)).toEqual(['0:phase_reaction:2']);
 });

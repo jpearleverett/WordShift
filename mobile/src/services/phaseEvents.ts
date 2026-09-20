@@ -11,11 +11,13 @@ import { getWordPhaseTier } from './localGenerator';
  */
 
 export interface PhaseTransitionEvent {
+  /** A resident's immediate response shares ceremony persistence and overlay ownership. */
+  presentation?: 'cinematic' | 'dialogue';
   phase: DialoguePhase;
   title: string;
   /** Hide the era name for ordinary transitions; special ceremonies keep it. */
   showTitle?: boolean;
-  /** Essential ceremonies wait for Continue; reading speed is not a motion preference. */
+  /** Legacy marker for authored effect pacing; every ceremony now waits for Continue. */
   readAtOwnPace?: boolean;
   scenes: PhaseScene[];
   bgColor: string;
@@ -58,8 +60,8 @@ export interface PhaseScene {
   imageOpacity?: number;
   /** A modest close view gives consecutive passages distinct framing. */
   imageFraming?: 'wide' | 'detail';
-  delay: number; // ms before showing this scene
-  duration: number; // ms to display this scene
+  delay: number; // authored timeline offset, retained for scene/effect metadata
+  duration: number; // visual-effect duration; never a deadline for reading
   /**
    * Visual effect for this scene (rendered by PhaseTransitionOverlay).
    * 'descend' drives the scene IMAGE: a slow translateY down + opacity-in

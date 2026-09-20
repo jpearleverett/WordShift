@@ -990,9 +990,10 @@ describe('launch-readiness app-integration wiring', () => {
   });
 
   test('the phase ceremony is the share prompt\'s second peak, under the exit-nudge guards (product-retention-7)', () => {
-    // The ceremony path fires only once the phase scene is acknowledged.
+    // The animal's immediate response owns the handoff. Promotion waits for
+    // that acknowledgement and an empty story queue, including home dialogs.
     expect(APP_TSX).toMatch(
-      /if \(completed\?\.kind === 'phase' && completed\.phase <= 2\) \{\s*maybeShowCeremonySharePrompt\(\)\.catch\(\(\) => \{\}\);\s*\}/
+      /if \(completed\?\.kind === 'phase_reaction' && completed\.phase <= 2 &&\s*!storyOverlayActive && !homeOverlayActive &&\s*\(await getPendingCeremonies\(\)\)\.length === 0\) \{\s*maybeShowCeremonySharePrompt\(\)\.catch\(\(\) => \{\}\);\s*\}/
     );
     // The pit exit (Collect Now) is the route to the ward ceremony, so it
     // snapshots the win exactly like the Next/Home exits; otherwise the

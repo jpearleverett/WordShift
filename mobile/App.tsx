@@ -1,6 +1,8 @@
 import { DAILY_BOARD_VERSION } from './src/services/dailyBoardVersion';
 import { saveWithPlayerRetry } from './src/services/saveRetry';
 import { createCeremonyPlayback } from './src/services/ceremonyPlayback';
+import { buildPhaseReactionEvent } from './src/services/phaseTransitionReactions';
+import { PhaseReactionDialogue } from './src/components/PhaseReactionDialogue';
 import { subscribeBillingChanges } from './src/services/iap';
 import { useLaunchIntents } from './src/hooks/useLaunchIntents';
 import { useInitialGameRoute } from './src/hooks/useInitialGameRoute';
@@ -88,6 +90,7 @@ import {
   checkFreeStreakFreeze,
   consumeVariantNudge,
   getFullProgress,
+  getPendingCeremonies,
   queueHouseCeremony,
   getRitualWords,
   consumeCycleOpening,
@@ -1246,6 +1249,10 @@ function MainApp() {
           const event = getPhaseTransitionEvent(record.phase);
           if (!event) throw new Error('The saved phase scene is unavailable');
           return event;
+        }
+        case 'phase_reaction': {
+          const context = await getArrivalContext();
+          return buildPhaseReactionEvent(record.phase, context.unlockedAnimals ?? [], context);
         }
         case 'house': return buildHouseCompletionEvent(await getArrivalContext());
         case 'arrival': return buildFinalPuzzleEvent(await getRitualWords(), await getArrivalContext());
@@ -4272,7 +4279,7 @@ function MainApp() {
   }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.pendingPhaseTransition, persistence.currentPhase, postVictoryIntro]);
 
   // The share prompt's SECOND peak: the ward-ignition ceremony (the first sky
-  // change). Runs once the phase scene is acknowledged, from the pit, under
+  // change). Runs after the resident's response is acknowledged, from the pit, under
   // the same one-time flag, exit-nudge gate and spacing record as the flawless
   // path, so a careful player who never solves flawless still meets the one
   // share invite. Its Share CTA opens the last exited board's snapshot (the
@@ -4917,6 +4924,21 @@ function MainApp() {
   else if (overlayOwner === 'ceremony' && presentedPhaseEvent !== phaseTransitionEvent) setPresentedPhaseEvent(phaseTransitionEvent);
   const cinematicEvent = overlayOwner === 'ceremony' || presentedPhaseEvent === phaseTransitionEvent
     ? phaseTransitionEvent : null;
+  const completePresentedCeremony = async () => {
+    const completed = await ceremonyPlayback.complete(cinematicEvent);
+    if (completed?.kind === 'new_cycle' && pendingCycleRebuildRef.current) {
+      pendingCycleRebuildRef.current = false;
+      await rebuildSessionFromStorage({ restartOnboarding: false });
+    }
+    // The resident gets the first word after the sky changes. A share invite
+    // can follow their response only when no other scene or home dialog is
+    // owed; the ordinary flawless-win path keeps the invitation available.
+    if (completed?.kind === 'phase_reaction' && completed.phase <= 2 &&
+        !storyOverlayActive && !homeOverlayActive &&
+        (await getPendingCeremonies()).length === 0) {
+      maybeShowCeremonySharePrompt().catch(() => {});
+    }
+  };
 
   useLaunchIntents(
     onboardingFlow.onboardingReady && !bootRouting &&
@@ -6256,22 +6278,14 @@ function MainApp() {
       <ScreenTransitionOverlay opacity={transitionOverlay} color={transitionOverlayColor} />
       {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay
-        event={cinematicEvent}
+        event={cinematicEvent?.presentation === 'dialogue' ? null : cinematicEvent}
         suspended={overlayOwner !== 'ceremony'}
-        onComplete={async () => {
-          const completed = await ceremonyPlayback.complete(phaseTransitionEvent);
-          if (completed?.kind === 'new_cycle' && pendingCycleRebuildRef.current) {
-            pendingCycleRebuildRef.current = false;
-            await rebuildSessionFromStorage({ restartOnboarding: false });
-          }
-          // The share peak is the FIRST sky change (phases 1-2). By phase 3
-          // the flawless path has had ~60 boards, and the phase-4 entry can
-          // queue the held house ceremony right behind it, where a share
-          // card would stack over the Temple scene.
-          if (completed?.kind === 'phase' && completed.phase <= 2) {
-            maybeShowCeremonySharePrompt().catch(() => {});
-          }
-        }}
+        onComplete={completePresentedCeremony}
+      />
+      <PhaseReactionDialogue
+        event={cinematicEvent?.presentation === 'dialogue' ? cinematicEvent : null}
+        suspended={overlayOwner !== 'ceremony'}
+        onComplete={completePresentedCeremony}
       />
       <StorySceneModal
         memory={overlayOwner === 'story' ? activeStory?.memory ?? null : null}

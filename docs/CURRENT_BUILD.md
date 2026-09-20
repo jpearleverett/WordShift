@@ -1,5 +1,13 @@
 # Current build and documentation
 
+## September 20 manual phase transitions and resident responses
+
+`feature/manual-phase-transitions`, based on main `4682c4c`, makes every ceremony passage wait for Continue and adds Back navigation. Android Back returns to the previous passage, with skip confirmation on the first. Revisiting a passage does not repeat its one-shot audio or haptics.
+
+Completing or deliberately skipping a phase ceremony immediately opens a recruited resident's acknowledgement. The response is saved in the ceremony queue before the handoff, survives interruption, and takes priority over a held house ceremony or share invitation. It does not consume regular conversations or introductions. Phase 5 responds after the aftermath and respects the player's ending boundary.
+
+Validation passed: **227 Jest suites / 5,286 tests** in-band, TypeScript, zero-warning lint and the story corpus audit. Eight targeted rendered browser journeys passed, including 320px enlarged-text controls, normal/reduced-motion manual navigation, interrupted ceremony/reaction recovery, save retry and pit navigation; the final reaction-state cleanup also passed its browser journey again. The app remains **1.3.9 / Android 104**. These checks are source/web validation, not a signed Android device pass.
+
 ## September 20 decision and Journal follow-up
 
 `feature/story-layout-journal-fixes`, based on main `45973ae`, fixes oversized decision illustrations, rewrites the Journal introduction with the real menu icons and destinations, limits earlier conversations to completed dialogue, and simplifies How to Play. The owner's **1.3.9 / Android 104** version is unchanged. TypeScript, zero-warning lint and **684 focused tests in 15 suites** passed. See the [change and validation report](UI_FOLLOWUP_2026-09-20.md); ordinary GitHub CI supplies the full-suite and browser results. Physical Android layout verification remains part of the next internal-testing build.
