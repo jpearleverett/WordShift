@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryContext, StoryMemory, StorySceneId, StoryState, STORY_COPY, canResumeStoryScene, loadStoryState, selectStoryScene, getStoryPortraitSpeaker, getStoryPresentationPhase } from '../services/storySpine';
 import { StoryArchiveChapter, StoryArchiveHistory, loadStoryArchiveHistory, getStoryArchiveChapterLines, getStoryArchiveChapterSummary, getStoryArchiveChapters, getStorySpeakerName, getVisibleStoryMemoryLines } from '../services/storyArchive';
 import { getSettingsSync } from '../services/settings';
-import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
@@ -60,15 +60,16 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
   const memoryCard = (memory: StoryMemory, summary: string, onPress: () => void) => {
     const resident = getStoryPortraitSpeaker(memory, 0);
     const speaker = context?.unlockedAnimals.includes(resident) ? resident : null;
-    const name = speaker ? getStorySpeakerName(speaker) : STORY_COPY.narrator;
-    return <Pressable key={memory.scene.id} accessibilityRole="button" accessibilityLabel={`${memory.scene.title}. ${name}. ${summary}`} onPress={onPress} style={[styles.row, styles.entryRow, { backgroundColor: theme.sectionBg, borderColor: theme.sectionBorder }]}>
+    // A card names its resident or nobody; it never names "The house".
+    const name = speaker ? getStorySpeakerName(speaker) : '';
+    return <Pressable key={memory.scene.id} accessibilityRole="button" accessibilityLabel={[memory.scene.title, name, summary].filter(Boolean).join('. ')} onPress={onPress} style={[styles.row, styles.entryRow, { backgroundColor: theme.sectionBg, borderColor: theme.sectionBorder }]}>
       <View style={styles.entryPortrait} accessible={false} importantForAccessibility="no-hide-descendants" pointerEvents="none">
         {speaker ? <StoryPortrait speaker={speaker} phase={getStoryPresentationPhase(memory)} passage={`journal:${memory.scene.id}`} size={ENTRY_PORTRAIT_SIZE} speaking={false} />
           : <Image source={JOURNAL_ICON} resizeMode="contain" style={styles.fallbackPortrait} accessible={false} />}
       </View>
       <View style={styles.entryText}>
         <AppText textRole="label" style={[styles.rowTitle, { color: theme.title }]}>{memory.scene.title}</AppText>
-        <AppText textRole="caption" style={[styles.rowResident, { color: theme.muted }]}>{name}</AppText>
+        {!!name && <AppText textRole="caption" style={[styles.rowResident, { color: theme.muted }]}>{name}</AppText>}
         <AppText textRole="caption" style={[styles.rowBody, { color: theme.body }]}>{summary}</AppText>
       </View>
     </Pressable>;
@@ -85,7 +86,8 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
           {selectedCycle !== null && <AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>Cycle {selectedCycle + 1}. This answer belongs to that earlier morning.</AppText>}
           {selected.completed && <AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>{selected.scene.memory}</AppText>}
           {answer && <AppText textRole="label" style={[styles.answer, { color: theme.title }]}>{STORY_COPY.savedChoice}: {answer}</AppText>}
-          {memoryLines.map((line, index) => <View key={`${index}:${line.speaker}`} style={styles.line}><AppText textRole="label" style={[styles.speaker, { color: theme.title }]}>{getStorySpeakerName(line.speaker)}</AppText><AppText textRole="reading"  style={[styles.body, { color: theme.body }]}>{line.text}</AppText></View>)}
+          {/* Narration is set in italics with no nameplate, as in the reader. */}
+          {memoryLines.map((line, index) => <View key={`${index}:${line.speaker}`} style={styles.line}>{line.speaker !== 'narrator' && <AppText textRole="label" style={[styles.speaker, { color: theme.title }]}>{getStorySpeakerName(line.speaker)}</AppText>}<AppText textRole="reading"  style={[styles.body, line.speaker === 'narrator' && styles.narration, { color: theme.body }]}>{line.text}</AppText></View>)}
           {selectedCycle === null && context && state && canResumeStoryScene(context, state, selected.scene.id) && <CandyButton phase={phase} label={STORY_COPY.resume} onPress={() => resume(selected.scene.id)} />}
         </ScrollView> : chapter ? <FlatList style={styles.scroll} key={chapter.id} data={earlierLines} keyExtractor={item => item.id} initialNumToRender={6} windowSize={5} contentContainerStyle={styles.reading} ListHeaderComponent={<AppText textRole="caption" style={[styles.summary, { color: theme.muted }]}>{STORY_COPY.archiveHint}</AppText>} renderItem={({ item }) => <AppText  style={[styles.archiveLine, styles.body, { color: theme.body, borderColor: theme.sectionBorder }]}>{item.text}</AppText>} /> : <>
           <View style={styles.tabs}>{(['memories', 'archive'] as const).map(value => <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: tab === value }} onPress={() => setTab(value)} style={[styles.tab, { borderColor: theme.sectionBorder, backgroundColor: tab === value ? theme.sectionBg : 'transparent' }]}><AppText textRole="label" style={[styles.tabText, { color: theme.title }]}>{STORY_COPY[value]}</AppText></Pressable>)}</View>
@@ -126,6 +128,7 @@ const styles = StyleSheet.create({
   message: { flex: 1, padding: SURFACE.panelPadX },
   body: { ...TEXT_ROLE.reading, lineHeight: 28 },
   speaker: { ...TEXT_ROLE.label, marginBottom: 8 },
+  narration: { fontFamily: BODY_FONT_ITALIC },
   line: { marginBottom: 24 },
   summary: { fontFamily: BODY_FONT, fontSize: 15, lineHeight: 25, marginBottom: 22 },
   answer: { fontFamily: PIXEL_FONT_BOLD, fontSize: 15, lineHeight: 24, marginBottom: 24 },

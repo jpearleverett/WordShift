@@ -175,6 +175,10 @@ test('narrator-led memories use the established companion while locked residents
   const tree = await loadedJournal({ ...state, memories: { old_mark: narrator, seeds: locked } } as StoryState);
   const portraits = tree.filter(node => node.type === 'StoryPortrait');
   expect(portraits.map(node => node.props.speaker)).toEqual(['fox']);
-  expect(labels(tree)).toContain(STORY_COPY.narrator);
+  // A card with no resident to show names nobody: "The house" is never a
+  // speaker, so the concealed card carries only its title and summary.
+  expect(labels(tree)).not.toContain(STORY_COPY.narrator);
+  const concealed = tree.find(node => node.props.accessibilityRole === 'button' && String(node.props.accessibilityLabel).startsWith('Something kept'))!;
+  expect(concealed.props.accessibilityLabel).not.toContain(STORY_COPY.narrator);
   expect(tree.some(node => node.type === 'Image' && node.props.style?.width === 56 && node.props.style?.height === 56)).toBe(true);
 });

@@ -95,13 +95,25 @@ describe('StorySceneModal saving affordance is delayed, never per-page', () => {
     expect(flat).toMatch(/hiddenAction: \{ opacity: 0 \}/);
   });
 
+  it('never attributes narration to "The house" and never draws the player', () => {
+    // The nameplate is skipped for the narrator before the name is even looked
+    // up; the resident's idle portrait stays in view (see the rendering test).
+    expect(flat).toContain("const speakerName = line && line.speaker !== 'narrator' ? getStorySpeakerName(line.speaker) : '';");
+    expect(flat).toContain('{!!speakerName && <AppText textRole="label" testID="story-scene-speaker"');
+    // The player has no sprite, so the player's own line shows the nameplate
+    // alone, and the row keeps the portrait's height so the text never jumps.
+    expect(flat).toContain("{portraitSpeaker && line?.speaker !== 'player' && <StoryPortrait");
+    expect(flat).toContain('style={[styles.speakerRow, { minHeight: layout.portraitSize }]}');
+  });
+
   it('keeps the error, retry and accessibility paths intact', () => {
     const flatRun = runBlock.replace(/\s+/g, ' ');
     expect(flatRun).toMatch(/catch \{ setError\(true\); [\s\S]*?announceForA11y\(STORY_COPY\.saveError\); \}/);
     expect(src).toContain('retry.current = action');
     expect(src).toMatch(/\{error && <View accessibilityLiveRegion="assertive">/);
     expect(src).toContain('label={STORY_COPY.retry}');
-    expect(src).toContain('announceForA11y(`${speakerName}. ${line.text}`)');
+    // Narration is announced bare: it has no speaker to prefix.
+    expect(src).toContain('announceForA11y(speakerName ? `${speakerName}. ${line.text}` : line.text)');
     // The modal never closes and re-opens between pages (that would fade).
     expect(src).toContain('visible={!!memory && !!line}');
   });

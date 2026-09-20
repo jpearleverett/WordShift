@@ -54,7 +54,11 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const visiblePage = memory ? Math.min(readingPage, memory.page, pages.length - 1) : 0;
   const error = errorPage === pageKey && visiblePage === memory?.page;
   const line = memory ? pages[visiblePage] : undefined;
-  const speakerName = line ? getStorySpeakerName(line.speaker) : '';
+  // Narration carries no nameplate. The resident stays in view (idle) while the
+  // narrator describes the room, but the line is never attributed to "The
+  // house": with Ember's portrait beside it that read as Ember speaking AS the
+  // house, and the house is the one thing in this story that must not narrate.
+  const speakerName = line && line.speaker !== 'narrator' ? getStorySpeakerName(line.speaker) : '';
   const options = memory && visiblePage === memory.page && !memory.choice && memory.page === memory.scene.lines.length - 1 ? memory.scene.options : undefined;
   const presentationPhase = memory ? getStoryPresentationPhase(memory) : phase;
   // Bound both image dimensions explicitly: Android otherwise retains the
@@ -67,7 +71,7 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   }, [pageKey]);
   useEffect(() => {
     scroll.current?.scrollTo({ y: 0, animated: false });
-    if (line) announceForA11y(`${speakerName}. ${line.text}`);
+    if (line) announceForA11y(speakerName ? `${speakerName}. ${line.text}` : line.text);
   }, [memory?.scene.id, memory?.page, speakerName, line?.text]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => {
     if (revealTimer.current) clearTimeout(revealTimer.current);
@@ -96,9 +100,12 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
         <ScrollView ref={scroll} testID="story-scene-scroll" style={{ flexShrink: 1, maxHeight: layout.scrollMaxHeight }} contentContainerStyle={[styles.content, { width: layout.cardWidth }]} bounces={false} keyboardShouldPersistTaps="handled">
           {illustration && <Image source={illustration.source} testID="story-scene-art" resizeMode="contain" style={[styles.sceneArt, { width: layout.artWidth, height: layout.artHeight }]} accessible={false} />}
           <AppText textRole="title" accessibilityRole="header"  style={[styles.title, { color: theme.title }]}>{memory?.scene.title}</AppText>
-          <View style={styles.speakerRow}>
-            {portraitSpeaker && <StoryPortrait speaker={portraitSpeaker} phase={presentationPhase} passage={`${memory?.scene.id}:${visiblePage}`} size={layout.portraitSize} speaking={line?.speaker === portraitSpeaker} />}
-            <AppText textRole="label" style={[styles.speaker, { color: theme.title }]}>{speakerName}</AppText>
+          {/* The row keeps the portrait's height on every page, so a narrated
+              page (portrait, no nameplate) and the player's own line (nameplate,
+              no portrait: the player is never drawn) sit the text at one height. */}
+          <View style={[styles.speakerRow, { minHeight: layout.portraitSize }]}>
+            {portraitSpeaker && line?.speaker !== 'player' && <StoryPortrait speaker={portraitSpeaker} phase={presentationPhase} passage={`${memory?.scene.id}:${visiblePage}`} size={layout.portraitSize} speaking={line?.speaker === portraitSpeaker} />}
+            {!!speakerName && <AppText textRole="label" testID="story-scene-speaker" style={[styles.speaker, { color: theme.title }]}>{speakerName}</AppText>}
           </View>
           <AppText testID="story-scene-text" textRole="reading" style={[styles.body, line?.speaker === 'narrator' && styles.narration, { color: theme.body }]}>{line?.text}</AppText>
           <View style={styles.actions}>
