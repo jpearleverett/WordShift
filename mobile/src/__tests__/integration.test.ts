@@ -19,6 +19,8 @@ import {
   calculatePhaseAcceleration,
   getCurrentPhase,
   confirmPhaseTransition,
+  getPendingPhaseTransition,
+  invalidateProgressCache,
 } from '../services/amberCurrency';
 import { checkAchievements, clearAchievements, AchievementCheckState } from '../services/achievements';
 import {
@@ -28,6 +30,7 @@ import {
   NARRATIVE_ACCELERATION,
   STREAK_BONUSES,
   calculateStreakMultiplier,
+  ALL_ANIMAL_TYPES,
 } from '../types/homeWorld';
 
 beforeEach(async () => {
@@ -135,8 +138,9 @@ describe('Victory Flow Integration', () => {
     expect(result.newPhase).toBe(3);
     await confirmPhaseTransition();
 
-    // Phase 3 -> 4 at 124 puzzles
+    // Phase 3 -> 4 at 124 puzzles, once the whole house is home
     await devAddPuzzles(39); // 84 + 39 = 123
+    await moveEveryResidentIn();
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(4);
@@ -172,6 +176,17 @@ describe('Victory Flow Integration', () => {
 // ---------------------------------------------------------------------------
 // 2. Phase Boundary Tests
 // ---------------------------------------------------------------------------
+// The reveal additionally waits for the whole house (FULL_HOUSE_PHASE), so a
+// Phase 3 -> 4 fixture has to move everyone in first. Phases 0-3 never consult
+// the house and keep their bare fixtures, which is what proves the hold did
+// not over-reach.
+async function setResidentsHome(animals: readonly string[]): Promise<void> {
+  const progress = { ...(await loadProgress()), unlockedAnimals: [...animals] };
+  await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(progress));
+  invalidateProgressCache();
+}
+const moveEveryResidentIn = () => setResidentsHome(ALL_ANIMAL_TYPES);
+
 describe('Phase Boundaries', () => {
   test('at exactly 16 puzzles, phase transitions from 0 to 1', async () => {
     await devAddPuzzles(15);
@@ -203,12 +218,28 @@ describe('Phase Boundaries', () => {
     expect(result.phaseChanged).toBe(true);
   });
 
-  test('at exactly 124 puzzles, phase transitions from 3 to 4', async () => {
+  test('at exactly 124 puzzles the reveal is HELD until the whole house is home', async () => {
     await devAddPuzzles(123);
     expect(await getCurrentPhase()).toBe(3);
 
+    // Every threshold is met and one resident is still missing. The reveal is
+    // withheld, and it reports the phase the world is actually in: a held
+    // result that still named 4 would send the live session into the reveal it
+    // is being denied (useGamePersistence takes newPhase on the not-pending
+    // branch), with no ceremony behind it.
+    await setResidentsHome(ALL_ANIMAL_TYPES.slice(0, ALL_ANIMAL_TYPES.length - 1));
+
+    const held = await awardPuzzleAmber('EASY', 1);
+    expect(held.puzzlesSolved).toBe(124);
+    expect(held.phaseChanged).toBe(false);
+    expect(held.newPhase).toBe(3);
+    expect(held.phaseTransitionPending).toBe(false);
+    expect(await getPendingPhaseTransition()).toBeNull();
+    expect(await getCurrentPhase()).toBe(3);
+
+    // The last resident moves in; the next offering opens the way.
+    await moveEveryResidentIn();
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(124);
     expect(result.newPhase).toBe(4);
     expect(result.phaseChanged).toBe(true);
   });

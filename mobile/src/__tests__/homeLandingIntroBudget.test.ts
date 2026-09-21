@@ -23,13 +23,13 @@ const end = home.indexOf('  // First-harvest home safety net', start);
 // `new Function` cannot parse; it is type-only, so it is stripped here.
 const source = home.slice(start, end).replace(/ as 1 \| 2 \| 3 \| 4/g, '');
 
-function createHarness(seen: Partial<Record<'challenge' | 'daily' | 'pit' | 'journal' | 'gated', boolean>> = {}) {
-  const fox = { id: 'fox' };
+function createHarness(seen: Partial<Record<'challenge' | 'daily' | 'pit' | 'journal' | 'gated' | 'fullHouse', boolean>> = {}) {
+  const fox = { id: 'fox', hasNewDialogue: false };
   const scope = {
     hasHomeProgress: true, isOnboarding: false, showIntroDialogue: false,
     introOverrideLines: null as string[] | null, introOpening: false, pendingAnimalIntroCount: 0,
     houseGiftBusy: false, homePhase: 0, homePuzzleCount: 9, pitPhaseReady: false,
-    animals: [fox], ANIMALS: [fox],
+    animals: [fox] as { id: string; hasNewDialogue?: boolean }[], ANIMALS: [fox],
     landingIntroSpentRef: { current: false },
     introSurfaceBusyRef: { current: false },
     unlockFlow: { nextUnlock: null as null | { type: string; minPuzzles?: number; name: string }, showRoomUnlock: null },
@@ -41,6 +41,13 @@ function createHarness(seen: Partial<Record<'challenge' | 'daily' | 'pit' | 'jou
     hasSeenPitNudge: jest.fn(async () => seen.pit ?? false),
     hasSeenJournalIntro: jest.fn(async () => seen.journal ?? false),
     hasSeenGatedUnlockIntro: jest.fn(async () => seen.gated ?? false),
+    hasSeenFullHouseIntro: jest.fn(async () => seen.fullHouse ?? false),
+    // The full-house beat: everyone home, still one phase below the reveal.
+    // Defaults put the harness OUTSIDE it (phase 0, house not whole), so the
+    // existing budget cases are unchanged and only the cases below opt in.
+    FULL_HOUSE_PHASE: 4,
+    houseIsWhole: false,
+    getFullHouseIntroLines: jest.fn((waiting: number) => [`full house ${waiting}`]),
     getChallengeIntroLines: () => ['challenge'],
     getDailyChallengeIntroLines: () => ['daily'],
     getFoxPitNudgeLines: () => ['pit'],
@@ -74,13 +81,112 @@ function createHarness(seen: Partial<Record<'challenge' | 'daily' | 'pit' | 'jou
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.useRealTimers());
 
-test('the source slice covers the five budgeted intros', () => {
+test('the source slice covers the six budgeted intros', () => {
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
-  for (const context of ['challenge_intro', 'daily_challenge_intro', 'pit_nudge', 'gated_room_intro']) {
+  for (const context of ['challenge_intro', 'daily_challenge_intro', 'pit_nudge', 'gated_room_intro', 'full_house_intro']) {
     expect(source).toContain(`setIntroContext('${context}')`);
   }
   expect(source).toContain('setJournalSpotlightActive(true)');
+});
+
+test('the full-house beat fires when the last resident is in, and spends the landing', async () => {
+  // Everyone home, world still at Phase 3: the reveal is waiting on nothing
+  // but the next offering, and this is the last moment the player can go and
+  // let anyone finish (afterwards the victory screen hides every exit and the
+  // pit seals itself). Nothing else is pending here, so the beat is free to
+  // take the landing.
+  const harness = createHarness({ daily: true, journal: true });
+  harness.scope.homePhase = 3;
+  harness.scope.houseIsWhole = true;
+  harness.render();
+  await jest.advanceTimersByTimeAsync(1000);
+
+  expect(harness.scope.setIntroContext).toHaveBeenCalledWith('full_house_intro');
+  expect(harness.scope.landingIntroSpentRef.current).toBe(true);
+  // The beat is told how many home badges are LIT, not how many residents have
+  // unread lines. The two differ after a full round of visits, when everyone is
+  // inside their dialogue cooldown and every badge is dark, and the badge count
+  // is the one that matches what the player sees when they look up at the house.
+  expect(harness.scope.getFullHouseIntroLines).toHaveBeenCalledWith(0);
+  expect(harness.scope.setIntroOverrideLines).toHaveBeenCalledWith(['full house 0']);
+  harness.unmount();
+});
+
+test('the full-house beat is told how many residents are actually waiting', async () => {
+  const harness = createHarness({ daily: true, journal: true });
+  harness.scope.homePhase = 3;
+  harness.scope.houseIsWhole = true;
+  harness.scope.animals = [
+    { id: 'fox', hasNewDialogue: true },
+    { id: 'owl', hasNewDialogue: true },
+    { id: 'sloth', hasNewDialogue: false },
+  ];
+  harness.render();
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(harness.scope.getFullHouseIntroLines).toHaveBeenCalledWith(2);
+  harness.unmount();
+});
+
+test('the new resident\'s own introduction wins the window it completes the house in', async () => {
+  // useUnlockFlow publishes the new roster (through loadAllData) BEFORE arming
+  // that resident's introduction on a 300ms timer, so the beat sees a whole
+  // house first. Without the settle re-check Ember would land on the
+  // newcomer's doorstep and announce that somebody had something to say while
+  // displacing the one about to say it.
+  const harness = createHarness({ daily: true, journal: true });
+  harness.scope.homePhase = 3;
+  harness.scope.houseIsWhole = true;
+  harness.render();
+
+  // The introduction claims the shared surface inside the settle window.
+  await jest.advanceTimersByTimeAsync(300);
+  harness.scope.introSurfaceBusyRef.current = true;
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(harness.scope.setIntroContext).not.toHaveBeenCalled();
+
+  // Its flag is only written when the card closes, so the beat is still owed
+  // and lands on the next quiet landing.
+  harness.scope.introSurfaceBusyRef.current = false;
+  harness.unmount();
+  const next = createHarness({ daily: true, journal: true });
+  next.scope.homePhase = 3;
+  next.scope.houseIsWhole = true;
+  next.render();
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(next.scope.setIntroContext).toHaveBeenCalledWith('full_house_intro');
+  next.unmount();
+});
+
+test('the full-house beat stays down while anyone is still missing', async () => {
+  const harness = createHarness({ daily: true, journal: true });
+  harness.scope.homePhase = 3;
+  harness.scope.houseIsWhole = false;
+  harness.render();
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(harness.scope.setIntroContext).not.toHaveBeenCalled();
+  harness.unmount();
+});
+
+test('the full-house beat stays down once the reveal has been offered', async () => {
+  // pitPhaseReady means a transition is already pending, so "go and listen
+  // first" is no longer something the player can act on: the victory screen
+  // has hidden every exit and the pit seals itself.
+  //
+  // The pit nudge is marked SEEN here on purpose. It is declared just above
+  // this effect and awaits one fewer promise, so leaving it eligible lets it
+  // take the landing first and the case passes with the pitPhaseReady guard
+  // deleted. With it suppressed the full-house beat is the only candidate for
+  // the budget, and the guard is what has to hold the beat down.
+  const harness = createHarness({ daily: true, journal: true, pit: true });
+  harness.scope.homePhase = 3;
+  harness.scope.pitPhaseReady = true;
+  harness.scope.houseIsWhole = true;
+  harness.render();
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(harness.scope.setIntroContext).not.toHaveBeenCalled();
+  expect(harness.scope.landingIntroSpentRef.current).toBe(false);
+  harness.unmount();
 });
 
 test('a landing with the daily AND the journal pending shows ONE intro, in declaration order', async () => {

@@ -104,6 +104,13 @@ interface EraSpec {
  * off-phase snapshot).
  */
 const ERA_SPECS: Record<CreatorEra, EraSpec> = {
+  // dusk and shadows keep their modest purses. The reveal now waits for all
+  // thirteen residents (FULL_HOUSE_PHASE), which makes the approach eras a
+  // LONGER road to the hook but not a closed one: measured through the real
+  // pipeline, shadows reaches the reveal in ~20 self-funding wins against ~5
+  // before, and dusk ~59 against ~40, with the pit naming what it is waiting
+  // for the whole way. A reviewer who wants the reveal itself opens the
+  // 'reveal' era, which is what it is for.
   dusk: { phase: 2, puzzles: 50, maxUnlockOrder: 13, minSpendableAmber: 150 },
   shadows: { phase: 3, puzzles: 85, maxUnlockOrder: 19, minSpendableAmber: 250 },
   reveal: { phase: 4, puzzles: 140, maxUnlockOrder: Number.MAX_SAFE_INTEGER, minSpendableAmber: 400 },
@@ -291,7 +298,15 @@ export async function applyCreatorSnapshot(target: 'dusk' | 'shadows' | 'reveal'
         stars,
         i % 10 === 9 ? 'challenge' : 'standard',
         0.6, // engaged three-star rate → narrative acceleration, like a real reviewer-speed run
-        true // credit to balance — the sim "harvests" every batch
+        true, // credit to balance — the sim "harvests" every batch
+        // The reveal's full-house hold is a pacing rule for a player who is
+        // living through the descent. This loop is not: it runs before step 4
+        // buys any room, because the rooms it buys are gated on the solve count
+        // this loop produces. Step 4 then builds the era's house and step 5
+        // pins the rest, so the snapshot the reviewer opens still has everyone
+        // home. Without the bypass the loop stalls at Phase 3 and the 'reveal'
+        // era fails its own target-phase assertion below.
+        { ignoreFullHouseHold: true },
       );
       // Deferred transitions are confirmed immediately — the pit ceremony's
       // own API — so the snapshot's phase pin is always the CONFIRMED state.

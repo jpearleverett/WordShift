@@ -296,10 +296,35 @@ describe('production economy journey simulation', () => {
       const spent = j.recruitsAndRooms.reduce((sum, unlock) => sum + unlock.cost, 0) + j.optionalSpent;
       expect(j.availableAmber + j.pendingAmber + spent).toBe(earned);
     }
-    // Paid amber must not accelerate the same wins' narrative phase schedule.
+    // Paid amber must not accelerate the narrative phase schedule.
+    //
+    // Phases 1-3 never consult the house, so this still holds outright and is
+    // asserted outright. PHASE 4 IS DELIBERATELY EXCLUDED, and the reason is a
+    // real trade the owner accepted rather than an oversight: the reveal now
+    // waits for all thirteen residents (FULL_HOUSE_PHASE), residents cost
+    // amber, and a large share of amber income accrues per real-world DAY
+    // (logins, dailies, quests, streaks) rather than per solve. So the reveal
+    // now follows the purse, and measured against this same simulation it
+    // moves by cohort: free 8/day 96 -> 112, Patron and Supporter 96 -> 104,
+    // a player who skips quests and dailies 96 -> 152, and one continuous
+    // 240-win session 96 -> 216. The casual 2/day target moves 90 -> 94.
+    // Paying therefore reaches the reveal about 8 wins sooner than the same
+    // free schedule. Nothing here buys phase PROGRESS; it buys the house the
+    // reveal waits on. Re-run with WORDSHIFT_ECONOMY_REPORT before touching
+    // the gate, the unlock costs or the amber faucets.
     const free = journeys.find(j => j.id === 'engaged')!;
     for (const paid of journeys.filter(j => ['patron', 'supporter'].includes(j.id))) {
-      for (const phase of ['1', '2', '3', '4']) expect(paid.phases[phase]).toEqual(free.phases[phase]);
+      for (const phase of ['1', '2', '3']) expect(paid.phases[phase]).toEqual(free.phases[phase]);
+    }
+    // What replaces it: the reveal may never precede the last resident, in any
+    // cohort. That is the gate's whole promise, and it is the half a purse can
+    // never buy past.
+    for (const j of journeys) {
+      const lastRecruit = j.recruitsAndRooms
+        .filter(unlock => unlock.win !== undefined)
+        .reduce((latest, unlock) => Math.max(latest, unlock.win as number), 0);
+      expect(j.phases['4']).toBeDefined();
+      expect(j.phases['4'].win).toBeGreaterThanOrEqual(lastRecruit);
     }
   }, 60000);
 });

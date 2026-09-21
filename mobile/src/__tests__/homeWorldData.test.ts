@@ -207,15 +207,17 @@ describe('UNLOCK_PROGRESSION', () => {
     expect(lastGate).toBeLessThan(phase4Threshold);
   });
 
-  // The reveal floor (90) must land before the house completes (sky-garden
-  // gate + the final animal), so the Phase-4 dwell + finale play out inside a
-  // finished temple. Completion/recruit is ~96-100, capped dwell completes
-  // ~104-108, arming waits for 115, the final board is ~116, and
-  // post-revelation ~117-122. This pins the SOLVE FLOORS only: a player whose
-  // weighted progress lags the floors can finish the house before Phase 4
-  // commits, so the house ceremony is HELD in the ceremony queue until
-  // confirmPhaseTransition lands Phase 4 (canQueueHouseCeremony in
-  // amberCurrency) rather than playing a pre-reveal temple.
+  // The last gate sits ABOVE the reveal's own floor (92 > 90), which since the
+  // reveal began waiting for the whole house (FULL_HOUSE_PHASE,
+  // isRevealHeldForHouse in amberCurrency) means the floor is never what
+  // decides when the reveal lands: the house is. The ordering this pins is
+  // therefore the one the gate depends on, not a coincidence to preserve
+  // loosely. It also means the house is now ALWAYS finished before Phase 4
+  // commits, so canQueueHouseCeremony's hold is exercised on every
+  // playthrough rather than only for a below-ramp player, and the Temple
+  // scene can still never play before the reveal it presumes.
+  // Beyond it: capped dwell, arming at FINALE_ARM_MIN_PUZZLES, the marked
+  // final board, then post-revelation under the Phase 5 floor.
   test('house completion sits after the reveal floor, before the Phase 5 floor', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)

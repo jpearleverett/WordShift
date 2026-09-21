@@ -48,7 +48,7 @@ import { clearAchievements, getUnlockedCount } from '../services/achievements';
 import { isOnboardingComplete, resetOnboarding } from '../services/onboarding';
 import { MIN_PUZZLES_FOR_PHASE } from '../constants/gameBalance';
 import { getNextAnimalConversation } from '../services/conversationProgress';
-import { AnimalType } from '../types/homeWorld';
+import { ALL_ANIMAL_TYPES, AnimalType } from '../types/homeWorld';
 
 const CODE = 'REVIEW-EMBER-2026';
 
@@ -142,8 +142,14 @@ describe('applyCreatorSnapshot', () => {
       // Enough real puzzles to satisfy the Phase 4 exposure floor.
       expect(progress.puzzlesSolved).toBeGreaterThanOrEqual(MIN_PUZZLES_FOR_PHASE[4]);
       // Full house: every room (13 incl. the starter den) and every animal.
+      // Exact, not "at least 10": the reveal now waits for the whole house
+      // (FULL_HOUSE_PHASE), and the kit's win loop bypasses that hold because
+      // it runs before step 4 buys anything. If the bypass ever outlived the
+      // build that follows it, this snapshot would hand a reviewer the one
+      // state the feature exists to forbid: Phase 4 with empty rooms.
+      expect(progress.unlockedAnimals).toHaveLength(ALL_ANIMAL_TYPES.length);
+      expect([...progress.unlockedAnimals].sort()).toEqual([...ALL_ANIMAL_TYPES].sort());
       expect(progress.unlockedRooms.length).toBeGreaterThanOrEqual(10);
-      expect(progress.unlockedAnimals.length).toBeGreaterThanOrEqual(10);
       expect(progress.houseCompleted).toBe(true);
       // Reviewer has spending money and a real earnings history.
       expect(progress.amber).toBeGreaterThan(0);
@@ -232,3 +238,4 @@ describe('applyCreatorSnapshot', () => {
     expect(progress.puzzlesSolved).toBe(0);
   });
 });
+

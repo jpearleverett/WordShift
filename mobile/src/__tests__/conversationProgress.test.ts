@@ -190,3 +190,4 @@ test.each([STORAGE_COMMIT_KEY, PROGRESS_KEY])('an introduction save failure at %
   expect(getNextAnimalConversation(await getFullProgress(), 'fox')!.index).toBe(0);
   expect(getTotalDialogueCount('fox', 4)).toBeGreaterThan(100);
 });
+
