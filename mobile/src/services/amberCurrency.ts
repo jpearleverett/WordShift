@@ -573,6 +573,14 @@ export async function awardPuzzleAmber(
   streakMilestoneMessage: string | null;
   streakSaved: boolean;
   phaseTransitionPending: boolean;
+  /**
+   * The fraction this award just saved, so the session mirror can follow it on
+   * EVERY path. Without it the held reveal never refreshed App's copy:
+   * useGamePersistence only set the fraction on the pending branch, and a held
+   * win reports phaseTransitionPending false, so the pit drew an under-lit
+   * circle from a pre-win number while storage had already saturated at 1.0.
+   */
+  phaseProgressFraction: number;
 }> {
   const progress = await loadProgress();
 
@@ -871,6 +879,7 @@ export async function awardPuzzleAmber(
     streakMilestoneMessage,
     streakSaved,
     phaseTransitionPending: phaseChanged || progress.pendingPhaseTransition != null,
+    phaseProgressFraction: progress.phaseProgressFraction ?? 0,
   };
 }
 

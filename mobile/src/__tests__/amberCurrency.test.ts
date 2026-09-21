@@ -1650,6 +1650,20 @@ describe('the reveal waits for the whole house', () => {
     expect(await getCurrentPhase()).toBe(3);
   });
 
+  test('a held award still reports the saturated ward fraction', async () => {
+    // The caller mirrors this into App state on EVERY award. It used to be set
+    // only alongside a pending transition, and a held win reports
+    // phaseTransitionPending false, so the pit drew an under-lit circle from a
+    // pre-win number and withheld its own explanation until a relaunch.
+    await devAddPuzzles(123);
+    await setResidentsHome(ALL_ANIMAL_TYPES.slice(0, 12));
+
+    const held = await awardPuzzleAmber('EASY', 1);
+    expect(held.phaseChanged).toBe(false);
+    expect(held.phaseProgressFraction).toBe(1);
+    expect((await getFullProgress()).phaseProgressFraction).toBe(1);
+  });
+
   test('the hold releases the moment the last resident is home', async () => {
     await devAddPuzzles(123);
     await setResidentsHome(ALL_ANIMAL_TYPES.slice(0, 12));

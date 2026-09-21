@@ -1218,30 +1218,23 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // as it did before this line existed.
   const [residentsAway, setResidentsAway] = useState(0);
   const [houseRead, setHouseRead] = useState(false);
-  const [durableFraction, setDurableFraction] = useState(0);
   useEffect(() => {
     let live = true;
     loadProgress()
-      .then(progress => {
-        if (!live) return;
-        setResidentsAway(countResidentsAway(progress.unlockedAnimals));
-        setDurableFraction(progress.phaseProgressFraction ?? 0);
-      })
+      .then(progress => { if (live) setResidentsAway(countResidentsAway(progress.unlockedAnimals)); })
       .catch(() => {})
       .finally(() => { if (live) setHouseRead(true); });
     return () => { live = false; };
   }, []);
 
-  // App's phaseProgressFraction is a SESSION MIRROR, and the held reveal is
-  // the one path that never refreshes it: useGamePersistence only calls
-  // setPhaseProgressFraction(1) on the pending branch, and a held win reports
-  // phaseTransitionPending false, so the mirror keeps the pre-win value (0.93,
-  // say) while storage has already saturated at 1.0. Reading the durable
-  // number here is what lets the circle fill and the held-house line appear on
-  // the FIRST visit after the hold engages rather than after a relaunch. Max,
-  // never replace: the prop is fresher for every ordinary transition, and this
-  // read can only ever make the pit more current.
-  const wardFraction = Math.max(phaseProgressFraction, durableFraction);
+  // The fraction stays the LIVE prop, never a durable snapshot taken at mount.
+  // A snapshot goes stale in the other direction: a pending transition clamps
+  // the stored fraction to 1, and confirmPhaseTransition resets it to 0, so a
+  // mount-time copy would keep a just-ignited circle full and let it claim the
+  // house was holding it. The held reveal's own staleness is fixed where it
+  // belongs instead, in useGamePersistence, which now mirrors the fraction on
+  // every award rather than only alongside a pending transition.
+  const wardFraction = phaseProgressFraction;
 
   const wardColors = getWardMarkColors(phase);
   const litCount = pendingPhaseTransition != null

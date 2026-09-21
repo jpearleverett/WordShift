@@ -138,6 +138,8 @@ export interface VictoryData {
   unbrokenWeaveRankedUp?: boolean;
   /** True when this puzzle created a new pending phase transition in the pit */
   phaseTransitionPending: boolean;
+  /** The ward-progress fraction storage now holds, mirrored on every award. */
+  phaseProgressFraction: number;
   /** True when pending harvest batches hit the 200 cap and oldest were trimmed */
   harvestOverflow: boolean;
   /** Monotonic count of real puzzles solved (drives interstitial ad cadence) */
@@ -294,12 +296,18 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       setCumulativeStats(result.cumulativeStats);
       updatePuzzleCount(result.puzzlesSolved);
       setAmberBalance(Math.max(0, result.amberBalance));
+      // The fraction follows storage on BOTH branches. It used to be set only
+      // alongside a pending transition, which left it stale for the one path
+      // that saturates it without offering one: the reveal held for an
+      // incomplete house (isRevealHeldForHouse) reports phaseTransitionPending
+      // false, so the pit drew an under-lit circle and withheld its own
+      // explanation until the next relaunch.
+      setPhaseProgressFraction(result.phaseProgressFraction);
       if (!result.phaseTransitionPending) {
         updateSessionPhase(result.newPhase);
         setCurrentPhase(result.newPhase);
       } else {
         setPendingPhaseTransition(result.newPhase);
-        setPhaseProgressFraction(1);
       }
       logEvent({ type: 'puzzle_completed', data: {
         difficulty, stars: result.earnedStars, hintsUsed, invalidAttempts, gameMode, isDaily,

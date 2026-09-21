@@ -49,6 +49,7 @@ import { isOnboardingComplete, resetOnboarding } from '../services/onboarding';
 import { MIN_PUZZLES_FOR_PHASE } from '../constants/gameBalance';
 import { getNextAnimalConversation } from '../services/conversationProgress';
 import { ALL_ANIMAL_TYPES, AnimalType } from '../types/homeWorld';
+import { UNLOCK_PROGRESSION } from '../services/homeWorldData';
 
 const CODE = 'REVIEW-EMBER-2026';
 
@@ -236,5 +237,19 @@ describe('applyCreatorSnapshot', () => {
     expect(ok).toBe(false);
     const progress = await getFullProgress();
     expect(progress.puzzlesSolved).toBe(0);
+  });
+});
+
+describe('the approach eras can still be played into the reveal', () => {
+  // The reveal waits for all thirteen residents now, so an era that lands a
+  // reviewer short of a full house must at least hand them the amber to
+  // finish it. Otherwise the era named for the approach is a dead end for the
+  // thing it approaches.
+  test.each([['dusk', 13], ['shadows', 19]] as const)('%s carries the rest of the house', async (era, maxOrder) => {
+    const remaining = UNLOCK_PROGRESSION
+      .filter(unlock => unlock.order > maxOrder)
+      .reduce((sum, unlock) => sum + unlock.cost, 0);
+    expect(await applyCreatorSnapshot(era)).toBe(true);
+    expect((await getFullProgress()).amber).toBeGreaterThanOrEqual(remaining);
   });
 });

@@ -384,6 +384,7 @@ async function computeVictory(input: VictoryInput): Promise<VictoryData> {
         harvestBatchId,
         autoCollected: false,
         phaseTransitionPending: amberResult.phaseTransitionPending,
+        phaseProgressFraction: amberResult.phaseProgressFraction,
         harvestOverflow: harvestResult.overflow,
         puzzlesSolved: amberResult.puzzlesSolved,
       };
