@@ -37,7 +37,8 @@
  *
  * Decision logic is pure/exported for testing; the persisted state only records
  * "have we shown this yet" + an interstitials-seen counter (+ the armed offer,
- * + the local-day rewarded-double presentation counter).
+ * + the local-day rewarded-double CLAIM counter; presentations are never
+ * counted anywhere in this module).
  * This is device UX pacing (like ad_pacing), intentionally NOT part of cloud sync.
  */
 

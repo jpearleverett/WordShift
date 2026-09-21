@@ -721,9 +721,15 @@ function MainApp() {
   // The setup menu keeps this private ladder snapshot current without making
   // the puzzle hook own persistence for a Phase-5-only modifier.
   const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
-  // Whether THIS victory presents the double slot at all. Decided (and the
-  // presentation recorded) once per victory at processing time — the slot is
-  // cadence-capped per local day and blocked at phase 4+ (monetizationPrompts).
+  // Whether THIS victory presents the double slot at all. Decided once per
+  // victory at processing time, so modal re-renders cannot re-decide it.
+  //
+  // SHOWING THE SLOT RECORDS NOTHING. The per-local-day allowance is spent
+  // only by a credited claim, in useVictoryDouble. Do not add a
+  // recordRewardedDoubleClaimed() call beside the decision below: charging the
+  // cap on presentation is the bug this was changed to fix, where a player who
+  // kept declining exhausted the day and the 2x vanished without ever paying
+  // out. monetizationPromptsUsage.test.ts fails if a second caller appears.
   const [victoryDoubleOffer, setVictoryDoubleOffer] = useState(false);
 
   // Phase transition overlay state
