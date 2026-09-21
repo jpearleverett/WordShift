@@ -4,10 +4,26 @@
   "sourceImage": "exec-690e75d2-d359-4479-83ee-2cae6bfaa022.png",
   "width": 960,
   "height": 540,
-  "bytes": 90976,
-  "sha256": "760d488a3a368e619650c68b76d409f0ac9d72b79648caaaaf2f2fdda459b7df",
+  "bytes": 50256,
+  "sha256": "f971ea33c717499830d0c63f12097526a6d9707e0700e6e1e7532c6c85911154",
   "generatedAt": "2026-09-19T18:47:03.621Z",
   "promptProvenance": "Initial queue; prompt source is retained in feature-branch history.",
   "actualPrompt": "ENVIRONMENT-ONLY STILL LIFE. Show a COMPLETELY UNOCCUPIED room. NO foxes, NO axolotls, NO people, NO animals, NO bodies, NO faces, NO human-shaped shadows; the game supplies its character portraits separately. Primary subject: blue aquarium water reflecting the warm, empty cottage, a small fish-shaped shadow/reflection in the glass evoking a remembered pet's outline without showing any actual fish or animal. The room itself is empty. Use case: illustration-story. Asset type: one finished landscape 16:9 story-page illustration for WordShift, an intimate woodland-cottage pixel-art game. Depict this exact authored narrative moment: \"It kept the part of PLUM it could understand, friend. The shape of him. We will have to show it what it left out.\". Setting: an intimate woodland cottage aquarium, blue midnight water and quiet reflective shadows.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The game adds its exact animal portrait separately. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped.",
-  "regeneratedFor": "Removed unintended full animal characters"
+  "regeneratedFor": "Removed unintended full animal characters",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Move the viewer INSIDE the tank: expand the aquarium water to fill the whole frame and remove the cottage room, glass, stand and furniture, continuing the plants, sunken wood, rocks and sand with light rays and bubbles.",
+      "attempts": 1,
+      "costUsd": 0.027,
+      "review": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size.",
+      "previousSha256": "760d488a3a368e619650c68b76d409f0ac9d72b79648caaaaf2f2fdda459b7df",
+      "editedAt": "2026-09-21T10:36:01.427Z"
+    }
+  ]
 }

@@ -4,6 +4,22 @@
   "sourceImage": "exec-a22cb0db-5082-4c7a-ab6f-41239b5369c5.png",
   "width": 960,
   "height": 540,
-  "bytes": 95432,
-  "sha256": "db4213d94420538fda8d8d39c6c827aeab19afdd36eefb3beaa8a39279e22032"
+  "bytes": 78372,
+  "sha256": "68dc59464d99acb46a7cafb741d7b81a29004acb18ed0e104eb3e2d10946da4d",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Move the viewer INSIDE the tank: expand the aquarium water to fill the whole frame and remove the cottage room, glass, stand and furniture, continuing the plants, sunken wood, rocks and sand with light rays and bubbles.",
+      "attempts": 1,
+      "costUsd": 0.027,
+      "review": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size.",
+      "previousSha256": "db4213d94420538fda8d8d39c6c827aeab19afdd36eefb3beaa8a39279e22032",
+      "editedAt": "2026-09-21T10:35:59.953Z"
+    }
+  ]
 }

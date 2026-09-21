@@ -435,29 +435,37 @@
       "id": "plum-01",
       "scene": "plum",
       "asset": "assets/story/pages/plum-01.webp",
-      "sha256": "5b83bc48ea68f2fd53d1e787f689c6ebb9e06bf749c1e5ff9b02789847beab50",
-      "status": "pass"
+      "sha256": "4d5fd9daa0e41a5cee32c5f48fc5c981f321c0cb609ca6512ec079f0fb11295e",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "plum-02",
       "scene": "plum",
       "asset": "assets/story/pages/plum-02.webp",
-      "sha256": "db4213d94420538fda8d8d39c6c827aeab19afdd36eefb3beaa8a39279e22032",
-      "status": "pass"
+      "sha256": "68dc59464d99acb46a7cafb741d7b81a29004acb18ed0e104eb3e2d10946da4d",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "plum-03",
       "scene": "plum",
       "asset": "assets/story/pages/plum-03.webp",
-      "sha256": "db9785d5cb937331c87a041cd7e3069ddad7f8cbaa85fbb2085122845ee7b161",
-      "status": "pass"
+      "sha256": "c14c471e9ce8538cd05a5e53a0754decdaff94186b913fd8afa09f3f977bc15e",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "plum-04",
       "scene": "plum",
       "asset": "assets/story/pages/plum-04.webp",
-      "sha256": "e49d8389e7fbf3f81c6c7dc68a0d05fa1e6c7a0da3aeb9f00a46df0aeef6433f",
-      "status": "pass"
+      "sha256": "162ddc14dd6f72353380b9b02fcc67b8a2da09fb087abd592a060a97a0fc2ec8",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "plum-05",
@@ -797,43 +805,55 @@
       "id": "returned-01",
       "scene": "returned",
       "asset": "assets/story/pages/returned-01.webp",
-      "sha256": "fa05181684d9333d071ef3a50f8b2603c876a9b0191683d81dd02d7a0582041b",
-      "status": "pass"
+      "sha256": "45d02b02e155c1f298c8d4c6b3f02358a8aafcd6847ac43e753d29689cf6342a",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "returned-02",
       "scene": "returned",
       "asset": "assets/story/pages/returned-02.webp",
-      "sha256": "d1034f671b2945b4840edf549f06bc4b3a6720c0efa95e277a6f1f0b76aff084",
-      "status": "pass"
+      "sha256": "fbb3c5bd490631f7b50820e5cc843ce52c5a2f430256ff07f4222f44674906b3",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "returned-03",
       "scene": "returned",
       "asset": "assets/story/pages/returned-03.webp",
-      "sha256": "4051c508df1ad446815561579f4c6f85fc73c1276aeb0ffb15cd70dc60ceec21",
-      "status": "pass"
+      "sha256": "5015b6d4ec06627c7574d636cdd7fcef2cb1a116fd99b02ad9bef795bab045cd",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "returned-04",
       "scene": "returned",
       "asset": "assets/story/pages/returned-04.webp",
-      "sha256": "af2017e26de28f4ebeb254b96f2aa0979e3130962399468eb4679979e593f37a",
-      "status": "pass"
+      "sha256": "6b0a5a6d5c942521b2ae8917ee016cdfa2ddb4f809a83283f44257b6ba5894df",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "returned-05",
       "scene": "returned",
       "asset": "assets/story/pages/returned-05.webp",
-      "sha256": "3ff7cc73bbd38d1667dab5ba51786c040a1b359be9f986e38b787dece1f301ad",
-      "status": "pass"
+      "sha256": "b582bf2a815b52883ddf5a3e2b9eb743783dc08a878de6cc9d4364d2bef1ea64",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "returned-06",
       "scene": "returned",
       "asset": "assets/story/pages/returned-06.webp",
-      "sha256": "760d488a3a368e619650c68b76d409f0ac9d72b79648caaaaf2f2fdda459b7df",
-      "status": "pass"
+      "sha256": "f971ea33c717499830d0c63f12097526a6d9707e0700e6e1e7532c6c85911154",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "returned-07",
@@ -1335,15 +1355,19 @@
       "id": "plum-recollection",
       "scene": "plum",
       "asset": "assets/story/pages/plum-recollection.webp",
-      "sha256": "3e53ff14dddf50e4a8476e822674fb54502f733391a12a122f1b684390e25f63",
-      "status": "pass"
+      "sha256": "5eebb3ea1087f377335c4bf2f77f1f1aa9b32914d9c2f59f41a019e6c895c2b4",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: this retrospective card serves both the axolotl and the non-axolotl variant of its scene, so it carries no aquarium at all; a tank standing in a dry parlour contradicted the aquarium room, which is the inside of the water."
     },
     {
       "id": "plum_recruited-recollection",
       "scene": "plum_recruited",
       "asset": "assets/story/pages/plum_recruited-recollection.webp",
-      "sha256": "e0896f551582e04139a380ed956685e2a9d1778211eec16031c35033482d9f40",
-      "status": "pass"
+      "sha256": "4b6399580750488bff6c9804a8480d50e7081008577aa846b6de82312120a4c9",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "record-recollection",
@@ -1370,8 +1394,10 @@
       "id": "returned-recollection",
       "scene": "returned",
       "asset": "assets/story/pages/returned-recollection.webp",
-      "sha256": "e16c3daf71d4d8159aa4a865a0ef97f097855519fd389d2365cfbdf1c82839ca",
-      "status": "pass"
+      "sha256": "f124a692ab18ffb2ff98532c1d60b550bcd699df293a8809e2516a9064060dcd",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: this retrospective card serves both the axolotl and the non-axolotl variant of its scene, so it carries no aquarium at all; a tank standing in a dry parlour contradicted the aquarium room, which is the inside of the water."
     },
     {
       "id": "council-recollection",
