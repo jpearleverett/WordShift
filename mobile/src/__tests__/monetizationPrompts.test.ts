@@ -9,7 +9,7 @@ import {
   armRemoveAdsNudgeIfEligible,
   consumePendingRemoveAdsNudge,
   canOfferRewardedDouble,
-  recordRewardedDoubleOffered,
+  recordRewardedDoubleClaimed,
   canShowExitNudge,
   recordExitNudgeShown,
   clearMonetPrompts,
@@ -82,12 +82,12 @@ describe('pure decisions', () => {
 
   it('rewarded double: capped per day, blocked from the dread arc (phase 4+)', () => {
     expect(REWARDED_DOUBLE_DAILY_CAP).toBe(5);
-    expect(shouldOfferRewardedDouble({ offersToday: 0, phase: 0 })).toBe(true);
-    expect(shouldOfferRewardedDouble({ offersToday: REWARDED_DOUBLE_DAILY_CAP - 1, phase: 3 })).toBe(true);
-    expect(shouldOfferRewardedDouble({ offersToday: REWARDED_DOUBLE_DAILY_CAP, phase: 0 })).toBe(false);
+    expect(shouldOfferRewardedDouble({ claimsToday: 0, phase: 0 })).toBe(true);
+    expect(shouldOfferRewardedDouble({ claimsToday: REWARDED_DOUBLE_DAILY_CAP - 1, phase: 3 })).toBe(true);
+    expect(shouldOfferRewardedDouble({ claimsToday: REWARDED_DOUBLE_DAILY_CAP, phase: 0 })).toBe(false);
     // The dread arc is protected like interstitials — no offers at all.
-    expect(shouldOfferRewardedDouble({ offersToday: 0, phase: REWARDED_DOUBLE_BLOCKED_FROM_PHASE })).toBe(false);
-    expect(shouldOfferRewardedDouble({ offersToday: 0, phase: 5 })).toBe(false);
+    expect(shouldOfferRewardedDouble({ claimsToday: 0, phase: REWARDED_DOUBLE_BLOCKED_FROM_PHASE })).toBe(false);
+    expect(shouldOfferRewardedDouble({ claimsToday: 0, phase: 5 })).toBe(false);
   });
 });
 
@@ -111,25 +111,38 @@ describe('exit-nudge cadence (canShowExitNudge / recordExitNudgeShown)', () => {
   });
 });
 
-describe('rewarded-double cadence (canOfferRewardedDouble / recordRewardedDoubleOffered)', () => {
-  it('presents at most REWARDED_DOUBLE_DAILY_CAP times per local day', async () => {
+describe('rewarded-double cadence (canOfferRewardedDouble / recordRewardedDoubleClaimed)', () => {
+  it('allows at most REWARDED_DOUBLE_DAILY_CAP CLAIMS per local day', async () => {
     for (let i = 0; i < REWARDED_DOUBLE_DAILY_CAP; i++) {
       expect(await canOfferRewardedDouble(0)).toBe(true);
-      expect(await recordRewardedDoubleOffered()).toBe(i + 1);
+      expect(await recordRewardedDoubleClaimed()).toBe(i + 1);
     }
     expect(await canOfferRewardedDouble(0)).toBe(false);
   });
 
+  it('keeps offering forever while the player declines: asking is not taking', async () => {
+    // The reported bug: the 2x control vanished after a few boards for a
+    // player who never tapped it, because merely presenting the slot spent
+    // one of the day's five. Reading the gate must record nothing at all.
+    for (let i = 0; i < REWARDED_DOUBLE_DAILY_CAP * 4; i++) {
+      expect(await canOfferRewardedDouble(0)).toBe(true);
+    }
+    // ...and the day's allowance is still whole, so the first claim is #1.
+    expect(await recordRewardedDoubleClaimed()).toBe(1);
+    expect(await canOfferRewardedDouble(0)).toBe(true);
+  });
+
+
   it('resets on the local-day rollover', async () => {
     for (let i = 0; i < REWARDED_DOUBLE_DAILY_CAP; i++) {
-      await recordRewardedDoubleOffered();
+      await recordRewardedDoubleClaimed();
     }
     expect(await canOfferRewardedDouble(0)).toBe(false);
 
     mockToday = '2026-07-15';
     expect(await canOfferRewardedDouble(0)).toBe(true);
     // The stale day's count rolls over — the new day starts from 1.
-    expect(await recordRewardedDoubleOffered()).toBe(1);
+    expect(await recordRewardedDoubleClaimed()).toBe(1);
   });
 
   it('never offers at phase 4+, even with the day untouched', async () => {
@@ -143,21 +156,26 @@ describe('rewarded-double cadence (canOfferRewardedDouble / recordRewardedDouble
     for (let i = 0; i < 10; i++) {
       expect(await canOfferRewardedDouble(0)).toBe(true);
     }
-    expect(await recordRewardedDoubleOffered()).toBe(1);
+    expect(await recordRewardedDoubleClaimed()).toBe(1);
   });
 
   it('persists the day + count under the wordshift_monet_prompts key', async () => {
-    await recordRewardedDoubleOffered();
+    await recordRewardedDoubleClaimed();
     const raw = await AsyncStorage.getItem('wordshift_monet_prompts');
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw as string);
     expect(parsed.rewardedDoubleDate).toBe('2026-07-14');
-    expect(parsed.rewardedDoubleOffersToday).toBe(1);
+    // The claim counter, under its own key. An older build persisted
+    // rewardedDoubleOffersToday here; load() spreads the stored record over
+    // the defaults, so that key contributes nothing and a player whose day was
+    // spent on DECLINED offers is freed by the update rather than at midnight.
+    expect(parsed.rewardedDoubleClaimsToday).toBe(1);
+    expect(parsed.rewardedDoubleOffersToday).toBeUndefined();
   });
 
   it('Reset All clears the cadence state', async () => {
     for (let i = 0; i < REWARDED_DOUBLE_DAILY_CAP; i++) {
-      await recordRewardedDoubleOffered();
+      await recordRewardedDoubleClaimed();
     }
     expect(await canOfferRewardedDouble(0)).toBe(false);
     await clearMonetPrompts();
