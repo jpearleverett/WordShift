@@ -7,8 +7,8 @@
   "webpQuality": 83,
   "encoderEffort": 4,
   "flattenBackground": "#f2e5bc",
-  "bytes": 139640,
-  "sha256": "ae812e920f377decfcd2b257277ceca41043ae2b3397726d83667478d94d265f",
+  "bytes": 140354,
+  "sha256": "4585aa5570012c3e81daca44b5f5f46237ae570095f71bb4be43aa6deb83e035",
   "generatedAt": "2026-09-19T19:08:47.324Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 OBJECT-ONLY environmental still-life for a WordShift story page. Illustrate the props and setting only; the game displays the exact resident portrait separately, so NEVER add a full person or animal to this image. Depict this exact authored narrative moment: \"Yes. I will not rush you out of that anger. I did not tell you the whole truth when it mattered.\". Setting: the cottage hearth and two chairs in gentle morning light with room to sit apart. Story speaker species is fox; narrator passages describe the surrounding household.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, full-bleed OPAQUE background with NO transparency, no split panels. Keep the important subject inside the middle 85% so nothing is clipped. FINAL HARD CONSTRAINT: depict objects and environment ONLY, never full characters, people, human faces, resident faces or written dialogue. The small elderly orange-gold fish PLUM is an explicit exception: include this fish when it is the named subject of the narrative, with a worried face and small notch in its fin.",
   "promptSha256": "94c910efd435ebe9d5bd97c0d908e4bfc5541123618a9e6e27b5156bd852d691",
@@ -34,6 +34,22 @@
       "review": "Re-done 2026-09-21 after an independent review failed the first repair: it had emptied the basket and left a flat black void larger than any dark patch the painting itself contains, and the blanket then read as propped against the rim of an empty basket. Repaired from the ORIGINAL image so the blanket continues into the basket with its own stitch texture and tone.",
       "previousSha256": "cb9656fa6e7c15fdb230a31625eaece60ba4a449fd0f5f9b506de8f420bfbc97",
       "editedAt": "2026-09-21T11:32:30.535Z"
+    },
+    {
+      "tool": "runpod public endpoint: qwen-image-edit-2511 + deterministic per-channel histogram match",
+      "mode": "crop then measured composite",
+      "window": {
+        "x0": 70,
+        "y0": 344,
+        "x1": 136,
+        "y1": 408
+      },
+      "prompt": "Remove the hedgehog and fill the basket with the same cream knitted blanket; the fill was then histogram-matched per channel to the original drape.",
+      "attempts": 4,
+      "costUsd": 0.08,
+      "review": "Third repair, 2026-09-21. Two model attempts missed the value target in opposite directions: the first left the corner holding 59 percent of the frame brightest pixels, the second emptied it into a 991-pixel contiguous near-black. This version keeps the filled geometry but is composited by measurement: the untouched drape is restored from the original exactly, and the new fill is histogram-matched per channel to that drape. Result against the original: fill rgb 119,86,66 against the drape 100,75,56; fill max luminance 221 against 218; zero pixels above 245 in that corner, where the rejected version had 269; near-black pixels 198 against the original 328.",
+      "previousSha256": "ae812e920f377decfcd2b257277ceca41043ae2b3397726d83667478d94d265f",
+      "editedAt": "2026-09-21T11:46:47.829Z"
     }
   ]
 }

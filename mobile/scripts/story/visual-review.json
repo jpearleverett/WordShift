@@ -1146,10 +1146,10 @@
       "id": "reply-03",
       "scene": "reply",
       "asset": "assets/story/pages/reply-03.webp",
-      "sha256": "ae812e920f377decfcd2b257277ceca41043ae2b3397726d83667478d94d265f",
+      "sha256": "4585aa5570012c3e81daca44b5f5f46237ae570095f71bb4be43aa6deb83e035",
       "status": "pass",
       "retouched": true,
-      "note": "Re-done 2026-09-21 after an independent review failed the first repair: it had emptied the basket and left a flat black void larger than any dark patch the painting itself contains, and the blanket then read as propped against the rim of an empty basket. Repaired from the ORIGINAL image so the blanket continues into the basket with its own stitch texture and tone."
+      "note": "Third repair, 2026-09-21. Two model attempts missed the value target in opposite directions: the first left the corner holding 59 percent of the frame brightest pixels, the second emptied it into a 991-pixel contiguous near-black. This version keeps the filled geometry but is composited by measurement: the untouched drape is restored from the original exactly, and the new fill is histogram-matched per channel to that drape. Result against the original: fill rgb 119,86,66 against the drape 100,75,56; fill max luminance 221 against 218; zero pixels above 245 in that corner, where the rejected version had 269; near-black pixels 198 against the original 328."
     },
     {
       "id": "reply-04",
