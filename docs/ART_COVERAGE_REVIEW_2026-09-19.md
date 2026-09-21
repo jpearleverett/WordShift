@@ -57,6 +57,20 @@ A player reading the `witness` conversation saw a fox paw on one page, a human h
 
 **Deliberately left alone.** `witness-05` draws eight residents around the table; every species is accurate and recognizable, so it stays. Small ambiguous ornaments (carved foxes, squirrels and rabbits on mantels and shelves) are decor, and at delivery size they are four or five pixels. The dark upright mark on the road heroes that one reviewer read as a distant walker is, at 10x, a plant stem at the path verge among other verge vegetation.
 
+## September 21, 2026 location pass
+
+A second player note asked whether the backgrounds match the rooms the residents actually live in. Two places in this game have art the player sees constantly, and the story pages contradicted both.
+
+**The Aquarium Room is the inside of a planted tank.** Axel the axolotl lives underwater; his sprite wears a diving mask and trails bubbles. Every page of his two conversations had been drawn from the other side of the glass, as a small tank standing on a sideboard in a dry parlour, which is the opposite of where he is. The ten pages are now inside the water, and his hand on the glass, which was a human hand with a thumb, is a pale axolotl hand with four slender fingers.
+
+**The Offering Pit is outdoors.** It is a sunken ring of rock around a deep dark opening with a cool glow at its edge, in a mossy forest clearing under a dusk-to-night sky. Eight pages set at the rim had drawn an indoor stone cellar with a water-filled masonry well, a bucket on a rope and a ladder. They now show the pit the player offers words into.
+
+**Chill's office is modern, and that is intentional.** His room has a glass desk, a monitor, ring binders and a city window. The five pages where he speaks about his own ledger were rustic cottage desks with oil lanterns and quills; they are now his office, keeping the paper ledger, ink and pen that the dialogue names. Pages of the same scene that also serve the variant where Chill was never invited stay ordinary house interiors, since they must read correctly both ways.
+
+**What the rule is not.** A resident in another resident's room is fine: Axel sits at the supper table in Panko's kitchen, and sleeps on a cushion in Ember's parlour, because an amphibian can leave the water. The rule binds only a scene set in a resident's own space, and the places the player can walk to.
+
+An independent audit then checked all 189 illustrations against these locations and flagged eight, six of them genuine: a trapdoor onto a cellar well in a parlour floor, a fish tank on a kitchen sideboard, a goldfish bowl on a porch table, and three underwater pages that kept enough of a tank rim to still read as a view from outside the glass. All six were corrected.
+
 ## Verification scope
 
 This review used the authored story inventory, source code, exported artwork, and per-scene contact sheets. Current image hashes are recorded in the review manifest; content-preserving alpha flattening retained the original semantic approvals. Persistent decision-scene portraits are implemented separately from the page illustration. This report does not claim a native Android visual walkthrough, touch-interaction validation, or pixel-exact correspondence between independent illustrations.

@@ -7,8 +7,8 @@
   "webpQuality": 83,
   "encoderEffort": 4,
   "flattenBackground": "#f2e5bc",
-  "bytes": 117552,
-  "sha256": "bd5a8ed550480b2bc9cea1f2d1029a1054e38905a34dd3a6bbc7936a0c63345b",
+  "bytes": 87204,
+  "sha256": "bb17c02ce6fd044ba068e2312f002063cda6fa83a85da3e43f6c5f56c8a76818",
   "generatedAt": "2026-09-19T19:01:48.754Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 OBJECT-ONLY environmental still-life for a WordShift story page. Illustrate the props and setting only; the game displays the exact resident portrait separately, so NEVER add a full person or animal to this image. Depict this exact authored narrative moment: \"Whatever is down there keeps the shape of everything, exactly. I am starting to wonder whether keeping the shape is enough.\". Setting: a woodland cottage hearth, an imperfect ceramic cup and wooden chairs, with a ritual stone pit below the house. Story speaker species is fox; narrator passages describe the surrounding household.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, full-bleed OPAQUE background with NO transparency, no split panels. Keep the important subject inside the middle 85% so nothing is clipped. FINAL HARD CONSTRAINT: depict objects and environment ONLY, never full characters, people, human faces, resident faces or written dialogue. The small elderly orange-gold fish PLUM is an explicit exception: include this fish when it is the named subject of the narrative, with a worried face and small notch in its fin.",
   "promptSha256": "dc4181965efbbc8eed4c67ca0bc96052096be31e6aeeb85bd4452d5afe9137e3",
@@ -28,6 +28,17 @@
       "review": "Retouched 2026-09-21: Rule 4 (stray non-resident creature): removed the tan hamster-like creature from the top of the book stack beside the lantern at bottom right. One qwen crop call (seed 7, region 0.79,0.69,0.95,0.93, 320px window at 640,220) did it. Verified: the rust-red top book cover now continues empty with worn-leather scratch highlights (irregular marks, not lettering), the foliage and trapdoor edge behind co | critic: No repair needed. Verified: creature fully removed; top book cover continues empty with three irregular scuff highlights (checked at 10x, no glyph structure or baseline, not lettering); foliage and trapdoor edge behind continue in matching pixel clusters; pixel diff confined exactly to the 320px win",
       "previousSha256": "925c647a24f7eae2818305cdcb5082e31542689866d10f84898673a0caf79bc8",
       "editedAt": "2026-09-21T10:14:34.650Z"
+    },
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Remove the indoor well or the standing fish vessel and continue the room behind it.",
+      "attempts": 2,
+      "costUsd": 0.054,
+      "review": "Location consistency follow-up, 2026-09-21: the pit is outdoors and PLUM lives in a room-sized planted tank, so a trapdoor onto a masonry well in the parlour floor, a fish tank on a kitchen sideboard and a goldfish bowl on the porch table all contradicted the places the game shows. Each was removed and the room continued behind it.",
+      "previousSha256": "bd5a8ed550480b2bc9cea1f2d1029a1054e38905a34dd3a6bbc7936a0c63345b",
+      "editedAt": "2026-09-21T11:01:48.425Z"
     }
   ]
 }

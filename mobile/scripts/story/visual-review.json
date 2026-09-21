@@ -65,8 +65,10 @@
       "id": "cup-05",
       "scene": "cup",
       "asset": "assets/story/pages/cup-05.webp",
-      "sha256": "391df36483841f311af5efbb9ae5af5b81f87e985392fe1bb70064562c1433a8",
-      "status": "pass"
+      "sha256": "d64c64917e13b1f060cee00a63a95b6d09d1e2d94f416ae7fcfc84af62c4d65b",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a partial human figure in a sweater and skirt was moving the cup and a tabby cat slept by the hearth. Both are gone and the kitchen continues behind them; the chipped mug now sits at the far place, which is what the line describes. Reviewed by an independent critic and by the maintainer."
     },
     {
       "id": "cup-06",
@@ -245,15 +247,19 @@
       "id": "supper-06",
       "scene": "supper",
       "asset": "assets/story/pages/supper-06.webp",
-      "sha256": "827c5e80d69ebe2e7e0942c038f009761443865f58f29670f36342215b9e2b62",
-      "status": "pass"
+      "sha256": "ad5135bf1f4b3778b69fcc9d5c0e171597847321fbd1856d831735ec0d0a9d73",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a tabby cat asleep by the stove is gone and the rug continues. Thyme and Axel stay at the table; an axolotl in another resident room is fine. Reviewed by an independent critic and by the maintainer."
     },
     {
       "id": "supper-07",
       "scene": "supper",
       "asset": "assets/story/pages/supper-07.webp",
-      "sha256": "da713be13298dd046b68233424276da65cd947d0246a4982e9401939248eedc0",
-      "status": "pass"
+      "sha256": "4c7e5b44ce2d85f158295909b71a8bb7053aaa1cab8214da6294ae4cda0f4346",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a cat asleep on the fireside chair is gone and the cushion continues. Reviewed by an independent critic and by the maintainer."
     },
     {
       "id": "supper-08",
@@ -268,8 +274,10 @@
       "id": "supper-09",
       "scene": "supper",
       "asset": "assets/story/pages/supper-09.webp",
-      "sha256": "6399a54b62cdd8008bb55fed7c7c13a565da9be7e893307b36d18b2d1feaa6dd",
-      "status": "pass"
+      "sha256": "8df0aa11224de40da4c25f7aefeceb3dda5f7d1a3226c847e0baf4e7b90fd286",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a collie asleep on the hearth rug is gone and the rug continues. No dog lives in this house. Reviewed by the maintainer."
     },
     {
       "id": "supper-10",
@@ -500,31 +508,37 @@
       "id": "plum-08",
       "scene": "plum",
       "asset": "assets/story/pages/plum-08.webp",
-      "sha256": "bd5a8ed550480b2bc9cea1f2d1029a1054e38905a34dd3a6bbc7936a0c63345b",
+      "sha256": "bb17c02ce6fd044ba068e2312f002063cda6fa83a85da3e43f6c5f56c8a76818",
       "status": "pass",
       "retouched": true,
-      "note": "Retouched 2026-09-21: Rule 4 (stray non-resident creature): removed the tan hamster-like creature from the top of the book stack beside the lantern at bottom right. One qwen crop call (seed 7, region 0.79,0.69,0.95,0.93, 320px window at 640,220) did it. Verified: the rust-red top book cover now continues empty with worn-leather scratch highlights (irregular marks, not lettering), the foliage and trapdoor edge behind co | critic: No repair needed. Verified: creature fully removed; top book cover continues empty with three irregular scuff highlights (checked at 10x, no glyph structure or baseline, not lettering); foliage and trapdoor edge behind continue in matching pixel clusters; pixel diff confined exactly to the 320px win"
+      "note": "Location consistency follow-up, 2026-09-21: the pit is outdoors and PLUM lives in a room-sized planted tank, so a trapdoor onto a masonry well in the parlour floor, a fish tank on a kitchen sideboard and a goldfish bowl on the porch table all contradicted the places the game shows. Each was removed and the room continued behind it."
     },
     {
       "id": "record-01",
       "scene": "record",
       "asset": "assets/story/pages/record-01.webp",
-      "sha256": "45e1da68c4ab1cd76565dcad3521f004124f769a9140b4778d1abac6ff9bd9ed",
-      "status": "pass"
+      "sha256": "002e345b73e99cec65526f133350174066e4abc5c7dfa4e16d8090d5d0c65b70",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-02",
       "scene": "record",
       "asset": "assets/story/pages/record-02.webp",
-      "sha256": "4206b8032586ab98f9c3416c9ab96606449c89ca876faf0565251260968218e8",
-      "status": "pass"
+      "sha256": "9bdb59d7c956f133522b41667f94f58ae6189ebc4cb5c3102c61f3507fea768e",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-03",
       "scene": "record",
       "asset": "assets/story/pages/record-03.webp",
-      "sha256": "20169e42b728094d4f3b0b0facd68d66ac16c55220096deda557bc10d6ef5e2f",
-      "status": "pass"
+      "sha256": "7ca17882937fce5071b7889e6ef97d1765b18e55acc4af778c82426a0b6abe72",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-04",
@@ -571,10 +585,10 @@
       "id": "record-09",
       "scene": "record",
       "asset": "assets/story/pages/record-09.webp",
-      "sha256": "feca4714a8df0338e928a0bf5ac546774f63f157576337263feb06611f9adbac",
+      "sha256": "5dea26164d3d962efffbc6eb6824c6bdcbc0539692686acf74ecf85096a69256",
       "status": "pass",
       "retouched": true,
-      "note": "Retouched 2026-09-21: Defect: a malformed pangolin-scaled, hedgehog-headed quadruped on the desk at bottom right beside the lantern base (region 0.80,0.52,1.00,0.78). Plan followed: removal (not a resident; rule 4), continuing the desk planks, the lantern base flank and the wooden crate behind it. One paid call: qwen crop mode on region 0.76,0.48,1.00,0.82 (371px window at 589,166), attempt a1 ($0.02). The model remove | critic: PASS. a1r.png accepted: creature fully removed; desk planks, lantern base rim and crate lower face continue in matching blocky pixel clusters and palette. Verified: 0 pixels changed outside paste rect 792,280-960,418 (rest byte-identical to shipped WebP); feather band max diff 28/255 with no visible"
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-10",
@@ -595,11 +609,11 @@
       "id": "record-12",
       "scene": "record",
       "asset": "assets/story/pages/record-12.webp",
-      "sha256": "2287ae9812b09057a0f134fb4790080561adf9117516d077ef322e9fce55027c",
+      "sha256": "71e8909e64385f0f1d6fb276c2cdbb11bba2c4de7b05174ce3c100756f58d5bc",
       "status": "pass",
       "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable.",
       "retouched": true,
-      "note": "Retouched 2026-09-21: Defect: a miniature tan capybara-like creature (rule 4, plan: remove) on the wooden tray beside the ink bottle, in front of the stacked green books. One qwen crop-mode call (attempt a1-remove, region widened to 0.77,0.37,1.00,0.67, window 603,102 357x357) removed it cleanly: the tray continues as a plain wooden board, the book bottoms and desk grain continue, no new creature/hand/lettering, render | critic: Accept a1-tight.png. Independent pixel diff against the shipped record-12.webp: all changes confined to bbox (786,226)-(951,345), 0 changed pixels outside the declared paste rect, so the lamp, pen, paper, ink bottle, leaf dish and cloth are byte-identical. At 4x and 6x nearest-neighbour the miniatur"
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-13",
@@ -822,19 +836,19 @@
       "id": "returned-02",
       "scene": "returned",
       "asset": "assets/story/pages/returned-02.webp",
-      "sha256": "fbb3c5bd490631f7b50820e5cc843ce52c5a2f430256ff07f4222f44674906b3",
+      "sha256": "61d7559e3c0caf9f9f67c3346b435bc2ae0fd1c8d3f477b0d23d59da0bc2697a",
       "status": "pass",
       "retouched": true,
-      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
+      "note": "Location consistency follow-up, 2026-09-21: an independent location audit found these still read as a tank viewed from outside the glass, because a rim survived the first conversion. The water now fills the frame."
     },
     {
       "id": "returned-03",
       "scene": "returned",
       "asset": "assets/story/pages/returned-03.webp",
-      "sha256": "5015b6d4ec06627c7574d636cdd7fcef2cb1a116fd99b02ad9bef795bab045cd",
+      "sha256": "d062a0d9dc3755dc27e5e3ee7280fb1534fa51e492765c38e9c922e8fd7175a5",
       "status": "pass",
       "retouched": true,
-      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
+      "note": "Location consistency follow-up, 2026-09-21: an independent location audit found these still read as a tank viewed from outside the glass, because a rim survived the first conversion. The water now fills the frame."
     },
     {
       "id": "returned-04",
@@ -858,10 +872,10 @@
       "id": "returned-06",
       "scene": "returned",
       "asset": "assets/story/pages/returned-06.webp",
-      "sha256": "f971ea33c717499830d0c63f12097526a6d9707e0700e6e1e7532c6c85911154",
+      "sha256": "3a20aa50675f4f2f7928a0d49aa0f5ce3b0fd6c8b9e35a68f533d93d5235dd21",
       "status": "pass",
       "retouched": true,
-      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
+      "note": "Location consistency follow-up, 2026-09-21: an independent location audit found these still read as a tank viewed from outside the glass, because a rim survived the first conversion. The water now fills the frame."
     },
     {
       "id": "returned-07",
@@ -913,9 +927,11 @@
       "id": "council-03",
       "scene": "council",
       "asset": "assets/story/pages/council-03.webp",
-      "sha256": "6884fa1e436c6fdd496b8d6bc21cdbad27d2e5786ce59720f53a3a6c5f732dd7",
+      "sha256": "bae217665c6e4f1820eced912c8f363034dd752e2a09b77e2583eb839449f747",
       "status": "pass",
-      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable.",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a cat asleep on the windowsill is gone and the sill and plant continue. Reviewed by the maintainer."
     },
     {
       "id": "council-04",
@@ -1012,8 +1028,10 @@
       "id": "after-05",
       "scene": "after",
       "asset": "assets/story/pages/after-05.webp",
-      "sha256": "a67d9dd5ee98ac090772ad41927bf7d110524e043274989a5cdfe6d5a7029479",
-      "status": "pass"
+      "sha256": "374b32871a6a6328ff0976bca8133c496fe3211252e29011d1d798ccf90b9882",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency follow-up, 2026-09-21: the pit is outdoors and PLUM lives in a room-sized planted tank, so a trapdoor onto a masonry well in the parlour floor, a fish tank on a kitchen sideboard and a goldfish bowl on the porch table all contradicted the places the game shows. Each was removed and the room continued behind it."
     },
     {
       "id": "after-06",
@@ -1096,8 +1114,10 @@
       "id": "after-17",
       "scene": "after",
       "asset": "assets/story/pages/after-17.webp",
-      "sha256": "3ee72d2a8e951b91753c7d720612d0c229e322d26aa406cc82695c725ee8124a",
-      "status": "pass"
+      "sha256": "eae56ee3c93828c0701bc2aebf494dd8396600eb4cd9facd446ce17016397c65",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency follow-up, 2026-09-21: the pit is outdoors and PLUM lives in a room-sized planted tank, so a trapdoor onto a masonry well in the parlour floor, a fish tank on a kitchen sideboard and a goldfish bowl on the porch table all contradicted the places the game shows. Each was removed and the room continued behind it."
     },
     {
       "id": "after-18",
@@ -1124,8 +1144,10 @@
       "id": "reply-03",
       "scene": "reply",
       "asset": "assets/story/pages/reply-03.webp",
-      "sha256": "7553e451f26d19babe7681b015e55751450bc0b9e5a642b46aa8acf163a513b8",
-      "status": "pass"
+      "sha256": "cb9656fa6e7c15fdb230a31625eaece60ba4a449fd0f5f9b506de8f420bfbc97",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a hedgehog in the basket beside the armchair is gone and the knitted blanket continues. No hedgehog lives in this house. Reviewed by the maintainer."
     },
     {
       "id": "reply-04",
@@ -1219,9 +1241,11 @@
       "id": "old_mark-07",
       "scene": "old_mark",
       "asset": "assets/story/pages/old_mark-07.webp",
-      "sha256": "0f7a46e7305c4d66cd3a615457f7dca96d5a3cdabe1adb8c4631a2069359ed85",
+      "sha256": "3539c8fb413f985d08e442b9a02baa7f14c6ddc595ce082f457fb144ac560c35",
       "status": "pass",
-      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable.",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "old_mark-08",

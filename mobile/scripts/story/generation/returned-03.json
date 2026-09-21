@@ -7,8 +7,8 @@
   "webpQuality": 83,
   "encoderEffort": 4,
   "flattenBackground": "#f2e5bc",
-  "bytes": 57604,
-  "sha256": "5015b6d4ec06627c7574d636cdd7fcef2cb1a116fd99b02ad9bef795bab045cd",
+  "bytes": 46214,
+  "sha256": "d062a0d9dc3755dc27e5e3ee7280fb1534fa51e492765c38e9c922e8fd7175a5",
   "generatedAt": "2026-09-19T19:13:56.373Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 OBJECT-ONLY environmental still-life for a WordShift story page. Illustrate the props and setting only; the game displays the exact resident portrait separately, so NEVER add a full person or animal to this image. Depict this exact authored narrative moment: \"The same bite out of his fin. The same little face.\". Setting: an intimate woodland cottage aquarium, blue midnight water and quiet reflective shadows. Story speaker species is axolotl; narrator passages describe the surrounding household.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, full-bleed OPAQUE background with NO transparency, no split panels. Keep the important subject inside the middle 85% so nothing is clipped. FINAL HARD CONSTRAINT: depict objects and environment ONLY, never full characters, people, human faces, resident faces or written dialogue. The small elderly orange-gold fish PLUM is an explicit exception: include this fish when it is the named subject of the narrative, with a worried face and small notch in its fin.",
   "promptSha256": "69714b601808b7228b8df7e2709c61f02d5567274da5401486e15abddb711afc",
@@ -23,6 +23,17 @@
       "review": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size.",
       "previousSha256": "4051c508df1ad446815561579f4c6f85fc73c1276aeb0ffb15cd70dc60ceec21",
       "editedAt": "2026-09-21T10:36:00.896Z"
+    },
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Remove every glass pane, tank rim and frame so the water and its plants run off all four edges, as if the viewer were in the water.",
+      "attempts": 2,
+      "costUsd": 0.054,
+      "review": "Location consistency follow-up, 2026-09-21: an independent location audit found these still read as a tank viewed from outside the glass, because a rim survived the first conversion. The water now fills the frame.",
+      "previousSha256": "5015b6d4ec06627c7574d636cdd7fcef2cb1a116fd99b02ad9bef795bab045cd",
+      "editedAt": "2026-09-21T11:01:48.093Z"
     }
   ]
 }

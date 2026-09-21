@@ -4,9 +4,25 @@
   "sourceImage": "exec-3515f8c8-fb38-4c61-8e1c-b3d2551fc11f.png",
   "width": 960,
   "height": 540,
-  "bytes": 103432,
-  "sha256": "6399a54b62cdd8008bb55fed7c7c13a565da9be7e893307b36d18b2d1feaa6dd",
+  "bytes": 98540,
+  "sha256": "8df0aa11224de40da4c25f7aefeceb3dda5f7d1a3226c847e0baf4e7b90fd286",
   "generatedAt": "2026-09-19T18:47:27.180Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 story-page illustration for WordShift, an intimate woodland-cottage pixel-art game. Depict this exact authored narrative moment: \"For a while the room sounds like an ordinary supper, not like a room listening for something.\". Setting: a woodland cottage kitchen and supper table with soup, warm hearth in uneasy dusk.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped.",
-  "promptSha256": "0412cd36d0ccf9219d38523822502efc946729efca6f8588604b5e5643ea4c2e"
+  "promptSha256": "0412cd36d0ccf9219d38523822502efc946729efca6f8588604b5e5643ea4c2e",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen-image-edit-2511",
+      "mode": "crop",
+      "window": null,
+      "prompt": "Remove the non-resident creature and continue the surface behind it.",
+      "attempts": 3,
+      "costUsd": 0.06,
+      "review": "Retouched 2026-09-21: a collie asleep on the hearth rug is gone and the rug continues. No dog lives in this house. Reviewed by the maintainer.",
+      "previousSha256": "6399a54b62cdd8008bb55fed7c7c13a565da9be7e893307b36d18b2d1feaa6dd",
+      "editedAt": "2026-09-21T11:02:13.305Z"
+    }
+  ]
 }

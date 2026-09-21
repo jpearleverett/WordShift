@@ -6,8 +6,8 @@
   "height": 540,
   "webpQuality": 83,
   "encoderEffort": 4,
-  "bytes": 81108,
-  "sha256": "6884fa1e436c6fdd496b8d6bc21cdbad27d2e5786ce59720f53a3a6c5f732dd7",
+  "bytes": 74802,
+  "sha256": "bae217665c6e4f1820eced912c8f363034dd752e2a09b77e2583eb839449f747",
   "generatedAt": "2026-09-19T18:53:48.080Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 OBJECT-ONLY environmental still-life for a WordShift story page. Illustrate the props and setting only; the game displays the exact resident portrait separately, so NEVER add a full person or animal to this image. Depict this exact authored narrative moment: \"It learned how to keep us exactly as we are, friend. It never learned where that has to stop.\". Setting: a woodland cottage common room at midnight, household belongings and the final moment before an otherworldly welcome, no monster visible. Story speaker species is fox; narrator passages describe the surrounding household.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped. FINAL HARD CONSTRAINT: depict objects and environment ONLY, never full characters, people, human faces, resident faces or written dialogue. The small elderly orange-gold fish PLUM is an explicit exception: include this fish when it is the named subject of the narrative, with a worried face and small notch in its fin.",
   "promptSha256": "ac8aa67f29c83713699ea4e1f843115b1dbdafe07f1fb8c96b5d4e204b1c8b16",
@@ -16,5 +16,18 @@
     "previousSha256": "d6f37a03bc13f1b852207ca701877eb0fd3b0d7114996923f8935a664edf18be",
     "source": "original generated PNG",
     "at": "2026-09-19T18:56:49.421Z"
-  }
+  },
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen-image-edit-2511",
+      "mode": "crop",
+      "window": null,
+      "prompt": "Remove the non-resident creature and continue the surface behind it.",
+      "attempts": 3,
+      "costUsd": 0.06,
+      "review": "Retouched 2026-09-21: a cat asleep on the windowsill is gone and the sill and plant continue. Reviewed by the maintainer.",
+      "previousSha256": "6884fa1e436c6fdd496b8d6bc21cdbad27d2e5786ce59720f53a3a6c5f732dd7",
+      "editedAt": "2026-09-21T11:02:13.482Z"
+    }
+  ]
 }

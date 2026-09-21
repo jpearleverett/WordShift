@@ -7,9 +7,22 @@
   "webpQuality": 83,
   "encoderEffort": 4,
   "flattenBackground": "#f2e5bc",
-  "bytes": 101948,
-  "sha256": "45e1da68c4ab1cd76565dcad3521f004124f769a9140b4778d1abac6ff9bd9ed",
+  "bytes": 48342,
+  "sha256": "002e345b73e99cec65526f133350174066e4abc5c7dfa4e16d8090d5d0c65b70",
   "generatedAt": "2026-09-19T19:02:18.054Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 OBJECT-ONLY environmental still-life for a WordShift story page. Illustrate the props and setting only; the game displays the exact resident portrait separately, so NEVER add a full person or animal to this image. Depict this exact authored narrative moment: \"I wrote this in the ledger: \"I am afraid.\" Three words, complete and accurate.\". Setting: a cottage writing desk with a leather ledger and cream paper, a late-night lamp. Story speaker species is capybara; narrator passages describe the surrounding household.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, full-bleed OPAQUE background with NO transparency, no split panels. Keep the important subject inside the middle 85% so nothing is clipped. FINAL HARD CONSTRAINT: depict objects and environment ONLY, never full characters, people, human faces, resident faces or written dialogue. The small elderly orange-gold fish PLUM is an explicit exception: include this fish when it is the named subject of the narrative, with a worried face and small notch in its fin.",
-  "promptSha256": "60d9ab36e548c9973dc2144dd9ffcc0be6fc5f4ee50bc420b2dd3b6418fa6131"
+  "promptSha256": "60d9ab36e548c9973dc2144dd9ffcc0be6fc5f4ee50bc420b2dd3b6418fa6131",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Re-set the scene in Chill the capybara room, which is a modern office: pale grey panelled walls with a flow-diagram and a bar-chart print, a glass-topped desk with metal legs, a monitor and keyboard, a mesh office chair, an angled desk lamp, ring binders, a succulent, a green rug and a city-skyline window. Keep the paper ledger, loose sheets, ink and pen the dialogue names.",
+      "attempts": 1,
+      "costUsd": 0.027,
+      "review": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors.",
+      "previousSha256": "45e1da68c4ab1cd76565dcad3521f004124f769a9140b4778d1abac6ff9bd9ed",
+      "editedAt": "2026-09-21T10:57:59.194Z"
+    }
+  ]
 }

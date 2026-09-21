@@ -89,6 +89,12 @@ resize, parchment flatten, WebP q83 effort 4) and recording the model, prompt,
 window, cost and previous hash under `retouches` in
 `scripts/story/generation/<id>.json`, plus the new hash in `visual-review.json`.
 
+Match the setting to the place the game itself shows. The Aquarium Room is the
+inside of a planted tank, so Axel's scenes are underwater; the Offering Pit is
+an outdoor rock-rimmed hole in a forest clearing, not a cellar well; and Chill's
+room is a modern office. A resident visiting another resident's room is fine,
+so this rule binds only a scene set in a resident's own space.
+
 Judge a retouch at the size the reader uses, not at 1:1. `getStorySceneLayout`
 caps the illustration at 136dp tall, so these 960x540 assets display around
 240x136; a paw that looks flat at full resolution can read correctly there,
