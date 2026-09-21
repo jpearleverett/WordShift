@@ -4,6 +4,22 @@
   "sourceImage": "exec-35792278-dfa8-4efe-a3b6-4b34457ba348.png",
   "width": 960,
   "height": 540,
-  "bytes": 110832,
-  "sha256": "2ed338104699aa1e0fd873ed8835234a870761ce364f411225d786b3d54ed0fb"
+  "bytes": 102196,
+  "sha256": "590f3fbcbab62e00189bb2eb221ace5efa61c0b7416ee7eb6f5e205319160503",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "crop",
+      "window": null,
+      "prompt": "Remove the sleeping grey tabby cat completely. Show the green knitted cushion continuing naturally where the cat was: a flat, slightly rounded cushion top in the same dark moss-green knit texture with soft highlights on the folds, and behind it the wooden chair back rails, the grey stone wall and the window sill with the climbing ivy exactly as they already appear. Same 16-bit pixel art rendering with visible pixel clusters, no photographic texture, same palette. Keep the wooden chair, the window, the purple sunset, the green book and the wooden box of cubes exactly as they are. Change nothing else. No cat, no animal, no human, no fingers, no skin.",
+      "attempts": 3,
+      "costUsd": 0.06,
+      "review": "Retouched 2026-09-21: Defect: stray grey tabby cat on the green cushion by the window (rule 4: remove, continue cushion and chair). Attempt a1 (qwen crop, region 0.72,0.26,1.00,0.54, seed 11) removed the cat cleanly and continued the cushion as a dark moss-green waffle-knit top with the chair rails, stone wall, sill and ivy intact, but the tool's default 425px paste window also re-rendered the window sky (orange-purple | critic: PASS. The grey tabby is fully removed with no residual fur, ear or white-bib pixels; the bench cushion is continued as a flat waffle-knit top over the untouched original front roll, and the chair rails, stone wall, sill, ivy, dice-cube box and book stack inside the paste rectangle are faithful re-re",
+      "previousSha256": "2ed338104699aa1e0fd873ed8835234a870761ce364f411225d786b3d54ed0fb",
+      "editedAt": "2026-09-21T10:14:36.264Z"
+    }
+  ]
 }

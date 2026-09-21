@@ -33,8 +33,10 @@
       "id": "cup-01",
       "scene": "cup",
       "asset": "assets/story/pages/cup-01.webp",
-      "sha256": "b8b8067296ee32ffb4c4875181157582acef87f7da06243fd3cc7b035efd8a54",
-      "status": "pass"
+      "sha256": "daef5c928798c4bcb8f3636f980b090daf93c1ee84137b6c7c92951bb1e42cc0",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Single defect (rule 4, stray orange-and-white cat on the window-seat blanket). The plan said it was already removed in the pre-existing t1.png, so I inspected that file instead of spending a call: opened the 960x540 composite and the original|result sheet at full size, zoomed the paste window (56,35)-(376,355) at 3x against the original, and zoomed the new blanket at 8x. The cat is gone; the seat  | critic: Passes as-is; no repair needed. Cat fully removed; blanket drawn in crisp pixel clusters in the scene's own tartan palette; pixel diff confined to the paste window (56,35)-(375,354) with 0 changed pixels outside, edge-ring mean diff 2.4 (max 13) so no seam; teapot/mugs/apples inside the window are v"
     },
     {
       "id": "cup-02",
@@ -54,8 +56,10 @@
       "id": "cup-04",
       "scene": "cup",
       "asset": "assets/story/pages/cup-04.webp",
-      "sha256": "c14c09ba1d1b6f022e39814951195f47f423a55518ec1026034877059bf8274e",
-      "status": "pass"
+      "sha256": "d7acecefbaaa87e455ad6b6dd645a91154209ecfe9f4ecd7b633ebda56ddb893",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule 1 applied (Ember speaks the line and pours): the human hand gripping the saucepan handle was converted into a red fox paw; sleeve, pan, cocoa and everything else kept. Attempt t1 (qwen crop, region 0.64,0.00,1.00,0.34, seed 11, window paste): rejected, paw was a flat orange blob at a much coarser pixel size and the model invented a second fox paw and sleeve on the table by the spoon. Attempt  | critic: Passing. Independent diff: 0 changed pixels outside the paste rect (x628-840, y0-176); inside it the only change beyond resampling noise is the paw itself and a slightly crisper outline on the handle end beneath it (x636-654, y103-117), invisible at 3x. Skin-toned pixels in the rect fell 367 -> 41, "
     },
     {
       "id": "cup-05",
@@ -68,22 +72,28 @@
       "id": "cup-06",
       "scene": "cup",
       "asset": "assets/story/pages/cup-06.webp",
-      "sha256": "91fb43fdcbc460b87ab848c1b8f07f19df5bf1dee0d934af370741d53ec9dd62",
-      "status": "pass"
+      "sha256": "e75baaaaf2738f8e1718ffa9b757b655c844111de85608d3d08b821eeb307d70",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Single defect, rule 4 (non-resident creature): the calico cat asleep on the rug in front of the hearth was removed and the rug and hearth base continued; the fox paws holding the mug are untouched. All three calls used qwen in crop mode on region 0.73,0.37,0.93,0.61 with --paste region so the mug handle and green jar beside the window stayed byte-identical. a1 (seed 11) removed the cat but redrew  | critic: No repair needed. Independent diff confirms visible changes are confined to x 677-894 / y 188-340 (cat silhouette, rug, hearth base); the only pixels touched beyond that are a uniform ~3-4/255 feather ring at the crop margin, invisible at 1x. Fox paws, mug, chipped handle, jar, firewood and stove ar"
     },
     {
       "id": "cup-07",
       "scene": "cup",
       "asset": "assets/story/pages/cup-07.webp",
-      "sha256": "341432aa9cc04a6480dd13a58d044d46edb7640148c1a12c0ecaaee421f6f333",
-      "status": "pass"
+      "sha256": "459546c2babd19958fa184393f64ce2fb3334b56c9762d1d1d4a3600da618957",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule 1 (narrated \"she\" = Ember): the pink human hand gripping the saucepan handle was converted into a red fox forepaw; the green snowflake sleeve, cuff, copper pan, handle, shelves and everything else are untouched. Only the hand itself (x 345-445, y 125-200 of 960x540) was edited, not the whole 0.06-0.52 sleeve region, since the plan keeps the sleeve. Attempt paw1 (qwen crop, seed 11, region 0.3 | critic: Accepted. The human hand is fully replaced by a red fox forepaw that follows the species reference (orange-russet back with darker shading, cream underside, dark claws), keeps the hand's size and grip on the handle, and leaves the sleeve, cuff, pan and everything outside the 312-485 x 94-230 paste r"
     },
     {
       "id": "echo-01",
       "scene": "echo",
       "asset": "assets/story/pages/echo-01.webp",
-      "sha256": "72ffaea69cb790d98400ed52c614486bf755485123af0151843aff52b04c77f3",
-      "status": "pass"
+      "sha256": "bfbca8fde3a32ad937549b2c778740627537914ed23bdcba18053c0fea81470a",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule applied: the narration is object-only (\"HOME catches against the rim\") and the plan names the player, so the arm+hand were REMOVED (rule 2), not converted. Three paid calls, all on the same 540x540 left-column crop window: rm1 (qwen, $0.02) removed the arm and drew a convincing stone rim/outer wall but recoloured the whole window cool blue-grey (rim drift 30 levels, visible seam at x=540) and | critic: PASS. Verified against the shipped webp: the human arm, knitted sleeve, cream cuff and bare hand are completely gone; no skin, cuff or sweater pixels remain, and no new hand, creature, lettering or animal appeared anywhere. Diff is confined to the arm silhouette (bbox x0-394, y205-539); the block, l"
     },
     {
       "id": "echo-02",
@@ -96,15 +106,19 @@
       "id": "echo-03",
       "scene": "echo",
       "asset": "assets/story/pages/echo-03.webp",
-      "sha256": "5b65f94026ec144418f5014ad5704fce71316f577109669e5d850fa9d9e76827",
-      "status": "pass"
+      "sha256": "6a9e6153ff1e7669d5868d2cb69591d537c9690dc9a469db0542117a7176e9f8",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Owl-foot conversion read as an alien pale claw at delivery size, so the limb was removed entirely instead, which matches the object-only art direction and the line (the notebook lying by itself on the rim). | critic: Reviewed by the maintainer at full size and at the in-game delivery size (136dp tall): limb, sleeve and cloak gone, notebook intact on the rim, table and candle continued, no seam."
     },
     {
       "id": "echo-04",
       "scene": "echo",
       "asset": "assets/story/pages/echo-04.webp",
-      "sha256": "bd18862434ac7092835421ae836902dd4b33888d391432e12f4b413992092d79",
-      "status": "pass"
+      "sha256": "b3d82c2536b4eac35c00d5a65a6715fcbc81477bb3c17a0f7ffbfa0fd7323489",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Local re-composite only, from the existing echo-04/rm1.raw.png (no model calls this round); new script edits/echo-04_footprint2.mjs, result j2.png copied to final.png (960x540, 0 pixels changed outside the mask, 449,695 of 518,400 pixels byte-identical to the original; the top, moss shape, rim outer face, table front, leg and black corner keep the accepted polygon and 5px feather). What changed vs | critic: No repair needed. Hand and sleeve are fully removed; the diff is confined to x 0-397, y 302-539 (inside the listed region) and the rest of the frame is byte-identical, so both scratch rows survive and the picture still matches the authored line. The joint the artist worried about is clean: the x~343"
     },
     {
       "id": "echo-05",
@@ -124,30 +138,38 @@
       "id": "witness-01",
       "scene": "witness",
       "asset": "assets/story/pages/witness-01.webp",
-      "sha256": "98edfbbd27635846f43b062415808fb95b95d4597bc6bc625f3535c2a58f9f0d",
+      "sha256": "468f682b4c7087690e8028005e1d6154572651e8ed3551412c47dca1565844d5",
       "status": "pass",
-      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable.",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule 2 applied (the narration says \"You write down...\" so the player acts and is never drawn): the fox foreleg/paw on the sheet was REMOVED, and the curled grey-brown fur shape in the bottom-left corner (the plan's secondary inspection item; it was present) was removed in the same call. One qwen crop-mode call (attempt a1-remove-arm-and-fur, region 0.00,0.44,0.50,1.00 covering both defects, --past | critic: PASS. Both defects removed (fox foreleg/paw off the sheet; grey-brown fur lump in the bottom-left corner replaced by leaf-patterned rug). Independent diff: zero changed pixels outside the paste rect 0,213..504,540; top seam (y 213) and right seam (x 480-504) invisible at 4x; paper's completed left e"
     },
     {
       "id": "witness-02",
       "scene": "witness",
       "asset": "assets/story/pages/witness-02.webp",
-      "sha256": "3e22c8e6c2d9f9f13de9af6e9b0cee6d46ddc6d9153bf8d86c80044fae808450",
-      "status": "pass"
+      "sha256": "ab86cb8ac8d64033db0e28e17730d1f9c86aef20e828be7e8ad39b14e43b1a03",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Started from t1.png (prior round: human hand already converted to Ember's fox forepaw; inspected against the original sheet and accepted: orange-russet pixel paw with darker shading, dark claws pinching the page, green knitted sleeve and the whole right half otherwise identical). Defect this round: the grey tabby cat on the window-seat cushions (rule 4, remove and continue cushions + blanket). Two | critic: No repair needed. Cat fully removed (no residual silhouette at 3x/5x); diff versus t1 confined to x 301-479 / y 206-276 inside the defect region; cushions, blanket seam and the rest of the frame unchanged; fill is pixel-clustered knit tone-matched to the dim surroundings with no visible seam; inheri"
     },
     {
       "id": "witness-03",
       "scene": "witness",
       "asset": "assets/story/pages/witness-03.webp",
-      "sha256": "2ed338104699aa1e0fd873ed8835234a870761ce364f411225d786b3d54ed0fb",
-      "status": "pass"
+      "sha256": "590f3fbcbab62e00189bb2eb221ace5efa61c0b7416ee7eb6f5e205319160503",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Defect: stray grey tabby cat on the green cushion by the window (rule 4: remove, continue cushion and chair). Attempt a1 (qwen crop, region 0.72,0.26,1.00,0.54, seed 11) removed the cat cleanly and continued the cushion as a dark moss-green waffle-knit top with the chair rails, stone wall, sill and ivy intact, but the tool's default 425px paste window also re-rendered the window sky (orange-purple | critic: PASS. The grey tabby is fully removed with no residual fur, ear or white-bib pixels; the bench cushion is continued as a flat waffle-knit top over the untouched original front roll, and the chair rails, stone wall, sill, ivy, dice-cube box and book stack inside the paste rectangle are faithful re-re"
     },
     {
       "id": "witness-04",
       "scene": "witness",
       "asset": "assets/story/pages/witness-04.webp",
-      "sha256": "d824c76c6d4d5fcc31d42341107ec4629d804ee8c760c1453db00c7f7f301931",
-      "status": "pass"
+      "sha256": "987ba7b018cabf98e631db8f675cdc85291482aa17ed16d1f0b2f446c6a80b57",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Base: the rejected local-assembly6.png (its bottom-left removal, defect 2, was accepted and is kept byte-identical). Two model calls were made first, chained from that base, one edit per call in tight 320px windows as the critic advised: d1-rabbit (qwen, region 0.41,0.10,0.55,0.44, window 301,0-621,320) and d2-wombat (qwen, region 0.57,0.60,0.77,0.84, window 484,220-804,540). Both came back as the | critic: PASS. All three defects resolved per plan: rabbit paw remapped in place to grey-brown (mean 165,107,63 -> 109,77,56, now darker than the paper so it no longer reads as white), silhouette/fur texture/green cuff untouched, no halo or unconverted highlight at 8x; viewer paw+sleeve removed with the pen "
     },
     {
       "id": "witness-05",
@@ -160,15 +182,19 @@
       "id": "witness-06",
       "scene": "witness",
       "asset": "assets/story/pages/witness-06.webp",
-      "sha256": "a0d3bb252f96fd7eab8439ebdfba7451a2a9bb06139f32e619e851579780457d",
-      "status": "pass"
+      "sha256": "0d5e53d8afad2f95831bee74e27e57015f8a44aa67fc516c607e6b26acc8c420",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule applied: rule 2 (the player folds the account, so the hand is REMOVED, object-only picture), per the brief's plan. The defect (brown human hand in a green knit sleeve holding up the envelope) spans 0.53 of the width, so the tool's crop rule would have forced full mode anyway; a1 was a single qwen full-frame call (region 0.00,0.36,0.56,1.00, --paste region, seed 11) asking for the hand and sle | critic: PASS. The brown human hand and green knit sleeve are gone entirely (no fingers, skin or cuff remain anywhere), replaced by bare plank desktop with the folded cream envelope and its fern sprig lying flat, the runner's fringed left end, the desk's dark front edge, a desk leg and floor shadow at the lo"
     },
     {
       "id": "witness-07",
       "scene": "witness",
       "asset": "assets/story/pages/witness-07.webp",
-      "sha256": "870c3598eba1a7a74c30257d2a6d72520e99a8e284d29e5de45160441fdacfa0",
-      "status": "pass"
+      "sha256": "7dac2079b2f4139451fe1683354761d6dcf164b9840599eff906dea0c86fe8f9",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: PLAN FOLLOWED (option b from the critic): chained the paw conversion from the previous round's a2-remove-right-full.png (right hand + grey-brown sleeve already removed cleanly; desk wood and embroidered runner continue to the right edge), so the delivered PNG carries BOTH halves of the plan: the grey-brown-sleeved hand removed, and Ember's green-sleeved hand converted to a red fox forepaw. Ember ( | critic: PASS. Independent diff against the shipped witness-07.webp: 0 pixels changed outside the two paste rects (paw 225..533x219..397, right 616..960x289..540); content inside the rects that should be unchanged (wax seal, envelope body, notebook corner, chair leg, log basket, braided rug) keeps shape, pal"
     },
     {
       "id": "supper-01",
@@ -204,8 +230,10 @@
       "id": "supper-05",
       "scene": "supper",
       "asset": "assets/story/pages/supper-05.webp",
-      "sha256": "e8738d3fbea589a19c9394189345e140ee07fd5ab11367540b89ac7061966dc2",
-      "status": "pass"
+      "sha256": "fda10352550cdd737662181282255eb366a5cb7f6567fc991b3bdddd8c8aab32",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Based on edits/supper-05/a2r.png as the critic asked (not the original). Because three prior qwen attempts all produced chunky sprite-style paws with black outlines, I redrew the paw and sleeve procedurally at the scene's own pixel scale (renderer saved beside the result as final_v2.render.js). Steps: (1) built a mask of the old sprite paw/sleeve from its exact flat palette plus >=4px flat-block d | critic: Passing: the digit-less shaggy stump is gone; the new forepaw is a plausible small red-fox paw (domed russet dorsum, four short rounded toes with dark claws hooked over the loop, cream wrist strip, no thumb, 1 px dithered fur matching the teapot's speckle) and the olive cable-knit sleeve reads as a "
     },
     {
       "id": "supper-06",
@@ -225,8 +253,10 @@
       "id": "supper-08",
       "scene": "supper",
       "asset": "assets/story/pages/supper-08.webp",
-      "sha256": "75dda0053891a81a269c1994e69d273434f0ba1110288c8a7e3574b1afed15dc",
-      "status": "pass"
+      "sha256": "2f8f07041edfae09375f1ec4130808bca2f5b3be7fffe105a160cce70dc1bdcd",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule applied: the limb belonged to an unidentifiable dark badger-like creature (white stripe, not a resident), so per the plan it was REMOVED rather than converted. Region 0.00,0.10,0.36,0.66 (widened from the brief's 0.00,0.12,0.38,0.64), qwen crop mode (532px window at the left edge), --paste region so only the defect box plus 24px margin was blended back. a1 (seed random, $0.02): creature fully | critic: Passing. Creature, sleeve, paw and edge fur tuft are gone; diff confirms all changes lie within x 0..367 / y 37..378 and the right 60% is byte-identical. Kettle handle/lid/finial, hearth base, table edge and the small bowl under the former sleeve are continued convincingly; both feathered seams are "
     },
     {
       "id": "supper-09",
@@ -454,8 +484,10 @@
       "id": "plum-08",
       "scene": "plum",
       "asset": "assets/story/pages/plum-08.webp",
-      "sha256": "925c647a24f7eae2818305cdcb5082e31542689866d10f84898673a0caf79bc8",
-      "status": "pass"
+      "sha256": "bd5a8ed550480b2bc9cea1f2d1029a1054e38905a34dd3a6bbc7936a0c63345b",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule 4 (stray non-resident creature): removed the tan hamster-like creature from the top of the book stack beside the lantern at bottom right. One qwen crop call (seed 7, region 0.79,0.69,0.95,0.93, 320px window at 640,220) did it. Verified: the rust-red top book cover now continues empty with worn-leather scratch highlights (irregular marks, not lettering), the foliage and trapdoor edge behind co | critic: No repair needed. Verified: creature fully removed; top book cover continues empty with three irregular scuff highlights (checked at 10x, no glyph structure or baseline, not lettering); foliage and trapdoor edge behind continue in matching pixel clusters; pixel diff confined exactly to the 320px win"
     },
     {
       "id": "record-01",
@@ -496,29 +528,37 @@
       "id": "record-06",
       "scene": "record",
       "asset": "assets/story/pages/record-06.webp",
-      "sha256": "d48af50e86ae171775f1365e32fd074a9cc73ee46849f8ed9b77ead05a103582",
-      "status": "pass"
+      "sha256": "c9c885a51f656241107cff0352fb28a5b35049f9ced00f489a3af829a1cdf5d1",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Defect: heavy dark bear-like forepaw entering from the left, resting on the pressed-plant pages. Plan was to redraw it as Ember's slim red fox forepaw, else remove. Two conversion attempts (qwen crop, region 0.00,0.40,0.34,0.90, seeds 11 and 4242) both failed rule 7: a1 produced a flat saturated cartoon fox leg with a hard black outline (nothing like the painterly textured fur of the picture) alth | critic: Accept a3-remove-tight.png. Pixel diff confirms the edit is confined to x 0..266, y 284..460 (0 changed pixels outside the claimed mask); the invented post is absent, the small mushroom sketch, throw, chair and tray are byte-identical. The bear paw and claws are fully gone with no fur ghost at any s"
     },
     {
       "id": "record-07",
       "scene": "record",
       "asset": "assets/story/pages/record-07.webp",
-      "sha256": "76d53bfff27d9b02b91c10e521a2bd166293cca9d53a4beaca3910920101b5da",
-      "status": "pass"
+      "sha256": "988b04ce5085222fbb31f580b6e5798131b9e9d17317886d3720c174032b7ebc",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule applied: the line is narration (\"you and Ember compare the pages\"), so the pink four-fingered hand (gilled, axolotl-like) in the green sleeve at the lower right is the player's and was REMOVED per the plan, not converted. Attempt a1 (qwen, crop window 428,8 532px, --paste region so the lamp/ledger inside the window stayed untouched, seed 11): hand, gill fronds and sleeve gone; the loose sheet | critic: PASS on a1.png. Verified: hand, gill fronds and green sleeve are gone (strict skin-pink scan of the paste rect x>=590,y>=310: 0 px in a1 vs 1491 in the original); 0 pixels changed outside the paste rect; the paste edge is feathered (mean diff 0 at col 589, 1.1 at 590, ~9 by 600), and the y=310 bound"
     },
     {
       "id": "record-08",
       "scene": "record",
       "asset": "assets/story/pages/record-08.webp",
-      "sha256": "2b56c16125334eb4be094d13b5b305b94d91ae42ddda8ab3a6efce7810f9704f",
-      "status": "pass"
+      "sha256": "3fe4579cdd6c5631e8e8fc3ac379facf6e2fd3a1f95657c9361ed17ab7f48e1b",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Base kept as a1-hand.png (accepted hand removal; right half untouched). Foreleg pass redone from a1 with region 0.00,0.26,0.50,0.97 and --paste region as the critic asked.\n\nAttempts this round (3 paid calls, $0.074): a4 qwen seed 41 with the painterly/no-outline/dark-stockings prompt: qwen again drew an outlined sprite limb, this time almost entirely black (92 black-next-to-orange edge pixels, sam | critic: PASS, no repair required. Verified: (1) the pink human hand and its sleeve at lower right are gone; the loose page continues to its corner over a second sheet, the desk grain runs through and the lamp throws a blocky warm reflection on the wood, consistent with the picture's other highlights. (2) Th"
     },
     {
       "id": "record-09",
       "scene": "record",
       "asset": "assets/story/pages/record-09.webp",
-      "sha256": "36dc608f747f720fad93b001876a8189661ad79b2b1a37f200bf3ed1625b493d",
-      "status": "pass"
+      "sha256": "feca4714a8df0338e928a0bf5ac546774f63f157576337263feb06611f9adbac",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Defect: a malformed pangolin-scaled, hedgehog-headed quadruped on the desk at bottom right beside the lantern base (region 0.80,0.52,1.00,0.78). Plan followed: removal (not a resident; rule 4), continuing the desk planks, the lantern base flank and the wooden crate behind it. One paid call: qwen crop mode on region 0.76,0.48,1.00,0.82 (371px window at 589,166), attempt a1 ($0.02). The model remove | critic: PASS. a1r.png accepted: creature fully removed; desk planks, lantern base rim and crate lower face continue in matching blocky pixel clusters and palette. Verified: 0 pixels changed outside paste rect 792,280-960,418 (rest byte-identical to shipped WebP); feather band max diff 28/255 with no visible"
     },
     {
       "id": "record-10",
@@ -539,9 +579,11 @@
       "id": "record-12",
       "scene": "record",
       "asset": "assets/story/pages/record-12.webp",
-      "sha256": "ad5888d8db5070609c3d170c20ba0e193837a5888b8f00a8a5f2927bf187961b",
+      "sha256": "2287ae9812b09057a0f134fb4790080561adf9117516d077ef322e9fce55027c",
       "status": "pass",
-      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable.",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Defect: a miniature tan capybara-like creature (rule 4, plan: remove) on the wooden tray beside the ink bottle, in front of the stacked green books. One qwen crop-mode call (attempt a1-remove, region widened to 0.77,0.37,1.00,0.67, window 603,102 357x357) removed it cleanly: the tray continues as a plain wooden board, the book bottoms and desk grain continue, no new creature/hand/lettering, render | critic: Accept a1-tight.png. Independent pixel diff against the shipped record-12.webp: all changes confined to bbox (786,226)-(951,345), 0 changed pixels outside the declared paste rect, so the lamp, pen, paper, ink bottle, leaf dish and cloth are byte-identical. At 4x and 6x nearest-neighbour the miniatur"
     },
     {
       "id": "record-13",
@@ -1089,8 +1131,10 @@
       "id": "reply-08",
       "scene": "reply",
       "asset": "assets/story/pages/reply-08.webp",
-      "sha256": "4d22376b6c30f545b397bb1aa4a6c3ce82fc4d01a60de796469ea04e22def3ae",
-      "status": "pass"
+      "sha256": "fad83416ab049bb95980d504c21ea221b0d09d75d5624b12f3dc5d0cfac5ca8d",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Both defects are rule 4 (stray creatures, narrator line, no actor): the cat asleep on the left armchair's fern blanket and the songbird on the windowsill were removed and the blanket/cushion and sill continued. Attempt 1 (cat-a1, qwen crop, region 0.07,0.39,0.33,0.67 -> window 0,87,398x398, seed 11): the cat was gone but qwen restyled the whole window into a flat saturated green chair and a hard h | critic: PASS. Both stray creatures (cat on the left armchair, songbird on the sill) are cleanly removed; the fern blanket, olive cushion, sill and lake view continue naturally in the same 16-bit dithered rendering and muted palette. Changes are confined to the artist's 398px window (zero diff outside it); i"
     },
     {
       "id": "reply-09",

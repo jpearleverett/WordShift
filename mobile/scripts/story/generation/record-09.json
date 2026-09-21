@@ -4,9 +4,30 @@
   "sourceImage": "exec-9cc6ea03-7acf-46b9-9d0a-2bde6c0a87dd.png",
   "width": 960,
   "height": 540,
-  "bytes": 95034,
-  "sha256": "36dc608f747f720fad93b001876a8189661ad79b2b1a37f200bf3ed1625b493d",
+  "bytes": 88036,
+  "sha256": "feca4714a8df0338e928a0bf5ac546774f63f157576337263feb06611f9adbac",
   "generatedAt": "2026-09-19T18:47:33.515Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 story-page illustration for WordShift, an intimate woodland-cottage pixel-art game. Depict this exact authored narrative moment: \"I have ink.\". Setting: a cottage writing desk with a leather ledger and cream paper, a late-night lamp.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped.",
-  "promptSha256": "bc25b8b0d1f45dc14fa412b2549eaea0fa0c1d739e0597d08e684c739d52a2f0"
+  "promptSha256": "bc25b8b0d1f45dc14fa412b2549eaea0fa0c1d739e0597d08e684c739d52a2f0",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "crop",
+      "window": {
+        "left": 589,
+        "top": 166,
+        "width": 371,
+        "height": 371
+      },
+      "prompt": "Remove the small scaly hedgehog-like animal sitting on the desk beside the green lantern base completely. Show the wooden desk top continuing naturally where it was: warm lamplit brown wood planks with horizontal grain and a soft orange lantern glow, and the dark brown wooden crate behind it continuing straight down to the desk surface. Keep the green metal lantern base, the dark inkwell cap, the sprig of white flowers and everything else exactly as they are. Same 16-bit pixel art rendering with visible pixel clusters, no photographic texture. Change nothing else. No animal, no creature, no human, no fingers, no skin.",
+      "attempts": 1,
+      "costUsd": 0.02,
+      "review": "Retouched 2026-09-21: Defect: a malformed pangolin-scaled, hedgehog-headed quadruped on the desk at bottom right beside the lantern base (region 0.80,0.52,1.00,0.78). Plan followed: removal (not a resident; rule 4), continuing the desk planks, the lantern base flank and the wooden crate behind it. One paid call: qwen crop mode on region 0.76,0.48,1.00,0.82 (371px window at 589,166), attempt a1 ($0.02). The model remove | critic: PASS. a1r.png accepted: creature fully removed; desk planks, lantern base rim and crate lower face continue in matching blocky pixel clusters and palette. Verified: 0 pixels changed outside paste rect 792,280-960,418 (rest byte-identical to shipped WebP); feather band max diff 28/255 with no visible",
+      "previousSha256": "36dc608f747f720fad93b001876a8189661ad79b2b1a37f200bf3ed1625b493d",
+      "editedAt": "2026-09-21T10:14:35.358Z"
+    }
+  ]
 }

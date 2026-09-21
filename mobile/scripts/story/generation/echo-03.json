@@ -4,6 +4,27 @@
   "sourceImage": "exec-7cd545a2-bbfa-4514-ba64-1379214f82c2.png",
   "width": 960,
   "height": 540,
-  "bytes": 111580,
-  "sha256": "5b65f94026ec144418f5014ad5704fce71316f577109669e5d850fa9d9e76827"
+  "bytes": 93584,
+  "sha256": "6a9e6153ff1e7669d5868d2cb69591d537c9690dc9a469db0542117a7176e9f8",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "crop",
+      "window": {
+        "left": 0,
+        "top": 0,
+        "width": 540,
+        "height": 540
+      },
+      "prompt": "Remove the reaching limb, green sleeve and cloak edge; the open notebook stays on the mossy rim; continue the side table, runner, candle and wall.",
+      "attempts": 4,
+      "costUsd": 0.08,
+      "review": "Retouched 2026-09-21: Owl-foot conversion read as an alien pale claw at delivery size, so the limb was removed entirely instead, which matches the object-only art direction and the line (the notebook lying by itself on the rim). | critic: Reviewed by the maintainer at full size and at the in-game delivery size (136dp tall): limb, sleeve and cloak gone, notebook intact on the rim, table and candle continued, no seam.",
+      "previousSha256": "5b65f94026ec144418f5014ad5704fce71316f577109669e5d850fa9d9e76827",
+      "editedAt": "2026-09-21T10:14:33.092Z"
+    }
+  ]
 }

@@ -4,6 +4,27 @@
   "sourceImage": "exec-5ad70dab-f670-4abd-b089-4e43ca47288d.png",
   "width": 960,
   "height": 540,
-  "bytes": 120388,
-  "sha256": "b8b8067296ee32ffb4c4875181157582acef87f7da06243fd3cc7b035efd8a54"
+  "bytes": 114728,
+  "sha256": "daef5c928798c4bcb8f3636f980b090daf93c1ee84137b6c7c92951bb1e42cc0",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "crop",
+      "window": {
+        "left": 56,
+        "top": 35,
+        "width": 320,
+        "height": 320
+      },
+      "prompt": "Same 16-bit pixel art rendering. Remove the sleeping cat completely. Show the empty window seat with only the folded green tartan blanket and the wooden bench, continuing the blanket pattern and the wood naturally where the cat was. Change nothing else.",
+      "attempts": 0,
+      "costUsd": 0,
+      "review": "Retouched 2026-09-21: Single defect (rule 4, stray orange-and-white cat on the window-seat blanket). The plan said it was already removed in the pre-existing t1.png, so I inspected that file instead of spending a call: opened the 960x540 composite and the original|result sheet at full size, zoomed the paste window (56,35)-(376,355) at 3x against the original, and zoomed the new blanket at 8x. The cat is gone; the seat  | critic: Passes as-is; no repair needed. Cat fully removed; blanket drawn in crisp pixel clusters in the scene's own tartan palette; pixel diff confined to the paste window (56,35)-(375,354) with 0 changed pixels outside, edge-ring mean diff 2.4 (max 13) so no seam; teapot/mugs/apples inside the window are v",
+      "previousSha256": "b8b8067296ee32ffb4c4875181157582acef87f7da06243fd3cc7b035efd8a54",
+      "editedAt": "2026-09-21T10:14:35.894Z"
+    }
+  ]
 }

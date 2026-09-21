@@ -4,8 +4,29 @@
   "sourceImage": "exec-6fc42758-c7b5-480e-8dbb-8c3e00722815.png",
   "width": 960,
   "height": 540,
-  "bytes": 130274,
-  "sha256": "4d22376b6c30f545b397bb1aa4a6c3ce82fc4d01a60de796469ea04e22def3ae",
+  "bytes": 121764,
+  "sha256": "fad83416ab049bb95980d504c21ea221b0d09d75d5624b12f3dc5d0cfac5ca8d",
   "generatedAt": "2026-09-19T18:47:00.707Z",
-  "promptProvenance": "Initial queue; prompt source is retained in feature-branch history."
+  "promptProvenance": "Initial queue; prompt source is retained in feature-branch history.",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "crop",
+      "window": {
+        "left": 0,
+        "top": 87,
+        "width": 398,
+        "height": 398
+      },
+      "prompt": "Remove two things from this picture and change nothing else. First, remove the sleeping ginger-and-white cat from the armchair: fill its spot by continuing the cream knitted blanket with its sage-green fern motif over the seat, and the muted olive-green seat cushion beneath it, following the existing folds, wrinkles and soft shading. Second, remove the small brown songbird standing on the windowsill: show the wooden sill, the window frame and the lake-and-forest view continuing behind where it stood. Preserve the picture exactly as it is everywhere else: the same soft, muted, low-saturation colours, the same warm evening lighting, the same gentle dithered pixel shading and the same level of detail as the original. Do not brighten, saturate, flatten, sharpen, clean up or restyle the armchair, the blanket, the wool basket, the firewood, the potted plant, the vines or the window. No cat, no bird, no animal, no human, no fingers, no skin.",
+      "attempts": 2,
+      "costUsd": 0.04,
+      "review": "Retouched 2026-09-21: Both defects are rule 4 (stray creatures, narrator line, no actor): the cat asleep on the left armchair's fern blanket and the songbird on the windowsill were removed and the blanket/cushion and sill continued. Attempt 1 (cat-a1, qwen crop, region 0.07,0.39,0.33,0.67 -> window 0,87,398x398, seed 11): the cat was gone but qwen restyled the whole window into a flat saturated green chair and a hard h | critic: PASS. Both stray creatures (cat on the left armchair, songbird on the sill) are cleanly removed; the fern blanket, olive cushion, sill and lake view continue naturally in the same 16-bit dithered rendering and muted palette. Changes are confined to the artist's 398px window (zero diff outside it); i",
+      "previousSha256": "4d22376b6c30f545b397bb1aa4a6c3ce82fc4d01a60de796469ea04e22def3ae",
+      "editedAt": "2026-09-21T10:14:35.697Z"
+    }
+  ]
 }

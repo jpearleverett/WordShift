@@ -4,8 +4,8 @@
   "sourceImage": "exec-6d8a2c82-ff89-434c-ab62-41a2e88cec72.png",
   "width": 960,
   "height": 540,
-  "bytes": 60006,
-  "sha256": "ad5888d8db5070609c3d170c20ba0e193837a5888b8f00a8a5f2927bf187961b",
+  "bytes": 55074,
+  "sha256": "2287ae9812b09057a0f134fb4790080561adf9117516d077ef322e9fce55027c",
   "generatedAt": "2026-09-19T18:50:27.801Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 OBJECT-ONLY environmental still-life for a WordShift story page. Illustrate the props and setting only; the game displays the exact resident portrait separately, so NEVER add a full person or animal to this image. Depict this exact authored narrative moment: \"I can leave the house's version on the page. I will not put my name to it.\". Setting: a cottage writing desk with a leather ledger and cream paper, a late-night lamp. Story speaker species is capybara; narrator passages describe the surrounding household.  Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped. FINAL HARD CONSTRAINT: depict objects and environment ONLY, never full characters, people, human faces, resident faces or written dialogue. The small elderly orange-gold fish PLUM is an explicit exception: include this fish when it is the named subject of the narrative, with a worried face and small notch in its fin.",
   "promptSha256": "b6af39a86e7f0d9e834cd891e500eebe11d134cd7d71d29e9947bf33888e7688",
@@ -16,5 +16,18 @@
     "previousSha256": "9bbd731c140b7e186a45ce72f54741c292299d516640fb9cfca2005276a1d9e1",
     "source": "original generated PNG",
     "at": "2026-09-19T18:56:51.644Z"
-  }
+  },
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "crop",
+      "window": null,
+      "prompt": "Remove the small tan brown animal (the little capybara-shaped creature) lying on the desk beside the black ink bottle completely. Show the flat wooden desk tray and the polished brown wooden desktop continuing naturally where it was, with the same warm lamplight and wood grain, and the stacked green hardcover books with the pale leaf embroidery and the green embroidered cloth continuing behind it. Same 16-bit pixel art rendering with visible pixel clusters, no photographic texture. Keep the black ink bottle, the small round dish with the leaf, the brass lamp base, the stacked books, the trailing plant leaves and the green cloth exactly as they are. Change nothing else. No animal, no creature, no human, no hand, no fingers, no skin.",
+      "attempts": 1,
+      "costUsd": 0.02,
+      "review": "Retouched 2026-09-21: Defect: a miniature tan capybara-like creature (rule 4, plan: remove) on the wooden tray beside the ink bottle, in front of the stacked green books. One qwen crop-mode call (attempt a1-remove, region widened to 0.77,0.37,1.00,0.67, window 603,102 357x357) removed it cleanly: the tray continues as a plain wooden board, the book bottoms and desk grain continue, no new creature/hand/lettering, render | critic: Accept a1-tight.png. Independent pixel diff against the shipped record-12.webp: all changes confined to bbox (786,226)-(951,345), 0 changed pixels outside the declared paste rect, so the lamp, pen, paper, ink bottle, leaf dish and cloth are byte-identical. At 4x and 6x nearest-neighbour the miniatur",
+      "previousSha256": "ad5888d8db5070609c3d170c20ba0e193837a5888b8f00a8a5f2927bf187961b",
+      "editedAt": "2026-09-21T10:14:35.514Z"
+    }
+  ]
 }

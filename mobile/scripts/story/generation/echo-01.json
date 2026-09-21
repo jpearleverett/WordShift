@@ -4,6 +4,22 @@
   "sourceImage": "exec-33b08b32-f1c5-440a-8238-d881216d9935.png",
   "width": 960,
   "height": 540,
-  "bytes": 72832,
-  "sha256": "72ffaea69cb790d98400ed52c614486bf755485123af0151843aff52b04c77f3"
+  "bytes": 72298,
+  "sha256": "bfbca8fde3a32ad937549b2c778740627537914ed23bdcba18053c0fea81470a",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "crop",
+      "window": null,
+      "prompt": "Remove the human arm in the green knitted sweater sleeve, its cream ribbed cuff and its pale hand completely from the lower left of the picture, and fill the space with the well itself: the curved rim of weathered stone blocks with moss in the cracks continues from the stone ledge under the coiled rope and bucket at the top left down and around the front of the well, its front face of stacked stone blocks visible below the rim top, and below that the outer stone wall of the well fades into dark shadowed ground in the lower left corner. Fill only with stone, moss and shadow: do not add any new rope, bucket, object, plant, animal or figure. The thin dark rope hanging from the top of the picture stays exactly as it is and ends where it meets the rim; do not thicken or extend it. Keep the exact colours and brightness of the picture: dark warm grey-brown stone, dull olive-green moss, near-black water, warm orange candlelight, nothing bluer, cooler or brighter. Keep the small wooden block floating on the dark rippled water, the water, the existing wooden bucket, the coiled rope, the brass lantern with its candle, the ivy and the stone walls exactly as they are. Same 16-bit pixel art rendering with visible pixel clusters and the same palette, no photographic texture, no smooth shading. Change nothing else. No human, no hand, no arm, no sleeve, no fingers, no skin, no animal.",
+      "attempts": 3,
+      "costUsd": 0.067,
+      "review": "Retouched 2026-09-21: Rule applied: the narration is object-only (\"HOME catches against the rim\") and the plan names the player, so the arm+hand were REMOVED (rule 2), not converted. Three paid calls, all on the same 540x540 left-column crop window: rm1 (qwen, $0.02) removed the arm and drew a convincing stone rim/outer wall but recoloured the whole window cool blue-grey (rim drift 30 levels, visible seam at x=540) and | critic: PASS. Verified against the shipped webp: the human arm, knitted sleeve, cream cuff and bare hand are completely gone; no skin, cuff or sweater pixels remain, and no new hand, creature, lettering or animal appeared anywhere. Diff is confined to the arm silhouette (bbox x0-394, y205-539); the block, l",
+      "previousSha256": "72ffaea69cb790d98400ed52c614486bf755485123af0151843aff52b04c77f3",
+      "editedAt": "2026-09-21T10:14:32.894Z"
+    }
+  ]
 }
