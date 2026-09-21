@@ -104,14 +104,15 @@ interface EraSpec {
  * off-phase snapshot).
  */
 const ERA_SPECS: Record<CreatorEra, EraSpec> = {
-  // dusk and shadows carry the rest of the house in spendable amber (3,050 and
-  // 1,800 at current unlock costs) because the reveal now waits for all
-  // thirteen residents (FULL_HOUSE_PHASE). Without it a reviewer opening the
-  // era named for the approach could not play forward INTO the thing it is
-  // approaching: shadows lands past the weighted threshold with ten residents,
-  // so the house, not the solving, would be the only thing in their way.
-  dusk: { phase: 2, puzzles: 50, maxUnlockOrder: 13, minSpendableAmber: 3050 },
-  shadows: { phase: 3, puzzles: 85, maxUnlockOrder: 19, minSpendableAmber: 1800 },
+  // dusk and shadows keep their modest purses. The reveal now waits for all
+  // thirteen residents (FULL_HOUSE_PHASE), which makes the approach eras a
+  // LONGER road to the hook but not a closed one: measured through the real
+  // pipeline, shadows reaches the reveal in ~20 self-funding wins against ~5
+  // before, and dusk ~59 against ~40, with the pit naming what it is waiting
+  // for the whole way. A reviewer who wants the reveal itself opens the
+  // 'reveal' era, which is what it is for.
+  dusk: { phase: 2, puzzles: 50, maxUnlockOrder: 13, minSpendableAmber: 150 },
+  shadows: { phase: 3, puzzles: 85, maxUnlockOrder: 19, minSpendableAmber: 250 },
   reveal: { phase: 4, puzzles: 140, maxUnlockOrder: Number.MAX_SAFE_INTEGER, minSpendableAmber: 400 },
   peace: { phase: 5, puzzles: 180, maxUnlockOrder: Number.MAX_SAFE_INTEGER, minSpendableAmber: 600 },
 };
