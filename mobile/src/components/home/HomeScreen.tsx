@@ -90,7 +90,6 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, FULL_HOUSE_PHASE, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { AmberInline } from '../AmberInline';
-import { countResidentsWithUnreadConversation } from '../../services/conversationProgress';
 import { getChallengeIntroLines, getHouseCompletionText, getJournalIntroLines, getJournalSpotlightSteps, getDailyChallengeIntroLines, getGatedRoomIntroLines, getOfferingIntroLines, getHarvestHomeIntroLines, getHarvestNudgeLine, getUnbrokenWeaveIntroLines, getKeeperRecordLines, getReservedBuiltItselfLine, getHomeAmbientLine, getFoxPitNudgeLines, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt, getHouseUpgradesPointerLabel, getFullHouseIntroLines } from '../../services/phaseNarrative';
 import { getStrongestDreadWord } from '../../services/localGenerator';
 import {
@@ -733,6 +732,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
   const introArrivalOccurred = progress ? hasAnimalConversationArrivalOccurred(progress) : false;
+  // Every resident moved in. The reveal's own hold reads the same roster
+  // (isRevealHeldForHouse in amberCurrency), so this flips exactly when the
+  // hold releases.
+  const houseIsWhole = !!progress && countResidentsAway(progress.unlockedAnimals) === 0;
   // The normal introduction keeps every page. Only its phrasing changes with
   // the house; global tutorial overrides retain their own existing scripts.
   const currentIntroLines = useMemo(() => {
@@ -1453,7 +1456,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // The house is whole (one-time, Fox-led). Fires the first time every resident
   // is in and the world is still at Phase 3, so the reveal is waiting on
-  // nothing but the next offering.
+  // nothing but progress.
   //
   // This is the unread-conversation warning, and home is the ONLY place it can
   // honestly live. Once the reveal is offered, the victory screen hides Next
@@ -1462,30 +1465,48 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // first" is a thing the player could actually do. Requiring !pitPhaseReady
   // keeps it on that side of the line and leaves the pending transition's own
   // nudge to the pit beat above.
+  //
+  // It carries the gated-room intro's settle delay for the same reason that one
+  // does, only more sharply: the resident who completes the house is bought on
+  // THIS screen, and useUnlockFlow publishes the new roster (via loadAllData)
+  // BEFORE arming that resident's own introduction on a 300ms timer. Firing
+  // immediately would put Ember over the newcomer's doorstep and announce that
+  // somebody has something to say while displacing the one who was about to say
+  // it. The re-check lets the introduction win the window; the beat then lands
+  // on the next quiet landing, since its flag is only set when the card closes.
   useEffect(() => {
     if (!hasHomeProgress || isOnboarding || showIntroDialogue || introOverrideLines || introOpening || pendingAnimalIntroCount > 0 || houseGiftBusy) return;
     if (landingIntroSpentRef.current) return;
-    if (pitPhaseReady || homePhase !== FULL_HOUSE_PHASE - 1) return;
-    if (!progress || countResidentsAway(progress.unlockedAnimals) > 0) return;
+    if (pitPhaseReady || homePhase !== FULL_HOUSE_PHASE - 1 || !houseIsWhole) return;
 
     let cancelled = false;
-    (async () => {
-      const seen = await hasSeenFullHouseIntro();
-      if (seen || cancelled || introSurfaceBusyRef.current || landingIntroSpentRef.current) return;
+    const timer = setTimeout(() => {
+      if (cancelled || introSurfaceBusyRef.current || landingIntroSpentRef.current) return;
+      (async () => {
+        const seen = await hasSeenFullHouseIntro();
+        if (seen || cancelled || introSurfaceBusyRef.current || landingIntroSpentRef.current) return;
 
-      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
-      if (!fox) return;
+        const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+        if (!fox) return;
 
-      landingIntroSpentRef.current = true;
-      setIntroAnimal(fox);
-      setIntroDialogueIndex(0);
-      setIntroOverrideLines(getFullHouseIntroLines(countResidentsWithUnreadConversation(progress)));
-      setIntroContext('full_house_intro');
-      setShowIntroDialogue(true);
-    })();
+        landingIntroSpentRef.current = true;
+        setIntroAnimal(fox);
+        setIntroDialogueIndex(0);
+        // Count what the player would SEE if they looked: the same per-resident
+        // signal that lights the `!` badges, cooldown included. A separate
+        // unread-line count would disagree with the badges after a full round
+        // of visits and send the player to doors that open on nothing.
+        setIntroOverrideLines(getFullHouseIntroLines(animals.filter(a => a.hasNewDialogue).length));
+        setIntroContext('full_house_intro');
+        setShowIntroDialogue(true);
+      })();
+    }, GATED_ROOM_INTRO_SETTLE_MS);
 
-    return () => { cancelled = true; };
-  }, [hasHomeProgress, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, animals, pitPhaseReady, homePhase, progress]);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // houseIsWhole, not `progress`: HomeScreen replaces that object on every
+    // committed dialogue line, quest claim, season claim and menu amber change,
+    // and this effect has no business waking for any of them.
+  }, [houseIsWhole, hasHomeProgress, isOnboarding, showIntroDialogue, introOverrideLines, introOpening, pendingAnimalIntroCount, houseGiftBusy, animals, pitPhaseReady, homePhase]);
 
   // Journal intro (one-time, Fox-led spotlight, when journal becomes available).
   // The spotlight card carries its own preview of the journal's sections and

@@ -52,6 +52,9 @@ describe('the held-ward line at the pit', () => {
 });
 
 describe("Ember's full-house beat", () => {
+  // The count the caller passes is the number of LIT HOME BADGES, so it
+  // already respects dialogue cooldown and covers a resident whose whole
+  // introduction is still waiting as well as one left mid-conversation.
   test('always announces the house and never invents an obligation', () => {
     for (const waiting of [0, 1, 2, 13]) {
       const lines = getFullHouseIntroLines(waiting);
@@ -63,15 +66,20 @@ describe("Ember's full-house beat", () => {
       }
       const all = lines.join(' ');
       expect(all).toContain('Everyone is in');
+      // Promises the house, never a number of wins: the beat fires when the
+      // last resident arrives, which can be well short of the weighted
+      // threshold the reveal also needs.
+      expect(all).toContain('not waiting on the house any more');
+      expect(all).not.toMatch(/\bnext (offering|win)\b/i);
       // Honest about the stake: no line is lost to the reveal, only re-voiced.
       expect(all).toContain('None of it goes away');
     }
   });
 
   test('mentions the unfinished conversations only when there are some', () => {
-    expect(getFullHouseIntroLines(0).join(' ')).not.toContain('partway through');
-    expect(getFullHouseIntroLines(1).join(' ')).toContain('One of them is still partway through');
-    expect(getFullHouseIntroLines(4).join(' ')).toContain('Four of them are still partway through');
+    expect(getFullHouseIntroLines(0).join(' ')).not.toContain('have not told you');
+    expect(getFullHouseIntroLines(1).join(' ')).toContain('One of them still has something they have not told you');
+    expect(getFullHouseIntroLines(4).join(' ')).toContain('Four of them still have something they have not told you');
     // An invitation, never an instruction.
     expect(getFullHouseIntroLines(4).join(' ')).toContain('if you like');
   });

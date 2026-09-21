@@ -4105,16 +4105,31 @@ export function getPitHouseIncompleteHint(residentsAway: number): string | null 
  * the last three recruits, who have barely started. What the reveal changes is
  * the VOICE the rest arrives in, since the house stops using contractions
  * there. So the beat offers the visit and does not pretend to a loss.
+ *
+ * The caller passes the count of residents whose home badge is lit, so the
+ * number always matches what the player sees when they look up at the house,
+ * cooldown included.
+ *
+ * It promises the HOUSE, never the next win. The beat fires when the last
+ * resident moves in, which needs 92 solves, while the reveal also needs the
+ * weighted threshold, and a player who bought ahead can be well short of it.
+ * Waiting for both is not an option: the moment both are satisfied the reveal
+ * is offered on that same win, leaving no landing to speak on at all. So the
+ * line says the house is no longer what the circle is waiting for, which is
+ * true the instant it is said and stays true.
  */
 export function getFullHouseIntroLines(residentsWaiting: number): string[] {
   const lines = [
     'Everyone is in. Every room has someone in it, and the whole house is awake at once.',
-    'You will feel the circle turn soon. The next offering is enough.',
+    'The circle will turn when it is ready now. It is not waiting on the house any more.',
   ];
+  // "Something they have not told you", never "partway through": the count is
+  // the same signal that lights the home badges, and the newest resident has a
+  // whole introduction waiting rather than a half-finished sentence.
   if (residentsWaiting === 1) {
-    lines.push('One of them is still partway through telling you something. There is no hurry. Go up and let them finish, if you like.');
+    lines.push('One of them still has something they have not told you. There is no hurry. Go up and listen, if you like.');
   } else if (residentsWaiting > 1) {
-    lines.push(`${spellCountCapitalized(residentsWaiting)} of them are still partway through telling you something. There is no hurry. Go up and let them finish, if you like.`);
+    lines.push(`${spellCountCapitalized(residentsWaiting)} of them still have something they have not told you. There is no hurry. Go up and listen, if you like.`);
   }
   lines.push('None of it goes away either way. They will simply say the rest of it differently, after.');
   return lines;

@@ -1,7 +1,7 @@
 import storage, { runStorageTransaction } from './persistenceStorage';
 import { invalidateProgressCache, loadProgress } from './amberCurrency';
 import { getDialoguesForAnimal, getTotalDialogueCount } from './dialogue/animalDialogueBase';
-import { ALL_ANIMAL_TYPES, AnimalType, Dialogue, DialoguePhase, HomeWorldProgress, getAnimalPhase } from '../types/homeWorld';
+import { AnimalType, Dialogue, DialoguePhase, HomeWorldProgress, getAnimalPhase } from '../types/homeWorld';
 
 const PROGRESS_KEY = 'wordshift_home_progress';
 
@@ -57,41 +57,6 @@ export function getNextAnimalConversation(
     return { dialogue, index };
   }
   return null;
-}
-
-/**
- * How many unlocked residents still have an eligible unread regular line.
- *
- * This backs the soft warning before the reveal ceremony, and that is the only
- * thing it is for, which decides two of its rules.
- *
- * It reads each resident at their CURRENT effective phase, counting only what
- * the player could turn around and hear THIS MINUTE. The alternative, sweeping
- * at getAnimalPhase(4, type), reports more and is worse: the five lagging
- * residents resolve to 2 at global phase 3 and never to 3 at all, so a phase-4
- * sweep would name Sloane, Warren, Thyme, Bamboo and Moss as having something
- * to say when visiting them right now offers nothing. A warning the player
- * cannot act on is a worse warning. The material it leaves uncounted is not
- * lost either: unread lines survive every phase change, and the reveal is
- * exactly what opens the lagging residents' remaining chapters.
- *
- * And it never throws:
- * getConversationReadIds rejects a corrupt ledger, but a warning is not worth
- * refusing a transition over, so an unreadable record reports nothing owed and
- * the ceremony proceeds exactly as it did before this warning existed.
- *
- * Lines deferred on a locked resident (requiresAnimals) are already skipped by
- * getNextAnimalConversation, so they cannot inflate the count with material the
- * player has no way to reach.
- */
-export function countResidentsWithUnreadConversation(progress: HomeWorldProgress): number {
-  try {
-    const unlocked = new Set(progress.unlockedAnimals as AnimalType[]);
-    return ALL_ANIMAL_TYPES.filter(animal => unlocked.has(animal) &&
-      getNextAnimalConversation(progress, animal, getAnimalPhase(progress.currentPhase, animal), unlocked) !== null).length;
-  } catch {
-    return 0;
-  }
 }
 
 function completion(progress: HomeWorldProgress, animalType: AnimalType, completed: boolean): AnimalConversationCompletion {

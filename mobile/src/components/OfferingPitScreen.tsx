@@ -1211,17 +1211,49 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     return positions;
   }, [PIT_CENTER.x, PIT_CENTER.y, PIT_OVAL.radiusX, PIT_OVAL.radiusY]);
 
+  // ---- The house the reveal is waiting on ----
+  // Read once per visit. Residents arrive at HOME, never here, so this cannot
+  // go stale while the player stands at the pit. A failed read leaves it at 0,
+  // which falls through to the ordinary ward hint: the pit then behaves exactly
+  // as it did before this line existed.
+  const [residentsAway, setResidentsAway] = useState(0);
+  const [houseRead, setHouseRead] = useState(false);
+  const [durableFraction, setDurableFraction] = useState(0);
+  useEffect(() => {
+    let live = true;
+    loadProgress()
+      .then(progress => {
+        if (!live) return;
+        setResidentsAway(countResidentsAway(progress.unlockedAnimals));
+        setDurableFraction(progress.phaseProgressFraction ?? 0);
+      })
+      .catch(() => {})
+      .finally(() => { if (live) setHouseRead(true); });
+    return () => { live = false; };
+  }, []);
+
+  // App's phaseProgressFraction is a SESSION MIRROR, and the held reveal is
+  // the one path that never refreshes it: useGamePersistence only calls
+  // setPhaseProgressFraction(1) on the pending branch, and a held win reports
+  // phaseTransitionPending false, so the mirror keeps the pre-win value (0.93,
+  // say) while storage has already saturated at 1.0. Reading the durable
+  // number here is what lets the circle fill and the held-house line appear on
+  // the FIRST visit after the hold engages rather than after a relaunch. Max,
+  // never replace: the prop is fresher for every ordinary transition, and this
+  // read can only ever make the pit more current.
+  const wardFraction = Math.max(phaseProgressFraction, durableFraction);
+
   const wardColors = getWardMarkColors(phase);
   const litCount = pendingPhaseTransition != null
     ? PIT_WARD_COUNT
-    : Math.floor(phaseProgressFraction * PIT_WARD_COUNT);
+    : Math.floor(wardFraction * PIT_WARD_COUNT);
   // The NEXT ward "charges" continuously (partial-opacity lit color) so the
   // player always sees motion toward the next transition — the later phases
   // are 3-5x longer than the first, and whole-dot steps alone left them
   // looking stalled for dozens of puzzles.
   const wardChargeFraction = pendingPhaseTransition != null
     ? 0
-    : Math.max(0, Math.min(1, phaseProgressFraction * PIT_WARD_COUNT - litCount));
+    : Math.max(0, Math.min(1, wardFraction * PIT_WARD_COUNT - litCount));
   // The whole ward apparatus (ring + marks) shows through Phase 3; from the
   // reveal on, the pit's own dread lighting carries the scene. Previously the
   // marks additionally required some progress, so a player at exactly zero
@@ -1232,7 +1264,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // 0..1 charge of the whole ring, used for its brightness.
   const wardRingCharge = pendingPhaseTransition != null
     ? 1
-    : Math.max(0, Math.min(1, phaseProgressFraction));
+    : Math.max(0, Math.min(1, wardFraction));
 
   // Ward pulse loop for pending state
   useEffect(() => {
@@ -1286,33 +1318,18 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     };
   }, [ceremonyClock]);
 
-  // ---- The house the reveal is waiting on ----
-  // Read once per visit. Residents arrive at HOME, never here, so this cannot
-  // go stale while the player stands at the pit. A failed read leaves it at 0,
-  // which falls through to the ordinary ward hint: the pit then behaves exactly
-  // as it did before this line existed.
-  const [residentsAway, setResidentsAway] = useState(0);
-  const [houseRead, setHouseRead] = useState(false);
-  useEffect(() => {
-    let live = true;
-    loadProgress()
-      .then(progress => { if (live) setResidentsAway(countResidentsAway(progress.unlockedAnimals)); })
-      .catch(() => {})
-      .finally(() => { if (live) setHouseRead(true); });
-    return () => { live = false; };
-  }, []);
 
   // Ward hint or ready text
   const wardHintText = useMemo(() => {
     if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
       return getPitTransitionReadyText(pendingPhaseTransition);
     }
-    if (phase < 4 && phaseProgressFraction >= 0.15 && pendingPhaseTransition == null) {
+    if (phase < 4 && wardFraction >= 0.15 && pendingPhaseTransition == null) {
       // A full circle with no ceremony behind it is the reveal being held for
       // the rest of the house (isRevealHeldForHouse). Say so, or the pit is
       // simply mute at the one moment the player is most certain something
       // should happen. Only the reveal is ever held, hence phase 3.
-      if (phase === FULL_HOUSE_PHASE - 1 && phaseProgressFraction >= 1) {
+      if (phase === FULL_HOUSE_PHASE - 1 && wardFraction >= 1) {
         // Say nothing until the read lands. These lines are atmosphere, and a
         // line that appears and is then REPLACED a frame later reads as a
         // glitch; one that simply arrives does not. A failed read still
@@ -1320,10 +1337,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         if (!houseRead) return null;
         if (residentsAway > 0) return getPitHouseIncompleteHint(residentsAway);
       }
-      return getPitWardHint(phase, phaseProgressFraction);
+      return getPitWardHint(phase, wardFraction);
     }
     return null;
-  }, [phase, phaseProgressFraction, pendingPhaseTransition, ceremonyStatus, residentsAway, houseRead]);
+  }, [phase, wardFraction, pendingPhaseTransition, ceremonyStatus, residentsAway, houseRead]);
 
   // ---- Auto-trigger ceremony when entering pit with pending transition and no harvest ----
   useEffect(() => {
