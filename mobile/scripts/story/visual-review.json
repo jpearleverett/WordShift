@@ -90,49 +90,55 @@
       "id": "echo-01",
       "scene": "echo",
       "asset": "assets/story/pages/echo-01.webp",
-      "sha256": "bfbca8fde3a32ad937549b2c778740627537914ed23bdcba18053c0fea81470a",
+      "sha256": "bf1d2dc305ffcc2b62415018d1925d07dd36e19348becea5d484c94b19aa0bc1",
       "status": "pass",
       "retouched": true,
-      "note": "Retouched 2026-09-21: Rule applied: the narration is object-only (\"HOME catches against the rim\") and the plan names the player, so the arm+hand were REMOVED (rule 2), not converted. Three paid calls, all on the same 540x540 left-column crop window: rm1 (qwen, $0.02) removed the arm and drew a convincing stone rim/outer wall but recoloured the whole window cool blue-grey (rim drift 30 levels, visible seam at x=540) and | critic: PASS. Verified against the shipped webp: the human arm, knitted sleeve, cream cuff and bare hand are completely gone; no skin, cuff or sweater pixels remain, and no new hand, creature, lettering or animal appeared anywhere. Diff is confined to the arm silhouette (bbox x0-394, y205-539); the block, l"
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-02",
       "scene": "echo",
       "asset": "assets/story/pages/echo-02.webp",
-      "sha256": "53e09887d2583fc1cfaa99869b04e692b00d76a7876f9148e374efaae8d096cb",
-      "status": "pass"
+      "sha256": "1ca7c825319ede962148e5dba8ed5c1612ca1beb7063d231d358e7f703d3d6a6",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-03",
       "scene": "echo",
       "asset": "assets/story/pages/echo-03.webp",
-      "sha256": "6a9e6153ff1e7669d5868d2cb69591d537c9690dc9a469db0542117a7176e9f8",
+      "sha256": "de7e75cb5e130632de597349410681f568cec9d050faa249ce9bb6e18278a291",
       "status": "pass",
       "retouched": true,
-      "note": "Retouched 2026-09-21: Owl-foot conversion read as an alien pale claw at delivery size, so the limb was removed entirely instead, which matches the object-only art direction and the line (the notebook lying by itself on the rim). | critic: Reviewed by the maintainer at full size and at the in-game delivery size (136dp tall): limb, sleeve and cloak gone, notebook intact on the rim, table and candle continued, no seam."
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-04",
       "scene": "echo",
       "asset": "assets/story/pages/echo-04.webp",
-      "sha256": "b3d82c2536b4eac35c00d5a65a6715fcbc81477bb3c17a0f7ffbfa0fd7323489",
+      "sha256": "5ae3bfa556dfa3200665d19aea0042d2a034829144d445cc49f44882b13511cf",
       "status": "pass",
       "retouched": true,
-      "note": "Retouched 2026-09-21: Local re-composite only, from the existing echo-04/rm1.raw.png (no model calls this round); new script edits/echo-04_footprint2.mjs, result j2.png copied to final.png (960x540, 0 pixels changed outside the mask, 449,695 of 518,400 pixels byte-identical to the original; the top, moss shape, rim outer face, table front, leg and black corner keep the accepted polygon and 5px feather). What changed vs | critic: No repair needed. Hand and sleeve are fully removed; the diff is confined to x 0-397, y 302-539 (inside the listed region) and the rest of the frame is byte-identical, so both scratch rows survive and the picture still matches the authored line. The joint the artist worried about is clean: the x~343"
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-05",
       "scene": "echo",
       "asset": "assets/story/pages/echo-05.webp",
-      "sha256": "07c805f25b53e82a4c7415afd394e20a7e68d5a67342171162f1038508aa390d",
-      "status": "pass"
+      "sha256": "b248209a1f01b566f544d1d108e87439ab507354e1868e352a0968848146cb00",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-06",
       "scene": "echo",
       "asset": "assets/story/pages/echo-06.webp",
-      "sha256": "d5a4b5a8d7699ba663e3c16b56d192a06fa7dc0d33e1918e1de755f54ebdeedf",
-      "status": "pass"
+      "sha256": "9c568864df336b47a07862a3153a09d66648ddd55363b5a86e4f1761833e799e",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "witness-01",
@@ -485,8 +491,10 @@
       "id": "plum-07",
       "scene": "plum",
       "asset": "assets/story/pages/plum-07.webp",
-      "sha256": "559b12054ac510fce5eb258f6a86b43fa49cc649a8687d1be03c3a10f9c506f1",
-      "status": "pass"
+      "sha256": "a7466054a70917135084a94e838ec4ed599d6ad4af3c48f9285aac299c6abd83",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "plum-08",
@@ -1320,8 +1328,10 @@
       "id": "echo-recollection",
       "scene": "echo",
       "asset": "assets/story/pages/echo-recollection.webp",
-      "sha256": "bf8407bf6c7aaa0c93c5111579afd84ebac99bd31843cc51d241b641ff9b5fa6",
-      "status": "pass"
+      "sha256": "a45ddffe4075895b1f15832c022827940ada6a495ef249bff36685a87f29523f",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "witness-recollection",

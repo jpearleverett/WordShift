@@ -4,8 +4,8 @@
   "sourceImage": "exec-7cd545a2-bbfa-4514-ba64-1379214f82c2.png",
   "width": 960,
   "height": 540,
-  "bytes": 93584,
-  "sha256": "6a9e6153ff1e7669d5868d2cb69591d537c9690dc9a469db0542117a7176e9f8",
+  "bytes": 64298,
+  "sha256": "de7e75cb5e130632de597349410681f568cec9d050faa249ce9bb6e18278a291",
   "webpQuality": 83,
   "encoderEffort": 4,
   "flattenBackground": "#f2e5bc",
@@ -25,6 +25,17 @@
       "review": "Retouched 2026-09-21: Owl-foot conversion read as an alien pale claw at delivery size, so the limb was removed entirely instead, which matches the object-only art direction and the line (the notebook lying by itself on the rim). | critic: Reviewed by the maintainer at full size and at the in-game delivery size (136dp tall): limb, sleeve and cloak gone, notebook intact on the rim, table and candle continued, no seam.",
       "previousSha256": "5b65f94026ec144418f5014ad5704fce71316f577109669e5d850fa9d9e76827",
       "editedAt": "2026-09-21T10:14:33.092Z"
+    },
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Re-set the scene at the Offering Pit as the game draws it: outdoors below the cottage, a sunken ring of rock around a deep dark opening with a cool teal glow at the rim, moss, boulders, mushrooms, pines and distant mountains under a dusk-to-night sky. Remove the cellar, masonry well shaft, standing water, bucket, rope, ladder, shelves and furniture.",
+      "attempts": 1,
+      "costUsd": 0.027,
+      "review": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size.",
+      "previousSha256": "6a9e6153ff1e7669d5868d2cb69591d537c9690dc9a469db0542117a7176e9f8",
+      "editedAt": "2026-09-21T10:42:22.065Z"
     }
   ]
 }
