@@ -71,6 +71,16 @@ A second player note asked whether the backgrounds match the rooms the residents
 
 An independent audit then checked all 189 illustrations against these locations and flagged eight, six of them genuine: a trapdoor onto a cellar well in a parlour floor, a fish tank on a kitchen sideboard, a goldfish bowl on a porch table, and three underwater pages that kept enough of a tank rim to still read as a view from outside the glass. All six were corrected.
 
+## What the verification caught
+
+Three of the pet removals shipped on the maintainer's own inspection when a container restart killed their reviews mid-flight. Re-running those reviews failed two of them, and both failures were the same mistake rather than bad luck.
+
+Each had been repaired from the already-damaged file, so the model could not see the surface it was told to continue and invented one instead. The dog on the hearth rug became a wedge of bare floorboards in a hot orange that measured brighter than anything else in the lower half of the frame, including floor nearer the fire, so the lighting read backwards. The hedgehog in the basket became a flat near-black region six times larger than the biggest dark patch anywhere in the untouched painting, and the blanket beside it then read as propped against the rim of an empty basket. In both cases the drafting was clean; it was the surface that was wrong.
+
+Re-running each edit against the pre-repair art, where the real rug and the real blanket still sit beside the creature, fixed both in a single call. The rule is in [the asset README](../mobile/assets/story/README.md): repair from the original, and judge a fill by whether it draws the eye.
+
+This is also the argument for keeping the reviewer separate from the artist. Both bad fills removed their creature completely and looked competent in isolation; what condemned them was measuring the repaired area against the values the rest of the painting holds.
+
 ## Verification scope
 
 This review used the authored story inventory, source code, exported artwork, and per-scene contact sheets. Current image hashes are recorded in the review manifest; content-preserving alpha flattening retained the original semantic approvals. Persistent decision-scene portraits are implemented separately from the page illustration. This report does not claim a native Android visual walkthrough, touch-interaction validation, or pixel-exact correspondence between independent illustrations.

@@ -276,10 +276,10 @@
       "id": "supper-09",
       "scene": "supper",
       "asset": "assets/story/pages/supper-09.webp",
-      "sha256": "8df0aa11224de40da4c25f7aefeceb3dda5f7d1a3226c847e0baf4e7b90fd286",
+      "sha256": "83968b05bac8381b8df1715867342df734eed158ef2ae373b63b6eba162d237a",
       "status": "pass",
       "retouched": true,
-      "note": "Retouched 2026-09-21: a collie asleep on the hearth rug is gone and the rug continues. No dog lives in this house. Reviewed by the maintainer."
+      "note": "Re-done 2026-09-21 after an independent review failed the first repair: it had replaced a band of the kilim rug with invented bare floorboards that were the brightest thing in the lower half of the frame. This repair was made from the ORIGINAL image, where the real rug is still visible next to the dog, so the fill continues the actual pattern and value instead of inventing a surface."
     },
     {
       "id": "supper-10",
@@ -1146,10 +1146,10 @@
       "id": "reply-03",
       "scene": "reply",
       "asset": "assets/story/pages/reply-03.webp",
-      "sha256": "cb9656fa6e7c15fdb230a31625eaece60ba4a449fd0f5f9b506de8f420bfbc97",
+      "sha256": "ae812e920f377decfcd2b257277ceca41043ae2b3397726d83667478d94d265f",
       "status": "pass",
       "retouched": true,
-      "note": "Retouched 2026-09-21: a hedgehog in the basket beside the armchair is gone and the knitted blanket continues. No hedgehog lives in this house. Reviewed by the maintainer."
+      "note": "Re-done 2026-09-21 after an independent review failed the first repair: it had emptied the basket and left a flat black void larger than any dark patch the painting itself contains, and the blanket then read as propped against the rim of an empty basket. Repaired from the ORIGINAL image so the blanket continues into the basket with its own stitch texture and tone."
     },
     {
       "id": "reply-04",

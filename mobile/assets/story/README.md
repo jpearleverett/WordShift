@@ -89,6 +89,18 @@ resize, parchment flatten, WebP q83 effort 4) and recording the model, prompt,
 window, cost and previous hash under `retouches` in
 `scripts/story/generation/<id>.json`, plus the new hash in `visual-review.json`.
 
+Repair from the ORIGINAL, never from a damaged intermediate. Two removals in
+this pass were rejected on their first attempt and both failed the same way:
+the model was handed an image whose defect had already been cut out, could not
+see the surface it was meant to continue, and invented one. A dog on a hearth
+rug became a wedge of bare floorboards, in a hot orange brighter than anything
+else in the lower half of the frame; a hedgehog in a basket became a flat black
+void larger than any dark patch the painting itself contains. Re-running each
+edit with `--source` pointing at the pre-repair art, where the real rug and the
+real blanket are still visible beside the creature, fixed both on one call.
+Judge a fill by whether it draws the eye: an in-key repair disappears, and an
+invented surface announces itself even when the drafting is clean.
+
 Match the setting to the place the game itself shows. The Aquarium Room is the
 inside of a planted tank, so Axel's scenes are underwater; the Offering Pit is
 an outdoor rock-rimmed hole in a forest clearing, not a cellar well; and Chill's
