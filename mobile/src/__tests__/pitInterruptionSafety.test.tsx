@@ -72,7 +72,7 @@ jest.mock('../components/ui/NineSlice', () => ({ NineSliceFrame: 'NineSliceFrame
 
 import { Animated } from 'react-native';
 import { OfferingPitScreen, createPitCeremonyClock } from '../components/OfferingPitScreen';
-import { confirmPhaseTransition } from '../services/amberCurrency';
+import { confirmPhaseTransition, countResidentsAway, loadProgress } from '../services/amberCurrency';
 import { getHarvestState, offerAllBatches, settleBatchCredit, HarvestState } from '../services/wordHarvest';
 import { commitTendPurchase } from '../services/tending';
 import { showGameAlert } from '../services/gameAlert';
@@ -396,4 +396,70 @@ test('balance and modal rerenders reuse the pit glow animation graphs', async ()
   harness.render({ phase: 1 });
   expect(jest.mocked(Animated.multiply).mock.calls.length).toBe(graphCount + 4);
   harness.dispose();
+});
+
+describe('the held reveal explains itself at the pit', () => {
+  // The circle saturates while the reveal waits for the whole house
+  // (isRevealHeldForHouse), so without a line of its own the pit is silent at
+  // exactly the moment the player is most certain something should happen.
+  const held = { phase: 3 as const, phaseProgressFraction: 1, pendingPhaseTransition: null };
+  const wardHint = (tree: unknown) => find(tree, node =>
+    typeof node.props?.children === 'string' &&
+    String(node.props.children).startsWith('The circle is full'))?.props?.children;
+
+  const anyWardHint = (tree: unknown) => find(tree, node =>
+    node.props?.children === 'The pattern demands completion.' ||
+    (typeof node.props?.children === 'string' && String(node.props.children).startsWith('The circle is full')));
+
+  test('a full circle with rooms still empty says so, once the roster is read', async () => {
+    jest.mocked(countResidentsAway).mockReturnValue(3);
+    const pit = mount(held);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(wardHint(pit.render())).toBe(
+      'The circle is full. The house is not. Three rooms are still waiting for someone.');
+    pit.dispose();
+  });
+
+  test('the ward line waits for the roster instead of appearing and then changing', async () => {
+    // The pit renders nothing at all until its harvest state lands, so the
+    // window this guards is the one AFTER that and BEFORE the roster read:
+    // two separate storage reads that arrive together in a test and need not
+    // on a device. Hold the roster open to make it observable. Without the
+    // guard the ordinary hint renders here and is then REPLACED, and a
+    // swapping atmospheric line reads as a glitch where an arriving one does
+    // not.
+    type Roster = Awaited<ReturnType<typeof loadProgress>>;
+    let releaseRoster!: (progress: Roster) => void;
+    jest.mocked(loadProgress).mockReturnValueOnce(
+      new Promise(resolve => { releaseRoster = resolve; }) as ReturnType<typeof loadProgress>);
+    jest.mocked(countResidentsAway).mockReturnValue(3);
+
+    const pit = mount(held);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(anyWardHint(pit.render())).toBeUndefined();
+
+    releaseRoster({ unlockedAnimals: [] } as unknown as Roster);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(wardHint(pit.render())).toBe(
+      'The circle is full. The house is not. Three rooms are still waiting for someone.');
+    pit.dispose();
+  });
+
+  test('a whole house falls through to the ordinary ward hint', async () => {
+    jest.mocked(countResidentsAway).mockReturnValue(0);
+    const pit = mount(held);
+    await jest.advanceTimersByTimeAsync(0);
+    const tree = pit.render();
+    expect(wardHint(tree)).toBeUndefined();
+    expect(find(tree, node => node.props?.children === 'The pattern demands completion.')).toBeDefined();
+    pit.dispose();
+  });
+
+  test('a failed roster read still releases the hint rather than muting the pit', async () => {
+    jest.mocked(loadProgress).mockRejectedValueOnce(new Error('disk unavailable'));
+    const pit = mount(held);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(find(pit.render(), node => node.props?.children === 'The pattern demands completion.')).toBeDefined();
+    pit.dispose();
+  });
 });

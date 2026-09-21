@@ -170,16 +170,22 @@ test('the full-house beat stays down while anyone is still missing', async () =>
 
 test('the full-house beat stays down once the reveal has been offered', async () => {
   // pitPhaseReady means a transition is already pending, so "go and listen
-  // first" is no longer something the player can act on. The pit nudge owns
-  // that moment instead.
-  const harness = createHarness({ daily: true, journal: true });
+  // first" is no longer something the player can act on: the victory screen
+  // has hidden every exit and the pit seals itself.
+  //
+  // The pit nudge is marked SEEN here on purpose. It is declared just above
+  // this effect and awaits one fewer promise, so leaving it eligible lets it
+  // take the landing first and the case passes with the pitPhaseReady guard
+  // deleted. With it suppressed the full-house beat is the only candidate for
+  // the budget, and the guard is what has to hold the beat down.
+  const harness = createHarness({ daily: true, journal: true, pit: true });
   harness.scope.homePhase = 3;
   harness.scope.pitPhaseReady = true;
   harness.scope.houseIsWhole = true;
   harness.render();
   await jest.advanceTimersByTimeAsync(1000);
-  expect(harness.scope.setIntroContext).toHaveBeenCalledWith('pit_nudge');
-  expect(harness.scope.setIntroContext).not.toHaveBeenCalledWith('full_house_intro');
+  expect(harness.scope.setIntroContext).not.toHaveBeenCalled();
+  expect(harness.scope.landingIntroSpentRef.current).toBe(false);
   harness.unmount();
 });
 
