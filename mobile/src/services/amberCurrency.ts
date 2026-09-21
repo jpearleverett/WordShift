@@ -783,7 +783,16 @@ export async function awardPuzzleAmber(
   // robed sprites, phase-4 copy and dialogue budget, with durable phase still
   // 3 and no ceremony ever playing. It would also silence interstitials for
   // good, since App feeds the same number to a policy that mutes at phase >= 4.
-  const revealHeld = !options.ignoreFullHouseHold &&
+  // Only an OFFER can be held, so a transition already sitting in storage is
+  // left alone entirely. Clamping there would be actively wrong rather than
+  // merely pointless: with a pending 4 the result reports
+  // phaseTransitionPending true, and the caller takes the OTHER branch and
+  // hands the pit setPendingPhaseTransition(newPhase) as its ceremony target.
+  // A clamped 3 would make the pit read the phase-3 ward copy and band the
+  // phase-3 swell on the way into a reveal that confirmPhaseTransition then
+  // correctly commits as 4.
+  const revealHeld = progress.pendingPhaseTransition == null &&
+    !options.ignoreFullHouseHold &&
     isRevealHeldForHouse(newPhase, progress.unlockedAnimals);
   if (revealHeld) newPhase = previousPhase;
 

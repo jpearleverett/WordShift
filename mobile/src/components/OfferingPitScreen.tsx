@@ -1292,14 +1292,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // which falls through to the ordinary ward hint: the pit then behaves exactly
   // as it did before this line existed.
   const [residentsAway, setResidentsAway] = useState(0);
+  const [houseRead, setHouseRead] = useState(false);
   useEffect(() => {
     let live = true;
     loadProgress()
-      .then(progress => {
-        if (!live) return;
-        setResidentsAway(countResidentsAway(progress.unlockedAnimals));
-      })
-      .catch(() => {});
+      .then(progress => { if (live) setResidentsAway(countResidentsAway(progress.unlockedAnimals)); })
+      .catch(() => {})
+      .finally(() => { if (live) setHouseRead(true); });
     return () => { live = false; };
   }, []);
 
@@ -1313,13 +1312,18 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       // the rest of the house (isRevealHeldForHouse). Say so, or the pit is
       // simply mute at the one moment the player is most certain something
       // should happen. Only the reveal is ever held, hence phase 3.
-      if (phase === FULL_HOUSE_PHASE - 1 && phaseProgressFraction >= 1 && residentsAway > 0) {
-        return getPitHouseIncompleteHint(residentsAway);
+      if (phase === FULL_HOUSE_PHASE - 1 && phaseProgressFraction >= 1) {
+        // Say nothing until the read lands. These lines are atmosphere, and a
+        // line that appears and is then REPLACED a frame later reads as a
+        // glitch; one that simply arrives does not. A failed read still
+        // releases this, falling through to the ordinary hint.
+        if (!houseRead) return null;
+        if (residentsAway > 0) return getPitHouseIncompleteHint(residentsAway);
       }
       return getPitWardHint(phase, phaseProgressFraction);
     }
     return null;
-  }, [phase, phaseProgressFraction, pendingPhaseTransition, ceremonyStatus, residentsAway]);
+  }, [phase, phaseProgressFraction, pendingPhaseTransition, ceremonyStatus, residentsAway, houseRead]);
 
   // ---- Auto-trigger ceremony when entering pit with pending transition and no harvest ----
   useEffect(() => {

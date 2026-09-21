@@ -1677,6 +1677,27 @@ describe('the reveal waits for the whole house', () => {
     expect((await awardPuzzleAmber('EASY', 1)).newPhase).toBe(3);
   });
 
+  test('a pending reveal keeps its own ceremony target while the house is short', async () => {
+    // An already-offered transition is never held, and must not be RE-REPORTED
+    // either. With a pending 4 the result reports phaseTransitionPending true,
+    // so the caller reads newPhase as the pit's ceremony target; a clamped 3
+    // would play the phase-3 ward copy and swell into a reveal that
+    // confirmPhaseTransition then correctly commits as 4.
+    const progress = {
+      ...(await loadProgress()),
+      currentPhase: 3, pendingPhaseTransition: 4, puzzlesSolved: 123, phaseProgress: 123,
+      unlockedAnimals: [...ALL_ANIMAL_TYPES.slice(0, 12)],
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(progress));
+    invalidateProgressCache();
+
+    const result = await awardPuzzleAmber('EASY', 1);
+    expect(result.phaseTransitionPending).toBe(true);
+    expect(result.newPhase).toBe(4);
+    expect(result.phaseChanged).toBe(false); // still not a NEW offer
+    expect(await getPendingPhaseTransition()).toBe(4);
+  });
+
   test('a pending reveal written before the hold existed still commits', async () => {
     // Never revoke something already granted: an in-flight save carrying
     // pendingPhaseTransition 4 from an older build would otherwise be stranded

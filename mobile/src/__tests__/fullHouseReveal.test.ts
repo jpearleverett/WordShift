@@ -95,3 +95,28 @@ describe('the rule the copy describes', () => {
     expect(ALL_ANIMAL_TYPES).toHaveLength(13);
   });
 });
+
+describe('the bypass stays where it belongs', () => {
+  // ignoreFullHouseHold is an optional field on a public options bag, so any
+  // future caller could defeat the hold silently. The creator kit needs it
+  // (its win loop runs before it buys a room); nothing else may have it.
+  test('only the creator kit passes ignoreFullHouseHold', () => {
+    const fs = require('fs') as typeof import('fs');
+    const path = require('path') as typeof import('path');
+    const root = path.join(__dirname, '..');
+
+    const walk = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true })
+      .flatMap(entry => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return entry.name === '__tests__' ? [] : walk(full);
+        return /\.tsx?$/.test(entry.name) ? [full] : [];
+      });
+
+    const callers = walk(root)
+      .filter(file => fs.readFileSync(file, 'utf8').includes('ignoreFullHouseHold'))
+      .map(file => path.relative(root, file))
+      .sort();
+
+    expect(callers).toEqual(['services/amberCurrency.ts', 'services/creatorKit.ts']);
+  });
+});
