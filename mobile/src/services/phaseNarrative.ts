@@ -4049,6 +4049,77 @@ export function getPitTransitionReadyText(targetPhase: DialoguePhase): string {
   return PIT_TRANSITION_READY_TEXT[targetPhase] ?? 'Something shifts.';
 }
 
+/**
+ * Small counts spelled out, because a bare numeral in a line the house speaks
+ * reads as chrome rather than as someone talking.
+ */
+const SPELLED_COUNTS = [
+  'no one', 'one', 'two', 'three', 'four', 'five', 'six',
+  'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
+];
+
+function spellCount(value: number): string {
+  return SPELLED_COUNTS[value] ?? String(value);
+}
+
+/** The same count, opening a sentence. */
+function spellCountCapitalized(value: number): string {
+  const word = spellCount(value);
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+/**
+ * Shown at the pit when the wards are full but the reveal is being held for
+ * the rest of the house (see isRevealHeldForHouse in amberCurrency).
+ *
+ * Without this the pit is simply mute at a full circle, which reads as a bug.
+ * It names the rooms, never the system: no phase, no level, no puzzle count,
+ * and no instruction. The player already learns WHERE the next room is from
+ * the home screen's own signage.
+ */
+export function getPitHouseIncompleteHint(residentsAway: number): string | null {
+  if (residentsAway <= 0) return null;
+  // Counted in RESIDENTS, spoken as rooms, which stays true either way: the
+  // unlock ladder alternates room then resident, so a missing resident is
+  // either a room not built or a room built and empty, and both are a room
+  // waiting for someone.
+  return residentsAway === 1
+    ? 'The circle is full. The house is not. One room is still waiting for someone.'
+    : `The circle is full. The house is not. ${spellCountCapitalized(residentsAway)} rooms are still waiting for someone.`;
+}
+
+/**
+ * Ember's one-time beat on the home screen, the moment the last resident moves
+ * in and the reveal is no longer waiting on anything but the next offering.
+ *
+ * This is the "someone still has something to say" warning, and it lives HERE
+ * rather than at the pit for a reason worth keeping. Once the reveal is
+ * offered, the victory screen hides Next Level, Home and Share, and the pit
+ * seals its own navigation while a transition is pending. There is no moment
+ * after the offer at which the player can go and listen, so a warning raised
+ * then would be a choice with one real option. At home, with everyone finally
+ * in their rooms, it is an invitation the player can actually take.
+ *
+ * It is honest about the stake, which is smaller than it sounds: no line is
+ * ever lost to a phase change, and the residents who are furthest behind are
+ * the last three recruits, who have barely started. What the reveal changes is
+ * the VOICE the rest arrives in, since the house stops using contractions
+ * there. So the beat offers the visit and does not pretend to a loss.
+ */
+export function getFullHouseIntroLines(residentsWaiting: number): string[] {
+  const lines = [
+    'Everyone is in. Every room has someone in it, and the whole house is awake at once.',
+    'You will feel the circle turn soon. The next offering is enough.',
+  ];
+  if (residentsWaiting === 1) {
+    lines.push('One of them is still partway through telling you something. There is no hurry. Go up and let them finish, if you like.');
+  } else if (residentsWaiting > 1) {
+    lines.push(`${spellCountCapitalized(residentsWaiting)} of them are still partway through telling you something. There is no hurry. Go up and let them finish, if you like.`);
+  }
+  lines.push('None of it goes away either way. They will simply say the rest of it differently, after.');
+  return lines;
+}
+
 /** Text lines shown during the ward ignition ceremony */
 const PIT_TRANSITION_CEREMONY_TEXT: Record<number, string[]> = {
   1: [

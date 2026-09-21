@@ -30,7 +30,7 @@ import {
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { AmberInline, AmberValue } from './AmberInline';
 import { DialoguePhase } from '../types/homeWorld';
-import { AUTO_COLLECT_PUZZLE_LIMIT } from '../constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, FULL_HOUSE_PHASE } from '../constants/gameBalance';
 import {
   getPitOfferAllLabel,
   getPitEmptyMessage,
@@ -40,6 +40,7 @@ import {
   getPitOverflowText,
   PIT_WARD_COUNT,
   getPitWardHint,
+  getPitHouseIncompleteHint,
   getPitTransitionReadyText,
   getPitTransitionCeremonyText,
   getWardMarkColors,
@@ -55,7 +56,13 @@ import {
   getNewCyclePointerLine,
 } from '../services/phaseNarrative';
 import { getStrongestDreadWord } from '../services/localGenerator';
-import { confirmPhaseTransition, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
+import {
+  confirmPhaseTransition,
+  markMandatoryHarvestSeen,
+  hasSeenMandatoryHarvest,
+  countResidentsAway,
+  loadProgress,
+} from '../services/amberCurrency';
 import { FoxGuide } from './FoxGuide';
 import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
 import {
@@ -1279,16 +1286,40 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     };
   }, [ceremonyClock]);
 
+  // ---- The house the reveal is waiting on ----
+  // Read once per visit. Residents arrive at HOME, never here, so this cannot
+  // go stale while the player stands at the pit. A failed read leaves it at 0,
+  // which falls through to the ordinary ward hint: the pit then behaves exactly
+  // as it did before this line existed.
+  const [residentsAway, setResidentsAway] = useState(0);
+  useEffect(() => {
+    let live = true;
+    loadProgress()
+      .then(progress => {
+        if (!live) return;
+        setResidentsAway(countResidentsAway(progress.unlockedAnimals));
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+
   // Ward hint or ready text
   const wardHintText = useMemo(() => {
     if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
       return getPitTransitionReadyText(pendingPhaseTransition);
     }
     if (phase < 4 && phaseProgressFraction >= 0.15 && pendingPhaseTransition == null) {
+      // A full circle with no ceremony behind it is the reveal being held for
+      // the rest of the house (isRevealHeldForHouse). Say so, or the pit is
+      // simply mute at the one moment the player is most certain something
+      // should happen. Only the reveal is ever held, hence phase 3.
+      if (phase === FULL_HOUSE_PHASE - 1 && phaseProgressFraction >= 1 && residentsAway > 0) {
+        return getPitHouseIncompleteHint(residentsAway);
+      }
       return getPitWardHint(phase, phaseProgressFraction);
     }
     return null;
-  }, [phase, phaseProgressFraction, pendingPhaseTransition, ceremonyStatus]);
+  }, [phase, phaseProgressFraction, pendingPhaseTransition, ceremonyStatus, residentsAway]);
 
   // ---- Auto-trigger ceremony when entering pit with pending transition and no harvest ----
   useEffect(() => {

@@ -50,7 +50,16 @@ jest.mock('../services/localGenerator', () => ({ getStrongestDreadWord: () => nu
 jest.mock('../services/gameAlert', () => ({ showGameAlert: jest.fn() }));
 jest.mock('../services/weeklyQuests', () => ({ updateQuestProgress: jest.fn(async () => []) }));
 jest.mock('../services/wordHarvest', () => ({ getHarvestState: jest.fn(), offerBatch: jest.fn(), offerAllBatches: jest.fn(), settleBatchCredit: jest.fn(), reconcilePendingCredits: jest.fn(async () => []) }));
-jest.mock('../services/amberCurrency', () => ({ confirmPhaseTransition: jest.fn(), markMandatoryHarvestSeen: jest.fn(async () => {}), hasSeenMandatoryHarvest: jest.fn(async () => true) }));
+// loadProgress/countResidentsAway back the pit's "the house is not whole yet"
+// ward line. Stubbed with every resident home so the reveal's hold is inert
+// here and these tests keep exercising the ceremony itself.
+jest.mock('../services/amberCurrency', () => ({
+  confirmPhaseTransition: jest.fn(),
+  markMandatoryHarvestSeen: jest.fn(async () => {}),
+  hasSeenMandatoryHarvest: jest.fn(async () => true),
+  loadProgress: jest.fn(async () => ({ unlockedAnimals: [], currentPhase: 3 })),
+  countResidentsAway: jest.fn(() => 0),
+}));
 jest.mock('../services/tending', () => ({
   loadTendingState: jest.fn(async () => ({ level: 0 })),
   getNextTendingInfo: jest.fn(() => ({ nextLevel: 1, cost: 20 })),

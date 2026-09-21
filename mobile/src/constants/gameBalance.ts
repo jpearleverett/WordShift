@@ -61,6 +61,20 @@ export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   5: 120, // Post-revelation — after house completion/recruit (≈96-100), dwell completion (≈104-108), arming (115), final board (≈116), and post-revelation (≈117-122)
 };
 
+/**
+ * The one phase whose arrival additionally waits for the WHOLE HOUSE: the
+ * reveal does not turn until all thirteen residents have moved in, so the last
+ * recruit is present for it instead of walking in afterwards.
+ *
+ * Implemented as isRevealHeldForHouse in services/amberCurrency, which holds
+ * the OFFER (pendingPhaseTransition stays null) rather than refusing the pit's
+ * ceremony, because the victory screen hides every exit while a transition is
+ * pending. Note the ordering this creates against the table above: the reveal's
+ * own floor is 90 solves while the Sky Garden's room gate is 92, so this hold
+ * is normally what decides when the reveal lands, not MIN_PUZZLES_FOR_PHASE[4].
+ */
+export const FULL_HOUSE_PHASE: DialoguePhase = 4;
+
 // ============================================================================
 // AMBER ECONOMY
 // ============================================================================

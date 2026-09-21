@@ -1,5 +1,5 @@
 import NativeStorage from '@react-native-async-storage/async-storage';
-import { completeAnimalConversationLine, getNextAnimalConversation } from '../services/conversationProgress';
+import { completeAnimalConversationLine, countResidentsWithUnreadConversation, getNextAnimalConversation } from '../services/conversationProgress';
 import { getDialoguesForAnimal, getTotalDialogueCount } from '../services/dialogue/animalDialogueBase';
 import { ANIMALS } from '../services/homeWorldData';
 import { getFullProgress, invalidateProgressCache, markIntroSeen, hasSeenIntro, markPostRevelation, startNewCycle } from '../services/amberCurrency';
@@ -189,4 +189,58 @@ test.each([STORAGE_COMMIT_KEY, PROGRESS_KEY])('an introduction save failure at %
   expect((await getFullProgress()).introsSeen).toEqual(['fox']);
   expect(getNextAnimalConversation(await getFullProgress(), 'fox')!.index).toBe(0);
   expect(getTotalDialogueCount('fox', 4)).toBeGreaterThan(100);
+});
+
+describe('countResidentsWithUnreadConversation', () => {
+  // The reveal's soft warning (Ember's full-house beat on HomeScreen) counts
+  // residents with a line the player could go and hear THIS MINUTE.
+  test('counts every resident with an eligible unread line and ignores the locked ones', async () => {
+    const progress = await seed({ currentPhase: 3, conversationReadIds: {}, conversationReadVersion: 1 });
+    expect(countResidentsWithUnreadConversation(progress)).toBe(allTypes.length);
+
+    const half = allTypes.slice(0, 4);
+    expect(countResidentsWithUnreadConversation(
+      await seed({ currentPhase: 3, unlockedAnimals: [...half] }),
+    )).toBe(half.length);
+  });
+
+  test('a resident who has read everything available to them right now stops being counted', async () => {
+    // fox is vanguard, so at global phase 3 its whole phase-0..4 corpus is
+    // already eligible: reading all of it is what "caught up" means here.
+    const read = getDialoguesForAnimal('fox', 4).map(dialogue => dialogue.id);
+    const progress = await seed({
+      currentPhase: 3,
+      conversationReadIds: { fox: read },
+      conversationReadVersion: 1,
+    });
+    expect(getNextAnimalConversation(progress, 'fox')).toBeNull();
+    expect(countResidentsWithUnreadConversation(progress)).toBe(allTypes.length - 1);
+  });
+
+  test('a lagging resident is measured at the phase they can actually be heard at', async () => {
+    // Sloane lags, so at global phase 3 she resolves to animal phase 2 and only
+    // her phase 0-2 corpus is eligible. Reading exactly that much must silence
+    // her: counting her phase-3 block would name a visit that offers nothing.
+    const throughPhase2 = getDialoguesForAnimal('sloth', 2).map(dialogue => dialogue.id);
+    const progress = await seed({
+      currentPhase: 3,
+      conversationReadIds: { sloth: throughPhase2 },
+      conversationReadVersion: 1,
+    });
+    expect(countResidentsWithUnreadConversation(progress)).toBe(allTypes.length - 1);
+    // The reveal is exactly what opens the rest of her, so nothing was lost.
+    expect(getDialoguesForAnimal('sloth', 4).length).toBeGreaterThan(throughPhase2.length);
+    expect(countResidentsWithUnreadConversation(
+      { ...progress, currentPhase: 4 },
+    )).toBe(allTypes.length);
+  });
+
+  test('an unreadable ledger reports nothing owed rather than throwing at the caller', async () => {
+    // getConversationReadIds rejects a corrupt record. The warning is not worth
+    // refusing anything over, so it must swallow that and stay silent.
+    const progress = await seed({ currentPhase: 3 });
+    const corrupt = { ...progress, conversationReadIds: { fox: 'not-an-array' } } as unknown as HomeWorldProgress;
+    expect(() => getNextAnimalConversation(corrupt, 'fox')).toThrow();
+    expect(countResidentsWithUnreadConversation(corrupt)).toBe(0);
+  });
 });

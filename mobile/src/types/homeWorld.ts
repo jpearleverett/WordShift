@@ -104,6 +104,18 @@ export const ANIMAL_AWARENESS_TIERS: Record<AnimalType, AnimalAwarenessTier> = {
 };
 
 /**
+ * Every resident of the house, in no particular order.
+ *
+ * Derived from the awareness table rather than listed again, so the roster
+ * cannot drift: ANIMAL_AWARENESS_TIERS is Record<AnimalType, ...>, which makes
+ * a fourteenth resident a typecheck error until it has a tier. homeWorldData's
+ * ANIMALS is the richer source, but services that run BELOW it cannot read it
+ * (homeWorldData imports amberCurrency, so that dependency runs one way only).
+ */
+export const ALL_ANIMAL_TYPES: readonly AnimalType[] =
+  Object.keys(ANIMAL_AWARENESS_TIERS) as AnimalType[];
+
+/**
  * Get the effective phase for a specific animal based on their awareness tier.
  *
  * The tiers stagger the DESCENT (phases 1-3), never the ARRIVAL — in either

@@ -59,6 +59,10 @@ import {
   getPendingVariantTutorials,
   acknowledgeVariantTutorial,
   consumePendingVariantTutorial,
+  countResidentsHome,
+  countResidentsAway,
+  isRevealHeldForHouse,
+  getPendingPhaseTransition,
 } from '../services/amberCurrency';
 import {
   SURPRISE_BONUS_AMOUNTS,
@@ -71,7 +75,7 @@ import {
   RESONANT_BOARD_CAP_AMBER,
   MILESTONE_BONUSES,
 } from '../constants/gameBalance';
-import { FIRST_COMPLETION_BONUS, checkMilestone, getMilestoneMessage } from '../types/homeWorld';
+import { ALL_ANIMAL_TYPES, FIRST_COMPLETION_BONUS, checkMilestone, getMilestoneMessage } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -1594,5 +1598,106 @@ describe('milestone copy shifts with the phase (dead dread lines)', () => {
       );
       expect(resolved.message).toBe(fromTable);
     }
+  });
+});
+
+describe('the reveal waits for the whole house', () => {
+  async function setResidentsHome(animals: readonly string[]): Promise<void> {
+    const progress = { ...(await loadProgress()), unlockedAnimals: [...animals] };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(progress));
+    invalidateProgressCache();
+  }
+
+  test('the roster is counted by distinct KNOWN residents', () => {
+    expect(ALL_ANIMAL_TYPES).toHaveLength(13);
+    expect(countResidentsHome(ALL_ANIMAL_TYPES)).toBe(13);
+    expect(countResidentsAway(ALL_ANIMAL_TYPES)).toBe(0);
+    // A retried unlock and a stale id from an older roster must not forge a
+    // full house between them.
+    expect(countResidentsHome(['fox', 'fox', 'fox'])).toBe(1);
+    expect(countResidentsHome([...ALL_ANIMAL_TYPES, 'badger', 'fox'])).toBe(13);
+    expect(countResidentsHome([...ALL_ANIMAL_TYPES.slice(0, 12), 'badger'])).toBe(12);
+    expect(countResidentsAway([...ALL_ANIMAL_TYPES.slice(0, 12), 'badger'])).toBe(1);
+    // Never throws on a record that is not an array.
+    for (const bad of [undefined, null, 'fox', 13, {}]) expect(countResidentsHome(bad)).toBe(0);
+  });
+
+  test('only the reveal is ever held, and only while someone is missing', () => {
+    const short = ALL_ANIMAL_TYPES.slice(0, 12);
+    for (const target of [0, 1, 2, 3] as const) {
+      expect(isRevealHeldForHouse(target, [])).toBe(false);
+    }
+    expect(isRevealHeldForHouse(4, short)).toBe(true);
+    expect(isRevealHeldForHouse(4, ALL_ANIMAL_TYPES)).toBe(false);
+    // Phase 5 is pinned by markPostRevelation and never travels this road; the
+    // predicate must not answer for it either way.
+    expect(isRevealHeldForHouse(5, [])).toBe(false);
+  });
+
+  test('a held reveal reports the phase the world is actually in', async () => {
+    await devAddPuzzles(123);
+    await setResidentsHome(ALL_ANIMAL_TYPES.slice(0, 12));
+
+    const held = await awardPuzzleAmber('EASY', 1);
+    expect(held.phaseChanged).toBe(false);
+    // Not merely "no transition": the REPORTED phase must stay 3. The caller
+    // takes newPhase on the not-pending branch, so a held result naming 4
+    // would hand the live session the reveal it is being denied, with no
+    // ceremony behind it.
+    expect(held.newPhase).toBe(3);
+    expect(held.phaseTransitionPending).toBe(false);
+    expect(await getPendingPhaseTransition()).toBeNull();
+    expect(await getCurrentPhase()).toBe(3);
+  });
+
+  test('the hold releases the moment the last resident is home', async () => {
+    await devAddPuzzles(123);
+    await setResidentsHome(ALL_ANIMAL_TYPES.slice(0, 12));
+    expect((await awardPuzzleAmber('EASY', 1)).phaseChanged).toBe(false);
+
+    await setResidentsHome(ALL_ANIMAL_TYPES);
+    const opened = await awardPuzzleAmber('EASY', 1);
+    expect(opened.phaseChanged).toBe(true);
+    expect(opened.newPhase).toBe(4);
+    expect(await getPendingPhaseTransition()).toBe(4);
+    // And the rite still commits normally from there.
+    expect(await confirmPhaseTransition()).toEqual({ newPhase: 4, previousPhase: 3 });
+    expect(await getCurrentPhase()).toBe(4);
+  });
+
+  test('the earlier phases never consult the house', async () => {
+    await setResidentsHome([]);
+    await devAddPuzzles(15);
+    expect((await awardPuzzleAmber('EASY', 1)).newPhase).toBe(1);
+    await confirmPhaseTransition();
+    await devAddPuzzles(27);
+    expect((await awardPuzzleAmber('EASY', 1)).newPhase).toBe(2);
+    await confirmPhaseTransition();
+    await devAddPuzzles(39);
+    expect((await awardPuzzleAmber('EASY', 1)).newPhase).toBe(3);
+  });
+
+  test('a pending reveal written before the hold existed still commits', async () => {
+    // Never revoke something already granted: an in-flight save carrying
+    // pendingPhaseTransition 4 from an older build would otherwise be stranded
+    // behind the victory screen, which hides every exit while one is pending.
+    const progress = {
+      ...(await loadProgress()),
+      currentPhase: 3, pendingPhaseTransition: 4, unlockedAnimals: ['fox'],
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(progress));
+    invalidateProgressCache();
+
+    expect(await confirmPhaseTransition()).toEqual({ newPhase: 4, previousPhase: 3 });
+    expect(await getCurrentPhase()).toBe(4);
+  });
+
+  test('the creator kit alone may simulate past the hold', async () => {
+    await devAddPuzzles(123);
+    await setResidentsHome([]);
+    expect((await awardPuzzleAmber('EASY', 1)).phaseChanged).toBe(false);
+    const bypassed = await awardPuzzleAmber('EASY', 1, 'standard', 0, false, { ignoreFullHouseHold: true });
+    expect(bypassed.phaseChanged).toBe(true);
+    expect(bypassed.newPhase).toBe(4);
   });
 });

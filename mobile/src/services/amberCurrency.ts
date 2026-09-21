@@ -15,6 +15,7 @@ import {
   NARRATIVE_ACCELERATION,
   CHALLENGE_MODE_CONFIG,
   PendingCeremony,
+  ALL_ANIMAL_TYPES,
 } from '../types/homeWorld';
 import {
   MIN_PUZZLES_FOR_PHASE,
@@ -31,6 +32,7 @@ import {
   RESONANT_BOARD_CAP_AMBER,
   LEXICON_AMBER_MULTIPLIER,
   SPEED_AMBER_MULTIPLIER,
+  FULL_HOUSE_PHASE,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -61,6 +63,7 @@ const MODIFIER_STACKING_INTRO_SEEN_KEY = 'wordshift_modifier_stacking_intro_seen
 const LEXICON_INTRO_SEEN_KEY = 'wordshift_lexicon_intro_seen';
 const GATED_UNLOCK_INTRO_SEEN_KEY = 'wordshift_gated_unlock_intro_seen';
 const HARVEST_HOME_INTRO_SEEN_KEY = 'wordshift_harvest_home_intro_seen';
+const FULL_HOUSE_INTRO_SEEN_KEY = 'wordshift_full_house_intro_seen';
 
 // In-memory cache
 let progressCache: HomeWorldProgress | null = null;
@@ -528,6 +531,18 @@ export async function awardPuzzleAmber(
      * Defensively clamped to [0, RESONANT_BOARD_CAP_AMBER].
      */
     resonanceBonus?: number;
+    /**
+     * Simulate the descent without the reveal's full-house hold.
+     *
+     * ONLY the creator kit passes this. Its snapshot runs the whole win loop
+     * before it buys a single room (creatorKit.ts builds the house afterwards,
+     * because the room gates it purchases through are themselves keyed to the
+     * solve count the loop is producing), so the sim is legitimately at zero
+     * residents while it drives the phase. The save it hands the reviewer is
+     * consistent either way: the house is built, and every transition is
+     * confirmed immediately in the same loop. Real play never sets this.
+     */
+    ignoreFullHouseHold?: boolean;
   } = {}
 ): Promise<{
   amount: number;
@@ -758,6 +773,20 @@ export async function awardPuzzleAmber(
   if (newPhase > previousPhase + 1) {
     newPhase = (previousPhase + 1) as DialoguePhase;
   }
+  // The reveal waits for the whole house (isRevealHeldForHouse). Withholding
+  // the OFFER is what keeps that hold safe: an offered transition the pit then
+  // refuses would strand the player behind the victory screen's mustVisitPit
+  // gate. Holding also REPORTS the old phase, which is not a nicety. The caller
+  // reads `newPhase` on both branches (useGamePersistence.ts: no pending means
+  // updateSessionPhase(result.newPhase)), so a held result that still named 4
+  // would hand the live session the reveal it is being denied: dark theme,
+  // robed sprites, phase-4 copy and dialogue budget, with durable phase still
+  // 3 and no ceremony ever playing. It would also silence interstitials for
+  // good, since App feeds the same number to a policy that mutes at phase >= 4.
+  const revealHeld = !options.ignoreFullHouseHold &&
+    isRevealHeldForHouse(newPhase, progress.unlockedAnimals);
+  if (revealHeld) newPhase = previousPhase;
+
   // Only signal a phase change if this is a NEW transition (no pending one queued yet).
   // If a pending transition already exists, the player must confirm it in the pit first.
   const phaseChanged = newPhase > previousPhase && progress.pendingPhaseTransition == null;
@@ -834,6 +863,74 @@ export async function awardPuzzleAmber(
     streakSaved,
     phaseTransitionPending: phaseChanged || progress.pendingPhaseTransition != null,
   };
+}
+
+/**
+ * How many of the thirteen residents have actually moved in.
+ *
+ * Counts distinct KNOWN residents, so a duplicated id (a retried unlock) and a
+ * stale id from an older roster both count for nothing rather than forging a
+ * full house.
+ */
+export function countResidentsHome(unlockedAnimals: unknown): number {
+  if (!Array.isArray(unlockedAnimals)) return 0;
+  const roster = new Set<string>(ALL_ANIMAL_TYPES);
+  return new Set(unlockedAnimals.filter(id => typeof id === 'string' && roster.has(id))).size;
+}
+
+/** Residents who have not arrived yet, for the pit's held-ward line. */
+export function countResidentsAway(unlockedAnimals: unknown): number {
+  return ALL_ANIMAL_TYPES.length - countResidentsHome(unlockedAnimals);
+}
+
+/**
+ * Whether the reveal is being HELD because the house is not whole.
+ *
+ * The owner's rule: the arrangement may not turn until every resident has
+ * arrived, so the last recruit is present FOR the reveal instead of walking in
+ * after it. Only the reveal is held; phases 1-3 are never gated on the house.
+ *
+ * This gates the moment the transition is OFFERED, never the moment it is
+ * confirmed, and the distinction is the whole safety argument. An offered
+ * transition is what sets `pendingPhaseTransition`, which is what makes the
+ * victory screen hide Next Level / Home / Share until the player reaches the
+ * pit (`mustVisitPit` in VictoryModal.tsx). A pit that refused a ceremony it
+ * had already been promised would strand the player on that screen with no
+ * button that works. Withholding the OFFER costs nothing by comparison: the
+ * wards simply stay full, and the pit says why.
+ *
+ * Nothing already granted is ever revoked. confirmPhaseTransition does not
+ * consult this, so a save carrying a pending 4 written by an earlier build
+ * still commits, and a save already at phase 4 or 5 is untouched.
+ *
+ * There is no deadlock here, and it is worth writing down why, in two legs.
+ * The organic path: the last three rooms are held by isDescentTrioHeld
+ * (homeWorldData.ts) against WEIGHTED progress, never currentPhase, so they
+ * open at PHASE_THRESHOLDS[3] while the player is still phase 3 and still
+ * holding this gate shut. The paid paths (Reserve, Skip the wait, Speed it up)
+ * refuse the trio below currentPhase 3, and awardPuzzleAmber advances one
+ * phase at a time, so a target of 4 implies the player is AT 3: every one of
+ * them is open exactly while the hold is on. The remaining cost is amber, and
+ * the amber that clears it is per-puzzle pay plus quests and dailies, all of
+ * which keep coming without limit. (MILESTONE_BONUSES does NOT: it terminates
+ * at 930 solves, so do not lean on it for this argument.) The hold is a delay
+ * the player can always work through, never a wall.
+ *
+ * WHAT IT DOES COST, deliberately and with the owner's agreement: the reveal
+ * now follows the purse. Residents are bought, a large share of amber accrues
+ * per real-world day, and the endgame sits behind phase 4, so a cohort with
+ * more amber reaches the reveal sooner. economyJourneySimulation.test.ts
+ * carries the measured numbers and the reasoning.
+ */
+export function isRevealHeldForHouse(
+  targetPhase: DialoguePhase,
+  unlockedAnimals: unknown,
+): boolean {
+  // Exactly the reveal, never `>=`. Phase 5 is pinned by markPostRevelation
+  // and never travels this road, but a predicate that answered for it would be
+  // a trap waiting for whoever changes that.
+  if (targetPhase !== FULL_HOUSE_PHASE) return false;
+  return countResidentsHome(unlockedAnimals) < ALL_ANIMAL_TYPES.length;
 }
 
 // Guard against concurrent spend operations
@@ -1422,6 +1519,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(FIRST_WIN_GLITCH_KEY);
     await AsyncStorage.removeItem(GATED_UNLOCK_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(HARVEST_HOME_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(FULL_HOUSE_INTRO_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
     }
@@ -2383,6 +2481,28 @@ export async function hasSeenGatedUnlockIntro(): Promise<boolean> {
 export async function markGatedUnlockIntroSeen(): Promise<void> {
   try {
     await AsyncStorage.setItem(GATED_UNLOCK_INTRO_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Ember's one-time beat for the moment the last resident moves in and the
+ * reveal is waiting only on the next offering. Cloud-synced, because it is a
+ * story beat the player should not be shown twice on a second device, and
+ * cleared by Reset All with the rest of the one-time flags.
+ */
+export async function hasSeenFullHouseIntro(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(FULL_HOUSE_INTRO_SEEN_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markFullHouseIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(FULL_HOUSE_INTRO_SEEN_KEY, 'true');
   } catch {
     // Non-critical
   }

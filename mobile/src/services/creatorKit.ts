@@ -291,7 +291,15 @@ export async function applyCreatorSnapshot(target: 'dusk' | 'shadows' | 'reveal'
         stars,
         i % 10 === 9 ? 'challenge' : 'standard',
         0.6, // engaged three-star rate → narrative acceleration, like a real reviewer-speed run
-        true // credit to balance — the sim "harvests" every batch
+        true, // credit to balance — the sim "harvests" every batch
+        // The reveal's full-house hold is a pacing rule for a player who is
+        // living through the descent. This loop is not: it runs before step 4
+        // buys any room, because the rooms it buys are gated on the solve count
+        // this loop produces. Step 4 then builds the era's house and step 5
+        // pins the rest, so the snapshot the reviewer opens still has everyone
+        // home. Without the bypass the loop stalls at Phase 3 and the 'reveal'
+        // era fails its own target-phase assertion below.
+        { ignoreFullHouseHold: true },
       );
       // Deferred transitions are confirmed immediately — the pit ceremony's
       // own API — so the snapshot's phase pin is always the CONFIRMED state.

@@ -23,7 +23,7 @@ const end = home.indexOf('  // First-harvest home safety net', start);
 // `new Function` cannot parse; it is type-only, so it is stripped here.
 const source = home.slice(start, end).replace(/ as 1 \| 2 \| 3 \| 4/g, '');
 
-function createHarness(seen: Partial<Record<'challenge' | 'daily' | 'pit' | 'journal' | 'gated', boolean>> = {}) {
+function createHarness(seen: Partial<Record<'challenge' | 'daily' | 'pit' | 'journal' | 'gated' | 'fullHouse', boolean>> = {}) {
   const fox = { id: 'fox' };
   const scope = {
     hasHomeProgress: true, isOnboarding: false, showIntroDialogue: false,
@@ -41,6 +41,15 @@ function createHarness(seen: Partial<Record<'challenge' | 'daily' | 'pit' | 'jou
     hasSeenPitNudge: jest.fn(async () => seen.pit ?? false),
     hasSeenJournalIntro: jest.fn(async () => seen.journal ?? false),
     hasSeenGatedUnlockIntro: jest.fn(async () => seen.gated ?? false),
+    hasSeenFullHouseIntro: jest.fn(async () => seen.fullHouse ?? false),
+    // The full-house beat: everyone home, still one phase below the reveal.
+    // Defaults put the harness OUTSIDE it (phase 0), so the existing budget
+    // cases are unchanged and only the case below opts in.
+    FULL_HOUSE_PHASE: 4,
+    progress: { unlockedAnimals: [] as string[] } as { unlockedAnimals: string[] } | null,
+    countResidentsAway: (animals: string[]) => 13 - animals.length,
+    countResidentsWithUnreadConversation: () => 3,
+    getFullHouseIntroLines: () => ['full house'],
     getChallengeIntroLines: () => ['challenge'],
     getDailyChallengeIntroLines: () => ['daily'],
     getFoxPitNudgeLines: () => ['pit'],
@@ -74,13 +83,56 @@ function createHarness(seen: Partial<Record<'challenge' | 'daily' | 'pit' | 'jou
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.useRealTimers());
 
-test('the source slice covers the five budgeted intros', () => {
+test('the source slice covers the six budgeted intros', () => {
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
-  for (const context of ['challenge_intro', 'daily_challenge_intro', 'pit_nudge', 'gated_room_intro']) {
+  for (const context of ['challenge_intro', 'daily_challenge_intro', 'pit_nudge', 'gated_room_intro', 'full_house_intro']) {
     expect(source).toContain(`setIntroContext('${context}')`);
   }
   expect(source).toContain('setJournalSpotlightActive(true)');
+});
+
+test('the full-house beat fires when the last resident is in, and spends the landing', async () => {
+  // Everyone home, world still at Phase 3: the reveal is waiting on nothing
+  // but the next offering, and this is the last moment the player can go and
+  // let anyone finish (afterwards the victory screen hides every exit and the
+  // pit seals itself). Nothing else is pending here, so the beat is free to
+  // take the landing.
+  const harness = createHarness({ daily: true, journal: true });
+  harness.scope.homePhase = 3;
+  harness.scope.progress = { unlockedAnimals: Array.from({ length: 13 }, (_, i) => `a${i}`) };
+  harness.render();
+  await jest.advanceTimersByTimeAsync(1000);
+
+  expect(harness.scope.setIntroContext).toHaveBeenCalledWith('full_house_intro');
+  expect(harness.scope.setIntroOverrideLines).toHaveBeenCalledWith(['full house']);
+  expect(harness.scope.landingIntroSpentRef.current).toBe(true);
+  harness.unmount();
+});
+
+test('the full-house beat stays down while anyone is still missing', async () => {
+  const harness = createHarness({ daily: true, journal: true });
+  harness.scope.homePhase = 3;
+  harness.scope.progress = { unlockedAnimals: Array.from({ length: 12 }, (_, i) => `a${i}`) };
+  harness.render();
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(harness.scope.setIntroContext).not.toHaveBeenCalled();
+  harness.unmount();
+});
+
+test('the full-house beat stays down once the reveal has been offered', async () => {
+  // pitPhaseReady means a transition is already pending, so "go and listen
+  // first" is no longer something the player can act on. The pit nudge owns
+  // that moment instead.
+  const harness = createHarness({ daily: true, journal: true });
+  harness.scope.homePhase = 3;
+  harness.scope.pitPhaseReady = true;
+  harness.scope.progress = { unlockedAnimals: Array.from({ length: 13 }, (_, i) => `a${i}`) };
+  harness.render();
+  await jest.advanceTimersByTimeAsync(1000);
+  expect(harness.scope.setIntroContext).toHaveBeenCalledWith('pit_nudge');
+  expect(harness.scope.setIntroContext).not.toHaveBeenCalledWith('full_house_intro');
+  harness.unmount();
 });
 
 test('a landing with the daily AND the journal pending shows ONE intro, in declaration order', async () => {

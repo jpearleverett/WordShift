@@ -169,6 +169,7 @@ export const SYNC_KEYS = [
   'wordshift_mandatory_harvest_seen',
   'wordshift_gated_unlock_intro_seen',
   'wordshift_harvest_home_intro_seen',
+  'wordshift_full_house_intro_seen', // one-time beat when the last resident moves in
   'wordshift_fox_play_nudge_seen', // one-time Fox "here is Play" nudge
   'wordshift_pit_nudge_seen', // one-time pit-arrival nudge
   'wordshift_starter_intro_seen', // one-time Keeper's Welcome starter intro
