@@ -207,7 +207,7 @@ import { installGlobalFont } from './src/theme/fonts';
 import { addHints, grantBonusHint } from './src/services/hints';
 import { hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
-import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, recordRewardedDoubleOffered, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
+import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
 import { installGlobalErrorHandler, setErrorForwarder, reportError } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
@@ -721,9 +721,15 @@ function MainApp() {
   // The setup menu keeps this private ladder snapshot current without making
   // the puzzle hook own persistence for a Phase-5-only modifier.
   const [unbrokenWeaveMastery, setUnbrokenWeaveMastery] = useState<UnbrokenWeaveMastery | null>(null);
-  // Whether THIS victory presents the double slot at all. Decided (and the
-  // presentation recorded) once per victory at processing time — the slot is
-  // cadence-capped per local day and blocked at phase 4+ (monetizationPrompts).
+  // Whether THIS victory presents the double slot at all. Decided once per
+  // victory at processing time, so modal re-renders cannot re-decide it.
+  //
+  // SHOWING THE SLOT RECORDS NOTHING. The per-local-day allowance is spent
+  // only by a credited claim, in useVictoryDouble. Do not add a
+  // recordRewardedDoubleClaimed() call beside the decision below: charging the
+  // cap on presentation is the bug this was changed to fix, where a player who
+  // kept declining exhausted the day and the 2x vanished without ever paying
+  // out. monetizationPromptsUsage.test.ts fails if a second caller appears.
   const [victoryDoubleOffer, setVictoryDoubleOffer] = useState(false);
 
   // Phase transition overlay state
@@ -2830,20 +2836,22 @@ function MainApp() {
       // daily's +50% line can never linger onto later normal-board victories.
       setEventBonusLine(null);
       resetVictoryDouble();
-      // Rewarded-double cadence gate: the 2x slot presents up to
-      // REWARDED_DOUBLE_DAILY_CAP times per local day and never at phase 4+
-      // (the dread arc is protected like interstitials) — on every win it made
-      // the base reward read as the amount the player failed to claim. Decided
-      // + recorded HERE, once per victory (processing time), so modal
-      // re-renders can never double-count a presentation.
+      // Rewarded-double gate: the 2x slot presents while the player has
+      // doubles left today and is below phase 4 (the dread arc is protected
+      // like interstitials). Deciding it here, once per victory at processing
+      // time, keeps modal re-renders out of it.
       //
-      // Only spend a daily slot when the button can ACTUALLY present: ad-free
-      // owners always can (the instant ✦), everyone else needs a ready ad
-      // provider with rewarded budget left. Recording an offer for a button
-      // that then self-hides (cold-start SDK not up yet, no provider, or the
-      // rewarded daily cap reached) silently burned the day's slots on an
-      // invisible affordance — the reason the 2x "never showed up." So the
-      // slot now surfaces on the FIRST eligible win it can render on.
+      // Showing the slot records NOTHING. The day's allowance is spent only by
+      // a credited claim (useVictoryDouble), so declining the bonus leaves the
+      // control there on the next win and every win after, until the player
+      // actually takes it. An earlier build charged the cap on presentation,
+      // which made the 2x disappear after a few boards for anyone who kept
+      // saying no.
+      //
+      // The button must still be able to RENDER: ad-free owners always can
+      // (the instant ✦), everyone else needs a ready provider with rewarded
+      // budget left, so a cold-start SDK or an exhausted ad cap shows nothing
+      // rather than a control that self-hides.
       setVictoryDoubleOffer(false);
       if (victory.puzzlesSolved > AUTO_COLLECT_PUZZLE_LIMIT) {
         (async () => {
@@ -2851,7 +2859,6 @@ function MainApp() {
             const canPresentDouble =
               isAdFreeSync() || (isAdsReady() && !(await isRewardedCapReached()));
             if (canPresentDouble && (await canOfferRewardedDouble(persistence.currentPhase))) {
-              await recordRewardedDoubleOffered();
               setVictoryDoubleOffer(true);
             }
           } catch {

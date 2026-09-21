@@ -12,16 +12,33 @@
  *     on the same exit as the ad that triggered it.
  *
  * This file also paces the victory "double the reward" slot:
- *   - Rewarded-double cadence: the 2x control may present at most
- *     REWARDED_DOUBLE_DAILY_CAP times per LOCAL day, and never once the dread
- *     arc begins (phase 4+, protected exactly like interstitials). Otherwise
- *     it appears on every win and the base reward reads as the amount a
- *     rational player failed to claim. Ad-free owners' instant-double perk is
- *     the same slot, so it follows the same cadence.
+ *   - Rewarded-double cadence: the player may TAKE at most
+ *     REWARDED_DOUBLE_DAILY_CAP doubles per LOCAL day, and the slot never
+ *     presents once the dread arc begins (phase 4+, protected exactly like
+ *     interstitials). Ad-free owners' instant-double perk is the same slot and
+ *     the same cap.
+ *
+ *     The cap counts CLAIMS, never presentations, and that distinction is the
+ *     whole point of it. Counting presentations meant a player who simply did
+ *     not want the bonus spent the day's five slots by declining, and the 2x
+ *     control then vanished for the rest of the day without ever having paid
+ *     out — reported from the device as "it disappears after a few levels".
+ *     An offer the player turns down costs nothing and the slot keeps coming
+ *     back until they actually take it. What the cap still protects is the
+ *     thing worth protecting: bonus amber per day, and rewarded-ad inventory
+ *     (ads.ts's own REWARDED_DAILY_CAP likewise counts completed views).
+ *
+ *     KNOWN TRADE: the slot now appears on every eligible win until claimed,
+ *     which the presentation cap was originally written to avoid, on the
+ *     argument that an ever-present 2x makes the base reward read as the
+ *     amount a rational player failed to claim. That is a real cost and it was
+ *     accepted deliberately: an affordance that hides itself when you decline
+ *     it is worse, because the player cannot tell it from a bug.
  *
  * Decision logic is pure/exported for testing; the persisted state only records
  * "have we shown this yet" + an interstitials-seen counter (+ the armed offer,
- * + the local-day rewarded-double presentation counter).
+ * + the local-day rewarded-double CLAIM counter; presentations are never
+ * counted anywhere in this module).
  * This is device UX pacing (like ad_pacing), intentionally NOT part of cloud sync.
  */
 
@@ -37,7 +54,7 @@ import {
 
 const STORAGE_KEY = 'wordshift_monet_prompts';
 
-/** Max times per local day the victory "double the reward" slot may present. */
+/** Max doubles a player may CLAIM per local day. Declining costs nothing. */
 export const REWARDED_DOUBLE_DAILY_CAP = 5;
 
 /**
@@ -58,8 +75,16 @@ export interface MonetPromptState {
   removeAdsOfferPending: boolean;
   /** Local calendar day (YYYY-MM-DD) the rewarded-double counter belongs to. */
   rewardedDoubleDate: string | null;
-  /** Rewarded-double presentations already made on `rewardedDoubleDate`. */
-  rewardedDoubleOffersToday: number;
+  /**
+   * Doubles the player actually TOOK on `rewardedDoubleDate`.
+   *
+   * Deliberately a different key from the `rewardedDoubleOffersToday` an
+   * earlier build persisted: load() spreads the stored record over the
+   * defaults, so a record written by that build contributes nothing here and
+   * a player whose day was already spent on declined offers is freed at once
+   * rather than at the next local midnight.
+   */
+  rewardedDoubleClaimsToday: number;
   /** Puzzle count at which the most recent proactive victory-exit nudge presented. */
   lastExitNudgePuzzle: number | null;
 }
@@ -73,7 +98,7 @@ function getDefault(): MonetPromptState {
     interstitialsSeen: 0,
     removeAdsOfferPending: false,
     rewardedDoubleDate: null,
-    rewardedDoubleOffersToday: 0,
+    rewardedDoubleClaimsToday: 0,
     lastExitNudgePuzzle: null,
   };
 }
@@ -137,12 +162,13 @@ export function shouldShowRemoveAdsNudge(params: {
 }
 
 export function shouldOfferRewardedDouble(params: {
-  offersToday: number;
+  claimsToday: number;
   phase: number;
 }): boolean {
   // The dread arc is protected like interstitials — never present the slot.
   if (params.phase >= REWARDED_DOUBLE_BLOCKED_FROM_PHASE) return false;
-  return params.offersToday < REWARDED_DOUBLE_DAILY_CAP;
+  // Claims, not presentations: a declined offer must not close the slot.
+  return params.claimsToday < REWARDED_DOUBLE_DAILY_CAP;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,38 +262,39 @@ export async function consumePendingRemoveAdsNudge(): Promise<boolean> {
   return show;
 }
 
-/** Rewarded-double presentations recorded for TODAY (stale days read as 0). */
-function rewardedDoubleOffersFor(state: MonetPromptState, today: string): number {
-  return state.rewardedDoubleDate === today ? state.rewardedDoubleOffersToday : 0;
+/** Doubles CLAIMED today (a stale day reads as 0). */
+function rewardedDoubleClaimsFor(state: MonetPromptState, today: string): number {
+  return state.rewardedDoubleDate === today ? state.rewardedDoubleClaimsToday : 0;
 }
 
 /**
- * Whether the victory "double the reward" slot may present right now: under
- * the per-local-day cap and outside the dread arc (phase 4+). Read-only —
- * the caller records an actual presentation via recordRewardedDoubleOffered().
+ * Whether the victory "double the reward" slot may present right now: the
+ * player has doubles left today and is outside the dread arc (phase 4+).
+ * Read-only, and showing the slot records NOTHING — only a claim spends a
+ * slot, via recordRewardedDoubleClaimed(), so declining keeps it available.
  */
 export async function canOfferRewardedDouble(phase: number): Promise<boolean> {
   const state = await load();
   return shouldOfferRewardedDouble({
-    offersToday: rewardedDoubleOffersFor(state, getLocalDateString()),
+    claimsToday: rewardedDoubleClaimsFor(state, getLocalDateString()),
     phase,
   });
 }
 
 /**
- * Record one rewarded-double presentation for today (local-day bucketed; a
- * stale day rolls the counter over). Returns the new count for today. Call
- * exactly once per victory that actually presents the slot — never from a
- * render path, where re-renders would double-count.
+ * Record one CLAIMED double for today (local-day bucketed; a stale day rolls
+ * the counter over). Returns the new count for today. Call only when the
+ * bonus was actually credited — never on presentation, and never on an
+ * idempotent replay of a claim already counted.
  */
-export async function recordRewardedDoubleOffered(): Promise<number> {
+export async function recordRewardedDoubleClaimed(): Promise<number> {
   const state = await load();
   const today = getLocalDateString();
-  state.rewardedDoubleOffersToday = rewardedDoubleOffersFor(state, today) + 1;
+  state.rewardedDoubleClaimsToday = rewardedDoubleClaimsFor(state, today) + 1;
   state.rewardedDoubleDate = today;
   cache = state;
   await save();
-  return state.rewardedDoubleOffersToday;
+  return state.rewardedDoubleClaimsToday;
 }
 
 /** Clear soft-prompt pacing state (for Settings → Reset All). */

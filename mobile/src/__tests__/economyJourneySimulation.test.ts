@@ -29,7 +29,7 @@ import { clearWordHistory } from '../services/wordHistory';
 import { clearOfferingRequests } from '../services/offeringRequests';
 import { clearMasteryRecords } from '../services/masteryRecords';
 import { clearStoryState } from '../services/storySpine';
-import { canOfferRewardedDouble, clearMonetPrompts, recordRewardedDoubleOffered } from '../services/monetizationPrompts';
+import { canOfferRewardedDouble, clearMonetPrompts, recordRewardedDoubleClaimed } from '../services/monetizationPrompts';
 import { getLocalDateString } from '../services/dateUtils';
 import { clearDailyProgress, getDailyDifficulty, grantFirstDailyMercy, loadDailyProgress } from '../services/dailyChallenge';
 import { getUnlockedVariants, PuzzleVariant } from '../services/puzzleVariety';
@@ -198,7 +198,7 @@ async function simulate(cohort: Cohort): Promise<Journey> {
 
     if (cohort.sideRewards && win > AUTO_COLLECT_PUZZLE_LIMIT && await canOfferRewardedDouble(phase)) {
       if (isAdFreeSync() || consumeAdView()) {
-        await recordRewardedDoubleOffered();
+        await recordRewardedDoubleClaimed();
         await credit('victory_double', victory.amberEarned);
       }
     }
