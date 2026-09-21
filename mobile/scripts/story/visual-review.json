@@ -1146,10 +1146,10 @@
       "id": "reply-03",
       "scene": "reply",
       "asset": "assets/story/pages/reply-03.webp",
-      "sha256": "4585aa5570012c3e81daca44b5f5f46237ae570095f71bb4be43aa6deb83e035",
+      "sha256": "bb8bdbe679d9373e638410e7d0aeaa45403074229052233ce390b269eb7cdf6c",
       "status": "pass",
       "retouched": true,
-      "note": "Third repair, 2026-09-21. Two model attempts missed the value target in opposite directions: the first left the corner holding 59 percent of the frame brightest pixels, the second emptied it into a 991-pixel contiguous near-black. This version keeps the filled geometry but is composited by measurement: the untouched drape is restored from the original exactly, and the new fill is histogram-matched per channel to that drape. Result against the original: fill rgb 119,86,66 against the drape 100,75,56; fill max luminance 221 against 218; zero pixels above 245 in that corner, where the rejected version had 269; near-black pixels 198 against the original 328."
+      "note": "Fourth repair, 2026-09-21. Three reviewers passed the previous version two to one but all three named the same residual: a salmon cast in the highlights, which one of them diagnosed as the signature of per-channel histogram matching, where each channel lands its own distribution but the joint colour correlation is lost and a hue appears that exists nowhere in the cloth. This version matches luminance by histogram and moves chroma as a PAIR, by an affine shift to the drape mean and spread, so each pixel keeps its own hue relationship. Rosy highlights in the fill fall from 11.7 percent to 0.0, against 0.7 in the drape; still zero pixels above luminance 245 in that corner and no flat void."
     },
     {
       "id": "reply-04",
