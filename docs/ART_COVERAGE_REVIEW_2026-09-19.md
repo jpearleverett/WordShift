@@ -1,6 +1,8 @@
 # Story art and remaining image opportunities
 
-Reviewed September 19, 2026. All **185 story illustrations** have been visually reviewed against their authored lines and reconciled to the current asset SHA-256 values. **No open semantic corrections remain.** The durable per-image results are in [`mobile/scripts/story/visual-review.json`](../mobile/scripts/story/visual-review.json).
+Reviewed September 19, 2026. All **185 story illustrations** have been visually reviewed against their authored lines and reconciled to the current asset SHA-256 values. The durable per-image results are in [`mobile/scripts/story/visual-review.json`](../mobile/scripts/story/visual-review.json).
+
+> **Superseded in part on September 21, 2026.** The September 19 pass did not catch a class of defect that a player found immediately: human hands, arms and figures performing actions in an animal cottage, and pets (cats, a dog, a songbird) that live nowhere in this house. A re-audit of all 189 illustrations (the 185 pages plus the four ceremony heroes), with two independent reviews per image and a tie-break pass over every disagreement, found 26 images to correct. See [the September 21 retouch section](#september-21-2026-retouch-pass) below. Treat "no open corrections" as a claim about the reviews actually run, never about the art.
 
 ## Decision scenes
 
@@ -42,6 +44,56 @@ These are optional presentation improvements found in the current source, not mi
 | 2. House upgrade gift | [`HouseUpgradeGiftModal.tsx`](../mobile/src/components/home/HouseUpgradeGiftModal.tsx) shows the animal portrait and gift name, but no picture of the gift being handed over. [`shopArt.ts`](../mobile/src/components/shop/shopArt.ts) already supplies every room decoration/deepening and `attune_1`–`attune_3`. | Show the actual purchased object alongside the resident: use `getRoomUpgradeArt(gift.roomId, gift.tier)` for tiers 1–2 and the existing attunement art for tier 3. Keep the resident visible throughout the reaction. This would connect the shop purchase, handover, and room change. |
 
 Rules already have step illustrations; the Whisper Gallery has animal portraits and an empty-state illustration; Shop/Store items have dedicated art; sharing uses the wordmark, Ember, stars, and phase treatment; the offering pit already has a full illustrated environment. Additional generic decoration on those screens has lower value than the two specific reuse opportunities above. Victory and puzzle controls benefit from the requested reduction in clutter.
+
+## September 21, 2026 retouch pass
+
+A player reading the `witness` conversation saw a fox paw on one page, a human hand on the next, a curled sleeping fox on the next and two human hands on the last, and asked what the pictures were doing. The re-audit confirmed the pattern across the set.
+
+**What was wrong.** Twelve images contained a human hand, arm or partial figure; fourteen more contained an animal that was either a non-resident species (a sleeping cat on a window seat, a collie on the hearth rug, a songbird, a hedgehog, a pangolin-scaled hedgehog) or a resident drawn so poorly it read as no species at all (a digit-less furred stump pouring tea, a fox tail used as a forearm, a "fox" paw the size of a bear's). The original generation prompts forbade characters outright and asked for object-only still lifes, so these were generator slips that the first review did not weigh as breaking the world.
+
+**How they were fixed.** Each image was retouched in place, never regenerated: `scripts/story/editStoryArt.mjs` cuts a square window around the defect, sends only that window to a hosted instruction-following image-edit model, and composites the result back onto the untouched original through a feathered mask, so the authored composition and the rest of the frame survive byte-for-byte outside the paste. The rule applied per image follows the line, not the picture: where a **resident** performs the action the hand became that resident's paw (Ember's fox forepaw, Thyme's rabbit forepaw, Warren's wombat forepaw); where the **player** acts, or the actor was unclear, the limb was removed entirely and the surface continued, which is what the object-only direction asked for; non-resident creatures were removed and the cushion, rug or sill continued behind them.
+
+**How they were judged.** Every result was reviewed by an independent critic against the authored line and then by hand at the size the reader actually renders (`getStorySceneLayout` caps the illustration at 136dp tall, so a 960x540 asset is displayed around 240x136). Judging at full resolution alone is misleading in both directions: a crude paw that looks flat at 1:1 reads correctly at delivery size, while `echo-03`'s owl-foot conversion still read as an alien claw there and was redone as a removal. `scripts/story/generation/<id>.json` keeps each retouch's model, prompt, window, cost and previous hash.
+
+**Deliberately left alone.** `witness-05` draws eight residents around the table; every species is accurate and recognizable, so it stays. Small ambiguous ornaments (carved foxes, squirrels and rabbits on mantels and shelves) are decor, and at delivery size they are four or five pixels. The dark upright mark on the road heroes that one reviewer read as a distant walker is, at 10x, a plant stem at the path verge among other verge vegetation.
+
+## September 21, 2026 location pass
+
+A second player note asked whether the backgrounds match the rooms the residents actually live in. Two places in this game have art the player sees constantly, and the story pages contradicted both.
+
+**The Aquarium Room is the inside of a planted tank.** Axel the axolotl lives underwater; his sprite wears a diving mask and trails bubbles. Every page of his two conversations had been drawn from the other side of the glass, as a small tank standing on a sideboard in a dry parlour, which is the opposite of where he is. The ten pages are now inside the water, and his hand on the glass, which was a human hand with a thumb, is a pale axolotl hand with four slender fingers.
+
+**The Offering Pit is outdoors.** It is a sunken ring of rock around a deep dark opening with a cool glow at its edge, in a mossy forest clearing under a dusk-to-night sky. Eight pages set at the rim had drawn an indoor stone cellar with a water-filled masonry well, a bucket on a rope and a ladder. They now show the pit the player offers words into.
+
+**Chill's office is modern, and that is intentional.** His room has a glass desk, a monitor, ring binders and a city window. The five pages where he speaks about his own ledger were rustic cottage desks with oil lanterns and quills; they are now his office, keeping the paper ledger, ink and pen that the dialogue names. Pages of the same scene that also serve the variant where Chill was never invited stay ordinary house interiors, since they must read correctly both ways.
+
+**What the rule is not.** A resident in another resident's room is fine: Axel sits at the supper table in Panko's kitchen, and sleeps on a cushion in Ember's parlour, because an amphibian can leave the water. The rule binds only a scene set in a resident's own space, and the places the player can walk to.
+
+An independent audit then checked all 189 illustrations against these locations and flagged eight, six of them genuine: a trapdoor onto a cellar well in a parlour floor, a fish tank on a kitchen sideboard, a goldfish bowl on a porch table, and three underwater pages that kept enough of a tank rim to still read as a view from outside the glass. All six were corrected.
+
+## What the verification caught
+
+Three of the pet removals shipped on the maintainer's own inspection when a container restart killed their reviews mid-flight. Re-running those reviews failed two of them, and both failures were the same mistake rather than bad luck.
+
+Each had been repaired from the already-damaged file, so the model could not see the surface it was told to continue and invented one instead. The dog on the hearth rug became a wedge of bare floorboards in a hot orange that measured brighter than anything else in the lower half of the frame, including floor nearer the fire, so the lighting read backwards. The hedgehog in the basket became a flat near-black region six times larger than the biggest dark patch anywhere in the untouched painting, and the blanket beside it then read as propped against the rim of an empty basket. In both cases the drafting was clean; it was the surface that was wrong.
+
+Re-running each edit against the pre-repair art, where the real rug and the real blanket still sit beside the creature, fixed both in a single call. The rule is in [the asset README](../mobile/assets/story/README.md): repair from the original, and judge a fill by whether it draws the eye.
+
+This is also the argument for keeping the reviewer separate from the artist. Both bad fills removed their creature completely and looked competent in isolation; what condemned them was measuring the repaired area against the values the rest of the painting holds.
+
+## One removal that was not worth its cost
+
+`reply-03` is the exception in this pass and is recorded as one. A hedgehog sits in the wicker basket beside the left armchair, and no hedgehog lives in this house, so it was queued for removal with the rest. Five repairs were attempted and adversarial review measured each one against the painting it was editing:
+
+1. a flat near-black void larger than any dark patch the art itself contains;
+2. a fill so bright the corner held 59 percent of the frame's brightest pixels, drawing the eye before the fire did;
+3. a salmon cast, the signature of per-channel histogram matching, which lands each channel's own distribution but loses the joint colour correlation and invents a hue found nowhere in the cloth;
+4. luminance matched over the wrong population, leaving the blanket itself 43 percent too bright with one seventh of its shadow;
+5. a clone of the real blanket, which matched on every statistic and then imported a fragment of the basket handle and a leaf.
+
+The original art is hand-painted and coherent; each repair was worse than the flaw it removed. The owner's rule is that animals may appear as long as they are accurately drawn, and this hedgehog is accurate and roughly eight pixels tall at the size the reader sees. So the original stands, and the revert is written into the image's generation record rather than quietly dropped. The other non-resident removals in this pass succeeded cleanly and were kept.
+
+The transferable part: an adversarial reviewer earns its cost when it is told to refute rather than approve, and the right response to five failures is to stop, not to try a sixth.
 
 ## Verification scope
 

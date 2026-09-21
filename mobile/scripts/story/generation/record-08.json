@@ -4,8 +4,24 @@
   "sourceImage": "exec-881bf00d-8c19-4801-ba59-a95f6e5dfa5d.png",
   "width": 960,
   "height": 540,
-  "bytes": 99160,
-  "sha256": "2b56c16125334eb4be094d13b5b305b94d91ae42ddda8ab3a6efce7810f9704f",
+  "bytes": 92136,
+  "sha256": "3fe4579cdd6c5631e8e8fc3ac379facf6e2fd3a1f95657c9361ed17ab7f48e1b",
   "generatedAt": "2026-09-19T18:47:08.135Z",
-  "promptProvenance": "Initial queue; prompt source is retained in feature-branch history."
+  "promptProvenance": "Initial queue; prompt source is retained in feature-branch history.",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: seedream (a5 leg) + deterministic composite/grade (a6); qwen a4 and seedream a7 rejected",
+      "mode": "crop",
+      "window": null,
+      "prompt": "Replace the fluffy fox tail lying across the closed leather journal with a red fox's slim foreleg and forepaw, painted in exactly the same soft, dithered, painterly fur as the tail it replaces and the rest of this picture: fine fur clusters whose edges blend softly into the green sweater cuff, the leather journal and the desk. No dark outline, no flat fill, no cartoon sprite look. The foreleg comes out of the green knitted sleeve cuff on the left and lies along the top of the closed brown leather journal, no thicker than the cuff, in the same muted russet orange-brown fur as the tail with warm dark brown shading and a little cream fur underneath, never bright neon orange; the fur shades gradually to a darker brown only near the paw. It ends in one compact rounded forepaw resting flat on the leather cover with the toes pointing right: four short rounded toes with small cream fur tufts and four tiny dark claws, like a real fox paw seen from above, not curling over the front edge of the journal and not spread like fingers. No tail, no white tip. Keep the green knitted sleeve, the brown leather journal with its strap and leaf charm, the wooden chair back and the desk exactly as they are. Change nothing else. No human, no fingers, no skin.",
+      "attempts": 6,
+      "costUsd": 0.134,
+      "review": "Retouched 2026-09-21: Base kept as a1-hand.png (accepted hand removal; right half untouched). Foreleg pass redone from a1 with region 0.00,0.26,0.50,0.97 and --paste region as the critic asked.\n\nAttempts this round (3 paid calls, $0.074): a4 qwen seed 41 with the painterly/no-outline/dark-stockings prompt: qwen again drew an outlined sprite limb, this time almost entirely black (92 black-next-to-orange edge pixels, sam | critic: PASS, no repair required. Verified: (1) the pink human hand and its sleeve at lower right are gone; the loose page continues to its corner over a second sheet, the desk grain runs through and the lamp throws a blocky warm reflection on the wood, consistent with the picture's other highlights. (2) Th",
+      "previousSha256": "2b56c16125334eb4be094d13b5b305b94d91ae42ddda8ab3a6efce7810f9704f",
+      "editedAt": "2026-09-21T10:14:35.190Z"
+    }
+  ]
 }

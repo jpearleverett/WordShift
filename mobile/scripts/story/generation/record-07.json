@@ -4,6 +4,27 @@
   "sourceImage": "exec-265334be-7521-48be-9fc0-a510b190a278.png",
   "width": 960,
   "height": 540,
-  "bytes": 120740,
-  "sha256": "76d53bfff27d9b02b91c10e521a2bd166293cca9d53a4beaca3910920101b5da"
+  "bytes": 112228,
+  "sha256": "988b04ce5085222fbb31f580b6e5798131b9e9d17317886d3720c174032b7ebc",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "crop",
+      "window": {
+        "left": 428,
+        "top": 8,
+        "width": 532,
+        "height": 532
+      },
+      "prompt": "Remove the pink hand, its arm with the feathery pink gill fronds, and the green knitted sleeve at the bottom right of the picture completely. Show what was behind them continuing naturally: the lower right corner of the loose paper sheet with its plain cream margin, the dark polished wooden desktop with warm wood grain, the lit front edge of the desk continuing diagonally down to the right, and the green embroidered table runner with pale leaf embroidery continuing down to the bottom edge of the picture. Same 16-bit pixel art rendering with visible pixel clusters and the same palette, no photographic texture, no smooth vector shading. Keep the paper sheet, the leather ledger, the fox, the brass oil lamp, the books, the cup with the quill and everything else exactly as they are. Change nothing else. No human, no hand, no fingers, no skin, no sleeve, no new objects.",
+      "attempts": 3,
+      "costUsd": 0.06,
+      "review": "Retouched 2026-09-21: Rule applied: the line is narration (\"you and Ember compare the pages\"), so the pink four-fingered hand (gilled, axolotl-like) in the green sleeve at the lower right is the player's and was REMOVED per the plan, not converted. Attempt a1 (qwen, crop window 428,8 532px, --paste region so the lamp/ledger inside the window stayed untouched, seed 11): hand, gill fronds and sleeve gone; the loose sheet | critic: PASS on a1.png. Verified: hand, gill fronds and green sleeve are gone (strict skin-pink scan of the paste rect x>=590,y>=310: 0 px in a1 vs 1491 in the original); 0 pixels changed outside the paste rect; the paste edge is feathered (mean diff 0 at col 589, 1.1 at 590, ~9 by 600), and the y=310 bound",
+      "previousSha256": "76d53bfff27d9b02b91c10e521a2bd166293cca9d53a4beaca3910920101b5da",
+      "editedAt": "2026-09-21T10:14:35.017Z"
+    }
+  ]
 }

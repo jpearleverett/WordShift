@@ -75,6 +75,56 @@ Production recipes are in `scripts/story/`:
 - `generation/*.json` records each selected image. Initial production batches
   predate exact-prompt capture; their earlier recipes remain in Git history.
 
+## Retouching a shipped illustration (September 21, 2026)
+
+`scripts/story/editStoryArt.mjs` fixes a defect in one shipped page without
+regenerating it: it cuts a square window around the defect, sends only that
+window to a hosted instruction-following image-edit model, and composites the
+result back onto the untouched original through a feathered mask, so the
+authored composition survives and nothing outside the paste changes. Output
+goes to the gitignored `scripts/story/.edits/` with a before/after sheet and a
+per-attempt JSON; `applyStoryArtEdit.mjs <id> <edited.png> <note.json>` installs
+a reviewed result, re-encoding it exactly as `saveStoryArt.mjs` does (cover
+resize, parchment flatten, WebP q83 effort 4) and recording the model, prompt,
+window, cost and previous hash under `retouches` in
+`scripts/story/generation/<id>.json`, plus the new hash in `visual-review.json`.
+
+Know when to stop and keep the original. One removal in this pass defeated
+five attempts: a flat black void, a corner holding most of the frame's
+brightest pixels, a salmon hue that exists nowhere in the cloth, a fill
+measured too bright and too flat against the blanket it continued, and a clone
+that imported fragments of the basket handle and a leaf. The art being edited
+was hand-painted and coherent; every repair was worse than the flaw it removed.
+The original was restored. A picture that is right everywhere except for a
+small unexplained visitor beats a picture with a patch that draws the eye, and
+the revert is recorded in that image's generation record rather than hidden.
+
+Repair from the ORIGINAL, never from a damaged intermediate. Two removals in
+this pass were rejected on their first attempt and both failed the same way:
+the model was handed an image whose defect had already been cut out, could not
+see the surface it was meant to continue, and invented one. A dog on a hearth
+rug became a wedge of bare floorboards, in a hot orange brighter than anything
+else in the lower half of the frame; a hedgehog in a basket became a flat black
+void larger than any dark patch the painting itself contains. Re-running each
+edit with `--source` pointing at the pre-repair art, where the real rug and the
+real blanket are still visible beside the creature, fixed both on one call.
+Judge a fill by whether it draws the eye: an in-key repair disappears, and an
+invented surface announces itself even when the drafting is clean.
+
+Match the setting to the place the game itself shows. The Aquarium Room is the
+inside of a planted tank, so Axel's scenes are underwater; the Offering Pit is
+an outdoor rock-rimmed hole in a forest clearing, not a cellar well; and Chill's
+room is a modern office. A resident visiting another resident's room is fine,
+so this rule binds only a scene set in a resident's own space.
+
+Judge a retouch at the size the reader uses, not at 1:1. `getStorySceneLayout`
+caps the illustration at 136dp tall, so these 960x540 assets display around
+240x136; a paw that looks flat at full resolution can read correctly there,
+and a conversion that still reads wrong at that size should become a removal
+instead. Twenty-three images were corrected this way (human hands and figures,
+non-resident pets, and limbs of no identifiable species); see
+[the art coverage review](../../../docs/ART_COVERAGE_REVIEW_2026-09-19.md).
+
 New raster art is generated with the built-in image-generation tool, one image
 per beat, then reviewed against the narrative. Source PNG masters remain outside
 the runtime asset directory. Only the optimized WebPs ship in the app. Scripts,

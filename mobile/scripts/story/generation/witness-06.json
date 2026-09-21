@@ -4,6 +4,22 @@
   "sourceImage": "exec-1c402475-6950-427f-8404-1ee126878252.png",
   "width": 960,
   "height": 540,
-  "bytes": 85848,
-  "sha256": "a0d3bb252f96fd7eab8439ebdfba7451a2a9bb06139f32e619e851579780457d"
+  "bytes": 83928,
+  "sha256": "0d5e53d8afad2f95831bee74e27e57015f8a44aa67fc516c607e6b26acc8c420",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "full then crop (chained), footprint-composited",
+      "window": null,
+      "prompt": "Remove the long dark green cloth runner with the white diamond-chain border and the white vine motif that lies across the left half of the desk and hangs down over the desk's front edge in the lower left of the picture, completely. Where it was, show the desk itself continuing naturally: the warm reddish-brown wooden desk top with its horizontal plank grain lit orange by the lamp, and along the bottom of the picture the desk's dark brown front edge and the dark shadow beneath it, exactly like the bare wood already visible to the left of the stacked books and around the notebook. The folded cream envelope with the small green fern sprig stays lying flat on the desk exactly where it is, same size, same angle, same mottled paper, now resting on bare wood. The small green fringed runner under the open notebook, with its cream fringed left end, stays exactly as it is. Fill only with wood and shadow: do not add any new cloth, fabric, blanket, object, plant, animal, figure or lettering. Keep the stacked books, the brass lamp base, the clay pot and the open blank notebook exactly as they are, pixel for pixel. Keep the exact colours and brightness of the picture: warm orange lamplight, reddish-brown wood, nothing bluer, cooler or brighter. Same 16-bit pixel art rendering with visible pixel clusters and the same palette, no photographic texture, no smooth shading. Change nothing else. No human, no hand, no arm, no sleeve, no fingers, no skin.",
+      "attempts": 2,
+      "costUsd": 0.04,
+      "review": "Retouched 2026-09-21: Rule applied: rule 2 (the player folds the account, so the hand is REMOVED, object-only picture), per the brief's plan. The defect (brown human hand in a green knit sleeve holding up the envelope) spans 0.53 of the width, so the tool's crop rule would have forced full mode anyway; a1 was a single qwen full-frame call (region 0.00,0.36,0.56,1.00, --paste region, seed 11) asking for the hand and sle | critic: PASS. The brown human hand and green knit sleeve are gone entirely (no fingers, skin or cuff remain anywhere), replaced by bare plank desktop with the folded cream envelope and its fern sprig lying flat, the runner's fringed left end, the desk's dark front edge, a desk leg and floor shadow at the lo",
+      "previousSha256": "a0d3bb252f96fd7eab8439ebdfba7451a2a9bb06139f32e619e851579780457d",
+      "editedAt": "2026-09-21T10:14:33.930Z"
+    }
+  ]
 }

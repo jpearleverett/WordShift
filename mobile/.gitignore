@@ -72,3 +72,5 @@ scripts/tools/.icon-review/
 /store-output/
 # Self-contained delivery preview is saved separately; relative preview is tracked.
 /assets/Play_store/launch-2026-09-v2/preview-standalone.html
+# story retouch scratch (editStoryArt.mjs)
+scripts/story/.edits/

@@ -1,14 +1,16 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-19T19:19:36.776911+00:00",
-  "method": "Independent visual inspection against authored narrative lines, followed by per-scene sequence review and final SHA-256 reconciliation. No native device walkthrough is asserted.",
+  "reviewedAt": "2026-09-21T00:00:00+00:00",
+  "method": "Independent visual inspection against authored narrative lines, followed by per-scene sequence review and final SHA-256 reconciliation. Superseded in part on 2026-09-21: a re-audit with two independent reviews per image, a tie-break pass over every disagreement, and a separate audit against the game's own locations found human hands and figures, non-resident animals, and settings that contradicted the Aquarium Room, the Offering Pit and Chill's office. Those images were retouched in place and re-reviewed; entries carrying \"retouched\": true were corrected after the September 19 pass. No native device walkthrough is asserted.",
   "inventory": "scripts/story/story-art-prompts.json",
   "summary": {
     "expected": 185,
     "reviewed": 185,
     "passed": 185,
     "openFlags": 0,
-    "currentHashesMatched": 185
+    "currentHashesMatched": 185,
+    "retouched2026_09_21": 51,
+    "note": "currentHashesMatched is re-measured against the shipped files, not inherited from the September 19 pass."
   },
   "sceneCounts": {
     "cup": 8,
@@ -33,8 +35,10 @@
       "id": "cup-01",
       "scene": "cup",
       "asset": "assets/story/pages/cup-01.webp",
-      "sha256": "b8b8067296ee32ffb4c4875181157582acef87f7da06243fd3cc7b035efd8a54",
-      "status": "pass"
+      "sha256": "daef5c928798c4bcb8f3636f980b090daf93c1ee84137b6c7c92951bb1e42cc0",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Single defect (rule 4, stray orange-and-white cat on the window-seat blanket). The plan said it was already removed in the pre-existing t1.png, so I inspected that file instead of spending a call: opened the 960x540 composite and the original|result sheet at full size, zoomed the paste window (56,35)-(376,355) at 3x against the original, and zoomed the new blanket at 8x. The cat is gone; the seat  | critic: Passes as-is; no repair needed. Cat fully removed; blanket drawn in crisp pixel clusters in the scene's own tartan palette; pixel diff confined to the paste window (56,35)-(375,354) with 0 changed pixels outside, edge-ring mean diff 2.4 (max 13) so no seam; teapot/mugs/apples inside the window are v"
     },
     {
       "id": "cup-02",
@@ -54,100 +58,128 @@
       "id": "cup-04",
       "scene": "cup",
       "asset": "assets/story/pages/cup-04.webp",
-      "sha256": "c14c09ba1d1b6f022e39814951195f47f423a55518ec1026034877059bf8274e",
-      "status": "pass"
+      "sha256": "d7acecefbaaa87e455ad6b6dd645a91154209ecfe9f4ecd7b633ebda56ddb893",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule 1 applied (Ember speaks the line and pours): the human hand gripping the saucepan handle was converted into a red fox paw; sleeve, pan, cocoa and everything else kept. Attempt t1 (qwen crop, region 0.64,0.00,1.00,0.34, seed 11, window paste): rejected, paw was a flat orange blob at a much coarser pixel size and the model invented a second fox paw and sleeve on the table by the spoon. Attempt  | critic: Passing. Independent diff: 0 changed pixels outside the paste rect (x628-840, y0-176); inside it the only change beyond resampling noise is the paw itself and a slightly crisper outline on the handle end beneath it (x636-654, y103-117), invisible at 3x. Skin-toned pixels in the rect fell 367 -> 41, "
     },
     {
       "id": "cup-05",
       "scene": "cup",
       "asset": "assets/story/pages/cup-05.webp",
-      "sha256": "391df36483841f311af5efbb9ae5af5b81f87e985392fe1bb70064562c1433a8",
-      "status": "pass"
+      "sha256": "d64c64917e13b1f060cee00a63a95b6d09d1e2d94f416ae7fcfc84af62c4d65b",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a partial human figure in a sweater and skirt was moving the cup and a tabby cat slept by the hearth. Both are gone and the kitchen continues behind them; the chipped mug now sits at the far place, which is what the line describes. Reviewed by an independent critic and by the maintainer."
     },
     {
       "id": "cup-06",
       "scene": "cup",
       "asset": "assets/story/pages/cup-06.webp",
-      "sha256": "91fb43fdcbc460b87ab848c1b8f07f19df5bf1dee0d934af370741d53ec9dd62",
-      "status": "pass"
+      "sha256": "e75baaaaf2738f8e1718ffa9b757b655c844111de85608d3d08b821eeb307d70",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Single defect, rule 4 (non-resident creature): the calico cat asleep on the rug in front of the hearth was removed and the rug and hearth base continued; the fox paws holding the mug are untouched. All three calls used qwen in crop mode on region 0.73,0.37,0.93,0.61 with --paste region so the mug handle and green jar beside the window stayed byte-identical. a1 (seed 11) removed the cat but redrew  | critic: No repair needed. Independent diff confirms visible changes are confined to x 677-894 / y 188-340 (cat silhouette, rug, hearth base); the only pixels touched beyond that are a uniform ~3-4/255 feather ring at the crop margin, invisible at 1x. Fox paws, mug, chipped handle, jar, firewood and stove ar"
     },
     {
       "id": "cup-07",
       "scene": "cup",
       "asset": "assets/story/pages/cup-07.webp",
-      "sha256": "341432aa9cc04a6480dd13a58d044d46edb7640148c1a12c0ecaaee421f6f333",
-      "status": "pass"
+      "sha256": "459546c2babd19958fa184393f64ce2fb3334b56c9762d1d1d4a3600da618957",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule 1 (narrated \"she\" = Ember): the pink human hand gripping the saucepan handle was converted into a red fox forepaw; the green snowflake sleeve, cuff, copper pan, handle, shelves and everything else are untouched. Only the hand itself (x 345-445, y 125-200 of 960x540) was edited, not the whole 0.06-0.52 sleeve region, since the plan keeps the sleeve. Attempt paw1 (qwen crop, seed 11, region 0.3 | critic: Accepted. The human hand is fully replaced by a red fox forepaw that follows the species reference (orange-russet back with darker shading, cream underside, dark claws), keeps the hand's size and grip on the handle, and leaves the sleeve, cuff, pan and everything outside the 312-485 x 94-230 paste r"
     },
     {
       "id": "echo-01",
       "scene": "echo",
       "asset": "assets/story/pages/echo-01.webp",
-      "sha256": "72ffaea69cb790d98400ed52c614486bf755485123af0151843aff52b04c77f3",
-      "status": "pass"
+      "sha256": "bf1d2dc305ffcc2b62415018d1925d07dd36e19348becea5d484c94b19aa0bc1",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-02",
       "scene": "echo",
       "asset": "assets/story/pages/echo-02.webp",
-      "sha256": "53e09887d2583fc1cfaa99869b04e692b00d76a7876f9148e374efaae8d096cb",
-      "status": "pass"
+      "sha256": "1ca7c825319ede962148e5dba8ed5c1612ca1beb7063d231d358e7f703d3d6a6",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-03",
       "scene": "echo",
       "asset": "assets/story/pages/echo-03.webp",
-      "sha256": "5b65f94026ec144418f5014ad5704fce71316f577109669e5d850fa9d9e76827",
-      "status": "pass"
+      "sha256": "de7e75cb5e130632de597349410681f568cec9d050faa249ce9bb6e18278a291",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-04",
       "scene": "echo",
       "asset": "assets/story/pages/echo-04.webp",
-      "sha256": "bd18862434ac7092835421ae836902dd4b33888d391432e12f4b413992092d79",
-      "status": "pass"
+      "sha256": "5ae3bfa556dfa3200665d19aea0042d2a034829144d445cc49f44882b13511cf",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-05",
       "scene": "echo",
       "asset": "assets/story/pages/echo-05.webp",
-      "sha256": "07c805f25b53e82a4c7415afd394e20a7e68d5a67342171162f1038508aa390d",
-      "status": "pass"
+      "sha256": "b248209a1f01b566f544d1d108e87439ab507354e1868e352a0968848146cb00",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "echo-06",
       "scene": "echo",
       "asset": "assets/story/pages/echo-06.webp",
-      "sha256": "d5a4b5a8d7699ba663e3c16b56d192a06fa7dc0d33e1918e1de755f54ebdeedf",
-      "status": "pass"
+      "sha256": "9c568864df336b47a07862a3153a09d66648ddd55363b5a86e4f1761833e799e",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "witness-01",
       "scene": "witness",
       "asset": "assets/story/pages/witness-01.webp",
-      "sha256": "98edfbbd27635846f43b062415808fb95b95d4597bc6bc625f3535c2a58f9f0d",
+      "sha256": "468f682b4c7087690e8028005e1d6154572651e8ed3551412c47dca1565844d5",
       "status": "pass",
-      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable.",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule 2 applied (the narration says \"You write down...\" so the player acts and is never drawn): the fox foreleg/paw on the sheet was REMOVED, and the curled grey-brown fur shape in the bottom-left corner (the plan's secondary inspection item; it was present) was removed in the same call. One qwen crop-mode call (attempt a1-remove-arm-and-fur, region 0.00,0.44,0.50,1.00 covering both defects, --past | critic: PASS. Both defects removed (fox foreleg/paw off the sheet; grey-brown fur lump in the bottom-left corner replaced by leaf-patterned rug). Independent diff: zero changed pixels outside the paste rect 0,213..504,540; top seam (y 213) and right seam (x 480-504) invisible at 4x; paper's completed left e"
     },
     {
       "id": "witness-02",
       "scene": "witness",
       "asset": "assets/story/pages/witness-02.webp",
-      "sha256": "3e22c8e6c2d9f9f13de9af6e9b0cee6d46ddc6d9153bf8d86c80044fae808450",
-      "status": "pass"
+      "sha256": "ab86cb8ac8d64033db0e28e17730d1f9c86aef20e828be7e8ad39b14e43b1a03",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Started from t1.png (prior round: human hand already converted to Ember's fox forepaw; inspected against the original sheet and accepted: orange-russet pixel paw with darker shading, dark claws pinching the page, green knitted sleeve and the whole right half otherwise identical). Defect this round: the grey tabby cat on the window-seat cushions (rule 4, remove and continue cushions + blanket). Two | critic: No repair needed. Cat fully removed (no residual silhouette at 3x/5x); diff versus t1 confined to x 301-479 / y 206-276 inside the defect region; cushions, blanket seam and the rest of the frame unchanged; fill is pixel-clustered knit tone-matched to the dim surroundings with no visible seam; inheri"
     },
     {
       "id": "witness-03",
       "scene": "witness",
       "asset": "assets/story/pages/witness-03.webp",
-      "sha256": "2ed338104699aa1e0fd873ed8835234a870761ce364f411225d786b3d54ed0fb",
-      "status": "pass"
+      "sha256": "590f3fbcbab62e00189bb2eb221ace5efa61c0b7416ee7eb6f5e205319160503",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Defect: stray grey tabby cat on the green cushion by the window (rule 4: remove, continue cushion and chair). Attempt a1 (qwen crop, region 0.72,0.26,1.00,0.54, seed 11) removed the cat cleanly and continued the cushion as a dark moss-green waffle-knit top with the chair rails, stone wall, sill and ivy intact, but the tool's default 425px paste window also re-rendered the window sky (orange-purple | critic: PASS. The grey tabby is fully removed with no residual fur, ear or white-bib pixels; the bench cushion is continued as a flat waffle-knit top over the untouched original front roll, and the chair rails, stone wall, sill, ivy, dice-cube box and book stack inside the paste rectangle are faithful re-re"
     },
     {
       "id": "witness-04",
       "scene": "witness",
       "asset": "assets/story/pages/witness-04.webp",
-      "sha256": "d824c76c6d4d5fcc31d42341107ec4629d804ee8c760c1453db00c7f7f301931",
-      "status": "pass"
+      "sha256": "987ba7b018cabf98e631db8f675cdc85291482aa17ed16d1f0b2f446c6a80b57",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Base: the rejected local-assembly6.png (its bottom-left removal, defect 2, was accepted and is kept byte-identical). Two model calls were made first, chained from that base, one edit per call in tight 320px windows as the critic advised: d1-rabbit (qwen, region 0.41,0.10,0.55,0.44, window 301,0-621,320) and d2-wombat (qwen, region 0.57,0.60,0.77,0.84, window 484,220-804,540). Both came back as the | critic: PASS. All three defects resolved per plan: rabbit paw remapped in place to grey-brown (mean 165,107,63 -> 109,77,56, now darker than the paper so it no longer reads as white), silhouette/fur texture/green cuff untouched, no halo or unconverted highlight at 8x; viewer paw+sleeve removed with the pen "
     },
     {
       "id": "witness-05",
@@ -160,15 +192,19 @@
       "id": "witness-06",
       "scene": "witness",
       "asset": "assets/story/pages/witness-06.webp",
-      "sha256": "a0d3bb252f96fd7eab8439ebdfba7451a2a9bb06139f32e619e851579780457d",
-      "status": "pass"
+      "sha256": "0d5e53d8afad2f95831bee74e27e57015f8a44aa67fc516c607e6b26acc8c420",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule applied: rule 2 (the player folds the account, so the hand is REMOVED, object-only picture), per the brief's plan. The defect (brown human hand in a green knit sleeve holding up the envelope) spans 0.53 of the width, so the tool's crop rule would have forced full mode anyway; a1 was a single qwen full-frame call (region 0.00,0.36,0.56,1.00, --paste region, seed 11) asking for the hand and sle | critic: PASS. The brown human hand and green knit sleeve are gone entirely (no fingers, skin or cuff remain anywhere), replaced by bare plank desktop with the folded cream envelope and its fern sprig lying flat, the runner's fringed left end, the desk's dark front edge, a desk leg and floor shadow at the lo"
     },
     {
       "id": "witness-07",
       "scene": "witness",
       "asset": "assets/story/pages/witness-07.webp",
-      "sha256": "870c3598eba1a7a74c30257d2a6d72520e99a8e284d29e5de45160441fdacfa0",
-      "status": "pass"
+      "sha256": "7dac2079b2f4139451fe1683354761d6dcf164b9840599eff906dea0c86fe8f9",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: PLAN FOLLOWED (option b from the critic): chained the paw conversion from the previous round's a2-remove-right-full.png (right hand + grey-brown sleeve already removed cleanly; desk wood and embroidered runner continue to the right edge), so the delivered PNG carries BOTH halves of the plan: the grey-brown-sleeved hand removed, and Ember's green-sleeved hand converted to a red fox forepaw. Ember ( | critic: PASS. Independent diff against the shipped witness-07.webp: 0 pixels changed outside the two paste rects (paw 225..533x219..397, right 616..960x289..540); content inside the rects that should be unchanged (wax seal, envelope body, notebook corner, chair leg, log basket, braided rug) keeps shape, pal"
     },
     {
       "id": "supper-01",
@@ -204,36 +240,46 @@
       "id": "supper-05",
       "scene": "supper",
       "asset": "assets/story/pages/supper-05.webp",
-      "sha256": "e8738d3fbea589a19c9394189345e140ee07fd5ab11367540b89ac7061966dc2",
-      "status": "pass"
+      "sha256": "fda10352550cdd737662181282255eb366a5cb7f6567fc991b3bdddd8c8aab32",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Based on edits/supper-05/a2r.png as the critic asked (not the original). Because three prior qwen attempts all produced chunky sprite-style paws with black outlines, I redrew the paw and sleeve procedurally at the scene's own pixel scale (renderer saved beside the result as final_v2.render.js). Steps: (1) built a mask of the old sprite paw/sleeve from its exact flat palette plus >=4px flat-block d | critic: Passing: the digit-less shaggy stump is gone; the new forepaw is a plausible small red-fox paw (domed russet dorsum, four short rounded toes with dark claws hooked over the loop, cream wrist strip, no thumb, 1 px dithered fur matching the teapot's speckle) and the olive cable-knit sleeve reads as a "
     },
     {
       "id": "supper-06",
       "scene": "supper",
       "asset": "assets/story/pages/supper-06.webp",
-      "sha256": "827c5e80d69ebe2e7e0942c038f009761443865f58f29670f36342215b9e2b62",
-      "status": "pass"
+      "sha256": "ad5135bf1f4b3778b69fcc9d5c0e171597847321fbd1856d831735ec0d0a9d73",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a tabby cat asleep by the stove is gone and the rug continues. Thyme and Axel stay at the table; an axolotl in another resident room is fine. Reviewed by an independent critic and by the maintainer."
     },
     {
       "id": "supper-07",
       "scene": "supper",
       "asset": "assets/story/pages/supper-07.webp",
-      "sha256": "da713be13298dd046b68233424276da65cd947d0246a4982e9401939248eedc0",
-      "status": "pass"
+      "sha256": "4c7e5b44ce2d85f158295909b71a8bb7053aaa1cab8214da6294ae4cda0f4346",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a cat asleep on the fireside chair is gone and the cushion continues. Reviewed by an independent critic and by the maintainer."
     },
     {
       "id": "supper-08",
       "scene": "supper",
       "asset": "assets/story/pages/supper-08.webp",
-      "sha256": "75dda0053891a81a269c1994e69d273434f0ba1110288c8a7e3574b1afed15dc",
-      "status": "pass"
+      "sha256": "2f8f07041edfae09375f1ec4130808bca2f5b3be7fffe105a160cce70dc1bdcd",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule applied: the limb belonged to an unidentifiable dark badger-like creature (white stripe, not a resident), so per the plan it was REMOVED rather than converted. Region 0.00,0.10,0.36,0.66 (widened from the brief's 0.00,0.12,0.38,0.64), qwen crop mode (532px window at the left edge), --paste region so only the defect box plus 24px margin was blended back. a1 (seed random, $0.02): creature fully | critic: Passing. Creature, sleeve, paw and edge fur tuft are gone; diff confirms all changes lie within x 0..367 / y 37..378 and the right 60% is byte-identical. Kettle handle/lid/finial, hearth base, table edge and the small bowl under the former sleeve are continued convincingly; both feathered seams are "
     },
     {
       "id": "supper-09",
       "scene": "supper",
       "asset": "assets/story/pages/supper-09.webp",
-      "sha256": "6399a54b62cdd8008bb55fed7c7c13a565da9be7e893307b36d18b2d1feaa6dd",
-      "status": "pass"
+      "sha256": "83968b05bac8381b8df1715867342df734eed158ef2ae373b63b6eba162d237a",
+      "status": "pass",
+      "retouched": true,
+      "note": "Re-done 2026-09-21 after an independent review failed the first repair: it had replaced a band of the kilim rug with invented bare floorboards that were the brightest thing in the lower half of the frame. This repair was made from the ORIGINAL image, where the real rug is still visible next to the dog, so the fill continues the actual pattern and value instead of inventing a surface."
     },
     {
       "id": "supper-10",
@@ -405,29 +451,37 @@
       "id": "plum-01",
       "scene": "plum",
       "asset": "assets/story/pages/plum-01.webp",
-      "sha256": "5b83bc48ea68f2fd53d1e787f689c6ebb9e06bf749c1e5ff9b02789847beab50",
-      "status": "pass"
+      "sha256": "4d5fd9daa0e41a5cee32c5f48fc5c981f321c0cb609ca6512ec079f0fb11295e",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "plum-02",
       "scene": "plum",
       "asset": "assets/story/pages/plum-02.webp",
-      "sha256": "db4213d94420538fda8d8d39c6c827aeab19afdd36eefb3beaa8a39279e22032",
-      "status": "pass"
+      "sha256": "68dc59464d99acb46a7cafb741d7b81a29004acb18ed0e104eb3e2d10946da4d",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "plum-03",
       "scene": "plum",
       "asset": "assets/story/pages/plum-03.webp",
-      "sha256": "db9785d5cb937331c87a041cd7e3069ddad7f8cbaa85fbb2085122845ee7b161",
-      "status": "pass"
+      "sha256": "c14c471e9ce8538cd05a5e53a0754decdaff94186b913fd8afa09f3f977bc15e",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "plum-04",
       "scene": "plum",
       "asset": "assets/story/pages/plum-04.webp",
-      "sha256": "e49d8389e7fbf3f81c6c7dc68a0d05fa1e6c7a0da3aeb9f00a46df0aeef6433f",
-      "status": "pass"
+      "sha256": "162ddc14dd6f72353380b9b02fcc67b8a2da09fb087abd592a060a97a0fc2ec8",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "plum-05",
@@ -447,36 +501,46 @@
       "id": "plum-07",
       "scene": "plum",
       "asset": "assets/story/pages/plum-07.webp",
-      "sha256": "559b12054ac510fce5eb258f6a86b43fa49cc649a8687d1be03c3a10f9c506f1",
-      "status": "pass"
+      "sha256": "a7466054a70917135084a94e838ec4ed599d6ad4af3c48f9285aac299c6abd83",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "plum-08",
       "scene": "plum",
       "asset": "assets/story/pages/plum-08.webp",
-      "sha256": "925c647a24f7eae2818305cdcb5082e31542689866d10f84898673a0caf79bc8",
-      "status": "pass"
+      "sha256": "bb17c02ce6fd044ba068e2312f002063cda6fa83a85da3e43f6c5f56c8a76818",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency follow-up, 2026-09-21: the pit is outdoors and PLUM lives in a room-sized planted tank, so a trapdoor onto a masonry well in the parlour floor, a fish tank on a kitchen sideboard and a goldfish bowl on the porch table all contradicted the places the game shows. Each was removed and the room continued behind it."
     },
     {
       "id": "record-01",
       "scene": "record",
       "asset": "assets/story/pages/record-01.webp",
-      "sha256": "45e1da68c4ab1cd76565dcad3521f004124f769a9140b4778d1abac6ff9bd9ed",
-      "status": "pass"
+      "sha256": "002e345b73e99cec65526f133350174066e4abc5c7dfa4e16d8090d5d0c65b70",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-02",
       "scene": "record",
       "asset": "assets/story/pages/record-02.webp",
-      "sha256": "4206b8032586ab98f9c3416c9ab96606449c89ca876faf0565251260968218e8",
-      "status": "pass"
+      "sha256": "9bdb59d7c956f133522b41667f94f58ae6189ebc4cb5c3102c61f3507fea768e",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-03",
       "scene": "record",
       "asset": "assets/story/pages/record-03.webp",
-      "sha256": "20169e42b728094d4f3b0b0facd68d66ac16c55220096deda557bc10d6ef5e2f",
-      "status": "pass"
+      "sha256": "7ca17882937fce5071b7889e6ef97d1765b18e55acc4af778c82426a0b6abe72",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-04",
@@ -496,29 +560,37 @@
       "id": "record-06",
       "scene": "record",
       "asset": "assets/story/pages/record-06.webp",
-      "sha256": "d48af50e86ae171775f1365e32fd074a9cc73ee46849f8ed9b77ead05a103582",
-      "status": "pass"
+      "sha256": "c9c885a51f656241107cff0352fb28a5b35049f9ced00f489a3af829a1cdf5d1",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Defect: heavy dark bear-like forepaw entering from the left, resting on the pressed-plant pages. Plan was to redraw it as Ember's slim red fox forepaw, else remove. Two conversion attempts (qwen crop, region 0.00,0.40,0.34,0.90, seeds 11 and 4242) both failed rule 7: a1 produced a flat saturated cartoon fox leg with a hard black outline (nothing like the painterly textured fur of the picture) alth | critic: Accept a3-remove-tight.png. Pixel diff confirms the edit is confined to x 0..266, y 284..460 (0 changed pixels outside the claimed mask); the invented post is absent, the small mushroom sketch, throw, chair and tray are byte-identical. The bear paw and claws are fully gone with no fur ghost at any s"
     },
     {
       "id": "record-07",
       "scene": "record",
       "asset": "assets/story/pages/record-07.webp",
-      "sha256": "76d53bfff27d9b02b91c10e521a2bd166293cca9d53a4beaca3910920101b5da",
-      "status": "pass"
+      "sha256": "988b04ce5085222fbb31f580b6e5798131b9e9d17317886d3720c174032b7ebc",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Rule applied: the line is narration (\"you and Ember compare the pages\"), so the pink four-fingered hand (gilled, axolotl-like) in the green sleeve at the lower right is the player's and was REMOVED per the plan, not converted. Attempt a1 (qwen, crop window 428,8 532px, --paste region so the lamp/ledger inside the window stayed untouched, seed 11): hand, gill fronds and sleeve gone; the loose sheet | critic: PASS on a1.png. Verified: hand, gill fronds and green sleeve are gone (strict skin-pink scan of the paste rect x>=590,y>=310: 0 px in a1 vs 1491 in the original); 0 pixels changed outside the paste rect; the paste edge is feathered (mean diff 0 at col 589, 1.1 at 590, ~9 by 600), and the y=310 bound"
     },
     {
       "id": "record-08",
       "scene": "record",
       "asset": "assets/story/pages/record-08.webp",
-      "sha256": "2b56c16125334eb4be094d13b5b305b94d91ae42ddda8ab3a6efce7810f9704f",
-      "status": "pass"
+      "sha256": "3fe4579cdd6c5631e8e8fc3ac379facf6e2fd3a1f95657c9361ed17ab7f48e1b",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Base kept as a1-hand.png (accepted hand removal; right half untouched). Foreleg pass redone from a1 with region 0.00,0.26,0.50,0.97 and --paste region as the critic asked.\n\nAttempts this round (3 paid calls, $0.074): a4 qwen seed 41 with the painterly/no-outline/dark-stockings prompt: qwen again drew an outlined sprite limb, this time almost entirely black (92 black-next-to-orange edge pixels, sam | critic: PASS, no repair required. Verified: (1) the pink human hand and its sleeve at lower right are gone; the loose page continues to its corner over a second sheet, the desk grain runs through and the lamp throws a blocky warm reflection on the wood, consistent with the picture's other highlights. (2) Th"
     },
     {
       "id": "record-09",
       "scene": "record",
       "asset": "assets/story/pages/record-09.webp",
-      "sha256": "36dc608f747f720fad93b001876a8189661ad79b2b1a37f200bf3ed1625b493d",
-      "status": "pass"
+      "sha256": "5dea26164d3d962efffbc6eb6824c6bdcbc0539692686acf74ecf85096a69256",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-10",
@@ -539,9 +611,11 @@
       "id": "record-12",
       "scene": "record",
       "asset": "assets/story/pages/record-12.webp",
-      "sha256": "ad5888d8db5070609c3d170c20ba0e193837a5888b8f00a8a5f2927bf187961b",
+      "sha256": "71e8909e64385f0f1d6fb276c2cdbb11bba2c4de7b05174ce3c100756f58d5bc",
       "status": "pass",
-      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable.",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "record-13",
@@ -755,43 +829,55 @@
       "id": "returned-01",
       "scene": "returned",
       "asset": "assets/story/pages/returned-01.webp",
-      "sha256": "fa05181684d9333d071ef3a50f8b2603c876a9b0191683d81dd02d7a0582041b",
-      "status": "pass"
+      "sha256": "45d02b02e155c1f298c8d4c6b3f02358a8aafcd6847ac43e753d29689cf6342a",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "returned-02",
       "scene": "returned",
       "asset": "assets/story/pages/returned-02.webp",
-      "sha256": "d1034f671b2945b4840edf549f06bc4b3a6720c0efa95e277a6f1f0b76aff084",
-      "status": "pass"
+      "sha256": "61d7559e3c0caf9f9f67c3346b435bc2ae0fd1c8d3f477b0d23d59da0bc2697a",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency follow-up, 2026-09-21: an independent location audit found these still read as a tank viewed from outside the glass, because a rim survived the first conversion. The water now fills the frame."
     },
     {
       "id": "returned-03",
       "scene": "returned",
       "asset": "assets/story/pages/returned-03.webp",
-      "sha256": "4051c508df1ad446815561579f4c6f85fc73c1276aeb0ffb15cd70dc60ceec21",
-      "status": "pass"
+      "sha256": "d062a0d9dc3755dc27e5e3ee7280fb1534fa51e492765c38e9c922e8fd7175a5",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency follow-up, 2026-09-21: an independent location audit found these still read as a tank viewed from outside the glass, because a rim survived the first conversion. The water now fills the frame."
     },
     {
       "id": "returned-04",
       "scene": "returned",
       "asset": "assets/story/pages/returned-04.webp",
-      "sha256": "af2017e26de28f4ebeb254b96f2aa0979e3130962399468eb4679979e593f37a",
-      "status": "pass"
+      "sha256": "6b0a5a6d5c942521b2ae8917ee016cdfa2ddb4f809a83283f44257b6ba5894df",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "returned-05",
       "scene": "returned",
       "asset": "assets/story/pages/returned-05.webp",
-      "sha256": "3ff7cc73bbd38d1667dab5ba51786c040a1b359be9f986e38b787dece1f301ad",
-      "status": "pass"
+      "sha256": "b582bf2a815b52883ddf5a3e2b9eb743783dc08a878de6cc9d4364d2bef1ea64",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "returned-06",
       "scene": "returned",
       "asset": "assets/story/pages/returned-06.webp",
-      "sha256": "760d488a3a368e619650c68b76d409f0ac9d72b79648caaaaf2f2fdda459b7df",
-      "status": "pass"
+      "sha256": "3a20aa50675f4f2f7928a0d49aa0f5ce3b0fd6c8b9e35a68f533d93d5235dd21",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency follow-up, 2026-09-21: an independent location audit found these still read as a tank viewed from outside the glass, because a rim survived the first conversion. The water now fills the frame."
     },
     {
       "id": "returned-07",
@@ -843,9 +929,11 @@
       "id": "council-03",
       "scene": "council",
       "asset": "assets/story/pages/council-03.webp",
-      "sha256": "6884fa1e436c6fdd496b8d6bc21cdbad27d2e5786ce59720f53a3a6c5f732dd7",
+      "sha256": "bae217665c6e4f1820eced912c8f363034dd752e2a09b77e2583eb839449f747",
       "status": "pass",
-      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable.",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: a cat asleep on the windowsill is gone and the sill and plant continue. Reviewed by the maintainer."
     },
     {
       "id": "council-04",
@@ -942,8 +1030,10 @@
       "id": "after-05",
       "scene": "after",
       "asset": "assets/story/pages/after-05.webp",
-      "sha256": "a67d9dd5ee98ac090772ad41927bf7d110524e043274989a5cdfe6d5a7029479",
-      "status": "pass"
+      "sha256": "374b32871a6a6328ff0976bca8133c496fe3211252e29011d1d798ccf90b9882",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency follow-up, 2026-09-21: the pit is outdoors and PLUM lives in a room-sized planted tank, so a trapdoor onto a masonry well in the parlour floor, a fish tank on a kitchen sideboard and a goldfish bowl on the porch table all contradicted the places the game shows. Each was removed and the room continued behind it."
     },
     {
       "id": "after-06",
@@ -1026,8 +1116,10 @@
       "id": "after-17",
       "scene": "after",
       "asset": "assets/story/pages/after-17.webp",
-      "sha256": "3ee72d2a8e951b91753c7d720612d0c229e322d26aa406cc82695c725ee8124a",
-      "status": "pass"
+      "sha256": "eae56ee3c93828c0701bc2aebf494dd8396600eb4cd9facd446ce17016397c65",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency follow-up, 2026-09-21: the pit is outdoors and PLUM lives in a room-sized planted tank, so a trapdoor onto a masonry well in the parlour floor, a fish tank on a kitchen sideboard and a goldfish bowl on the porch table all contradicted the places the game shows. Each was removed and the room continued behind it."
     },
     {
       "id": "after-18",
@@ -1055,7 +1147,9 @@
       "scene": "reply",
       "asset": "assets/story/pages/reply-03.webp",
       "sha256": "7553e451f26d19babe7681b015e55751450bc0b9e5a642b46aa8acf163a513b8",
-      "status": "pass"
+      "status": "pass",
+      "retouched": false,
+      "note": "Original art retained; see the revert note in scripts/story/generation/reply-03.json."
     },
     {
       "id": "reply-04",
@@ -1089,8 +1183,10 @@
       "id": "reply-08",
       "scene": "reply",
       "asset": "assets/story/pages/reply-08.webp",
-      "sha256": "4d22376b6c30f545b397bb1aa4a6c3ce82fc4d01a60de796469ea04e22def3ae",
-      "status": "pass"
+      "sha256": "fad83416ab049bb95980d504c21ea221b0d09d75d5624b12f3dc5d0cfac5ca8d",
+      "status": "pass",
+      "retouched": true,
+      "note": "Retouched 2026-09-21: Both defects are rule 4 (stray creatures, narrator line, no actor): the cat asleep on the left armchair's fern blanket and the songbird on the windowsill were removed and the blanket/cushion and sill continued. Attempt 1 (cat-a1, qwen crop, region 0.07,0.39,0.33,0.67 -> window 0,87,398x398, seed 11): the cat was gone but qwen restyled the whole window into a flat saturated green chair and a hard h | critic: PASS. Both stray creatures (cat on the left armchair, songbird on the sill) are cleanly removed; the fern blanket, olive cushion, sill and lake view continue naturally in the same 16-bit dithered rendering and muted palette. Changes are confined to the artist's 398px window (zero diff outside it); i"
     },
     {
       "id": "reply-09",
@@ -1147,9 +1243,11 @@
       "id": "old_mark-07",
       "scene": "old_mark",
       "asset": "assets/story/pages/old_mark-07.webp",
-      "sha256": "0f7a46e7305c4d66cd3a615457f7dca96d5a3cdabe1adb8c4631a2069359ed85",
+      "sha256": "3539c8fb413f985d08e442b9a02baa7f14c6ddc595ce082f457fb144ac560c35",
       "status": "pass",
-      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable."
+      "normalizationReview": "Semantic approval carried across content-preserving alpha flattening; output remains readable.",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: these pages are the branch of the scene where Chill the capybara speaks about his own ledger, so they belong in his room, which the game draws as a modern office. They had been drawn as a rustic cottage desk with an oil lantern and a quill. The owner confirmed a modern office with modern tools is right for him. The paper ledger, ink and pen stay because the dialogue names them. Shared pages of the same scene, which also serve the variant where Chill has not been invited, were deliberately left as ordinary house interiors."
     },
     {
       "id": "old_mark-08",
@@ -1256,8 +1354,10 @@
       "id": "echo-recollection",
       "scene": "echo",
       "asset": "assets/story/pages/echo-recollection.webp",
-      "sha256": "bf8407bf6c7aaa0c93c5111579afd84ebac99bd31843cc51d241b641ff9b5fa6",
-      "status": "pass"
+      "sha256": "a45ddffe4075895b1f15832c022827940ada6a495ef249bff36685a87f29523f",
+      "status": "pass",
+      "retouched": true,
+      "note": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size."
     },
     {
       "id": "witness-recollection",
@@ -1291,15 +1391,19 @@
       "id": "plum-recollection",
       "scene": "plum",
       "asset": "assets/story/pages/plum-recollection.webp",
-      "sha256": "3e53ff14dddf50e4a8476e822674fb54502f733391a12a122f1b684390e25f63",
-      "status": "pass"
+      "sha256": "5eebb3ea1087f377335c4bf2f77f1f1aa9b32914d9c2f59f41a019e6c895c2b4",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: this retrospective card serves both the axolotl and the non-axolotl variant of its scene, so it carries no aquarium at all; a tank standing in a dry parlour contradicted the aquarium room, which is the inside of the water."
     },
     {
       "id": "plum_recruited-recollection",
       "scene": "plum_recruited",
       "asset": "assets/story/pages/plum_recruited-recollection.webp",
-      "sha256": "e0896f551582e04139a380ed956685e2a9d1778211eec16031c35033482d9f40",
-      "status": "pass"
+      "sha256": "4b6399580750488bff6c9804a8480d50e7081008577aa846b6de82312120a4c9",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size."
     },
     {
       "id": "record-recollection",
@@ -1326,8 +1430,10 @@
       "id": "returned-recollection",
       "scene": "returned",
       "asset": "assets/story/pages/returned-recollection.webp",
-      "sha256": "e16c3daf71d4d8159aa4a865a0ef97f097855519fd389d2365cfbdf1c82839ca",
-      "status": "pass"
+      "sha256": "f124a692ab18ffb2ff98532c1d60b550bcd699df293a8809e2516a9064060dcd",
+      "status": "pass",
+      "retouched": true,
+      "note": "Room consistency, 2026-09-21: this retrospective card serves both the axolotl and the non-axolotl variant of its scene, so it carries no aquarium at all; a tank standing in a dry parlour contradicted the aquarium room, which is the inside of the water."
     },
     {
       "id": "council-recollection",

@@ -4,6 +4,22 @@
   "sourceImage": "exec-7de5c8c8-d17c-4874-96da-fa881586807b.png",
   "width": 960,
   "height": 540,
-  "bytes": 93568,
-  "sha256": "d5a4b5a8d7699ba663e3c16b56d192a06fa7dc0d33e1918e1de755f54ebdeedf"
+  "bytes": 59762,
+  "sha256": "9c568864df336b47a07862a3153a09d66648ddd55363b5a86e4f1761833e799e",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Re-set the scene at the Offering Pit as the game draws it: outdoors below the cottage, a sunken ring of rock around a deep dark opening with a cool teal glow at the rim, moss, boulders, mushrooms, pines and distant mountains under a dusk-to-night sky. Remove the cellar, masonry well shaft, standing water, bucket, rope, ladder, shelves and furniture.",
+      "attempts": 1,
+      "costUsd": 0.027,
+      "review": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size.",
+      "previousSha256": "d5a4b5a8d7699ba663e3c16b56d192a06fa7dc0d33e1918e1de755f54ebdeedf",
+      "editedAt": "2026-09-21T10:42:22.528Z"
+    }
+  ]
 }

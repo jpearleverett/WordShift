@@ -7,11 +7,35 @@
   "webpQuality": 83,
   "encoderEffort": 4,
   "flattenBackground": "#f2e5bc",
-  "bytes": 107236,
-  "sha256": "d1034f671b2945b4840edf549f06bc4b3a6720c0efa95e277a6f1f0b76aff084",
+  "bytes": 94582,
+  "sha256": "61d7559e3c0caf9f9f67c3346b435bc2ae0fd1c8d3f477b0d23d59da0bc2697a",
   "generatedAt": "2026-09-19T19:17:15.859Z",
   "prompt": "Create a distinct next story-page illustration using this reference for WordShift's exact aquarium and orange-gold fish design. Landscape 16:9 rich sophisticated 16-bit storybook pixel art with visible carefully placed pixel clusters. Depict one small elderly orange-gold fish with a worried face and the same little notch missing from its fin, swimming along an eerily regular circular route within the SAME RECTANGULAR GLASS AQUARIUM as the reference. Its motion is suggested only by a faint naturally curved bubble wake in the water; no arrows, dashed lines, circles drawn over the image, diagrams or UI. Place the fish near the front-left portion of the tank facing along its route, with driftwood and aquatic plants behind. Frame slightly closer on the aquarium so this image differs clearly from the reference; remove the framed fish picture entirely and show only a little of the surrounding wooden table, amber lamplight and blue midnight window. Preserve the fish's recognizable color, worried face, size and fin notch. ONE fish, no duplicates or reflections reading as another fish; no monster, dead fish, bowl or round vessel. No people, no human faces, no other characters, no readable text, symbols or lettering. This is the exact story beat: something with the old fish PLUM's worried face swims the same complete circuit repeatedly, without stopping. The illustration shows a quiet uncanny instant, not a diagram or collage.",
   "promptSha256": "3859c9e7c42a2986c33f8f8ae59dfa97deefce9eecec6efbfcd6dc987b172465",
   "referenceImage": "exec-81652bbf-95ab-4c90-be39-66799adaa116.png",
-  "correctionReason": "Keep rectangular aquarium continuity; replace diagram arrows with a subtle natural bubble wake"
+  "correctionReason": "Keep rectangular aquarium continuity; replace diagram arrows with a subtle natural bubble wake",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Move the viewer INSIDE the tank: expand the aquarium water to fill the whole frame and remove the cottage room, glass, stand and furniture, continuing the plants, sunken wood, rocks and sand with light rays and bubbles.",
+      "attempts": 1,
+      "costUsd": 0.027,
+      "review": "Room consistency, 2026-09-21: Axel the axolotl LIVES in the water (the aquarium room art is the inside of a planted tank), so a scene shot from a dry parlour looking into a small tank on a sideboard contradicted the game world. Reviewed by the maintainer at full size and at the in-game delivery size.",
+      "previousSha256": "d1034f671b2945b4840edf549f06bc4b3a6720c0efa95e277a6f1f0b76aff084",
+      "editedAt": "2026-09-21T10:36:00.710Z"
+    },
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Remove every glass pane, tank rim and frame so the water and its plants run off all four edges, as if the viewer were in the water.",
+      "attempts": 2,
+      "costUsd": 0.054,
+      "review": "Location consistency follow-up, 2026-09-21: an independent location audit found these still read as a tank viewed from outside the glass, because a rim survived the first conversion. The water now fills the frame.",
+      "previousSha256": "fbb3c5bd490631f7b50820e5cc843ce52c5a2f430256ff07f4222f44674906b3",
+      "editedAt": "2026-09-21T11:01:47.936Z"
+    }
+  ]
 }

@@ -4,6 +4,22 @@
   "sourceImage": "exec-159305c6-3d6a-4eb4-95ee-b16d5bfeb084.png",
   "width": 960,
   "height": 540,
-  "bytes": 118878,
-  "sha256": "391df36483841f311af5efbb9ae5af5b81f87e985392fe1bb70064562c1433a8"
+  "bytes": 106998,
+  "sha256": "d64c64917e13b1f060cee00a63a95b6d09d1e2d94f416ae7fcfc84af62c4d65b",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen-image-edit-2511",
+      "mode": "crop",
+      "window": null,
+      "prompt": "Remove the non-resident creature and continue the surface behind it.",
+      "attempts": 3,
+      "costUsd": 0.06,
+      "review": "Retouched 2026-09-21: a partial human figure in a sweater and skirt was moving the cup and a tabby cat slept by the hearth. Both are gone and the kitchen continues behind them; the chipped mug now sits at the far place, which is what the line describes. Reviewed by an independent critic and by the maintainer.",
+      "previousSha256": "391df36483841f311af5efbb9ae5af5b81f87e985392fe1bb70064562c1433a8",
+      "editedAt": "2026-09-21T11:02:12.782Z"
+    }
+  ]
 }

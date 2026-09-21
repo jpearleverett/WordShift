@@ -4,9 +4,25 @@
   "sourceImage": "exec-e7b8dd19-d3cf-46bb-8135-7220e3e606be.png",
   "width": 960,
   "height": 540,
-  "bytes": 103136,
-  "sha256": "07c805f25b53e82a4c7415afd394e20a7e68d5a67342171162f1038508aa390d",
+  "bytes": 72790,
+  "sha256": "b248209a1f01b566f544d1d108e87439ab507354e1868e352a0968848146cb00",
   "generatedAt": "2026-09-19T18:47:53.243Z",
   "prompt": "Use case: illustration-story. Asset type: one finished landscape 16:9 story-page illustration for WordShift, an intimate woodland-cottage pixel-art game. Depict this exact authored narrative moment: \"I could call this a coincidence, friend. I would like that word to be some help. It is not.\". Setting: an old round dark stone well-like ritual pit beneath a woodland cottage; no monster visible. Wide quiet view of the ancient stone ritual rim below the cottage, amber lamplight, a still reflection and a few completely BLANK wooden letter tiles nearby. No paper or notebook; illustrate uncertainty without writing the spoken line. Create a distinct composition centered on the action or emotional detail in THIS sentence; do not reproduce a generic two-cups-and-notebook table. For spoken abstract thoughts, illustrate the specific setting, relevant object, and relationship described, without adding plot events. Visual style: sophisticated 16-bit storybook pixel art, clearly visible carefully placed pixel clusters, dimensional amber light and cool blue shadows, walnut wood and moss-green textiles, tactile handmade objects, strong readable silhouette at phone size. Rich finished art, not vector icons and not photorealism. NO PEOPLE, NO HUMAN CHILDREN, NO HUMAN FACES, NO HUMANOIDS, NO FULL CHARACTERS. The residents are woodland ANIMALS, never humans: Ember is an orange FOX; Axel is a pink AXOLOTL; Panko is a PANGOLIN; Archimedes is an OWL; Warren is a WOMBAT; Thyme is a RABBIT; Sloane is a SLOTH; Chill is a CAPYBARA. The game adds its exact animal portrait separately. A clearly animal paw or pink axolotl hand is permitted only when needed by the stated action. Do not add teacups unless this beat specifically concerns one. No UI, caption, border, collage, watermark, horror eyes, monster or invented plot. ABSOLUTELY NO TEXT: never write the supplied narrative sentence, dialogue, letters, numbers, words, quotes, glyphs, signs, or decorative typography anywhere in the illustration. Narrative paper and notebooks show subtle ink-like marks ONLY, with no readable or invented characters. A spoken line is an art direction, NEVER lettering. For ritual words use unlettered warm wooden word tiles or a quiet reflection, NEVER invent a word. Single landscape image, no split panels. Keep the important subject inside the middle 85% so nothing is clipped.",
-  "promptSha256": "58b9c37957cb39eb2e502db0ee6857196de59772ed1031eb8ab08f9b3da1e3f6"
+  "promptSha256": "58b9c37957cb39eb2e502db0ee6857196de59772ed1031eb8ab08f9b3da1e3f6",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: seedream-v4-edit",
+      "mode": "full",
+      "window": null,
+      "prompt": "Re-set the scene at the Offering Pit as the game draws it: outdoors below the cottage, a sunken ring of rock around a deep dark opening with a cool teal glow at the rim, moss, boulders, mushrooms, pines and distant mountains under a dusk-to-night sky. Remove the cellar, masonry well shaft, standing water, bucket, rope, ladder, shelves and furniture.",
+      "attempts": 1,
+      "costUsd": 0.027,
+      "review": "Location consistency, 2026-09-21: the Offering Pit the player actually visits is an OUTDOOR forest clearing with a dark glowing hole (assets/environment/pitt_*.webp). These pages had drawn it as an indoor stone cellar with a water-filled well, a bucket and a ladder, which is a different place from the one the game shows. Reviewed by the maintainer against the pit backgrounds at full size.",
+      "previousSha256": "07c805f25b53e82a4c7415afd394e20a7e68d5a67342171162f1038508aa390d",
+      "editedAt": "2026-09-21T10:42:22.362Z"
+    }
+  ]
 }

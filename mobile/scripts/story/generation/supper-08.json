@@ -4,6 +4,27 @@
   "sourceImage": "exec-24d8fb75-9393-4442-b2ce-9eabd3a0dc33.png",
   "width": 960,
   "height": 540,
-  "bytes": 122858,
-  "sha256": "75dda0053891a81a269c1994e69d273434f0ba1110288c8a7e3574b1afed15dc"
+  "bytes": 116696,
+  "sha256": "2f8f07041edfae09375f1ec4130808bca2f5b3be7fffe105a160cce70dc1bdcd",
+  "webpQuality": 83,
+  "encoderEffort": 4,
+  "flattenBackground": "#f2e5bc",
+  "retouches": [
+    {
+      "tool": "runpod public endpoint: qwen",
+      "mode": "crop",
+      "window": {
+        "left": 0,
+        "top": 0,
+        "width": 532,
+        "height": 532
+      },
+      "prompt": "Remove the dark-furred animal in the green knitted sweater at the left edge, and its entire arm, sleeve and clawed paw that reaches across the table to the kettle. Remove them completely. Where they were, continue the room naturally: extend the fireplace's existing orange and yellow flames leftwards so the whole fireplace opening is filled with the same finely drawn fire, inside the same dark iron surround and grey stone hearth, with the dark wooden floor below the hearth and the far edge of the wooden table with its small earthenware bowl. Complete the top of the brass kettle: a thin arched brass handle and a small round brass lid, fully visible above the green knitted tea cozy with the white fern pattern. Match the existing artwork exactly: the same 16-bit pixel art at the same fine pixel scale as the rest of the picture, small pixel clusters, not large blocks, the same warm palette, no photographic texture. Keep the kettle, the tea cozy, the green soup pot, the bread on the board, the candle, the daisies and the checked cloth exactly as they are. Change nothing else. No human, no hand, no animal, no fingers, no skin.",
+      "attempts": 2,
+      "costUsd": 0.04,
+      "review": "Retouched 2026-09-21: Rule applied: the limb belonged to an unidentifiable dark badger-like creature (white stripe, not a resident), so per the plan it was REMOVED rather than converted. Region 0.00,0.10,0.36,0.66 (widened from the brief's 0.00,0.12,0.38,0.64), qwen crop mode (532px window at the left edge), --paste region so only the defect box plus 24px margin was blended back. a1 (seed random, $0.02): creature fully | critic: Passing. Creature, sleeve, paw and edge fur tuft are gone; diff confirms all changes lie within x 0..367 / y 37..378 and the right 60% is byte-identical. Kettle handle/lid/finial, hearth base, table edge and the small bowl under the former sleeve are continued convincingly; both feathered seams are ",
+      "previousSha256": "75dda0053891a81a269c1994e69d273434f0ba1110288c8a7e3574b1afed15dc",
+      "editedAt": "2026-09-21T10:14:34.457Z"
+    }
+  ]
 }
