@@ -9,7 +9,7 @@
     "passed": 185,
     "openFlags": 0,
     "currentHashesMatched": 185,
-    "retouched2026_09_21": 52,
+    "retouched2026_09_21": 51,
     "note": "currentHashesMatched is re-measured against the shipped files, not inherited from the September 19 pass."
   },
   "sceneCounts": {
@@ -1146,10 +1146,10 @@
       "id": "reply-03",
       "scene": "reply",
       "asset": "assets/story/pages/reply-03.webp",
-      "sha256": "bb8bdbe679d9373e638410e7d0aeaa45403074229052233ce390b269eb7cdf6c",
+      "sha256": "7553e451f26d19babe7681b015e55751450bc0b9e5a642b46aa8acf163a513b8",
       "status": "pass",
-      "retouched": true,
-      "note": "Fourth repair, 2026-09-21. Three reviewers passed the previous version two to one but all three named the same residual: a salmon cast in the highlights, which one of them diagnosed as the signature of per-channel histogram matching, where each channel lands its own distribution but the joint colour correlation is lost and a hue appears that exists nowhere in the cloth. This version matches luminance by histogram and moves chroma as a PAIR, by an affine shift to the drape mean and spread, so each pixel keeps its own hue relationship. Rosy highlights in the fill fall from 11.7 percent to 0.0, against 0.7 in the drape; still zero pixels above luminance 245 in that corner and no flat void."
+      "retouched": false,
+      "note": "Original art retained; see the revert note in scripts/story/generation/reply-03.json."
     },
     {
       "id": "reply-04",

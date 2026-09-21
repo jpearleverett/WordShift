@@ -81,6 +81,20 @@ Re-running each edit against the pre-repair art, where the real rug and the real
 
 This is also the argument for keeping the reviewer separate from the artist. Both bad fills removed their creature completely and looked competent in isolation; what condemned them was measuring the repaired area against the values the rest of the painting holds.
 
+## One removal that was not worth its cost
+
+`reply-03` is the exception in this pass and is recorded as one. A hedgehog sits in the wicker basket beside the left armchair, and no hedgehog lives in this house, so it was queued for removal with the rest. Five repairs were attempted and adversarial review measured each one against the painting it was editing:
+
+1. a flat near-black void larger than any dark patch the art itself contains;
+2. a fill so bright the corner held 59 percent of the frame's brightest pixels, drawing the eye before the fire did;
+3. a salmon cast, the signature of per-channel histogram matching, which lands each channel's own distribution but loses the joint colour correlation and invents a hue found nowhere in the cloth;
+4. luminance matched over the wrong population, leaving the blanket itself 43 percent too bright with one seventh of its shadow;
+5. a clone of the real blanket, which matched on every statistic and then imported a fragment of the basket handle and a leaf.
+
+The original art is hand-painted and coherent; each repair was worse than the flaw it removed. The owner's rule is that animals may appear as long as they are accurately drawn, and this hedgehog is accurate and roughly eight pixels tall at the size the reader sees. So the original stands, and the revert is written into the image's generation record rather than quietly dropped. The other non-resident removals in this pass succeeded cleanly and were kept.
+
+The transferable part: an adversarial reviewer earns its cost when it is told to refute rather than approve, and the right response to five failures is to stop, not to try a sixth.
+
 ## Verification scope
 
 This review used the authored story inventory, source code, exported artwork, and per-scene contact sheets. Current image hashes are recorded in the review manifest; content-preserving alpha flattening retained the original semantic approvals. Persistent decision-scene portraits are implemented separately from the page illustration. This report does not claim a native Android visual walkthrough, touch-interaction validation, or pixel-exact correspondence between independent illustrations.

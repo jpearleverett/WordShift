@@ -89,6 +89,16 @@ resize, parchment flatten, WebP q83 effort 4) and recording the model, prompt,
 window, cost and previous hash under `retouches` in
 `scripts/story/generation/<id>.json`, plus the new hash in `visual-review.json`.
 
+Know when to stop and keep the original. One removal in this pass defeated
+five attempts: a flat black void, a corner holding most of the frame's
+brightest pixels, a salmon hue that exists nowhere in the cloth, a fill
+measured too bright and too flat against the blanket it continued, and a clone
+that imported fragments of the basket handle and a leaf. The art being edited
+was hand-painted and coherent; every repair was worse than the flaw it removed.
+The original was restored. A picture that is right everywhere except for a
+small unexplained visitor beats a picture with a patch that draws the eye, and
+the revert is recorded in that image's generation record rather than hidden.
+
 Repair from the ORIGINAL, never from a damaged intermediate. Two removals in
 this pass were rejected on their first attempt and both failed the same way:
 the model was handed an image whose defect had already been cut out, could not
