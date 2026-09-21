@@ -1,14 +1,16 @@
 {
   "schemaVersion": 1,
-  "reviewedAt": "2026-09-19T19:19:36.776911+00:00",
-  "method": "Independent visual inspection against authored narrative lines, followed by per-scene sequence review and final SHA-256 reconciliation. No native device walkthrough is asserted.",
+  "reviewedAt": "2026-09-21T00:00:00+00:00",
+  "method": "Independent visual inspection against authored narrative lines, followed by per-scene sequence review and final SHA-256 reconciliation. Superseded in part on 2026-09-21: a re-audit with two independent reviews per image, a tie-break pass over every disagreement, and a separate audit against the game's own locations found human hands and figures, non-resident animals, and settings that contradicted the Aquarium Room, the Offering Pit and Chill's office. Those images were retouched in place and re-reviewed; entries carrying \"retouched\": true were corrected after the September 19 pass. No native device walkthrough is asserted.",
   "inventory": "scripts/story/story-art-prompts.json",
   "summary": {
     "expected": 185,
     "reviewed": 185,
     "passed": 185,
     "openFlags": 0,
-    "currentHashesMatched": 185
+    "currentHashesMatched": 185,
+    "retouched2026_09_21": 52,
+    "note": "currentHashesMatched is re-measured against the shipped files, not inherited from the September 19 pass."
   },
   "sceneCounts": {
     "cup": 8,
