@@ -190,6 +190,7 @@ import {
   getOutOfHintsDismissLabel,
   getExpertUnlockIntroLines,
   getExpertLockedHint,
+  getMomentOfferCopy,
 } from './src/services/phaseNarrative';
 import { consumeCosmeticFirstShowing, peekCosmeticFirstShowing, markCosmeticFirstShowingShown } from './src/services/cosmeticReceipts';
 import {
@@ -224,7 +225,8 @@ import { installGlobalFont } from './src/theme/fonts';
 import { addHints, grantBonusHint } from './src/services/hints';
 import { hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
-import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, canShowExitNudge, recordExitNudgeShown } from './src/services/monetizationPrompts';
+import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, canShowExitNudge, recordExitNudgeShown, consumeMomentOffer, MomentOfferMoment } from './src/services/monetizationPrompts';
+import { MusicBoxModal } from './src/components/MusicBoxModal';
 import { installGlobalErrorHandler, setErrorForwarder, reportError } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
 import { pickHouseAsk, evaluateHouseAsk, HouseAsk } from './src/services/houseAsks';
@@ -659,6 +661,8 @@ function MainApp() {
   const [showPatronModal, setShowPatronModal] = useState(false);
   // Store modal — consumable amber/hint packs + the cosmetic bundle.
   const [showStoreModal, setShowStoreModal] = useState(false);
+  // The Keeper's Edition music box, opened by the story_end moment offer.
+  const [showMusicBoxOffer, setShowMusicBoxOffer] = useState(false);
   // Bumped when an amber-changing App-level modal (Store/Patron) closes, so a
   // mounted HomeScreen reloads its progress (purchased amber must register
   // against the next unlock immediately, not after the next screen change).
@@ -4350,13 +4354,41 @@ function MainApp() {
   // path, so a careful player who never solves flawless still meets the one
   // share invite. Its Share CTA opens the last exited board's snapshot (the
   // win that lit the ward), which is what the phase-aware card ages with.
-  const maybeShowCeremonySharePrompt = useCallback(async () => {
+  const maybeShowCeremonySharePrompt = useCallback(async (): Promise<boolean> => {
     const solved = persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0;
-    if (!(await canShowExitNudge(solved))) return;
+    if (!(await canShowExitNudge(solved))) return false;
     if (await maybeShowSharePrompt('phase_transition')) {
       await recordExitNudgeShown(solved);
+      return true;
     }
+    return false;
   }, [persistence.cumulativeStats, maybeShowSharePrompt]);
+
+  // One-time offers at the moments a player is most invested (the first
+  // phase change, the finished house, the ending, a second purchase). Each is
+  // one tasteful card, never during onboarding and never stacked on a Fox
+  // intro; the choice of product and the one-time bookkeeping live in
+  // monetizationPrompts.consumeMomentOffer. Returns whether a card showed.
+  const maybeShowMomentOffer = useCallback(async (moment: MomentOfferMoment): Promise<boolean> => {
+    if (onboardingFlow.isOnboarding) return false;
+    if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return false;
+    const target = await consumeMomentOffer(moment);
+    if (!target) return false;
+    const copy = getMomentOfferCopy(moment, target, persistence.currentPhase);
+    logEvent({ type: 'moment_offer_shown', data: { moment, target } });
+    showGameAlert(copy.title, copy.message, [
+      { text: copy.decline, style: 'cancel' },
+      {
+        text: copy.accept,
+        onPress: () => {
+          logEvent({ type: 'moment_offer_accepted', data: { moment, target } });
+          if (target === 'keepers_edition') setShowMusicBoxOffer(true);
+          else setShowStoreModal(true);
+        },
+      },
+    ]);
+    return true;
+  }, [onboardingFlow.isOnboarding, postVictoryIntro, persistence.currentPhase]);
 
   // At most ONE of the victory-exit nudges (share / notification permission /
   // deferred remove-ads / patron) fires per exit — the share peak takes
@@ -4412,6 +4444,10 @@ function MainApp() {
     }
     if (await maybeShowPatronNudge()) {
       await recordExitNudgeShown(solved);
+      return;
+    }
+    if (await maybeShowMomentOffer('second_purchase')) {
+      await recordExitNudgeShown(solved);
     }
   }, [
     victoryFlow.victoryData,
@@ -4420,6 +4456,7 @@ function MainApp() {
     maybePromptForNotifications,
     maybeShowRemoveAdsOffer,
     maybeShowPatronNudge,
+    maybeShowMomentOffer,
   ]);
 
   // One-time Swift Victories pointer: after the FIRST routine win past
@@ -4969,6 +5006,7 @@ function MainApp() {
     journal: storyFlow.journalContext !== null,
     share: shareResultData !== null,
     store: showStoreModal,
+    musicBox: showMusicBoxOffer,
     patron: showPatronModal,
     notification: notificationPrompt !== null,
     dailyLogin: dailyLoginGrant !== null,
@@ -5004,10 +5042,20 @@ function MainApp() {
     // The resident gets the first word after the sky changes. A share invite
     // can follow their response only when no other scene or home dialog is
     // owed; the ordinary flawless-win path keeps the invitation available.
-    if (completed?.kind === 'phase_reaction' && completed.phase <= 2 &&
-        !storyOverlayActive && !homeOverlayActive &&
+    // The moment offers ride the same quiet hand-off, one card per scene: the
+    // first phase change offers only when the share invite did not take it
+    // (it stays armed for the next change), the finished house and the
+    // ending's response each offer once.
+    const quiet = !storyOverlayActive && !homeOverlayActive;
+    if (completed?.kind === 'phase_reaction' && completed.phase <= 3 && quiet &&
         (await getPendingCeremonies()).length === 0) {
-      maybeShowCeremonySharePrompt().catch(() => {});
+      const shared = completed.phase <= 2 && await maybeShowCeremonySharePrompt().catch(() => false);
+      if (!shared) maybeShowMomentOffer('ceremony').catch(() => {});
+    } else if (completed?.kind === 'phase_reaction' && completed.phase === 5 && quiet &&
+        (await getPendingCeremonies()).length === 0) {
+      maybeShowMomentOffer('story_end').catch(() => {});
+    } else if (completed?.kind === 'house' && quiet && (await getPendingCeremonies()).length === 0) {
+      maybeShowMomentOffer('house_whole').catch(() => {});
     }
   };
 
@@ -6409,6 +6457,11 @@ function MainApp() {
           setHomeRefreshSignal(n => n + 1);
         }}
         onPatronChange={(isPatron) => { if (isPatron) persistenceActions.refreshStats(); }}
+      />
+      <MusicBoxModal
+        visible={overlayOwner === 'musicBox'}
+        phase={persistence.currentPhase}
+        onClose={() => setShowMusicBoxOffer(false)}
       />
       <StoreModal
         visible={overlayOwner === 'store'}

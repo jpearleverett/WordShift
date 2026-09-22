@@ -10,7 +10,9 @@ title: WordShift Privacy Policy
 Change log: the September 13, 2026 revision clarified existing purchase-restoration
 and local-reset behavior. The September 14, 2026 revision adds the retention
 periods below and links the data-deletion page. Neither adds a data category or
-a service provider.
+a service provider. The September 22, 2026 revision describes network addresses,
+the purchase identifier and anonymous daily totals, and names two ad mediation
+partners, AppLovin and Unity Ads, that AdMob may pass an ad request to.
 
 WordShift ("the app") is a word puzzle game developed by Jonathan Pearl Everett ("we", "us"). This policy explains what information the app handles, what is sent off your device, and which third-party services are involved.
 
@@ -47,15 +49,17 @@ When you are online, the app automatically backs up your game save (progress, cu
 ### Daily leaderboard
 If you play the Daily Challenge, your result (completion time, stars, and hints used) and your random install identifier are sent to our backend to compute an **anonymous** ranking. No name or profile is displayed.
 
-### Ads (Google AdMob)
-The app shows ads served by Google AdMob. To serve ads, Google may collect and process information including your device's advertising identifier, an approximate (coarse, IP-derived) location, and app-usage signals, and may use it for personalized advertising depending on your settings and consent. Where required (for example, in the EEA/UK), the app shows a consent prompt before ads are served, and a **Privacy Options** entry appears in the app's Settings so you can review or change your consent at any time. On iOS, the app asks for permission through Apple's App Tracking Transparency prompt before any tracking for ads. You can also reset or limit ad personalization in your device's settings. If you purchase **Remove Ads** or **Patron's Key**, or hold an active **Supporter** subscription, automatically shown ads (interstitial and banner) are turned off; reward ads only ever play when you choose to tap a reward button. See Google's [Privacy Policy](https://policies.google.com/privacy) and [how Google uses information from sites or apps that use its services](https://policies.google.com/technologies/partner-sites).
+### Ads (Google AdMob and its mediation partners)
+The app shows ads served by Google AdMob. AdMob may pass an ad request to one of its mediation partners, **AppLovin** or **Unity Ads**, when that partner offers the ad; the partner then receives the same kinds of information described below to serve and measure that ad, and follows the consent choice you made in the app. To serve ads, Google may collect and process information including your device's advertising identifier, an approximate (coarse, IP-derived) location, and app-usage signals, and may use it for personalized advertising depending on your settings and consent. Where required (for example, in the EEA/UK), the app shows a consent prompt before ads are served, and a **Privacy Options** entry appears in the app's Settings so you can review or change your consent at any time. On iOS, the app asks for permission through Apple's App Tracking Transparency prompt before any tracking for ads. You can also reset or limit ad personalization in your device's settings. If you purchase **Remove Ads** or **Patron's Key**, or hold an active **Supporter** subscription, automatically shown ads (interstitial and banner) are turned off; reward ads only ever play when you choose to tap a reward button. See Google's [Privacy Policy](https://policies.google.com/privacy) and [how Google uses information from sites or apps that use its services](https://policies.google.com/technologies/partner-sites).
 
 ### In-app purchases
-Purchases (for example, "Patron's Key", "Remove Ads", amber packs, hint packs, the one-time starter bundle, cosmetic bundles, and the monthly "Supporter" subscription) are processed by **Google Play Billing** (or Apple's App Store on iOS) and managed through **RevenueCat**. We receive a record of your in-app purchase history for this game — which products were purchased and when — so we can unlock or grant them and restore eligible entitlements. Local transaction references help finish interrupted grants without granting a purchase twice. Restore Purchases does not recreate spent amber or hints; progress and saved balances use Backup & Restore. RevenueCat assigns an anonymous app-user identifier to your store purchases so they can be restored. We do **not** receive or store your name or payment card details.
+Purchases (for example, "Patron's Key", "Remove Ads", amber packs, hint packs, the one-time starter bundle, cosmetic bundles, the season premium track, the Keeper's Edition, and the monthly "Supporter" subscription) are processed by **Google Play Billing** (or Apple's App Store on iOS) and managed through **RevenueCat**. We receive a record of your in-app purchase history for this game — which products were purchased and when — so we can unlock or grant them and restore eligible entitlements. Local transaction references help finish interrupted grants without granting a purchase twice. Restore Purchases does not recreate spent amber or hints; progress and saved balances use Backup & Restore. RevenueCat assigns an anonymous app-user identifier to your store purchases so they can be restored. We do **not** receive or store your name or payment card details.
 
 ## Third-party services
 
 - **Google AdMob** (ads) — <https://policies.google.com/privacy>
+- **AppLovin** (ads, through AdMob mediation) — <https://www.applovin.com/privacy/>
+- **Unity Ads** (ads, through AdMob mediation) — <https://unity.com/legal/game-player-and-app-user-privacy-policy>
 - **Google Play Billing** (purchases) — <https://policies.google.com/privacy>
 - **RevenueCat** (purchase management) — <https://www.revenuecat.com/privacy>
 - **Supabase** (cloud backup, daily leaderboard, anonymous analytics) — <https://supabase.com/privacy>

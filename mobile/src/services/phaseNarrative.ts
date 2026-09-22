@@ -5939,3 +5939,112 @@ export function getDailyPreparationRetryCopy(phase: number): {
     cancelLabel: 'Go home',
   };
 }
+
+// ---------------------------------------------------------------------------
+// The Keeper's Edition music box (sold after the ending)
+// ---------------------------------------------------------------------------
+
+export interface MusicBoxCopy {
+  title: string;
+  intro: string;
+  houseLabel: string;
+  boardLabel: string;
+  lockedBody: string;
+  buyLabel: (price: string) => string;
+  pendingMessage: string;
+  stopLabel: string;
+  closeLabel: string;
+  /** Row title per bed name in audio.MUSIC_BOX_TRACKS. */
+  trackTitles: Record<string, string>;
+}
+
+/**
+ * Copy for the music box. Only ever shown after the ending, so the dark
+ * beds may be named for what they are; titles never name a phase.
+ */
+export function getMusicBoxCopy(): MusicBoxCopy {
+  return {
+    title: 'The Music Box',
+    intro: 'Every song the house has played, from the first bright morning to what came after.',
+    houseLabel: 'In the house',
+    boardLabel: 'At the letters',
+    lockedBody: "The Keeper's Edition gathers every song the house has played into one small box you can open any time. Yours to keep, once bought.",
+    buyLabel: (price: string) => `Keep the music box · ${price}`,
+    pendingMessage: 'The store is still confirming this purchase. The box opens as soon as it does.',
+    stopLabel: 'Stop',
+    closeLabel: 'Close',
+    trackTitles: {
+      music_home_0: 'Morning in the Den',
+      music_home_1: 'The Afternoon Kettle',
+      music_home_2: 'Dusk on the Stairs',
+      music_home_3: 'Before the Storm',
+      music_home_4: 'The Robed House',
+      music_home_5: 'What Stays',
+      music_puzzle_0: 'Bright Tiles',
+      music_puzzle_1: 'A Letter Turns',
+      music_puzzle_2: 'Quieter Words',
+      music_puzzle_3: 'Held Breath',
+      music_puzzle_4: 'The Arrangement',
+      music_puzzle_5: 'The Pattern Continues',
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// One-time offers at the big moments (monetizationPrompts.resolveMomentOffer)
+// ---------------------------------------------------------------------------
+
+export interface MomentOfferCopy {
+  title: string;
+  message: string;
+  accept: string;
+  decline: string;
+}
+
+export function getMomentOfferCopy(
+  moment: 'ceremony' | 'house_whole' | 'story_end' | 'second_purchase',
+  target: 'starter' | 'supporter' | 'collection' | 'keepers_edition',
+  phase: number,
+): MomentOfferCopy {
+  const decline = 'Not now';
+  if (target === 'keepers_edition') {
+    return {
+      title: 'The music of the house',
+      message: 'Every song the house has played, the bright rooms and the dark ones, gathered in one small box you can open any time.',
+      accept: 'Open the music box',
+      decline,
+    };
+  }
+  if (target === 'starter') {
+    return {
+      title: 'A welcome on the shelf',
+      message: phase >= 2
+        ? 'The house has set a small bundle aside for you: amber and a few hints, once only. It waits on the shelf.'
+        : 'The house has put a small welcome aside for you: amber and a few hints, once only. It is on the shelf whenever you like.',
+      accept: 'Look at the shelf',
+      decline,
+    };
+  }
+  if (target === 'collection') {
+    return {
+      title: 'Every room is lit',
+      message: "The Keeper's Collection is a set of tiles and confetti found nowhere else in the house. It is on the shelf if you want to mark the moment.",
+      accept: 'Look at the shelf',
+      decline,
+    };
+  }
+  if (moment === 'second_purchase') {
+    return {
+      title: 'Thank you for keeping the lights on',
+      message: 'If you would like the house quiet for good, Supporters play without ads and receive amber every month, with each season\'s premium track.',
+      accept: 'See Supporter',
+      decline,
+    };
+  }
+  return {
+    title: 'Every room is lit',
+    message: 'The house is whole. Supporters play without ads and receive amber every month, with each season\'s premium track. There is no hurry.',
+    accept: 'See Supporter',
+    decline,
+  };
+}

@@ -461,7 +461,9 @@ describe('proactive share prompt', () => {
     expect(APP_TSX).toMatch(/const maybePromptForNotifications = useCallback\(async \(\): Promise<boolean>/);
     expect(APP_TSX).toMatch(/if \(await maybeShowSharePrompt\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
     expect(APP_TSX).toMatch(/if \(await maybeShowRemoveAdsOffer\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
-    expect(APP_TSX).toMatch(/if \(await maybeShowPatronNudge\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*\}/);
+    expect(APP_TSX).toMatch(/if \(await maybeShowPatronNudge\(\)\) \{\s*await recordExitNudgeShown\(solved\);\s*return;\s*\}/);
+    // The second-purchase moment offer is the last rung, under the same slot.
+    expect(APP_TSX).toMatch(/if \(await maybeShowMomentOffer\('second_purchase'\)\) \{\s*await recordExitNudgeShown\(solved\);\s*\}/);
   });
 
   test('notification permission is asked BEFORE the nudge gate (retention infrastructure, not a nudge)', () => {
@@ -501,7 +503,7 @@ describe('proactive share prompt', () => {
     const firstPromptCheck = flow.indexOf('maybeShowSharePrompt()');
     expect(cadenceGate).toBeGreaterThanOrEqual(0);
     expect(cadenceGate).toBeLessThan(firstPromptCheck);
-    expect(flow.match(/recordExitNudgeShown\(solved\)/g)).toHaveLength(4);
+    expect(flow.match(/recordExitNudgeShown\(solved\)/g)).toHaveLength(5);
     expect(APP_TSX).toMatch(/const maybeShowPatronNudge = useCallback\(async \(\): Promise<boolean>/);
   });
 
@@ -1029,7 +1031,7 @@ describe('launch-readiness app-integration wiring', () => {
     // The animal's immediate response owns the handoff. Promotion waits for
     // that acknowledgement and an empty story queue, including home dialogs.
     expect(APP_TSX).toMatch(
-      /if \(completed\?\.kind === 'phase_reaction' && completed\.phase <= 2 &&\s*!storyOverlayActive && !homeOverlayActive &&\s*\(await getPendingCeremonies\(\)\)\.length === 0\) \{\s*maybeShowCeremonySharePrompt\(\)\.catch\(\(\) => \{\}\);\s*\}/
+      /const quiet = !storyOverlayActive && !homeOverlayActive;\s*if \(completed\?\.kind === 'phase_reaction' && completed\.phase <= 3 && quiet &&\s*\(await getPendingCeremonies\(\)\)\.length === 0\) \{\s*const shared = completed\.phase <= 2 && await maybeShowCeremonySharePrompt\(\)\.catch\(\(\) => false\);\s*if \(!shared\) maybeShowMomentOffer\('ceremony'\)/
     );
     // The pit exit (Collect Now) is the route to the ward ceremony, so it
     // snapshots the win exactly like the Next/Home exits; otherwise the
@@ -1045,7 +1047,7 @@ describe('launch-readiness app-integration wiring', () => {
     );
     // Same one-time flag, same exit-nudge gate and spacing record as the
     // flawless path (it can never stack on the board-13 exit nudge either).
-    expect(ceremony).toMatch(/if \(!\(await canShowExitNudge\(solved\)\)\) return;/);
+    expect(ceremony).toMatch(/if \(!\(await canShowExitNudge\(solved\)\)\) return false;/);
     expect(ceremony).toMatch(/if \(await maybeShowSharePrompt\('phase_transition'\)\) \{\s*await recordExitNudgeShown\(solved\);/);
     // The shared decision passes the real trigger through, never a hardcoded false.
     expect(APP_TSX).toMatch(/consumeSharePrompt\(\{\s*isFlawlessWin: !isPhaseTransition && vd\?\.flawless === true,\s*isPhaseTransition,\s*isOnboarding: false,/);

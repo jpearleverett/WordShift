@@ -17,7 +17,7 @@ import AsyncStorage, { runStorageTransaction, isStorageTransactionActive } from 
 import { saveWithPlayerRetry } from './saveRetry';
 import { refreshEquippedOwnership } from './cosmetics';
 import { claimSupporterStipendIfDue } from './supporterStipend';
-import { awardBonusAmberInTransaction, getAmberBalance, invalidateProgressCache } from './amberCurrency';
+import { awardBonusAmberInTransaction, getAmberBalance, getFullProgress, invalidateProgressCache } from './amberCurrency';
 import { addHintsInTransaction, getHintBalance, invalidateHintsCache } from './hints';
 import {
   ENTITLEMENTS,
@@ -36,7 +36,15 @@ import {
   HINT_PACK_GRANTS,
   STARTER_PACK_GRANTS,
   FIRST_PURCHASE_AMBER_MULTIPLIER,
+  SEASON_PASS_PREMIUM_AMBER_COST,
 } from '../constants/gameBalance';
+import {
+  applySeasonPremiumPurchaseInTransaction,
+  canBuySeasonPremium,
+  getCurrentSeasonId,
+  getSeasonIdForTime,
+  invalidateSeasonPassCache,
+} from './seasonPass';
 
 // ---------------------------------------------------------------------------
 // Product catalog
@@ -65,6 +73,13 @@ export const PRODUCT_IDS = {
   // Consumable hint packs (repeatable; credit the hint balance).
   HINTS_SMALL: 'com.wordshift.hints_small',
   HINTS_LARGE: 'com.wordshift.hints_large',
+  /**
+   * Season premium — a CONSUMABLE (bought again each month) that opens the
+   * current season's premium track, beside the amber and Supporter routes.
+   */
+  SEASON_PREMIUM: 'com.wordshift.season_premium',
+  /** The Keeper's Edition — non-consumable, sold after the ending (the music box). */
+  KEEPERS_EDITION: 'com.wordshift.keepers_edition',
 } as const;
 
 export type ProductId = string;
@@ -76,7 +91,13 @@ export type ProductId = string;
 /** What a consumable purchase grants. Applied by the caller (StoreModal). */
 export type ConsumableReward =
   | { kind: 'amber'; amount: number }
-  | { kind: 'hints'; amount: number };
+  | { kind: 'hints'; amount: number }
+  /**
+   * Opens the premium track of the season the purchase was made in. `amount`
+   * is the amber paid INSTEAD when that is no longer possible at settlement
+   * (the month ended, or premium arrived another way first).
+   */
+  | { kind: 'season_premium'; amount: number };
 
 export interface ConsumableProductInfo {
   productId: ProductId;
@@ -143,8 +164,23 @@ export const CONSUMABLE_PRODUCTS: ConsumableProductInfo[] = [
 
 /** The reward a consumable product grants, or undefined if it isn't a consumable. */
 export function consumableReward(productId: ProductId): ConsumableReward | undefined {
+  if (productId === PRODUCT_IDS.SEASON_PREMIUM) return { kind: 'season_premium', amount: SEASON_PASS_PREMIUM_AMBER_COST };
   return CONSUMABLE_PRODUCTS.find(p => p.productId === productId)?.reward;
 }
+
+/** Display info for the season premium unlock (sold in the Season Pass, not the Store list). */
+export const SEASON_PREMIUM_INFO = {
+  productId: PRODUCT_IDS.SEASON_PREMIUM as ProductId,
+  name: 'Season premium track',
+  fallbackPrice: '$2.99',
+} as const;
+
+/** Display info for the post-ending Keeper's Edition. */
+export const KEEPERS_EDITION_INFO = {
+  productId: PRODUCT_IDS.KEEPERS_EDITION as ProductId,
+  name: "The Keeper's Edition",
+  fallbackPrice: '$4.99',
+} as const;
 
 // ---------------------------------------------------------------------------
 // Subscriptions (auto-renewing)
@@ -318,6 +354,7 @@ export function entitlementsForProduct(productId: ProductId): EntitlementKey[] {
   if (productId === PRODUCT_IDS.SUPPORTER_SUB) return [ENTITLEMENTS.SUPPORTER];
   if (productId === PRODUCT_IDS.COSMETIC_BUNDLE) return [ENTITLEMENTS.COSMETIC_BUNDLE];
   if (productId === PRODUCT_IDS.STARTER_PACK) return [ENTITLEMENTS.STARTER_PACK];
+  if (productId === PRODUCT_IDS.KEEPERS_EDITION) return [ENTITLEMENTS.KEEPERS_EDITION];
   return [productId];
 }
 
@@ -434,6 +471,8 @@ export interface PendingConsumableGrant {
    * records every id as applied, so neither surface can re-credit it.
    */
   linkedIds?: string[];
+  /** Season premium only: the local season (YYYY-MM) the purchase opens. */
+  seasonId?: string;
 }
 
 const PENDING_GRANTS_KEY = 'wordshift_pending_iap_grants';
@@ -487,6 +526,8 @@ interface GrantIntent {
    */
   linkedTransactionIds?: string[];
   firstPurchaseDoubled: boolean;
+  /** Season premium only: the season captured at checkout. */
+  seasonId?: string;
 }
 
 /**
@@ -574,6 +615,7 @@ async function persistPendingConsumableGrants(entries: GrantIntent[]): Promise<s
       ...(Number.isFinite(entry.purchasedAt) ? { storePurchasedAt: entry.purchasedAt } : {}),
       ...(entry.firstPurchaseDoubled ? {firstPurchaseDoubled:true} : {}),
       ...(linkedIds.length > 0 ? {linkedIds} : {}),
+      ...(entry.seasonId ? {seasonId: entry.seasonId} : {}),
     };
   });
   // Retry storage only; never call the store purchase API a second time.
@@ -604,8 +646,15 @@ async function persistPendingConsumableGrant(entry: GrantIntent): Promise<string
 }
 
 /** Credit + ledger acknowledgement + applied-ID receipt share one commit. */
-export async function settleConsumableGrant(grantId: string): Promise<{ amberBalance: number; hintBalance: number; applied: boolean }> {
+export async function settleConsumableGrant(grantId: string): Promise<{
+  amberBalance: number;
+  hintBalance: number;
+  applied: boolean;
+  /** Season premium only: whether the track opened or its amber price was paid instead. */
+  seasonOutcome?: 'unlocked' | 'unavailable';
+}> {
   let productId: string | undefined;
+  let seasonOutcome: 'unlocked' | 'unavailable' | undefined;
   try {
     const result = await runStorageTransaction('paid_grant_credit', async () => {
       const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
@@ -620,17 +669,26 @@ export async function settleConsumableGrant(grantId: string): Promise<{ amberBal
         if (!Number.isFinite(grant.reward.amount) || grant.reward.amount<0) throw new Error('Invalid paid reward');
         if (grant.reward.kind==='amber') await awardBonusAmberInTransaction(grant.reward.amount, `iap_${grant.productId}`);
         else if (grant.reward.kind==='hints') await addHintsInTransaction(grant.reward.amount, `iap_${grant.productId}`);
+        else if (grant.reward.kind==='season_premium') {
+          const seasonId = grant.seasonId ?? getSeasonIdForTime(grant.purchasedAt);
+          const { puzzlesSolved } = await getFullProgress();
+          seasonOutcome = await applySeasonPremiumPurchaseInTransaction(seasonId, puzzlesSolved);
+          // Never lose a paid unlock: a month that ended before settlement (or
+          // premium that arrived another way first) pays its amber price.
+          if (seasonOutcome !== 'unlocked') await awardBonusAmberInTransaction(grant.reward.amount, `iap_${grant.productId}_amber`);
+        }
         else throw new Error('Invalid paid reward kind');
         applied.add(grantId);
         for (const linked of grant.linkedIds ?? []) applied.add(linked);
         await AsyncStorage.setItem(APPLIED_GRANTS_KEY, JSON.stringify([...applied]));
       }
       await savePendingGrants(grants.filter(item=>item.grantId!==grantId));
-      return {amberBalance:await getAmberBalance(), hintBalance:await getHintBalance(), applied:!!grant};
+      return {amberBalance:await getAmberBalance(), hintBalance:await getHintBalance(), applied:!!grant,
+        ...(seasonOutcome ? { seasonOutcome } : {})};
     });
     notifyBillingChanges({ productId });
     return result;
-  } catch(error) { invalidateProgressCache(); invalidateHintsCache(); throw error; }
+  } catch(error) { invalidateProgressCache(); invalidateHintsCache(); invalidateSeasonPassCache(); throw error; }
 }
 
 /**
@@ -842,6 +900,40 @@ export function purchaseStarterPack(): Promise<StarterPackPurchaseResult> {
   return runCheckout(PRODUCT_IDS.STARTER_PACK, purchaseStarterPackUnlocked);
 }
 
+/**
+ * Buy the current season's premium track for real money. Refused before the
+ * store sheet opens when premium is already available (Supporter, an amber or
+ * earlier paid unlock) or the month's palette is already owned. The season is
+ * captured BEFORE checkout, so a purchase that completes after midnight on the
+ * last day still belongs to the month the player saw. Like other consumables,
+ * the caller settles `grantId` (settleConsumableGrant), which opens the track,
+ * or pays its amber price if that is no longer possible.
+ */
+export function purchaseSeasonPremium(puzzlesSolved: number): Promise<ConsumablePurchaseResult & { alreadyOwned?: boolean }> {
+  const productId = PRODUCT_IDS.SEASON_PREMIUM;
+  return runCheckout(productId, async () => {
+    if (!(await canBuySeasonPremium(puzzlesSolved))) {
+      return { success: false, productId, alreadyOwned: true, error: 'already_owned' };
+    }
+    const seasonId = getCurrentSeasonId();
+    const reward = consumableReward(productId)!;
+    const result = await provider.purchase(productId);
+    if (!result.success) {
+      return { success: false, productId, cancelled: result.cancelled, pending: result.pending, error: result.error };
+    }
+    const grantId = await persistPendingConsumableGrant({
+      productId,
+      reward,
+      transactionId: result.transactionId,
+      purchasedAt: result.purchasedAt,
+      linkedTransactionIds: result.linkedTransactionIds,
+      firstPurchaseDoubled: false,
+      seasonId,
+    });
+    return { success: true, productId, reward, grantId };
+  });
+}
+
 /** Verified receipt history from the billing SDK, never from player input. */
 export interface StorePurchaseTransaction {
   transactionId: string;
@@ -969,7 +1061,8 @@ async function persistRecoveredStorePurchase(transaction: StorePurchaseTransacti
         const grantId = starter ? `${transaction.transactionId}:${item.kind}` : transaction.transactionId;
         if (applied.has(grantId) || pending.some(grant => grant.grantId === grantId)) continue;
         pending.push({ grantId, productId: transaction.productId, reward: item, purchasedAt: transaction.purchasedAt,
-          ...(doubled ? { firstPurchaseDoubled: true } : {}) });
+          ...(doubled ? { firstPurchaseDoubled: true } : {}),
+          ...(item.kind === 'season_premium' ? { seasonId: getSeasonIdForTime(transaction.purchasedAt) } : {}) });
       }
       await savePendingGrants(pending);
       if (doubled) await markAmberPurchaseMade();

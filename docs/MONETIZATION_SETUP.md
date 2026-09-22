@@ -116,7 +116,9 @@ purchases and no ads, degrading exactly like the NoOp providers.
 
 ## 1. In-app purchases (RevenueCat)
 
-Products (`iap.ts` → `PRODUCT_IDS`) — 10 SKUs in three flavors (5 entitlements total):
+Products (`iap.ts` → `PRODUCT_IDS`) — 12 SKUs in three flavors (6 entitlements total).
+The two added on 2026-09-22 (`season_premium`, `keepers_edition`) still need
+creating in Play Console and RevenueCat; see the notes under each.
 
 **Non-consumables** (grant a permanent entitlement):
 
@@ -128,6 +130,13 @@ Products (`iap.ts` → `PRODUCT_IDS`) — 10 SKUs in three flavors (5 entitlemen
   one-time bundle: 1,200 amber + 5 hints, `gameBalance.STARTER_PACK_GRANTS`;
   `purchaseStarterPack()` refuses a repurchase before it ever hits billing, so
   the entitlement doubles as the one-per-account lock)
+- `com.wordshift.keepers_edition` → `keepers_edition` entitlement (The Keeper's
+  Edition, suggested $4.99). Sold only after the ending, from the music box
+  row in the ☰ menu and the one-time story_end offer. It opens the music box
+  (`components/MusicBoxModal.tsx`): all twelve authored beds, playable on
+  demand. **Owner:** create it as a one-time NON-consumable in Play Console,
+  import it into RevenueCat and attach it to a new entitlement whose identifier
+  is EXACTLY `keepers_edition`.
 
 **Subscription** (auto-renewing; grants an entitlement *while active*):
 
@@ -147,6 +156,16 @@ Products (`iap.ts` → `PRODUCT_IDS`) — 10 SKUs in three flavors (5 entitlemen
   **600 / 2,000 / 5,500** amber (`gameBalance.AMBER_PACK_GRANTS`)
 - `com.wordshift.hints_small` / `hints_large` → hint packs of **5 / 20** hints
   (`gameBalance.HINT_PACK_GRANTS`)
+- `com.wordshift.season_premium` → opens the CURRENT season's premium track
+  (suggested $2.99), sold in the Season Pass beside the amber and Supporter
+  routes (`iap.purchaseSeasonPremium`). It rides the paid-grant ledger: the
+  season is captured before checkout, and a payment that settles after that
+  month has ended (or after premium arrived another way) pays the track's
+  amber price (`SEASON_PASS_PREMIUM_AMBER_COST`, 2,500) instead, so a confirmed
+  payment is never lost. It is refused before the store sheet opens when
+  premium is already available or the month's palette is owned. **Owner:**
+  create it as a one-time CONSUMABLE in Play Console and import it into
+  RevenueCat as a Consumable attached to NO entitlement (like the amber packs).
 
 > **First-purchase incentive:** the FIRST amber pack a player ever buys grants
 > **2x** its amount (`gameBalance.FIRST_PURCHASE_AMBER_MULTIPLIER`). The
@@ -288,6 +307,58 @@ AdMob test units; the ad-safety control is the release channel: `app.config.js`
 resolves `adsUseTestIds` to `false` only when `WORDSHIFT_RELEASE_CHANNEL` is
 `production` (the `production` EAS profile), and every other channel keeps the
 `true` literal. Never hand-flip the literal.
+
+### AdMob mediation (AppLovin and Unity Ads)
+
+Added 2026-09-22. `plugins/withAdMediation.js` puts the Android adapters for
+AppLovin (13.6.1.0) and Unity Ads (4.17.0.0, with Unity Ads SDK 4.17.0) into
+the native build. They are pinned to the adapter releases built against Google
+Mobile Ads 25.0.0, the SDK `react-native-google-mobile-ads` 16.x ships
+(`adMediationConfig.test.ts` fails if that SDK moves). The JavaScript ad code
+does not change: an adapter with no mediation group does nothing, so ads keep
+coming from AdMob alone until the console steps below are done. The adapters
+are native, so they arrive with a new binary (1.4.5 / code 110 or later), never
+an OTA. Everything below uses bidding, which needs no waterfall tuning.
+
+1. **AppLovin.** Sign up at <https://dash.applovin.com/>. Under Account, then
+   Keys, copy the **SDK Key** (and the **Report Key** for revenue reporting).
+2. **Unity Ads.** Sign in at <https://cloud.unity.com/>, open Monetization (Unity
+   Ads), create a project and add the Android app with package
+   `com.wordshift.app`. Note its **Game ID**. Create one ad unit each for
+   Interstitial, Rewarded and Banner, set to **bidding**, and note each
+   **Placement ID**. For reporting, create an API key and note your
+   **Organization core ID** (Monetization settings, API management).
+3. **AdMob, per format.** In AdMob, open Mediation, then Create mediation group.
+   Pick Android and Interstitial, name it, and add the existing WordShift
+   interstitial ad unit. Under Bidding, Add ad sources: add **AppLovin**
+   (enter the SDK Key, and the Report Key when asked) and **Unity Ads** (enter
+   the Game ID and the Interstitial Placement ID, plus the Organization core ID
+   and API key when asked). Save. Repeat for **Rewarded** (rewarded unit and
+   Unity's rewarded placement) and **Banner** (banner unit and Unity's banner
+   placement).
+4. **Consent partners.** In AdMob, Privacy & messaging: open the GDPR message
+   and make sure the ad partners list includes AppLovin and Unity Ads (the
+   "commonly used ad partners" choice includes both; a custom list must add
+   them), then Publish. Do the same in the US states message if you have one.
+   Without this, those two partners get no ads in the EEA/UK.
+5. **app-ads.txt.** Each network shows its own `app-ads.txt` line(s) in its
+   dashboard (AppLovin: Account, then app-ads.txt; Unity: Monetization
+   settings). Append them, unedited, to the `app-ads.txt` served at
+   `https://jpearleverett.github.io/app-ads.txt`, keeping the Google line.
+   Unauthorised inventory is paid less or not at all.
+6. **Play Console, Data safety.** AppLovin and Unity collect the same kinds of
+   data as AdMob (device advertising ID, approximate location, app
+   interactions, diagnostics) for advertising. Review the Data safety answers
+   against their SDK disclosures and update them if anything is new.
+7. **Test on a device.** In AdMob, Settings, then Test devices, add your phone
+   and set "Open ad inspector" to a gesture (for example Flick). On the
+   internal-testing build, perform the gesture to open the Ad Inspector: each
+   mediation group should list AppLovin and Unity Ads as loaded adapters, and
+   a test request from each should succeed. Never tap a live ad.
+8. **Watch it ramp.** Bidding partners take a few days of traffic to compete
+   fully. AdMob's Mediation report shows each source's share and eCPM.
+
+The privacy policy already names both partners (revision of 2026-09-22).
 
 ---
 

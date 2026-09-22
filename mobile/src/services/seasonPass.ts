@@ -94,6 +94,8 @@ interface SeasonPassState {
   claimedPremium: number[];
   /** True once premium is unlocked for THIS season by spending amber. */
   premiumUnlockedByAmber: boolean;
+  /** True once premium is unlocked for THIS season by a real-money purchase. */
+  premiumUnlockedByPurchase?: boolean;
 }
 
 export interface SeasonTierView {
@@ -137,6 +139,8 @@ export interface SeasonPassView {
   premiumCosmeticAmberEquivalent: number;
   /** Existing unlocks and Supporter benefits remain valid; do not sell the same collection twice. */
   canUnlockPremiumWithAmber: boolean;
+  /** Same rule for the real-money unlock: one sale per season, never over an owned palette. */
+  canBuyPremium: boolean;
   tiers: SeasonTierView[];
   /** Count of rewards claimable right now (free + premium). */
   claimableCount: number;
@@ -196,6 +200,7 @@ async function loadState(puzzlesSolved: number): Promise<SeasonPassState> {
             claimedFree: Array.isArray(parsed.claimedFree) ? parsed.claimedFree : [],
             claimedPremium: Array.isArray(parsed.claimedPremium) ? parsed.claimedPremium : [],
             premiumUnlockedByAmber: parsed.premiumUnlockedByAmber === true,
+            premiumUnlockedByPurchase: parsed.premiumUnlockedByPurchase === true,
           };
         }
       }
@@ -245,7 +250,7 @@ function tiersUnlockedFor(state: SeasonPassState, puzzlesSolved: number): number
 
 /** Premium is available this season via an active subscription OR an amber unlock. */
 function premiumAvailable(state: SeasonPassState): boolean {
-  return isSupporterSync() || state.premiumUnlockedByAmber;
+  return isSupporterSync() || state.premiumUnlockedByAmber || state.premiumUnlockedByPurchase === true;
 }
 
 /**
@@ -299,6 +304,7 @@ export async function getSeasonPassView(puzzlesSolved: number): Promise<SeasonPa
     premiumCosmeticOwned,
     premiumCosmeticAmberEquivalent: SEASON_PREMIUM_COSMETIC_AMBER_EQUIVALENT,
     canUnlockPremiumWithAmber: !premiumUnlocked && !premiumCosmeticOwned,
+    canBuyPremium: !premiumUnlocked && !premiumCosmeticOwned,
     tiers,
     claimableCount,
   };
@@ -433,4 +439,34 @@ export async function purchaseSeasonPremiumWithAmber(puzzlesSolved: number): Pro
     invalidateProgressCache();
     throw error;
   }
+}
+
+/** The local season (YYYY-MM) a timestamp falls in: a recovered purchase keeps its own month. */
+export function getSeasonIdForTime(ms: number): string {
+  return getLocalDateString(new Date(ms)).slice(0, 7);
+}
+
+/** Whether a real-money premium unlock can be sold right now (checked again at settlement). */
+export async function canBuySeasonPremium(puzzlesSolved: number): Promise<boolean> {
+  return (await getSeasonPassView(puzzlesSolved)).canBuyPremium;
+}
+
+/**
+ * Apply a PAID premium unlock inside the purchase ledger's own storage
+ * transaction (iap.settleConsumableGrant), so the unlock and the paid-grant
+ * acknowledgement commit together. Returns 'unavailable' when the season it
+ * was bought for has ended, or premium or the month's palette arrived another
+ * way first; the caller then pays the amber equivalent, so a paid unlock is
+ * never lost and never sold twice.
+ */
+export async function applySeasonPremiumPurchaseInTransaction(
+  seasonId: string,
+  puzzlesSolved: number,
+): Promise<'unlocked' | 'unavailable'> {
+  const state = await loadState(puzzlesSolved);
+  if (state.seasonId !== seasonId) return 'unavailable';
+  if (premiumAvailable(state) || await ownsCosmetic(getSeasonPremiumCosmeticId(state.seasonId))) return 'unavailable';
+  state.premiumUnlockedByPurchase = true;
+  await persist(state);
+  return 'unlocked';
 }

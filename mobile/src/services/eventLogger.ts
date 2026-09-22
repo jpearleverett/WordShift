@@ -9,6 +9,8 @@ const MAX_EVENTS = 500;
  * Event types tracked by the game
  */
 export type EventType =
+  | 'moment_offer_shown'
+  | 'moment_offer_accepted'
   | 'puzzle_completed'
   | 'puzzle_generation_failed'
   | 'puzzle_started'

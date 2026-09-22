@@ -86,6 +86,17 @@ verify the latest binary, backend deployment or public release.
 - [ ] **Story pilot (recommended).** Run the unfamiliar-reader
   [story playtest protocol](STORY_PLAYTEST_PROTOCOL.md), including a Phase-3
   late recruit; no completed report exists yet.
+- [ ] **Store products for the new purchases (owner).** Create and activate in
+  Play Console, then import into RevenueCat:
+  `com.wordshift.season_premium` (one-time product, CONSUMABLE; suggested
+  $2.99; RevenueCat product type Consumable, attached to no entitlement) and
+  `com.wordshift.keepers_edition` (one-time product, NON-CONSUMABLE; suggested
+  $4.99; attached to a new RevenueCat entitlement with identifier EXACTLY
+  `keepers_edition`). Until they exist the season cash button and the music box
+  purchase simply do not appear (no live price, no sale).
+- [ ] **AdMob mediation (owner).** The build carries the AppLovin and Unity Ads
+  adapters (`plugins/withAdMediation.js`); they do nothing until mediation
+  groups exist. Steps are in [monetization setup](MONETIZATION_SETUP.md#admob-mediation-applovin-and-unity-ads).
 - [ ] **Ad and consent matrix.** Keep `adsUseTestIds: true` through internal and
   closed testing: with the channel-derived flag that means running this matrix
   on an `internal-testing`-profile build (its channel keeps Google test units,
@@ -186,7 +197,8 @@ verify the latest binary, backend deployment or public release.
   Policy updated (effective September 22, 2026) and Terms updated (effective
   September 22, 2026): clarified purchase restore and Reset All behavior, added
   data retention periods, described network addresses, the purchase identifier
-  and anonymous daily totals, and added a governing-law clause."
+  and anonymous daily totals, named our ad mediation partners (AppLovin, Unity
+  Ads), and added a governing-law clause."
 - [ ] **Publish the documentation clarification with release notes.** The
   September 13 privacy/terms revision clarifies existing purchase delivery,
   restore and reset behavior; the September 14 revision adds retention periods

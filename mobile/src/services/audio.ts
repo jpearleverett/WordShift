@@ -1,5 +1,6 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { getSettings, getSettingsSync, subscribeSettings } from './settings';
+import { MUSIC_BOX_TRACKS } from './musicBox';
 
 /**
  * Sound effects + ambient music system for WordShift
@@ -749,42 +750,69 @@ export async function startMusicForPhase(phase: number): Promise<void> {
 export async function startMusicForScreen(screen: MusicScreen, phase: number): Promise<void> {
   try {
     if (!(await isMusicEnabled())) return;
-    const track = musicTrackForContext(screen, phase);
-    if (activeMusicTrack === track && musicPlayer) {
-      try {
-        if (!musicPlayer.playing) musicPlayer.play();
-      } catch {}
-      return;
-    }
-    if (!hasMusicTrack(track)) return;
-    const source = MUSIC_SOURCES[track];
-
-    // A rapid double-switch: snap off any player still fading out.
-    if (retiringMusicPlayer) {
-      try {
-        retiringMusicPlayer.remove();
-      } catch {}
-      retiringMusicPlayer = null;
-    }
-
-    const next = createAudioPlayer(source);
-    // Loop seam: `loop` on an MP3 relies on the LAME/Xing header in the first
-    // frame (encoder delay + padding) for a gapless wrap. ExoPlayer honours
-    // it; AVPlayer may leave a few ms at the seam. On beds 2-4 minutes long
-    // that is acceptable (the retired WAV beds were sample-exact by
-    // construction; that is the trade for authored music).
-    next.loop = true;
-    next.volume = 0;
-    next.play();
-
-    const prev = musicPlayer;
-    musicPlayer = next;
-    activeMusicTrack = track;
-    retiringMusicPlayer = prev;
-    fadeMusic(prev, next);
+    switchMusicTrack(musicTrackForContext(screen, phase));
   } catch {
     // Music must never crash gameplay
   }
+}
+
+/**
+ * Play one named bed from the music box. The player asked for it explicitly,
+ * so it plays even with background music switched off in Settings; closing
+ * the box hands music back to the screen (startMusicForScreen, or stopMusic
+ * when music is off). Same crossfade as every other switch. Never throws.
+ */
+export async function playMusicBoxTrack(track: string): Promise<void> {
+  try {
+    if (!MUSIC_BOX_TRACKS.includes(track)) return;
+    switchMusicTrack(track);
+  } catch {
+    // Music must never crash gameplay
+  }
+}
+
+/** Whether background music is on in Settings (the music box restores to this). */
+export async function isBackgroundMusicEnabled(): Promise<boolean> {
+  try {
+    return await isMusicEnabled();
+  } catch {
+    return false;
+  }
+}
+
+function switchMusicTrack(track: string): void {
+  if (activeMusicTrack === track && musicPlayer) {
+    try {
+      if (!musicPlayer.playing) musicPlayer.play();
+    } catch {}
+    return;
+  }
+  if (!hasMusicTrack(track)) return;
+  const source = MUSIC_SOURCES[track];
+
+  // A rapid double-switch: snap off any player still fading out.
+  if (retiringMusicPlayer) {
+    try {
+      retiringMusicPlayer.remove();
+    } catch {}
+    retiringMusicPlayer = null;
+  }
+
+  const next = createAudioPlayer(source);
+  // Loop seam: `loop` on an MP3 relies on the LAME/Xing header in the first
+  // frame (encoder delay + padding) for a gapless wrap. ExoPlayer honours
+  // it; AVPlayer may leave a few ms at the seam. On beds 2-4 minutes long
+  // that is acceptable (the retired WAV beds were sample-exact by
+  // construction; that is the trade for authored music).
+  next.loop = true;
+  next.volume = 0;
+  next.play();
+
+  const prev = musicPlayer;
+  musicPlayer = next;
+  activeMusicTrack = track;
+  retiringMusicPlayer = prev;
+  fadeMusic(prev, next);
 }
 
 /** Fade the ambient bed out and release its player. */

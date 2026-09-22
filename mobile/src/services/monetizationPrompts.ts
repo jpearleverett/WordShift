@@ -43,7 +43,14 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isPatronSync, isAdFreeSync } from './entitlements';
+import {
+  isPatronSync,
+  isAdFreeSync,
+  isSupporterSync,
+  hasEntitlementSync,
+  hasMadeAmberPurchaseSync,
+  ENTITLEMENTS,
+} from './entitlements';
 import { getLocalDateString } from './dateUtils';
 import {
   EXIT_NUDGE_MIN_PUZZLES,
@@ -87,6 +94,8 @@ export interface MonetPromptState {
   rewardedDoubleClaimsToday: number;
   /** Puzzle count at which the most recent proactive victory-exit nudge presented. */
   lastExitNudgePuzzle: number | null;
+  /** Moment offers already spent (see resolveMomentOffer); each fires at most once. */
+  momentOffersShown: MomentOfferMoment[];
 }
 
 let cache: MonetPromptState | null = null;
@@ -100,6 +109,7 @@ function getDefault(): MonetPromptState {
     rewardedDoubleDate: null,
     rewardedDoubleClaimsToday: 0,
     lastExitNudgePuzzle: null,
+    momentOffersShown: [],
   };
 }
 
@@ -305,4 +315,82 @@ export async function clearMonetPrompts(): Promise<void> {
   } catch {
     /* ignore */
   }
+}
+
+// ---------------------------------------------------------------------------
+// One-time offers at the big moments
+// ---------------------------------------------------------------------------
+
+/**
+ * The moments a player is most invested, each offered at most once per device:
+ *   - ceremony         the first phase change the player watches (the first
+ *                      pit ceremony), unless the share invite took that moment
+ *   - house_whole      the house-completion ceremony
+ *   - story_end        after the ending (the phase-5 response to the Arrival)
+ *   - second_purchase  a quiet victory exit after the player has bought once
+ * Never during onboarding or over another scene (the App callers guard that).
+ */
+export type MomentOfferMoment = 'ceremony' | 'house_whole' | 'story_end' | 'second_purchase';
+export type MomentOfferTarget = 'starter' | 'supporter' | 'collection' | 'keepers_edition';
+
+export interface OfferOwnership {
+  starterPack: boolean;
+  supporter: boolean;
+  adFree: boolean;
+  cosmeticBundle: boolean;
+  keepersEdition: boolean;
+  /** Any real-money purchase this device knows of. */
+  anyPurchase: boolean;
+}
+
+/** What the player already owns, from the synchronous entitlement cache. */
+export function getOfferOwnershipSync(): OfferOwnership {
+  const has = (key: string) => hasEntitlementSync(key);
+  const starterPack = has(ENTITLEMENTS.STARTER_PACK);
+  const supporter = isSupporterSync();
+  const adFree = isAdFreeSync();
+  const cosmeticBundle = has(ENTITLEMENTS.COSMETIC_BUNDLE);
+  const keepersEdition = has(ENTITLEMENTS.KEEPERS_EDITION);
+  return {
+    starterPack, supporter, adFree, cosmeticBundle, keepersEdition,
+    anyPurchase: hasMadeAmberPurchaseSync() || starterPack || supporter || adFree || isPatronSync() ||
+      cosmeticBundle || keepersEdition,
+  };
+}
+
+/**
+ * Pure: what to offer at a moment, or null. Never offers something owned, and
+ * never offers an ad-free product to a player who is already ad-free.
+ */
+export function resolveMomentOffer(moment: MomentOfferMoment, owned: OfferOwnership): MomentOfferTarget | null {
+  switch (moment) {
+    case 'ceremony':
+      return owned.starterPack ? null : 'starter';
+    case 'house_whole':
+      if (!owned.supporter && !owned.adFree) return 'supporter';
+      return owned.cosmeticBundle ? null : 'collection';
+    case 'story_end':
+      return owned.keepersEdition ? null : 'keepers_edition';
+    case 'second_purchase':
+      return owned.anyPurchase && !owned.supporter && !owned.adFree ? 'supporter' : null;
+  }
+}
+
+/**
+ * Claim a moment's offer. Returns the target to present, or null. A moment is
+ * spent once it has passed with nothing left to offer, EXCEPT second_purchase,
+ * which waits (unspent) until the player has actually bought something.
+ */
+export async function consumeMomentOffer(
+  moment: MomentOfferMoment,
+  owned: OfferOwnership = getOfferOwnershipSync(),
+): Promise<MomentOfferTarget | null> {
+  const state = await load();
+  const shown = Array.isArray(state.momentOffersShown) ? state.momentOffersShown : [];
+  if (shown.includes(moment)) return null;
+  if (moment === 'second_purchase' && !owned.anyPurchase) return null;
+  const target = resolveMomentOffer(moment, owned);
+  state.momentOffersShown = [...shown, moment];
+  await save();
+  return target;
 }
