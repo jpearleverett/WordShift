@@ -1,5 +1,5 @@
 import AsyncStorage from './persistenceStorage';
-import { DialogueSession, DialoguePhase, DIALOGUE_SESSION_CONFIG, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
+import { DialogueSession, DialoguePhase, DIALOGUE_SESSION_CONFIG, getDialoguesPerSession, getPuzzlesBetweenSessions, getConversationBacklogPlan } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_dialogue_sessions';
 
@@ -86,15 +86,46 @@ export function updateSessionPhase(phase: DialoguePhase): void {
   currentPhase = phase;
 }
 
+// Residents whose reading is well behind the house (see
+// getConversationBacklogPlan). Like the phase mirror above this is pushed in by
+// whoever resolves the resident's next unread line (useDialogueFlow at tap
+// time, homeWorldData when it lights the home badges); an animal nobody has
+// reported keeps ordinary pacing.
+const backlogPhases = new Map<string, number>();
+
 /**
- * Get the effective max dialogues for a session (phase-aware).
- * `sessionBonus` is a per-animal extension the CALLER decides (the catch-up
- * boost for late recruits with a regular-dialogue backlog — see
- * getCatchUpSessionBonus in types/homeWorld.ts); this module stays a pure
- * counter and never inspects dialogue state itself.
+ * Report the phase of a resident's next unread regular line (null once they
+ * have none). Longer visits and shorter rests follow while it sits two or
+ * more phases behind the house.
  */
-function getEffectiveMaxDialogues(sessionBonus: number = 0): number {
-  return getDialoguesPerSession(currentPhase) + Math.max(0, sessionBonus);
+export function updateConversationBacklog(animalId: string, nextLinePhase: number | null | undefined): void {
+  if (typeof nextLinePhase === 'number') backlogPhases.set(animalId, nextLinePhase);
+  else backlogPhases.delete(animalId);
+}
+
+function getBacklogPlan(animalId: string) {
+  return getConversationBacklogPlan(currentPhase, backlogPhases.get(animalId));
+}
+
+/** Whether this resident currently gets catch-up pacing. */
+export function isCatchingUp(animalId: string): boolean {
+  return getBacklogPlan(animalId).catchingUp;
+}
+
+/**
+ * Get the effective max dialogues for a session (phase-aware), extended for a
+ * resident catching up. `sessionBonus` is an additional caller-decided
+ * extension; the larger of the two applies, so they never stack.
+ */
+function getEffectiveMaxDialogues(animalId: string, sessionBonus: number = 0): number {
+  return getDialoguesPerSession(currentPhase) +
+    Math.max(0, sessionBonus, getBacklogPlan(animalId).sessionBonus);
+}
+
+function getPuzzlesBetween(animalId: string): number {
+  const base = getPuzzlesBetweenSessions(currentPhase);
+  const cap = getBacklogPlan(animalId).maxPuzzlesBetweenSessions;
+  return cap === null ? base : Math.min(base, cap);
 }
 
 /**
@@ -104,7 +135,7 @@ function getEffectiveMaxDialogues(sessionBonus: number = 0): number {
 function getCooldownRemaining(session: DialogueSession): number {
   if (session.puzzlesAtSessionEnd === null) return 0;
   const puzzlesSinceEnd = currentPuzzleCount - session.puzzlesAtSessionEnd;
-  return getPuzzlesBetweenSessions(currentPhase) - puzzlesSinceEnd;
+  return getPuzzlesBetween(session.animalId) - puzzlesSinceEnd;
 }
 
 /**
@@ -149,13 +180,13 @@ export async function checkDialogueAvailability(animalId: string, sessionBonus: 
   }
 
   // Session is active - check if max dialogues reached (phase-aware limit)
-  const maxDialogues = getEffectiveMaxDialogues(sessionBonus);
+  const maxDialogues = getEffectiveMaxDialogues(animalId, sessionBonus);
   if ((session.dialoguesInSession ?? 0) >= maxDialogues) {
     await startCooldown(animalId);
     return {
       available: false,
       reason: 'max_dialogues',
-      puzzlesRemaining: getPuzzlesBetweenSessions(currentPhase),
+      puzzlesRemaining: getPuzzlesBetween(animalId),
     };
   }
 
@@ -273,7 +304,7 @@ export function getSessionStatus(animalId: string, sessionBonus: number = 0): {
   // In active session (phase-aware limit)
   return {
     status: 'in_session',
-    dialoguesRemaining: getEffectiveMaxDialogues(sessionBonus) - session.dialoguesInSession,
+    dialoguesRemaining: getEffectiveMaxDialogues(animalId, sessionBonus) - session.dialoguesInSession,
   };
 }
 
@@ -296,5 +327,6 @@ export function formatTimeRemaining(puzzles: number): string {
  */
 export async function clearAllSessions(): Promise<void> {
   sessionsCache.clear();
+  backlogPhases.clear();
   await AsyncStorage.removeItem(STORAGE_KEY);
 }

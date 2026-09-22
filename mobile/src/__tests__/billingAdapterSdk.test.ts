@@ -44,6 +44,8 @@ jest.mock('react-native-purchases', () => {
     /** Store transaction id returned by purchaseStoreProduct. */
     transactionId: 'txn_test_1',
     transactions: [] as any[],
+    /** When set, overrides the checkout's Play purchaseDate (undefined = missing). */
+    purchaseDateFn: null as null | (() => string | undefined),
   };
   const customerInfo = () => ({
     entitlements: { active: { ...state.activeEntitlements } },
@@ -76,7 +78,7 @@ jest.mock('react-native-purchases', () => {
         productIdentifier: product?.identifier,
         transaction: {
           transactionIdentifier: state.transactionId,
-          purchaseDate: new Date().toISOString(),
+          purchaseDate: state.purchaseDateFn ? state.purchaseDateFn() : new Date().toISOString(),
           productIdentifier: product?.identifier,
         },
       };
@@ -150,6 +152,7 @@ beforeEach(async () => {
   rc.__state.throwOnGetCustomerInfo = false;
   rc.__state.transactionId = 'txn_test_1';
   rc.__state.transactions = [];
+  rc.__state.purchaseDateFn = null;
   const { invalidateProgressCache } = await import('../services/amberCurrency');
   const { invalidateHintsCache } = await import('../services/hints');
   invalidateProgressCache(); invalidateHintsCache();
@@ -702,5 +705,147 @@ describe('RevenueCat adapter — subscription management URL', () => {
     setBillingProvider(p);
     await flushBackgroundChain();
     expect(await getSubscriptionManagementUrl(PLAY_SUBSCRIPTIONS_URL)).toBe(PLAY_SUBSCRIPTIONS_URL);
+  });
+});
+
+
+describe('RevenueCat adapter — Play and RevenueCat disagree about the purchase time (MON-1)', () => {
+  const ORDER_ID = 'GPA.skew-0001';
+  const RC_ID = 'rc_txn_skewed';
+  const PLAY_TIME = Date.parse('2026-09-22T10:00:00.000Z');
+
+  async function setup() {
+    const iap = await import('../services/iap');
+    rc.__state.products = [storeProduct(PRODUCT_IDS.AMBER_SMALL)];
+    rc.__state.transactionId = ORDER_ID;
+    const p = await initProvider();
+    iap.setBillingProvider(p);
+    await flushBackgroundChain();
+    return iap;
+  }
+
+  async function everyRecoverySurface(expected: number) {
+    const { getAmberBalance, invalidateProgressCache } = await import('../services/amberCurrency');
+    const { restorePurchases } = await import('../services/iap');
+    const info = { entitlements: { active: {} }, nonSubscriptionTransactions: rc.__state.transactions };
+    rc.__state.listeners[0](info);
+    await flushBackgroundChain(); await flushBackgroundChain();
+    expect(await getAmberBalance()).toBe(expected);
+    await restorePurchases();
+    await flushBackgroundChain(); await flushBackgroundChain();
+    expect(await getAmberBalance()).toBe(expected);
+    invalidateProgressCache();
+    await initProvider();
+    await flushBackgroundChain(); await flushBackgroundChain();
+    expect(await getAmberBalance()).toBe(expected);
+  }
+
+  it('links a receipt dated 3 s after Play when it is the only new one', async () => {
+    const { purchaseConsumable, settleConsumableGrant } = await setup();
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    rc.__state.purchaseDateFn = () => new Date(PLAY_TIME).toISOString();
+    rc.__state.transactions = [{ transactionIdentifier: RC_ID, productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date(PLAY_TIME + 3_000).toISOString() }];
+    const result = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    expect(result.success).toBe(true);
+    await settleConsumableGrant(result.grantId!);
+    const credited = await getAmberBalance();
+    expect(credited).toBeGreaterThan(0);
+    const applied = JSON.parse(await AsyncStorage.getItem('wordshift_applied_iap_grants') ?? '[]');
+    expect(applied).toEqual(expect.arrayContaining([ORDER_ID, RC_ID]));
+    await everyRecoverySurface(credited);
+  });
+
+  it('a lagging receipt dated 45 s from Play is covered by the checkout, once', async () => {
+    const { purchaseConsumable, settleConsumableGrant } = await setup();
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    rc.__state.purchaseDateFn = () => new Date(PLAY_TIME).toISOString();
+    rc.__state.transactions = []; // post-purchase customer info lags
+    const result = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    await settleConsumableGrant(result.grantId!);
+    const credited = await getAmberBalance();
+    rc.__state.transactions = [{ transactionIdentifier: RC_ID, productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date(PLAY_TIME + 45_000).toISOString() }];
+    await everyRecoverySurface(credited);
+  });
+
+  it('a missing Play purchaseDate still records the checkout (device time), so the late receipt credits once', async () => {
+    const { purchaseConsumable, settleConsumableGrant } = await setup();
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    rc.__state.purchaseDateFn = () => undefined;
+    rc.__state.transactions = [];
+    const result = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    await settleConsumableGrant(result.grantId!);
+    const credited = await getAmberBalance();
+    const receipts = JSON.parse(await AsyncStorage.getItem('wordshift_iap_checkout_receipts') ?? '[]');
+    expect(receipts).toHaveLength(1);
+    rc.__state.transactions = [{ transactionIdentifier: RC_ID, productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date(Date.now() + 20_000).toISOString() }];
+    await everyRecoverySurface(credited);
+  });
+
+  it('two purchases of the same pack 10 s apart each credit exactly once', async () => {
+    const { purchaseConsumable, settleConsumableGrant } = await setup();
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    const { AMBER_PACK_GRANTS, FIRST_PURCHASE_AMBER_MULTIPLIER } = await import('../constants/gameBalance');
+    // Both customer infos lag, so neither checkout links its receipt directly.
+    rc.__state.transactions = [];
+    rc.__state.purchaseDateFn = () => new Date(PLAY_TIME).toISOString();
+    rc.__state.transactionId = 'GPA.first';
+    const first = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    await settleConsumableGrant(first.grantId!);
+    rc.__state.purchaseDateFn = () => new Date(PLAY_TIME + 10_000).toISOString();
+    rc.__state.transactionId = 'GPA.second';
+    const second = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    await settleConsumableGrant(second.grantId!);
+    const expected = AMBER_PACK_GRANTS.small * FIRST_PURCHASE_AMBER_MULTIPLIER + AMBER_PACK_GRANTS.small;
+    expect(await getAmberBalance()).toBe(expected);
+    // Both receipts then arrive, skewed by a few seconds.
+    rc.__state.transactions = [
+      { transactionIdentifier: 'rc_first', productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date(PLAY_TIME + 2_000).toISOString() },
+      { transactionIdentifier: 'rc_second', productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date(PLAY_TIME + 12_000).toISOString() },
+    ];
+    await everyRecoverySurface(expected);
+  });
+
+  it('two purchases 10 s apart whose receipts are linked at checkout also credit once each', async () => {
+    const { purchaseConsumable, settleConsumableGrant } = await setup();
+    const { getAmberBalance } = await import('../services/amberCurrency');
+    const { AMBER_PACK_GRANTS, FIRST_PURCHASE_AMBER_MULTIPLIER } = await import('../constants/gameBalance');
+    rc.__state.purchaseDateFn = () => new Date(PLAY_TIME).toISOString();
+    rc.__state.transactionId = 'GPA.first';
+    rc.__state.transactions = [{ transactionIdentifier: 'rc_first', productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date(PLAY_TIME + 3_000).toISOString() }];
+    const first = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    expect(first.success).toBe(true);
+    await settleConsumableGrant(first.grantId!);
+    rc.__state.purchaseDateFn = () => new Date(PLAY_TIME + 10_000).toISOString();
+    rc.__state.transactionId = 'GPA.second';
+    rc.__state.transactions = [...rc.__state.transactions,
+      { transactionIdentifier: 'rc_second', productIdentifier: PRODUCT_IDS.AMBER_SMALL, purchaseDate: new Date(PLAY_TIME + 13_000).toISOString() }];
+    const second = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    await settleConsumableGrant(second.grantId!);
+    const expected = AMBER_PACK_GRANTS.small * FIRST_PURCHASE_AMBER_MULTIPLIER + AMBER_PACK_GRANTS.small;
+    expect(await getAmberBalance()).toBe(expected);
+    await everyRecoverySurface(expected);
+  });
+});
+
+describe('RevenueCat adapter — restore on another store account (MON-6)', () => {
+  it('keeps permanent purchases the restore response merely omits, drops only explicit inactive ones', async () => {
+    const { setBillingProvider, restorePurchases } = await import('../services/iap');
+    await grantEntitlements([ENTITLEMENTS.PATRON, ENTITLEMENTS.COSMETIC_BUNDLE, ENTITLEMENTS.SUPPORTER]);
+    const p = await initProvider();
+    setBillingProvider(p);
+    await flushBackgroundChain();
+    const restore = jest.spyOn(rc.default, 'restorePurchases').mockResolvedValue({
+      entitlements: { active: { [ENTITLEMENTS.ADFREE]: { isActive: true } }, all: { [ENTITLEMENTS.SUPPORTER]: { isActive: false } } },
+      nonSubscriptionTransactions: [],
+    });
+    try {
+      const result = await restorePurchases();
+      expect(result.error).toBeUndefined();
+      expect(await hasEntitlement(ENTITLEMENTS.PATRON)).toBe(true);
+      expect(await hasEntitlement(ENTITLEMENTS.COSMETIC_BUNDLE)).toBe(true);
+      expect(await hasEntitlement(ENTITLEMENTS.ADFREE)).toBe(true);
+      expect(await hasEntitlement(ENTITLEMENTS.SUPPORTER)).toBe(false);
+      expect(result.entitlements).toEqual(expect.arrayContaining([ENTITLEMENTS.PATRON, ENTITLEMENTS.ADFREE]));
+    } finally { restore.mockRestore(); }
   });
 });

@@ -8,10 +8,14 @@
 // (e.g. src/services/providers/googleAdMobAds.ts). For web only, we redirect
 // those modules to an empty shim. Native (iOS/Android) resolution is untouched,
 // so real builds keep the real native modules.
-const { getDefaultConfig } = require('expo/metro-config');
+//
+// Sentry's wrapper is Expo's default config plus debug-ID injection, which
+// ties every bundle (the embedded one AND each `eas update`) to its own source
+// map, so an OTA hotfix's stack traces symbolicate against the right code.
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 const path = require('path');
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 
 const emptyModule = path.resolve(__dirname, 'web-shims/empty.js');
 

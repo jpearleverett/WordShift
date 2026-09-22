@@ -20,8 +20,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOMS = path.resolve(HERE, '..', '..', 'assets', 'rooms');
-const WINDOWS = path.join(ROOMS, 'windows');
+// Painted PNG originals (unbundled); the shipped rooms are WebP derivatives.
+const ROOMS = path.resolve(HERE, '..', '..', 'assets', 'raw', 'rooms');
+const WINDOWS = path.resolve(HERE, '..', '..', 'assets', 'rooms', 'windows');
 
 // Each room's window VIEW has a recognisable colour family that the dark wooden
 // frame and the interior foreground objects do not share, so we flood-fill from

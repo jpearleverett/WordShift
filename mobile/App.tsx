@@ -11,6 +11,7 @@ import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 import { getSupportIdentifier } from './src/services/supportIdentity';
 import { getSupportMailto } from './src/constants/links';
+import { buildSupportExport } from './src/services/supportExport';
 import { useGlobalOverlays } from './src/hooks/useGlobalOverlays';
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
 import {
@@ -29,6 +30,7 @@ import {
   Modal,
   Image,
   Linking,
+  Share,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -87,6 +89,8 @@ import {
   markBlindIntroSeen,
   hasSeenLexiconIntro,
   markLexiconIntroSeen,
+  hasSeenExpertIntro,
+  markExpertIntroSeen,
   getPendingVariantTutorials,
   acknowledgeVariantTutorial,
   checkFreeStreakFreeze,
@@ -176,6 +180,16 @@ import {
   getStoryPreparationRetryCopy,
   getDailyPreparationRetryCopy,
   getBootFailureCopy,
+  getRewardedHintGrantedMessage,
+  getRewardedHintLimitMessage,
+  getRewardedHintUnavailableMessage,
+  getOutOfHintsTitle,
+  getOutOfHintsMessage,
+  getOutOfHintsWatchLabel,
+  getOutOfHintsStoreLabel,
+  getOutOfHintsDismissLabel,
+  getExpertUnlockIntroLines,
+  getExpertLockedHint,
 } from './src/services/phaseNarrative';
 import { consumeCosmeticFirstShowing, peekCosmeticFirstShowing, markCosmeticFirstShowingShown } from './src/services/cosmeticReceipts';
 import {
@@ -318,7 +332,7 @@ type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery'
 
 type PostVictoryIntro =
   | { kind: 'variant_unlock'; variant: PuzzleVariant; lines: string[] }
-  | { kind: 'modifier_stacking' | 'blind_unlock' | 'lexicon_unlock' | 'starter_pack'; lines: string[] };
+  | { kind: 'modifier_stacking' | 'blind_unlock' | 'lexicon_unlock' | 'expert_unlock' | 'starter_pack'; lines: string[] };
 
 
 // Speed rescue: seconds granted by the one-per-board rewarded continue.
@@ -351,6 +365,8 @@ if (sentryDsn) {
     dsn: sentryDsn,
     // Crash + error capture only; no performance tracing by default.
     tracesSampleRate: 0,
+    // Keep internal-testing noise out of the production dashboards and alerts.
+    environment: String(Constants.expoConfig?.extra?.releaseChannel ?? 'internal-testing'),
   });
   setErrorForwarder((error, context) => {
     const err = error instanceof Error ? error : new Error(String(error));
@@ -1964,6 +1980,9 @@ function MainApp() {
       if (dismissedKind === 'lexicon_unlock') {
         await markLexiconIntroSeen();
       }
+      if (dismissedKind === 'expert_unlock') {
+        await markExpertIntroSeen();
+      }
       setPostVictoryIntro(null);
       await advanceQueuedPostVictoryIntro();
       // After the starter intro closes, open the Store so the "welcome" Fox
@@ -2383,6 +2402,9 @@ function MainApp() {
           houseAskRestoreSuppressRef.current = true;
           return;
         }
+        // An unfinished daily from an earlier day can never be resumed; drop it
+        // rather than leave it waiting in the slot until the next daily saves.
+        if (saved?.isPlayingDaily) await clearPuzzleState('daily').catch(() => {});
         const daily = await generateDailyPuzzle();
         if (!isCurrent()) return;
         puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength, daily.solution);
@@ -3065,6 +3087,19 @@ function MainApp() {
           lines: getBlindIntroLines(finalVictory.newPhase),
         });
       }
+      // EXPERT's unlock beat. Every other unlock (each style and modifier) gets
+      // a card, and EXPERT used to change only a locked menu row, so the tier
+      // meant to fill the Desert-to-Office gap went unnoticed.
+      if (
+        immediateIntros.length === 0 &&
+        completedTotal >= EXPERT_DIFFICULTY_UNLOCK_PUZZLES &&
+        !(await hasSeenExpertIntro())
+      ) {
+        immediateIntros.push({
+          kind: 'expert_unlock',
+          lines: getExpertUnlockIntroLines(finalVictory.newPhase),
+        });
+      }
       // Lexicon's own unlock beat. It is the one mode that changes nothing the
       // player can SEE (blind's previews visibly vanish, the clock counts
       // down), so it needs saying out loud more than any of them.
@@ -3256,6 +3291,12 @@ function MainApp() {
             puzzlesSolved: completedTotal,
             isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
             isDaily: isPlayingDaily,
+            // Never stack the OS sheet on a win that already carries a beat of
+            // its own: a ceremony waiting at the pit, the forced first harvest,
+            // or an unlock card queued for this exit.
+            isBusyMoment: finalVictory.phaseTransitionPending === true ||
+              finalVictory.mandatoryHarvest === true ||
+              immediateIntros.length > 0,
           }).then(prompted => {
             // The OS review sheet fired mid-victory, outside the exit-nudge
             // chain — flag it so THIS win's exit runs no nudges on top
@@ -3304,7 +3345,7 @@ function MainApp() {
             title: endgame.houseComplete ? 'THE HOUSE STANDS COMPLETE' : 'THE ARRANGEMENT IS COMPLETE',
             text: endgame.houseComplete
               ? 'The last word has settled. What happens next belongs to everyone who lives here.'
-              : 'There is still room to build. Tonight, the words have opened something beneath the unfinished house.',
+              : 'There is still room to build. Tonight, the words call something down to the unfinished house.',
           });
           queueEndgameCinematic();
         } else if (endgame?.kind === 'dwell') {
@@ -3313,8 +3354,8 @@ function MainApp() {
             : getDwellLine(Math.min(endgame.dwell ?? 0, FINALE_DWELL_PUZZLES), persistence.currentPhase, endgame.houseComplete);
         } else if (endgame?.kind === 'post_arrival') {
           orchestrationActions.setCompletionCoda({
-            title: 'THE PATTERN REMEMBERS YOU',
-            text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
+            title: 'THE MORNING AFTER',
+            text: 'It stayed. So did everyone who lives here. Your words are still in every wall.',
           });
           queueEndgameCinematic();
         }
@@ -4083,16 +4124,16 @@ function MainApp() {
         });
         puzzleActions.refreshHintBalance();
         hapticSuccess();
-        puzzleActions.setMessage(`+${REWARDED_HINT_GRANT} hint`);
+        puzzleActions.setMessage(getRewardedHintGrantedMessage(persistence.currentPhase));
       } else if (res.reason === 'daily_cap') {
-        puzzleActions.setMessage('Daily clip limit reached. Try the store.');
+        puzzleActions.setMessage(getRewardedHintLimitMessage(persistence.currentPhase));
       } else {
-        puzzleActions.setMessage('No hint this time. Hint packs live in the store.');
+        puzzleActions.setMessage(getRewardedHintUnavailableMessage(persistence.currentPhase));
       }
     } catch {
-      puzzleActions.setMessage('No hint this time. Hint packs live in the store.');
+      puzzleActions.setMessage(getRewardedHintUnavailableMessage(persistence.currentPhase));
     }
-  }, [puzzleActions]);
+  }, [puzzleActions, persistence.currentPhase]);
 
   // Raised by the hint button when the balance is empty. Offers a rewarded clip
   // (when under the daily cap) or the store. Guarded against re-entrant alerts.
@@ -4104,19 +4145,14 @@ function MainApp() {
     const capReached = await isRewardedCapReached().catch(() => false);
     const buttons: { text: string; style?: 'cancel'; onPress?: () => void }[] = [];
     const clipAvailable = !capReached && isAdsReady();
+    const phase = persistence.currentPhase;
     if (clipAvailable) {
-      buttons.push({ text: 'Watch a clip (+1)', onPress: () => { done(); handleClaimRewardedHint(); } });
+      buttons.push({ text: getOutOfHintsWatchLabel(phase), onPress: () => { done(); handleClaimRewardedHint(); } });
     }
-    buttons.push({ text: 'Get hints', onPress: () => { done(); setShowStoreModal(true); } });
-    buttons.push({ text: 'Not now', style: 'cancel', onPress: done });
-    showGameAlert(
-      'Out of hints',
-      clipAvailable
-        ? 'Watch a short clip for a free hint, or grab a hint pack in the store.'
-        : 'Hint packs are available in the store.',
-      buttons,
-    );
-  }, [handleClaimRewardedHint]);
+    buttons.push({ text: getOutOfHintsStoreLabel(phase), onPress: () => { done(); setShowStoreModal(true); } });
+    buttons.push({ text: getOutOfHintsDismissLabel(phase), style: 'cancel', onPress: done });
+    showGameAlert(getOutOfHintsTitle(phase), getOutOfHintsMessage(phase, clipAvailable), buttons);
+  }, [handleClaimRewardedHint, persistence.currentPhase]);
 
   const prevOutOfHintsSignal = useRef(0);
   useEffect(() => {
@@ -4868,7 +4904,7 @@ function MainApp() {
   }, [puzzleActions, keepSetupMenuOpen, puzzle.difficulty, puzzle.selectedVariant, puzzle.speedMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
 
   const handleToggleUnbrokenWeave = useCallback(() => {
-    if (persistence.currentPhase !== 5) return;
+    if (persistence.currentPhase !== 5 || !persistence.postRevelation) return;
     hapticMedium();
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
@@ -4885,6 +4921,7 @@ function MainApp() {
   }, [
     keepSetupMenuOpen,
     persistence.currentPhase,
+    persistence.postRevelation,
     puzzleActions,
     puzzle.difficulty,
     puzzle.unbrokenWeaveMode,
@@ -4956,6 +4993,10 @@ function MainApp() {
     ? phaseTransitionEvent : null;
   const completePresentedCeremony = async () => {
     const completed = await ceremonyPlayback.complete(cinematicEvent);
+    // The board after the Arrival is played after the ending: its session
+    // phase follows hasArrivalBeenPresented, which only turns true once this
+    // acknowledgement is saved.
+    if (completed?.kind === 'arrival') await persistenceActions.refreshStats();
     if (completed?.kind === 'new_cycle' && pendingCycleRebuildRef.current) {
       pendingCycleRebuildRef.current = false;
       await rebuildSessionFromStorage({ restartOnboarding: false });
@@ -5628,7 +5669,7 @@ function MainApp() {
             blindLocked={puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES}
             blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
             expertLocked={puzzlesSolvedForVariantUnlocks < EXPERT_DIFFICULTY_UNLOCK_PUZZLES}
-            expertUnlockHint={`6-letter apex. Opens at ${EXPERT_DIFFICULTY_UNLOCK_PUZZLES} (you're at ${puzzlesSolvedForVariantUnlocks})`}
+            expertUnlockHint={getExpertLockedHint(puzzlesSolvedForVariantUnlocks, EXPERT_DIFFICULTY_UNLOCK_PUZZLES)}
             speedActive={puzzle.speedMode}
             onToggleSpeedMode={handleToggleSpeedMode}
             // Speed joins the modifier list the moment that section first
@@ -5643,7 +5684,7 @@ function MainApp() {
             showLexiconToggle={puzzlesSolvedForVariantUnlocks >= BLIND_TOGGLE_UNLOCK_PUZZLES}
             lexiconLocked={puzzlesSolvedForVariantUnlocks < LEXICON_UNLOCK_PUZZLES}
             lexiconUnlockHint={getLexiconUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
-            showUnbrokenWeave={persistence.currentPhase === 5}
+            showUnbrokenWeave={persistence.currentPhase === 5 && persistence.postRevelation}
             unbrokenWeaveActive={puzzle.unbrokenWeaveMode}
             onToggleUnbrokenWeave={handleToggleUnbrokenWeave}
             unbrokenWeaveMastery={unbrokenWeaveMastery}
@@ -6457,6 +6498,11 @@ function BootHold({
   const openSupportMail = useCallback(() => {
     Linking.openURL(getSupportMailto(BOOT_APP_VERSION, supportIdentifier ?? undefined)).catch(() => {});
   }, [supportIdentifier]);
+  const shareSaveWithSupport = useCallback(() => {
+    buildSupportExport(BOOT_APP_VERSION)
+      .then(message => Share.share({ title: 'WordShift save', message }))
+      .catch(() => {});
+  }, []);
   const copy = getBootFailureCopy(onContinueWithoutCloud ? 'cloud' : failureKind);
   if (failed) {
     // A flowing, group-centred column: the card must be allowed to push the
@@ -6491,6 +6537,11 @@ function BootHold({
           <TouchableOpacity onPress={openSupportMail} accessibilityRole="link" accessibilityLabel={copy.contactSupport} style={bootStyles.failedLink}>
             <Text style={bootStyles.failedLinkText}>{copy.contactSupport}</Text>
           </TouchableOpacity>
+          {!onContinueWithoutCloud ? (
+            <TouchableOpacity onPress={shareSaveWithSupport} accessibilityRole="button" accessibilityLabel={copy.shareSave} style={bootStyles.failedLink}>
+              <Text style={bootStyles.failedLinkText}>{copy.shareSave}</Text>
+            </TouchableOpacity>
+          ) : null}
           {supportIdentifier ? (
             <Text selectable style={bootStyles.failedSupportId}>Support ID: {supportIdentifier}</Text>
           ) : null}

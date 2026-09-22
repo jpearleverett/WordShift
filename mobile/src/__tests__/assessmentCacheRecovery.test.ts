@@ -90,11 +90,16 @@ test('an older failed hint spend cannot roll back a newer paid grant', async () 
   let rejectSpend!: (error: Error) => void;
   (NativeStorage.setItem as jest.Mock).mockImplementationOnce(() => new Promise((_, reject) => { rejectSpend = reject; }));
   expect(consumeHintSync()).toBe(true);
-  await addHints(20, 'paid_pack');
-  rejectSpend(new Error('old spend failed'));
+  // The debit's write is queued ahead of the grant, so the grant waits for it.
+  const grant = addHints(20, 'paid_pack');
   await tick();
-  expect(getHintBalanceSync()).toBe(28);
-  expect(JSON.parse((await NativeStorage.getItem('wordshift_hints'))!).balance).toBe(28);
+  rejectSpend(new Error('old spend failed'));
+  await grant;
+  await tick();
+  // Writes are serialized: the failed spend rolls back before the grant runs,
+  // and the grant is kept whole on top of it (memory and disk agree).
+  expect(getHintBalanceSync()).toBe(29);
+  expect(JSON.parse((await NativeStorage.getItem('wordshift_hints'))!).balance).toBe(29);
 });
 
 test.each(['{broken', '{"balance":-2}', '{"balance":"9"}'])('unreadable hints are never overwritten with a free seed: %s', async raw => {

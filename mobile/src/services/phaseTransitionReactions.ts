@@ -10,8 +10,8 @@ const EMBER_REACTIONS: Record<Exclude<DialoguePhase, 0>, string> = {
   1: "That cup warmed before I touched the kettle. You saw it too, didn't you? Come sit by me a moment. I'd like to work out what happened.",
   2: "The fire has gone quiet, and the room is still getting warmer. I've opened the door a little. Tell me if you feel it too.",
   3: "You felt that weight in the house. I did too. I owe you more than another cup of tea. When you're ready, come and ask me what I know.",
-  4: "You have seen what the words are feeding. I asked you to help build this home, and I should have told you more. These robes do not make me certain about what comes next.",
-  5: "It is here, and the cup is cooling again. I will leave it until you ask for more. We can sit together without deciding how you ought to feel.",
+  4: "Now you know what the words were feeding. I knew some of it when I asked you to help build this home, and I kept it to myself. I am wearing the robe. It has not made me sure of anything.",
+  5: "It is here, and it is staying. I keep listening for it to tidy something. So far it has only listened back. Sit with me, if you like.",
 };
 
 const OTHER_REACTIONS: Record<Exclude<DialoguePhase, 0>, string> = {
@@ -39,7 +39,7 @@ export function getPhaseTransitionReaction(
   } else if (phase === 3 && speaker === 'rabbit') {
     text = "Oh. You felt that too. The soil warmed under both my paws, all at once. I'm keeping my seed tin with me tonight. Would you walk back to the garden with me?";
   } else if (phase === 5 && speaker === 'fox' && context?.boundary === 'remember') {
-    text = "It is here, and the private door stayed shut. I will not ask what you keep behind it. Shall I sit with you out here a little while?";
+    text = "It is here, and the private door stayed shut. I will not ask what you keep behind it. I will sit out here with you, if you want the company.";
   } else if (phase === 5 && speaker === 'fox' && context?.boundary === 'release') {
     text = "It is here, and the road is still open. If you want some air, take it. There will be a place by the hearth when you choose to come back.";
   }

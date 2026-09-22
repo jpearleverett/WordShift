@@ -1,6 +1,6 @@
 # WordShift — Store Listing Kit
 
-> **Android refresh approved September 17, 2026:** use the [revised copy](../mobile/docs/store-launch/README.md) and [refresh production status](../mobile/assets/Play_store/launch-2026-09-v2/README.md). Fresh screenshots and trailer footage are still pending; the refresh is not published. The [September 7 campaign](../mobile/assets/Play_store/launch-2026-09/README.md) remains the rollback snapshot. The material below is historical and for iOS reference.
+> **Live Play listing (confirmed by the owner 2026-09-22):** the September 7 campaign in [launch-2026-09](../mobile/assets/Play_store/launch-2026-09/README.md). The unpublished September 17 refresh (`launch-2026-09-v2` and its copy in `mobile/docs/store-launch/`), the September 19 `assembled-listing-2026-09` campaign and the `assembly-experiment` were deleted on 2026-09-22 with the scripts that built them; git history holds them.
 
 > **September 13 source review:** the current configuration and release checks
 > are in [CURRENT_BUILD.md](CURRENT_BUILD.md). The September 7 image pack has

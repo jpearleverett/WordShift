@@ -52,6 +52,7 @@ import {
   reconcileStorePurchaseHistory,
   StorePurchaseTransaction,
   notifyBillingChanges,
+  RECEIPT_MATCH_WINDOW_MS,
 } from '../iap';
 import { ENTITLEMENTS, EntitlementKey, grantEntitlements, getGrantedEntitlements, setEntitlements, invalidateEntitlementsCache } from '../entitlements';
 import { runStorageTransaction, StorageRecoveryRequiredError } from '../persistenceStorage';
@@ -189,9 +190,19 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
     // The before-snapshot identifies new receipts independently of device
     // clock skew. Where available, compare store time only to store time so
     // an earlier pending approval keeps its own credit.
-    const match = newest(entries.filter(entry =>
-      !before.has(entry.transactionId) &&
-      (!Number.isFinite(storePurchasedAt) || Math.abs(entry.purchasedAt - storePurchasedAt) <= 1000)));
+    const fresh = entries.filter(entry => !before.has(entry.transactionId));
+    let match = newest(fresh.filter(entry =>
+      !Number.isFinite(storePurchasedAt) || Math.abs(entry.purchasedAt - storePurchasedAt) <= 1000));
+    // Play's purchaseDate and RevenueCat's receipt date come from different
+    // systems and can disagree by seconds. When nothing is that close but
+    // EXACTLY ONE receipt for this product is new since checkout began, it is
+    // this purchase, provided it is still dated inside the receipt match
+    // window (a long-pending approval from days ago keeps its own credit).
+    if (match === null && fresh.length === 1 &&
+        (!Number.isFinite(fresh[0].purchasedAt) ||
+          Math.abs(fresh[0].purchasedAt - storePurchasedAt) <= RECEIPT_MATCH_WINDOW_MS)) {
+      match = fresh[0];
+    }
     return match && match.transactionId !== orderId ? [match.transactionId] : [];
   }
 
@@ -414,12 +425,18 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
       }
     },
 
-    async restorePurchases(): Promise<{ entitlements: EntitlementKey[]; error?: string }> {
+    async restorePurchases(): Promise<{ entitlements: EntitlementKey[]; inactive?: EntitlementKey[]; error?: string }> {
       if (!ready || !Purchases) return { entitlements: [] };
       try {
         const customerInfo = await Purchases.restorePurchases();
         void syncCompletedPurchases(customerInfo).catch(error => console.warn('[IAP] Receipt recovery failed:', error));
-        return { entitlements: entitlementsFrom(customerInfo) };
+        const active = entitlementsFrom(customerInfo);
+        const all = customerInfo?.entitlements?.all;
+        // Only an explicit inactive record may remove a local key (iap.ts merges).
+        const inactive = all !== null && typeof all === 'object'
+          ? Object.keys(all).filter(key => !active.includes(key) && all[key]?.isActive === false)
+          : [];
+        return { entitlements: active, ...(inactive.length > 0 ? { inactive } : {}) };
       } catch (error) {
         console.warn('[IAP] RevenueCat restore failed:', error);
         return { entitlements: [], error: 'restore_failed' };

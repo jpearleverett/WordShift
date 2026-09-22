@@ -3,7 +3,7 @@ import { loadProgress, purchaseUnlockWithAmber, canAfford, reserveUnlock, getRes
 import { phase2PoolHasNew } from './dialogue/animalDialogueBase';
 import { getPhase2PoolCursors } from './dialogue/animalDialogueNarrative';
 import { getTotalDialogueCount } from './animalDialogue';
-import { isOnCooldown } from './dialogueSession';
+import { isOnCooldown, updateConversationBacklog, updateSessionPhase } from './dialogueSession';
 import { logEvent } from './eventLogger';
 import { loadTendingState, hasNewPhase5Line } from './tending';
 import { loadChoiceState, hasPendingDialogueChoice } from './dialogueChoices';
@@ -1478,19 +1478,24 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
   // phase 2 (the first vanguard opportunity). Loaded once, not per animal.
   const nearEndgame = progress.currentPhase >= 5;
   const tendingState = nearEndgame ? await loadTendingState() : null;
-  const choiceState = progress.currentPhase >= 2 ? await loadChoiceState() : null;
+  // Badges are optional here: an unreadable record must not stop the house loading.
+  const choiceState = progress.currentPhase >= 2 ? await loadChoiceState().catch(() => null) : null;
   // Phase-2 exhaustion pool: badge honesty for animals whose base block is
   // done but who still have undelivered pool lines. Loaded once, not per animal.
   const phase2Cursors = progress.currentPhase >= 1 && progress.currentPhase <= 3
-    ? await getPhase2PoolCursors()
+    ? await getPhase2PoolCursors().catch(() => ({} as Record<string, number>))
     : {};
   // Locked-resident references wait unread until that friend joins the house.
   const unlockedTypes = new Set(progress.unlockedAnimals as AnimalType[]);
+  // Cooldowns below are phase- and backlog-aware; keep the session layer's
+  // mirrors current before consulting them.
+  updateSessionPhase(progress.currentPhase);
 
   return ANIMALS.map(animal => {
     const unlocked = progress.unlockedAnimals.includes(animal.id);
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
     const next = getNextAnimalConversation(progress, animal.type, animalPhase, unlockedTypes);
+    updateConversationBacklog(animal.id, next?.dialogue.phase);
     const total = getTotalDialogueCount(animal.type, Math.min(animalPhase, 4) as DialoguePhase);
     const dialogueIndex = next?.index ?? (animalPhase === 5
       ? Math.max(total, progress.lastDialogueRead[animal.id] ?? 0) : total);

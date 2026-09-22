@@ -35,6 +35,7 @@ export type EventType =
   | 'store_opened'
   | 'purchase_initiated'
   | 'iap_purchase'
+  | 'season_premium_unlocked'
   | 'purchase_cancelled'
   | 'purchase_failed'
   | 'daily_amber_claimed'

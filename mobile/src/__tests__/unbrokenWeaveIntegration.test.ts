@@ -24,7 +24,7 @@ describe('Unbroken Weave player-facing wiring', () => {
     );
     expect(APP_TSX).toMatch(/unbrokenWeaveMode: puzzle\.unbrokenWeaveMode/);
     expect(APP_TSX).toMatch(/spentLetters: puzzle\.spentLetters/);
-    expect(APP_TSX).toMatch(/showUnbrokenWeave=\{persistence\.currentPhase === 5\}/);
+    expect(APP_TSX).toMatch(/showUnbrokenWeave=\{persistence\.currentPhase === 5 && persistence\.postRevelation\}/);
     expect(APP_TSX).toMatch(/unbrokenWeaveActive=\{puzzle\.unbrokenWeaveMode\}/);
     expect(APP_TSX).toMatch(/onToggleUnbrokenWeave=\{handleToggleUnbrokenWeave\}/);
   });

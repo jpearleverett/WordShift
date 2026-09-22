@@ -35,8 +35,8 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
         afterReveal: 'You carried a hearthstone to my fire. I will set the carved side toward your chair. There is room for your feet beside it, whenever you want that seat.',
       },
       {
-        beforeReveal: "This ashen mantel sits well above the hearthstone. The light looks colder against it. Come close enough to feel the heat before you trust the colour.",
-        afterReveal: 'The ashen mantel gives the hearth a darker edge. Hold a paw near the fire and feel it for yourself. The colour of the stone cannot tell you whether a room is warm.',
+        beforeReveal: "This ashen mantel sits well above the hearthstone. The light looks colder against it. Come close enough to feel the heat before you trust the color.",
+        afterReveal: 'The ashen mantel gives the hearth a darker edge. Hold a paw near the fire and feel it for yourself. The color of the stone cannot tell you whether a room is warm.',
       },
       {
         beforeReveal: "The hearth is kindled a little further. See how the flame bends toward the stone? I'll sit with it awhile and see whether it does that without company.",
@@ -86,11 +86,11 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
     ],
     circumstance: [
       "There's always room at this table. Let me clear the flour from your end.",
-      "A pot rang while the stove was cold this morning. I checked for a draught. The window was shut.",
+      "A pot rang while the stove was cold this morning. I checked for a draft. The window was shut.",
       "The recipe keeps gaining instructions overnight. I've copied the one I actually meant to cook onto a separate scrap.",
       "It's trying to keep every meal exactly right. But I know what a hungry friend sounds like, and the recipe hasn't asked anyone how much they want.",
       'Something wants to preserve this table and everyone around it. I can understand that wish. I cannot let the wish decide that no guest may push a bowl away.',
-      'I still cook since the arrival. Some loaves are uneven, and I let people choose the crust they like. Sit for supper if you want it. The place is yours to leave empty too.',
+      'I have kept cooking since the arrival. Some loaves come out uneven, and I let people choose the crust they like. Sit for supper if you want it. The place is yours to leave empty too.',
     ],
   },
   study: {
@@ -101,7 +101,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
         afterReveal: 'A gilded globe for the desk. I will keep the atlas beside it. Two accounts of a coastline give me somewhere to begin when one of them changes.',
       },
       {
-        beforeReveal: "Marginalia. There's writing beside a passage I left unmarked. Thank you for bringing this to me. I'll copy the passage before I try answering its new neighbour.",
+        beforeReveal: "Marginalia. There's writing beside a passage I left unmarked. Thank you for bringing this to me. I'll copy the passage before I try answering its new neighbor.",
         afterReveal: 'The marginalia has reached this volume too. I will copy the passage and its new handwriting onto separate sheets. An annotation must not quietly become the original.',
       },
       {
@@ -123,7 +123,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
       "The books offer explanations more readily than evidence. I'm learning to leave a little space between the two.",
       "An entry changed after I disagreed with it. I've kept a copy of the disagreement somewhere the book cannot mistake for a margin.",
       'The writing helped us understand the invitation. It also tried to revise the record of our doubts. I will keep the unwelcome version beside the reassuring one.',
-      'The presence has arrived, and the accounts still differ. I can keep studying without calling the matter settled. Your gift earns a place in the catalogue, not a vote in favour of my conclusions.',
+      'The presence has arrived, and the accounts still differ. I can keep studying without calling the matter settled. Your gift earns a place in the catalogue, not a vote in favor of my conclusions.',
     ],
   },
   aquarium: {
@@ -134,8 +134,8 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
         afterReveal: 'You brought glowing coral. Look at the light finding the little hollows in the sand. I will set it near the glass, so we can both look at it from where we are.',
       },
       {
-        beforeReveal: "Still water. It's so smooth I can see every whisker. Let me wave a paw through it, though. I like being able to tell when I've moved.",
-        afterReveal: 'The water has gone still. I can see every little detail in the glass. I will put a paw through the surface and watch for a ripple. I want it to remember that I moved.',
+        beforeReveal: "Still water. It's so smooth I can see every frond of my gills. Let me wave a hand through it, though. I like being able to tell when I've moved.",
+        afterReveal: 'The water has gone still. I can see every little detail in the glass. I will put a hand through the surface and watch for a ripple. I want it to remember that I moved.',
       },
       {
         beforeReveal: "The first attunement makes the coral light reach right across the sand. There's a stone at the back I hadn't seen properly. Come look, it's shaped like a sleepy potato.",
@@ -146,7 +146,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
         afterReveal: 'The second attunement makes a current around the tank. I will float with it, then swim across it. I need to know which part of the journey is mine.',
       },
       {
-        beforeReveal: "Fully attuned. My reflection waved after I'd already stopped. Hello, slow me. I'll move a different paw next time and see whether it really is following.",
+        beforeReveal: "Fully attuned. My reflection waved after I'd already stopped. Hello, slow me. I'll move a different hand next time and see whether it really is following.",
         afterReveal: 'The tank is fully attuned. My reflection moves a moment after I do. I will keep changing the gesture. I want an echo that follows me, even when I do something unexpected.',
       },
     ],
@@ -179,8 +179,8 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
         afterReveal: 'The second attunement puts every leaf into the same rhythm. I will listen for a while, then turn over. There are limits to the attention I am willing to give a leaf.',
       },
       {
-        beforeReveal: "Fully attuned, and the vines have made one enormous knot. I recognise the shape. I'll leave this loose end alone, though. It may be useful to have somewhere to begin undoing it.",
-        afterReveal: 'The vines have finished their knot with the last attunement. I recognise the shape. I will leave the loose end within reach. Finishing a thing need not make it impossible to undo.',
+        beforeReveal: "Fully attuned, and the vines have made one enormous knot. I recognize the shape. I'll leave this loose end alone, though. It may be useful to have somewhere to begin undoing it.",
+        afterReveal: 'The vines have finished their knot with the last attunement. I recognize the shape. I will leave the loose end within reach. Finishing a thing need not make it impossible to undo.',
       },
     ],
     circumstance: [
@@ -188,7 +188,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
       "The leaves have been turning toward the wall in the evenings. I've had plenty of time to notice. Not much of an explanation yet.",
       "I've been waiting for a change in this house. Waiting gives a person time to become fond of an idea. It doesn't make the idea reliable.",
       "The vines are getting rather firm about where things belong. I wanted to see what the house was becoming. I'd still like it to leave room for a different arrangement.",
-      'I wanted the arrival. I could not promise it would be harmless, though I made waiting look very comfortable. You are entitled to remember that while being kind to me.',
+      'I wanted the arrival. I never promised it would be harmless, but I made waiting look so comfortable that nobody thought to ask. Be kind to me if you like. Remember that as well.',
       'It has arrived. I still like my hammock, and I have changed my mind about several grander things. We can enjoy an afternoon without making it a declaration that everything was worth it.',
     ],
   },
@@ -222,7 +222,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
       "There are sounds the walls carry better than the open air. I'm keeping separate notes for what I hear and what I think is making it.",
       "The sounds repeat when I try to listen somewhere else. That's what troubles me. A call should leave you free to turn an ear away.",
       'I heard the approach before I could explain it. Hearing first did not make me certain. I will keep recording the sounds that disagree with the pattern.',
-      'It has arrived, and my ears still need rest. I close the tent flap when I have heard enough. Thank you for bringing this quietly. You can stay without asking me to keep watch the whole time.',
+      'It has arrived, and my ears still need rest. I close the tent flap when I have heard enough. Thank you for bringing this quietly. Stay if you like. I will not keep watch the whole time.',
     ],
   },
   office: {
@@ -241,7 +241,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
         afterReveal: 'The first attunement warms the corner before the lamp is switched on. I will leave the switch alone and record how long it lasts. Efficiency still needs an explanation.',
       },
       {
-        beforeReveal: "The second attunement seems keen to organise my paperwork. I'll leave a few pages out of order deliberately. A filing system should survive a question about its methods.",
+        beforeReveal: "The second attunement seems keen to organize my paperwork. I'll leave a few pages out of order deliberately. A filing system should survive a question about its methods.",
         afterReveal: 'The second attunement has begun arranging my papers. I will keep a separate list of the order I chose. A tidy desk is of little use if I cannot find my own decisions.',
       },
       {
@@ -254,7 +254,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
       "A line appeared in the ledger before I'd written it. I put a question mark beside it. The question mark was mine, at least.",
       "The totals keep coming out agreeably neat. I've started retaining the untidy workings on a separate sheet.",
       "The ledger has been treating disagreement as a clerical error. I've opened a new column for it. There appears to be quite a lot to enter.",
-      'The house can keep a record by changing what the record contains. I helped organise those records. I need to account for the entries that went missing as well as the ones that balanced.',
+      'The house can keep a record by changing what the record contains. I helped organize those records. I need to account for the entries that went missing as well as the ones that balanced.',
       'Since the arrival, I have kept the crossed-out entries legible. Your gift goes under kindness received. There is no adjacent box requiring agreement, gratitude on demand, or a promise to stay.',
     ],
   },
@@ -344,8 +344,8 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
         afterReveal: 'The second attunement sets a regular knocking through the bamboo. I will listen to the pauses as carefully as the notes. My own breath has room in those pauses.',
       },
       {
-        beforeReveal: "Fully attuned. The lanterns have formed a circle over the mat. I'll sit a little outside its centre today. I wonder how the light looks from there.",
-        afterReveal: 'The lanterns form a circle with the final attunement. I will place my mat a little outside its centre. I want to see what the light offers from a seat I chose myself.',
+        beforeReveal: "Fully attuned. The lanterns have formed a circle over the mat. I'll sit a little outside its center today. I wonder how the light looks from there.",
+        afterReveal: 'The lanterns form a circle with the final attunement. I will place my mat a little outside its center. I want to see what the light offers from a seat I chose myself.',
       },
     ],
     circumstance: [
@@ -374,7 +374,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
       },
       {
         beforeReveal: "The second attunement seems to draw the moths earlier. I'll keep the old arrival times beside tonight's. Watching carefully means keeping what has changed.",
-        afterReveal: 'With the second attunement, the moths gather earlier. I will retain the old times beside the new ones. A record of change needs both.',
+        afterReveal: 'With the second attunement, the moths gather earlier. I will keep the old times beside the new ones. A record of change needs both.',
       },
       {
         beforeReveal: "Fully attuned. The lantern light bends toward a dark place between the stars. I'll mark the angle from the rail. I won't guess what lives at the other end.",
@@ -386,8 +386,8 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
       "There is a patch of sky the moths keep avoiding. I've marked where it sits in relation to the roof.",
       "I've watched something alter the spaces between the stars. I can tell you where I saw it. What it means is a larger claim.",
       "The pattern repeats more exactly every night. I'm keeping track of the moments I look away as well. I want my watching to remain something I choose.",
-      'I saw signs before I understood their cost. Precise attention did not make me an authority on what the presence would permit. I will be careful about the difference.',
-      'It is here now. I still watch the sky, and I also close my eyes when I am tired. The loft can hold a light for us without requiring either of us to keep an endless vigil.',
+      'I saw the signs before anyone else did. Seeing them first did not tell me what they would cost. I try to keep what I saw apart from what I guessed.',
+      'It lives in the house now. I still watch the sky, and I close my eyes when I am tired. The loft can keep a light for us. The watch can end at dawn, like any other job.',
     ],
   },
   belfry: {
@@ -402,7 +402,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
         afterReveal: 'The bronze is waking without a strike. I will feel along the beam and map where the note carries. Hearing a voice does not tell me everything about its speaker.',
       },
       {
-        beforeReveal: "The first attunement keeps the chalk sharp through a draught. Useful, though I'll keep my rough copy too. I want yesterday's crooked circle somewhere I can still find it.",
+        beforeReveal: "The first attunement keeps the chalk sharp through a draft. Useful, though I'll keep my rough copy too. I want yesterday's crooked circle somewhere I can still find it.",
         afterReveal: 'The first attunement keeps the chalk circles sharp. I will keep the rough copy beside my survey. The crooked original tells me something a perfect ring cannot.',
       },
       {
@@ -453,7 +453,7 @@ const RESIDENT_GIFT_SCRIPTS: Record<string, ResidentGiftScript> = {
       "The garden has been keeping its prettiest flowers open. I've started watching the young shoots as carefully. I want to see them grow into something new.",
       "A seedling that never changes may look well cared for. I've grown enough plants to know it still needs a next season.",
       'The presence would keep a loved thing at its loveliest. I can see the tenderness in that. I can also see a seedling kept from becoming a tree.',
-      'It has arrived, and I still save seed for a season I have not seen. Thank you for tending this patch with me. We may love a garden and still ask it to grow differently.',
+      'It has arrived, and I still save seed for a season I have not seen. The warmth would rather this garden stayed exactly as it is. I keep a few seeds dry anyway. Next year needs somewhere to start.',
     ],
   },
 };

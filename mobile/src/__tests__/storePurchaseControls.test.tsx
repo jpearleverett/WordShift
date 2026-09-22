@@ -5,6 +5,7 @@ import React, { type ReactElement } from 'react';
 // same-frame race that disabled state alone cannot protect.
 let mockSlots: any[] = [];
 let mockCursor = 0;
+jest.mock('../hooks/useScreenInsets', () => ({ useScreenInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }) }));
 jest.mock('react', () => ({
   ...jest.requireActual('react'),
   useEffect: jest.fn(),
@@ -23,7 +24,7 @@ jest.mock('react', () => ({
   },
 }));
 jest.mock('react-native', () => ({
-  View: 'View', Text: 'Text', Image: 'Image', TouchableOpacity: 'TouchableOpacity',
+  useWindowDimensions: () => ({ width: 390, height: 844 }), View: 'View', Text: 'Text', Image: 'Image', TouchableOpacity: 'TouchableOpacity',
   Modal: 'Modal', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
   Animated: { View: 'AnimatedView', Value: class { setValue() {} } },
   StyleSheet: { create: (styles: unknown) => styles },

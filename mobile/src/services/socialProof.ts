@@ -16,7 +16,7 @@
  * (no social proof shown) instead of selecting the table.
  */
 
-import { isSupabaseConfigured, sbRpc } from './supabaseClient';
+import { getBackendIdentity, isSupabaseConfigured, sbRpc } from './supabaseClient';
 import { getLocalDateString } from './dateUtils';
 
 export interface AggregateProof {
@@ -37,6 +37,12 @@ interface DailyCounterRow {
  * Atomically add `wordCount` to today's global "words offered" counter.
  * No-op when unconfigured. Never throws. Returns the new total when the RPC
  * reports it, else null.
+ *
+ * Passes the anonymous install id as `p_install_id` so the server's hourly
+ * budget (rate_limits_v1.sql) is per install rather than per network address,
+ * where a busy carrier NAT would share one bucket across many players. When
+ * the id cannot be read the parameter is omitted and the server falls back to
+ * the address bucket, exactly as before.
  */
 export async function recordPuzzleContribution(
   wordCount: number,
@@ -45,9 +51,18 @@ export async function recordPuzzleContribution(
   const count = Math.max(0, Math.round(wordCount));
   if (count <= 0) return null;
 
+  let installId: string | null = null;
+  try {
+    installId = await getBackendIdentity();
+  } catch {
+    installId = null;
+  }
+  const params: Record<string, unknown> = { p_date: getLocalDateString(), p_count: count };
+  if (typeof installId === 'string' && installId.length > 0) params.p_install_id = installId;
+
   const result = await sbRpc<number | { words_offered: number } | null>(
     'bump_words_offered',
-    { p_date: getLocalDateString(), p_count: count },
+    params,
   );
   if (result == null) return null;
   if (typeof result === 'number') return result;

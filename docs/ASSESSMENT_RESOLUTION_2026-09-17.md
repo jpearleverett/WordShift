@@ -1,7 +1,7 @@
 # Assessment resolution — September 17, 2026
 
 Reviewed against `main` at `c9f5835010a415b1434ca573ec6fcc61cba5fe28`.
-This records the follow-up implementation for [the September 16 assessment](ASSESSMENT_2026-09-16.md).
+This records the follow-up implementation for the September 16 assessment (retired on 2026-09-22; git history holds `docs/ASSESSMENT_2026-09-16.md`).
 
 All 41 numbered findings describe a real underlying defect or avoidable performance cost. All are addressed in this change, together with the 11 additional actionable appendix items. This is a source and automated-validation result, not certification of a signed Android release.
 

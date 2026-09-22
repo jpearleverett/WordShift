@@ -95,6 +95,7 @@ jest.mock('../services/animalDialogue', () => ({
   TUTORIAL_CALLBACK_DIALOGUES: ['tutorial callback line'],
   getCoordinatedEventLine: jest.fn(() => null),
   getWordThresholdDialogue: jest.fn(() => null),
+  peekWordThresholdPage: jest.fn(async () => null),
   getTotalDialogueCount: jest.fn(() => 24),
   getSacrificeReaction: jest.fn(() => null),
   getPhase2ExtraDialogues: jest.fn(() => []),
@@ -114,6 +115,7 @@ jest.mock('../services/dialogueSession', () => ({
   getSessionStatus: jest.fn(() => ({ status: 'in_session', dialoguesRemaining: 5 })),
   isOnCooldown: jest.fn(() => false),
   updateSessionPhase: jest.fn(),
+  updateConversationBacklog: jest.fn(),
 }));
 
 // Exercise the hook against explicit line receipts. The service's real storage,
@@ -160,6 +162,9 @@ jest.mock('../services/phaseNarrative', () => ({
   getDialogueCaughtUpLine: jest.fn((phase: number) => `caught up (phase ${phase})`),
   getDialogueRevealSkipHint: jest.fn(() => 'Tap the words to skip ahead.'),
   getArrivalResumeFramingLine: jest.fn((name: string) => `${name} settles in (resume framing).`),
+  getDialogueSessionEndMessage: jest.fn((_p: number, name: string, _t: string, resting: boolean) =>
+    resting ? `${name} wants to rest now.` : `${name} still has more to say.`),
+  getDialogueCooldownMessage: jest.fn((_p: number, name: string) => `${name} is resting.`),
 }));
 
 jest.mock('../services/weeklyQuests', () => ({
@@ -1050,6 +1055,63 @@ describe('useDialogueFlow Phase-3 choice reachability', () => {
 // (3 lines instead of 6 at the reveal, and a warm session refused outright)
 // until the player finished a puzzle.
 // ===========================================================================
+describe('useDialogueFlow late recruits reading their bright chapters', () => {
+  afterEach(() => {
+    progress.currentPhase = 0;
+    progress.puzzlesSolved = 10;
+  });
+
+  function setUp() {
+    resetHookState();
+    jest.clearAllMocks();
+    // The pangolin fixture stands in for a resident recruited at Phase 3 and
+    // still reading line 0 (the conversation mock reports phase-0 material).
+    progress.currentPhase = 3;
+    progress.puzzlesSolved = 90;
+    animals = [{ ...pangolin }];
+    getCurrentDialogueMock.mockReturnValue({ text: SHORT_LINE });
+    const animalDialogue = jest.requireMock('../services/animalDialogue') as {
+      getCrossAnimalReference: jest.Mock;
+      peekNarrativeSeedPage: jest.Mock;
+    };
+    animalDialogue.getCrossAnimalReference.mockReturnValue(null);
+    return animalDialogue;
+  }
+
+  it('reports the backlog before availability, so catch-up pacing applies to this visit', async () => {
+    setUp();
+    const dialogueSession = jest.requireMock('../services/dialogueSession') as {
+      updateConversationBacklog: jest.Mock;
+    };
+    const hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+
+    expect(dialogueSession.updateConversationBacklog).toHaveBeenCalledWith('pangolin', 0);
+    expect(dialogueSession.updateConversationBacklog.mock.invocationCallOrder[0])
+      .toBeLessThan(checkDialogueAvailabilityMock.mock.invocationCallOrder[0]);
+  });
+
+  it('plants a narrative seed although the house is past the bright days', async () => {
+    const animalDialogue = setUp();
+    animalDialogue.peekNarrativeSeedPage.mockResolvedValueOnce({ text: 'A seed line.', commit: jest.fn() });
+    let hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+    hook = render();
+
+    expect(animalDialogue.peekNarrativeSeedPage).toHaveBeenCalledWith('pangolin', 1);
+    expect(hook.dialogueText).toBe('A seed line.');
+  });
+
+  it('holds the reveal callback until the reader leaves the bright chapters', async () => {
+    const animalDialogue = setUp() as unknown as { peekNarrativeCallbackPage: jest.Mock };
+    progress.currentPhase = 4;
+    const hook = render();
+    await hook.handleAnimalTap({ ...pangolin, currentDialogueIndex: 0 } as never);
+
+    expect(animalDialogue.peekNarrativeCallbackPage).not.toHaveBeenCalled();
+  });
+});
+
 describe('useDialogueFlow session phase mirror', () => {
   afterEach(() => {
     progress.currentPhase = 0;

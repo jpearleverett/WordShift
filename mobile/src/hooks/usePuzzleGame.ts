@@ -26,7 +26,7 @@ import {
   RESONANT_BOARD_CAP_AMBER,
 } from '../constants/gameBalance';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getFinalBoardMoveMessage, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage, getUnbrokenWeaveUnavailableTitle, getHintRefusedMessage, getHintNoSafeRouteMessage, getUndoRefusedMessage, getUndoMessage, getWordLengthMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getBlockedWordMessage, getBlindFailMessage, getLockedLetterMessage, getEchoPuzzleMessage, getFinalBoardStartMessage, getFinalBoardUndoRefusal, getFinalBoardMoveMessage, getResonantMoveMessage, getUnbrokenWeaveSpentLetterMessage, getUnbrokenWeaveUnavailableMessage, getUnbrokenWeaveUnavailableTitle, getHintRefusedMessage, getHintNoSafeRouteMessage, getUndoRefusedMessage, getUndoMessage, getWordLengthMessage, getSpeedRescueResumeMessage } from '../services/phaseNarrative';
 import { showGameAlert } from '../services/gameAlert';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
@@ -3389,12 +3389,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSelectedLetter(null);
     setError(null);
     setSpeedRescueSignal(prev => ({ extraSec, id: (prev?.id ?? 0) + 1 }));
-    // Local copy: phaseNarrative.ts is owned by another workstream this pass.
-    setMessage(
-      currentPhase >= 3
-        ? 'The clock relents. Briefly.'
-        : 'Back in it! Extra time on the clock!'
-    );
+    setMessage(getSpeedRescueResumeMessage(currentPhase));
     return true;
   }, [gameState, currentPhase]);
 

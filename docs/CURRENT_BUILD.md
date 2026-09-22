@@ -1,5 +1,9 @@
 # Current build and documentation
 
+## September 22 launch-readiness follow-up (1.4.5 / 110)
+
+Branch `claude/wonderful-wright-wg49h9` carries the [2026-09-22 launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-22.md) and its fixes. App version **1.4.5**, Android code **110**; the build needs a new native binary because it adds the `android:appCategory="game"` manifest flag, the Sentry Android Gradle plugin (R8 mapping upload) and Metro debug IDs, so its OTA runtime is `1.4.5-<channel>`. The owner's device pass on the 1.4.4 internal build (2026-09-22) found purchases, onboarding, cloud backup and restore after Reset All, ads and notifications working. What remains before promotion is listed in the review's Resolution section and in the [launch checklist](LAUNCH_CHECKLIST.md); the Supabase files 9-11 are written and rehearsed offline but not applied.
+
 ## September 20 manual phase transitions and resident responses
 
 `feature/manual-phase-transitions`, based on main `4682c4c`, makes every ceremony passage wait for Continue and adds Back navigation. Android Back returns to the previous passage, with skip confirmation on the first. Revisiting a passage does not repeat its one-shot audio or haptics.
@@ -10,21 +14,21 @@ Validation passed: **227 Jest suites / 5,286 tests** in-band, TypeScript, zero-w
 
 ## September 20 decision and Journal follow-up
 
-`feature/story-layout-journal-fixes`, based on main `45973ae`, fixes oversized decision illustrations, rewrites the Journal introduction with the real menu icons and destinations, limits earlier conversations to completed dialogue, and simplifies How to Play. The owner's **1.3.9 / Android 104** version is unchanged. TypeScript, zero-warning lint and **684 focused tests in 15 suites** passed. See the [change and validation report](UI_FOLLOWUP_2026-09-20.md); ordinary GitHub CI supplies the full-suite and browser results. Physical Android layout verification remains part of the next internal-testing build.
+`feature/story-layout-journal-fixes`, based on main `45973ae`, fixes oversized decision illustrations, rewrites the Journal introduction with the real menu icons and destinations, limits earlier conversations to completed dialogue, and simplifies How to Play. The owner's **1.3.9 / Android 104** version is unchanged. TypeScript, zero-warning lint and **684 focused tests in 15 suites** passed. The change and validation report was retired on 2026-09-22 (git history holds it); ordinary GitHub CI supplies the full-suite and browser results. Physical Android layout verification remains part of the next internal-testing build.
 
 The same follow-up also adds animal portraits to Journal entries, moves victory confetti into the result foreground, shares the Sparks design between gameplay and the shop's live preview, and makes the difficulty button follow the phase's cottage colors. [PR #454](https://github.com/jpearleverett/WordShift/pull/454) records the latest complete validation.
 
 ## September 19 screenshot and store follow-up
 
-This work landed through [PR #453](https://github.com/jpearleverett/WordShift/pull/453), replacing the closed [PR #450](https://github.com/jpearleverett/WordShift/pull/450). It fixes the reported recovery/reset behavior, clipboard access, tutorial timing and modal overlap, drag clipping, axolotl scale, duplicate streak badge and victory layouts. It also adds 185 individually reviewed page illustrations with continuous resident portraits. See the [change and validation report](SCREENSHOT_FIXES_2026-09-19.md) and [art coverage review](ART_COVERAGE_REVIEW_2026-09-19.md).
+This work landed through [PR #453](https://github.com/jpearleverett/WordShift/pull/453), replacing the closed [PR #450](https://github.com/jpearleverett/WordShift/pull/450). It fixes the reported recovery/reset behavior, clipboard access, tutorial timing and modal overlap, drag clipping, axolotl scale, duplicate streak badge and victory layouts. It also adds 185 individually reviewed page illustrations with continuous resident portraits. See the [art coverage review](ART_COVERAGE_REVIEW_2026-09-19.md); the dated change and validation report was retired on 2026-09-22 (git history holds it).
 
 All 222 collected Jest suites have passing results across the integrated and focused runs; typecheck and zero-warning lint passed. The production Android Hermes JavaScript/assets export passed, including all 185 final story images, and the strict image validator found no missing or invalid assets. `expo-clipboard` is a new native dependency. This work is not a signed Android build or a Play upload, and the next internal-testing build still needs device verification.
 
-The [complete store campaign](../mobile/assets/Play_store/assembled-listing-2026-09/README.md) contains eight 1080 × 1920 portrait images, the feature graphic, icon alternatives, listing copy and a self-contained review. It uses source-asset assembly, including the complete pit path and updated choice art; the separate real-capture workflow remains available. Editing these files does not update the live Play listing.
+The September 19 `assembled-listing-2026-09` store campaign was deleted on 2026-09-22; the live Play listing is the September 7 [launch-2026-09](../mobile/assets/Play_store/launch-2026-09/README.md) campaign (owner-confirmed). Git history holds the deleted campaign.
 
 ## Animal walking follow-ups
 
-`feature/walk-foot-direction` corrects seventeen lower-limb frames across fourteen normal/robed walk atlases after reviewing all thirteen animals. Forward toes and alternating leg identity are preserved; the original fox walk is unchanged. The deterministic patch builder retains every pixel outside each selected lower-limb rectangle. See the [repair and validation report](ANIMAL_WALK_REPAIR_2026-09-20.md). This is a feature-branch artwork follow-up, not a new signed Android build or Play upload.
+`feature/walk-foot-direction` corrects seventeen lower-limb frames across fourteen normal/robed walk atlases after reviewing all thirteen animals. Forward toes and alternating leg identity are preserved; the original fox walk is unchanged. The deterministic patch builder retains every pixel outside each selected lower-limb rectangle. The dated repair and validation report was retired on 2026-09-22 (git history holds it). This is a feature-branch artwork follow-up, not a new signed Android build or Play upload.
 
 [PR #449](https://github.com/jpearleverett/WordShift/pull/449), on `feature/alternating-animal-walks` based on main `3b7ec4e`, supplies 12 refreshed normal cycles and 13 robed cycles; the original ten-frame normal fox walk remains. Outfit selection, loading fallbacks, facing and interrupted travel are covered, with reduced-motion and device-tier limits retained. [The walking review](ANIMAL_WALK_REVIEW_2026-09-17.md) records all 25 atlas checks, 5,161 unit tests and 43 browser journeys passing. This follow-up awaits owner merge and does not represent a new signed Android build or Play upload.
 
@@ -36,16 +40,16 @@ Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main`
 
 ## Build identity
 
-Current source builds on main `45973ae`, including the September 19 fixes and the owner's subsequent version bump. App version is **1.3.9** and Android version code **104**. The September 20 follow-up does not change either value. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source is app **1.4.5**, Android version code **110** (see the September 22 section above; 1.3.9 / 104 was the September 19-20 identity). The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
-| App version | `1.3.9` | `mobile/app.json` |
-| Android package / version code | `com.wordshift.app` / `104` | `mobile/app.json` |
+| App version | `1.4.5` | `mobile/app.json` |
+| Android package / version code | `com.wordshift.app` / `110` | `mobile/app.json` |
 | iOS bundle / build number | `com.wordshift.app` / `3` | `mobile/app.json` |
 | Expo / React Native | SDK 57; lockfile resolves Expo `57.0.20`, RN `0.86.3` | `mobile/package-lock.json` |
 | Version management | Local; increase Android version code for each new Play upload | `mobile/eas.json` |
-| Resolved OTA runtime | `1.3.9-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
+| Resolved OTA runtime | `1.4.5-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
 | Android release optimization | R8 minification, resource shrinking, optimized ProGuard defaults and optimized resource shrinking enabled; PNG crunch disabled | `mobile/app.json`, `mobile/plugins/withAndroidOptimization.js` |
 
 `mobile/package.json` still has npm package version `1.3.1`; that field is tooling metadata, not the Expo app version or Android version code. Do not infer the installed app version from it. The current React Native Gradle plugin resolves AGP 8.12.0; the optimization configuration does not require an AGP 9 migration.
@@ -228,6 +232,6 @@ Android test ad IDs remain deliberately enabled in the checked-in configuration.
 | Story, choices, ceremonies and visuals | [Story implementation](STORY_AND_VISUAL_IMPLEMENTATION.md), [story playtest](STORY_PLAYTEST_PROTOCOL.md), [presentation policy](../mobile/docs/STORY_PRESENTATION_POLICY.md), [typography ownership](../mobile/docs/TYPOGRAPHY_AND_ANIMATION_OWNERSHIP.md) |
 | Public copy and release art | [Store listing](STORE_LISTING.md), [press kit](PRESS_KIT.md), [launch asset package](../mobile/assets/Play_store/launch-2026-09/README.md) |
 
-The surviving September reports (`reports/`, `review-2026-09-06/`) are **historical evidence**. Their original counts, screenshots, access checks and completion statements apply to the recorded snapshot. Current references above take precedence for build commands and behavior. The July design audit and ledger, the September 5 review set, `RELEASE_VALIDATION_1_3_0.md` and the dated September status/handoff docs were deleted on 2026-09-15 once their findings had been folded into CLAUDE.md and the docs above; git history holds them. The marketing renders were compared against the current candidate and uploaded by the owner on 2026-09-15; editing their README does not regenerate the images, and the two Graphics assets are manual Play Console uploads, so changing them in Git never updates the live listing.
+The surviving September reports (`reports/`, and the bank proof files kept in `review-2026-09-06/` because the [bank top-up](PUZZLE_BANK_TOP_UP_2026-09-06.md) links them) are **historical evidence**. Their original counts, screenshots, access checks and completion statements apply to the recorded snapshot. Current references above take precedence for build commands and behavior. The July design audit and ledger, the September 5 review set, `RELEASE_VALIDATION_1_3_0.md` and the dated September status/handoff docs were deleted on 2026-09-15 once their findings had been folded into CLAUDE.md and the docs above; git history holds them. On 2026-09-22 the September 16 assessment (superseded by its [resolution](ASSESSMENT_RESOLUTION_2026-09-17.md)), the dated screenshot, UI and walk follow-up reports, the `visual-review/` walking strips and the unlinked screenshots and logs in `review-2026-09-06/` were deleted the same way. The marketing renders were compared against the current candidate and uploaded by the owner on 2026-09-15; editing their README does not regenerate the images, and the two Graphics assets are manual Play Console uploads, so changing them in Git never updates the live listing.
 
 Keep this page's audit date, commit, configuration and CI link together when updating it. Do not relabel historical evidence as a new device pass or mark an external deployment complete from source inspection alone.

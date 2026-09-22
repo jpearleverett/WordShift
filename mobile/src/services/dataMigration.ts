@@ -70,8 +70,8 @@ const MIGRATIONS: Migration[] = [
       const progressKey = 'wordshift_home_progress';
       try {
         const stored = await AsyncStorage.getItem(progressKey);
-        if (stored) {
-          const progress = JSON.parse(stored);
+        const progress = stored ? JSON.parse(stored) : null;
+        if (progress && typeof progress === 'object') {
 
           // Add phaseProgress if missing (initialize from puzzlesSolved)
           if (progress.phaseProgress === undefined) {
@@ -112,8 +112,8 @@ const MIGRATIONS: Migration[] = [
       const historyKey = 'wordshift_word_history';
       try {
         const stored = await AsyncStorage.getItem(historyKey);
-        if (stored) {
-          const data = JSON.parse(stored);
+        const data = stored ? JSON.parse(stored) : null;
+        if (data && typeof data === 'object') {
           // Only migrate if it has the old flat format (recentWords) and not the new grouped format
           if (data.recentWords && !data.puzzleGroups) {
             const words: string[] = data.recentWords;
@@ -142,8 +142,8 @@ const MIGRATIONS: Migration[] = [
       const progressKey = 'wordshift_home_progress';
       try {
         const stored = await AsyncStorage.getItem(progressKey);
-        if (stored) {
-          const progress = JSON.parse(stored);
+        const progress = stored ? JSON.parse(stored) : null;
+        if (progress && typeof progress === 'object') {
 
           // Add pendingPhaseTransition if missing
           if (progress.pendingPhaseTransition === undefined) {
@@ -170,8 +170,8 @@ const MIGRATIONS: Migration[] = [
       const progressKey = 'wordshift_home_progress';
       try {
         const stored = await AsyncStorage.getItem(progressKey);
-        if (stored) {
-          const progress = JSON.parse(stored);
+        const progress = stored ? JSON.parse(stored) : null;
+        if (progress && typeof progress === 'object') {
           // Idempotency marker: the remap is NOT safe to apply twice (a
           // remapped index re-remaps to garbage), so guard with a flag the
           // way v2/v3 guard with undefined-checks.
@@ -200,6 +200,9 @@ const MIGRATIONS: Migration[] = [
         const stored = await AsyncStorage.getItem(progressKey);
         if (!stored) return;
         const progress = JSON.parse(stored);
+        // A stored literal "null" parses without throwing; there is no
+        // progress object to migrate, so treat it as absent, not as a crash.
+        if (!progress || typeof progress !== 'object') return;
         // 'speed' is no longer a selectable style. A player who left it as
         // their preference would otherwise start every board on a variant key
         // that matches no config — no style copy, no bank family, no clock.
@@ -234,6 +237,9 @@ const MIGRATIONS: Migration[] = [
         const stored = await AsyncStorage.getItem(progressKey);
         if (!stored) return;
         const progress = JSON.parse(stored);
+        // A stored literal "null" parses without throwing; there is no
+        // progress object to migrate, so treat it as absent, not as a crash.
+        if (!progress || typeof progress !== 'object') return;
         // `houseCompleted` used to mean both "the house is whole" and "the
         // cutscene has played". Splitting them re-arms an interrupted delivery,
         // but without this backfill it would ALSO re-arm for everyone who

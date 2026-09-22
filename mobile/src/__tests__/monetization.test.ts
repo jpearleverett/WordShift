@@ -218,7 +218,7 @@ describe('iap', () => {
     expect(await isAdFree()).toBe(true);
   });
 
-  it('restorePurchases makes the store the authoritative set', async () => {
+  it('restorePurchases grants the active set the store reports', async () => {
     const fake: BillingProvider = {
       initialize: async () => {},
       getProducts: async () => [],
@@ -231,6 +231,23 @@ describe('iap', () => {
     const { entitlements } = await restorePurchases();
     expect(entitlements).toEqual([ENTITLEMENTS.PATRON]);
     expect(await isPatron()).toBe(true);
+  });
+
+  it('restore on another store account keeps local permanent purchases unless explicitly inactive', async () => {
+    await grantEntitlements([ENTITLEMENTS.PATRON, ENTITLEMENTS.SUPPORTER]);
+    const fake: BillingProvider = {
+      initialize: async () => {},
+      getProducts: async () => [],
+      purchase: async (productId): Promise<PurchaseResult> => ({ success: false, productId }),
+      restorePurchases: async () => ({ entitlements: [ENTITLEMENTS.ADFREE], inactive: [ENTITLEMENTS.SUPPORTER] }),
+      isReady: () => true,
+      getName: () => 'Other Account',
+    };
+    setBillingProvider(fake);
+    const { entitlements } = await restorePurchases();
+    expect(entitlements.sort()).toEqual([ENTITLEMENTS.ADFREE, ENTITLEMENTS.PATRON].sort());
+    expect(await isPatron()).toBe(true);
+    expect(await hasEntitlement(ENTITLEMENTS.SUPPORTER)).toBe(false);
   });
 
   it('does not clear local entitlements when restore returns an empty set from an unavailable provider', async () => {

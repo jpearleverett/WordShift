@@ -19,7 +19,9 @@ import {
   Animated,
   Easing,
   Image,
+  useWindowDimensions,
 } from 'react-native';
+import { useScreenInsets } from '../hooks/useScreenInsets';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getSurfaceTheme, SURFACE, getModalInSpring } from '../theme/surfaces';
 import { CONFETTI_THEMES } from '../theme/colors';
@@ -68,6 +70,11 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
   onAmberChange,
   onSubscribe,
 }) => {
+  // Bound the sheet by the system bars: under Android 15 edge-to-edge with
+  // three-button navigation a percentage height let its foot sit under the bar.
+  const insets = useScreenInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetMaxHeight = Math.max(240, windowHeight - insets.top - insets.bottom - 24);
   const t = getSurfaceTheme(phase);
   const copy = getSeasonPassCopy(phase as DialoguePhase);
   const [view, setView] = useState<SeasonPassView | null>(null);
@@ -311,7 +318,13 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
       }
       hapticMedium();
       if (typeof spend.newBalance === 'number') onAmberChange(spend.newBalance);
-      logEvent({ type: 'iap_purchase', data: { productId: 'season_premium_amber', kind: 'season', amber: cost } });
+      // An amber spend, not a checkout: its own event keeps it out of the
+      // store -> purchase funnel (docs/supabase/analytics_views_v1.sql).
+      // The cast stands until eventLogger's EventType union lists the name.
+      logEvent({
+        type: 'season_premium_unlocked',
+        data: { productId: 'season_premium_amber', kind: 'season', amber: cost },
+      });
       await refresh();
     } catch {
       showGameAlert('Save interrupted', 'Please try again. Any pending unlock will be recovered before continuing.');
@@ -331,7 +344,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
           style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay, opacity: backdropOpacity }]}
         />
         <Animated.View
-          style={[styles.cardWrap, { transform: [{ scale: cardScale }], opacity: cardOpacity }]}
+          style={[styles.cardWrap, { maxHeight: Math.min(sheetMaxHeight, windowHeight * 0.9), transform: [{ scale: cardScale }], opacity: cardOpacity }]}
         >
         <PanelCard phase={phase} kind="panel" style={styles.card}>
           {/* One-time full-card confetti burst (the season's own granted
@@ -340,7 +353,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
           <Confetti
             active={showFinaleConfetti}
             phase={phase}
-            colors={CONFETTI_THEMES.confetti_season}
+            colors={(view ? CONFETTI_THEMES[view.premiumCosmeticId as keyof typeof CONFETTI_THEMES] : undefined) ?? CONFETTI_THEMES.confetti_season}
             onComplete={() => setShowFinaleConfetti(false)}
           />
           <PixelPlaque phase={phase} label={'SEASON PASS'} style={styles.plaque} />
@@ -382,7 +395,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                   />
                   <Text style={[styles.premiumLocked, { color: t.body }]}>
                     {view.premiumCosmeticOwned
-                      ? 'Season confetti is already in your collection. Your free amber track continues each month.'
+                      ? `This month's confetti is already in your collection. Your free amber track continues, and Supporters receive ${view.premiumCosmeticAmberEquivalent} amber in its place.`
                       : `${copy.lockedLine} The complete premium track adds ${view.tiers.reduce((sum, tier) => sum + tier.premiumAmber, 0)} amber and one confetti palette.`}
                   </Text>
                   {view.canUnlockPremiumWithAmber && <CandyButton
@@ -459,7 +472,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                         {tr.freeClaimed ? ' ' : ''}{tr.freeClaimed ? <Image source={CHROME_ICONS.check} style={styles.inlineMark} /> : null}
                       </Text>
                       <Text style={[styles.tierReward, { color: view.premiumUnlocked ? t.title : t.muted }]}>
-                        Premium: +{tr.premiumAmber} amber{tr.premiumCosmetic ? (view.premiumCosmeticOwned ? ' · confetti owned' : ' + confetti') : ''}
+                        Premium: +{tr.premiumAmber} amber{tr.premiumCosmetic ? (view.premiumCosmeticOwned ? ` + ${view.premiumCosmeticAmberEquivalent} amber (confetti owned)` : ' + confetti') : ''}
                         {tr.premiumClaimed ? ' ' : ''}{tr.premiumClaimed ? <Image source={CHROME_ICONS.check} style={styles.inlineMark} /> : null}
                       </Text>
                     </View>

@@ -418,7 +418,9 @@ describe('notifications', () => {
         getPermissionsAsync: jest.fn(() => Promise.resolve({ status })),
         requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
         cancelAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve()),
-        scheduleNotificationAsync: jest.fn((request: { trigger: { type: string; date: Date } }) => {
+        AndroidImportance: { DEFAULT: 3 },
+        setNotificationChannelAsync: jest.fn(() => Promise.resolve(null)),
+        scheduleNotificationAsync: jest.fn((request: { trigger: { type: string; date: Date; channelId?: string } }) => {
           if (request.trigger.type !== 'date' || !(request.trigger.date instanceof Date)) {
             throw new TypeError('Invalid Expo date trigger');
           }
@@ -448,6 +450,15 @@ describe('notifications', () => {
       expect(expoMock.scheduleNotificationAsync).toHaveBeenCalled();
       for (const [request] of expoMock.scheduleNotificationAsync.mock.calls) {
         expect(request.trigger.type).toBe('date');
+      }
+    });
+
+    it('schedules every ping on the named Reminders channel', async () => {
+      const svc = loadWithStatus('granted');
+      await svc.scheduleAllNotifications(0);
+      expect(expoMock.setNotificationChannelAsync).toHaveBeenCalledWith('reminders', expect.objectContaining({ name: 'Reminders' }));
+      for (const [request] of expoMock.scheduleNotificationAsync.mock.calls) {
+        expect(request.trigger.channelId).toBe('reminders');
       }
     });
 

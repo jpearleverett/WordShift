@@ -153,3 +153,38 @@ test('a rejected daily record read aborts the whole credit', async () => {
 test('each new claim gets its own nonempty receipt identity', () => {
   expect(new Set(Array.from({ length: 20 }, createDailyAmberClaimId)).size).toBe(20);
 });
+
+test('receipts older than yesterday are pruned, while a midnight retry stays idempotent (P4)', async () => {
+  mockDay = '2026-07-01';
+  expect((await claimDailyAmberReward('day-1-view')).recorded).toBe(true);
+  mockDay = '2026-07-02';
+  expect((await claimDailyAmberReward('day-2-view')).recorded).toBe(true);
+  // Just after midnight: yesterday's interrupted reward is still recognised.
+  mockDay = '2026-07-03';
+  expect((await claimDailyAmberReward('day-2-view')).grantedAmount).toBe(0);
+  expect((await claimDailyAmberReward('day-3-view')).recorded).toBe(true);
+  const stored = JSON.parse((await NativeStorage.getItem(DAILY_KEY))!);
+  expect(stored.claimReceipts).toEqual(['day-2-view', 'day-3-view']);
+  expect(stored.claimReceiptDays).toEqual({ 'day-2-view': '2026-07-02', 'day-3-view': '2026-07-03' });
+  // A month of daily claims keeps the record bounded.
+  for (let day = 4; day <= 31; day += 1) {
+    mockDay = `2026-07-${String(day).padStart(2, '0')}`;
+    for (let index = 0; index < DAILY_AMBER_DAILY_CAP; index += 1) {
+      expect((await claimDailyAmberReward(`d${day}-${index}`)).recorded).toBe(true);
+    }
+  }
+  const after = JSON.parse((await NativeStorage.getItem(DAILY_KEY))!);
+  expect(after.claimReceipts.length).toBeLessThanOrEqual(2 * DAILY_AMBER_DAILY_CAP);
+  expect(Object.keys(after.claimReceiptDays).sort()).toEqual([...after.claimReceipts].sort());
+});
+
+test('legacy receipts without a recorded day are dated to the record day and pruned later', async () => {
+  await NativeStorage.setItem(DAILY_KEY, JSON.stringify({ date: '2026-07-03', count: 1, claimReceipts: ['legacy-view'] }));
+  mockDay = '2026-07-04';
+  expect((await claimDailyAmberReward('legacy-view')).grantedAmount).toBe(0);
+  expect((await claimDailyAmberReward('fresh-view')).recorded).toBe(true);
+  expect(JSON.parse((await NativeStorage.getItem(DAILY_KEY))!).claimReceipts).toEqual(['legacy-view', 'fresh-view']);
+  mockDay = '2026-07-06';
+  expect((await claimDailyAmberReward('later-view')).recorded).toBe(true);
+  expect(JSON.parse((await NativeStorage.getItem(DAILY_KEY))!).claimReceipts).toEqual(['later-view']);
+});

@@ -49,7 +49,7 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     shadows: "I told the fire about the tall dark shape, and it drew that circle again, bigger, notch and all. My two mysteries knew each other. I called that practically tidy. Finding a connection isn't quite the same as understanding one.",
   },
   fx_1_24: {
-    revealed: "I meant to teach that note to a friend. It's easy, I thought, already in your chest, you only have to agree to it. I liked how lovely the lesson sounded in my head. Agree to what, though? I hadn't even finished the sentence I wanted someone else to trust.",
+    revealed: "I once promised to teach you that note. It is easy, I said. It is already in your chest, you only have to agree to it. Agree to what? I never finished that sentence, and still I asked you to trust it.",
   },
   fx_1_25: {
     arrived: "I'd planned a long evening of midnight, blankets, the fire's trick, all of it. Chocolate so thick it was really a dessert. We can still have the blankets and chocolate. I won't put another invitation underneath them.",
@@ -94,7 +94,7 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     arrived: "The grate was cold and the floor was warm, so I put the kettle on the floor. Then I made a joke about it. The joke went well. I was running short of jokes, and a fox notices that sort of shortage.",
   },
   fx_3_4: {
-    arrived: "While the fire grew cold, something else was beginning to burn underneath us. Slow and patient, like bread rising. I checked it every night. The warmth is still here, but I don't have to pretend we're only waiting to find out what it feeds.",
+    arrived: "While the fire grew cold, something else was beginning to burn underneath us. Slow and patient, like bread rising. I checked it every night. It is here now. At least nobody has to pretend we do not know what it is.",
   },
   fx_3_6: {
     revealed: "I really can read flames. I let it pass for a party trick because that made pleasant company easier. It was never a trick. Telling you now doesn't put that explanation back where it belonged, before anybody started bringing words.",
@@ -118,7 +118,7 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     arrived: "I meant whatever was coming to have to go through this fox before it reached the friends I wanted here. It's here now. I can make you that promise out loud, but keeping it means listening when you tell me where to stand.",
   },
   fx_4_6: {
-    arrived: "Those robes itched. I expected an ancient secret to come with better lining. Taking the lining out has improved my sleeves considerably. The secret is taking longer to put right.",
+    arrived: "That robe itched. I expected an ancient secret to come with better lining. Taking the lining out has improved my sleeves considerably. The secret is taking longer to put right.",
   },
   fx_4_21: {
     arrived: "I asked whether warmth that made someone stay could also let them go. We have a limit to keep now. I still ask that question when I set out the cups, because wanting company is when I'm most likely to forget it.",
@@ -207,7 +207,7 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     revealed: "Ember looked up too, sometimes in the middle of a sentence. We didn't mention it to each other. I thought we were sharing something by leaving it unsaid. We were also leaving a great many questions where neither of us had to answer them.",
   },
   pg_2_20: {
-    revealed: "I insisted nobody was making me do it. My hands went ahead of me, but toward things I thought I wanted. I called that choosing. I turn it over still: wanting a dish and finding my hands already making it should have felt less alike.",
+    revealed: "I insisted nobody was making me do it. My hands went ahead of me, but toward things I thought I wanted, so I called that choosing. I still turn it over. Wanting a dish should not feel the same as finding it already half made.",
   },
   pg_2_w1: {
     shadows: "The recipe asked for water from where the light stops. Axel knows that water firsthand; ask him about it if you want to understand the page. His tank belongs to him. No recipe ever gave anybody permission to put a ladle in it.",
@@ -278,13 +278,13 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     shadows: "When the study first grew warm along the inner wall, I moved my favorite books and blamed the season. A warm room full of paper should have worried me. Blaming the season spared me a question, though it did nothing useful for the books.",
   },
   ow_1_17: {
-    shadows: "Three words appeared in the margin. When I first checked, one had turned up on your board and two hadn't. I kept all three in the account, with the date. Otherwise a later match can make an earlier uncertainty disappear.",
+    shadows: "Three words appeared in the margin. When I first checked, one had turned up among your words and two hadn't. I kept all three in the account, with the date. Otherwise a later match can make an earlier uncertainty disappear.",
   },
   ow_1_18: {
     shadows: "Ember wasn't surprised. Her fire spelled things too; might it and the book share an author? I said that was absurd, then repeated absurd all week like a charm. Repetition was doing the work that evidence should have done.",
   },
   ow_1_19: {
-    shadows: "I made a drawer for dull explanations: draughts, damp, tired eyes, the house settling. Each odd thing got one, filed and dated. I planned to choose a convincing explanation afterward. The drawer is useful now as a record of how badly I wanted an ordinary one.",
+    shadows: "I made a drawer for dull explanations: drafts, damp, tired eyes, the house settling. Each odd thing got one, filed and dated. I planned to choose a convincing explanation afterward. The drawer is useful now as a record of how badly I wanted an ordinary one.",
   },
   ow_1_23: {
     revealed: "I called it unease, in the low voice one uses in a library. A scholar was only short of information, I insisted. Then I began to suspect the thing knew me. Owning a large vocabulary gave me plenty of words to hide behind.",
@@ -311,7 +311,7 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     shadows: "My first theory was protection. Then I checked the arrows. Protection should face outward, toward a threat; these pointed inward. An inconvenient direction for my theory, and a much more useful thing to notice than how elegant the diagram looked.",
   },
   ow_2_16: {
-    arrived: "The book listed words you had formed beside ones you hadn't, when I first compared them. I dated the comparison. A record of what we knew beforehand is quite different from a book taking credit afterward.",
+    arrived: "When I first found the list near the back of the book, every word on it matched my log of yours, in order. I dated that comparison. A record of what we knew beforehand is quite different from a book taking credit afterward.",
   },
   ow_2_17: {
     arrived: "The list ran beyond the words you'd brought, and I withheld the later ones because a prediction can become an instruction. Each morning the next word's ink grew darker. I kept checking it, as though careful observation meant I wasn't helping it along.",

@@ -15,7 +15,7 @@ import {
   getVariantTutorialDialogue,
   TUTORIAL_CALLBACK_DIALOGUES,
   getCoordinatedEventLine,
-  getWordThresholdDialogue,
+  peekWordThresholdPage,
   getTotalDialogueCount,
   getSacrificeReaction,
   getPhase2ExtraDialogues,
@@ -35,6 +35,7 @@ import {
   getSessionStatus,
   isOnCooldown,
   updateSessionPhase,
+  updateConversationBacklog,
 } from '../services/dialogueSession';
 // Imported straight from the dialogue data module (as homeWorldData does):
 // phase-start indices are the only way to read an absolute dialogue index as
@@ -71,6 +72,8 @@ import {
   getDialogueCaughtUpLine,
   getDialogueRevealSkipHint,
   getArrivalResumeFramingLine,
+  getDialogueSessionEndMessage,
+  getDialogueCooldownMessage,
 } from '../services/phaseNarrative';
 import { recordAnimalVisit, Quest } from '../services/weeklyQuests';
 import { hapticLight, hapticSelection } from '../services/haptics';
@@ -375,10 +378,9 @@ export function resolveVisiblePage(
  * come back later there is just wrong. Caller passes `onCooldown` read AFTER the
  * session has ended (so grace state is settled).
  */
-function sessionEndMessage(name: string, onCooldown: boolean): string {
-  return onCooldown
-    ? `${name} wants to rest now. Come back after solving a few puzzles.`
-    : `${name} still has more to say. Tap them again to keep talking.`;
+function sessionEndMessage(name: string, animalType: string, onCooldown: boolean, phase: number): string {
+  // Copy lives in phaseNarrative (house register, canon pronouns, no "puzzles").
+  return getDialogueSessionEndMessage(phase, name, animalType, onCooldown);
 }
 
 interface SessionInfo {
@@ -664,8 +666,12 @@ export function useDialogueFlow({
   const getRegularConversation = useCallback((animal: Animal) => {
     if (!progress) return null;
     const ids = conversationReads?.source === progress ? conversationReads.ids : progress.conversationReadIds;
-    return getNextAnimalConversation({ ...progress, conversationReadIds: ids }, animal.type,
+    const next = getNextAnimalConversation({ ...progress, conversationReadIds: ids }, animal.type,
       getAnimalPhase(progress.currentPhase, animal.type), getUnlockedTypes());
+    // Every read of the next line also tells the session layer how far behind
+    // the house this resident is, so catch-up pacing follows the reader.
+    updateConversationBacklog(animal.id, next?.dialogue.phase);
+    return next;
   }, [progress, conversationReads, getUnlockedTypes]);
 
   // Keep the session layer's phase mirror current.
@@ -961,25 +967,15 @@ export function useDialogueFlow({
     // layer is reading THIS phase and not its module default (see the mirror
     // effect above) before either is consulted.
     if (progress) updateSessionPhase(progress.currentPhase);
+    // Resolving the next line reports this resident's reading position, which
+    // sets catch-up pacing before the session budget and rest are consulted.
+    getRegularConversation(animal);
     const availability = await checkDialogueAvailability(animal.id, 0);
     if (!ownsVisit()) return;
 
     if (!availability.available) {
       // Phase-aware cooldown messages
-      const phase = progress?.currentPhase ?? 0;
-      const cooldownMessages = phase >= 3
-        ? [
-            `${animal.name} is preparing. Return after more offerings.`,
-            `The ritual requires patience. ${animal.name} will speak again soon.`,
-          ]
-        : phase >= 2
-          ? [
-              `${animal.name} is lost in thought. Come back after solving some puzzles.`,
-            ]
-          : [
-              `${animal.name} needs some quiet time. Play more puzzles and come back!`,
-            ];
-      setCooldownMessage(cooldownMessages[Math.floor(Math.random() * cooldownMessages.length)]);
+      setCooldownMessage(getDialogueCooldownMessage(progress?.currentPhase ?? 0, animal.name, animal.type));
       return;
     }
 
@@ -1187,27 +1183,42 @@ export function useDialogueFlow({
       }
     }
 
-    // 6. Word count threshold dialogue — low priority
-    if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.totalWordsFormed) {
-      const approxPrevious = Math.max(0, (progress.totalWordsFormed || 0) - 5);
-      const thresholdLine = getWordThresholdDialogue(
-        animal.type,
-        progress.totalWordsFormed,
-        approxPrevious,
-        progress.currentPhase
-      );
-      if (thresholdLine) {
-        pages.push({ text: thresholdLine });
+    // 6. Word count threshold dialogue — low priority. Peeked on every
+    // regular visit (it records when a resident was met, so a late resident
+    // catches up on thresholds crossed before they joined), shown only when
+    // nothing else leads the visit, and marked heard when it is shown.
+    if (progress && progress.totalWordsFormed) {
+      try {
+        const approxPrevious = Math.max(0, (progress.totalWordsFormed || 0) - 5);
+        const thresholdPage = await peekWordThresholdPage(
+          animal.type,
+          progress.totalWordsFormed,
+          approxPrevious,
+          progress.currentPhase,
+          progress.conversationReadIds?.[animal.id]?.length ?? 0
+        );
+        if (!ownsVisit()) return;
+        if (thresholdPage && !hasCoordinatedEvent && pages.length === 0) {
+          pages.push(thresholdPage);
+        }
+      } catch {
+        // Threshold lines are non-critical
       }
     }
 
     // 6b. Bright-days narrative seed — innocent lines with dark double meanings
     // that Phase 4 recontextualizes. Deterministic: seed 0 becomes due on the
     // animal's 2nd dialogue session, seed 1 on its 5th; each delivers once.
-    // Gate is <= 1 so animals unlocked during Phase 1 still plant their seeds
-    // (the corpus is still innocent there); from Phase 2 the register darkens
-    // and a "seed" would no longer read as innocent, so planting stops.
-    if (progress && progress.currentPhase <= 1) {
+    // A seed belongs beside the bright chapters, so it plants while either the
+    // house (phase <= 1) or this resident's own conversation (next line still
+    // in phase 0-1 material) is in the bright days. The second half lets a
+    // late recruit, met at Phase 3 but reading from their first line, plant
+    // seeds on their own 2nd and 5th visits so the reveal callbacks pay off
+    // something the player actually heard.
+    const readingBrightChapters = progress
+      ? (getRegularConversation(animal)?.dialogue.phase ?? 5) <= 1
+      : false;
+    if (progress && (progress.currentPhase <= 1 || readingBrightChapters)) {
       try {
         const sessionNumber = (getSession(animal.id)?.sessionsCompleted ?? 0) + 1;
         const seed = await peekNarrativeSeedPage(animal.type, sessionNumber);
@@ -1275,11 +1286,12 @@ export function useDialogueFlow({
 
     // 8b. Phase 4 only: one-time callbacks recontextualizing the Phase 0 seed
     // lines (one per visit, each shown once). Widened gate: an animal that
-    // reaches Phase 4 with NO seeds heard could never hear them now (seed
-    // planting stops at global Phase 2) — this covers the descent trio,
-    // unlocked at Phase 3-4, whose callbacks are self-contained and would
-    // otherwise be permanently unreachable on a first run.
-    if (animalPhase === 4) {
+    // reaches Phase 4 with NO seeds heard (planting stops once both the house
+    // and its reading are past the bright days) still gets its callbacks,
+    // which are self-contained. While the resident
+    // is still reading their own bright chapters the payoff waits, so a late
+    // recruit plants a seed (6b) before its callback recontextualizes it.
+    if (animalPhase === 4 && !readingBrightChapters) {
       try {
         const seedCallback = await peekNarrativeCallbackPage(animal.type, {
           allowUnheardSeeds: true,
@@ -1370,10 +1382,13 @@ export function useDialogueFlow({
   const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
     if (!animal.isUnlocked || !progress) return false;
     if (onIntroduction && !progress.introsSeen.includes(animal.id)) return true;
+    // Resolve the next line first: it reports catch-up pacing, which the
+    // cooldown check below depends on.
+    const regular = getRegularConversation(animal);
     if (isOnCooldown(animal.id)) return false;
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
     const totalDialogues = getTotalDialogueCount(animal.type, Math.min(animalPhase, 4) as DialoguePhase);
-    if (getRegularConversation(animal)) return true;
+    if (regular) return true;
     if (animalPhase === 5) {
       // Once the regular conversation is complete, only new pool lines light the badge.
       const pool = buildPhase5Pool(animal.type, tendingLevel, playerChoices[animal.type] ?? null);
@@ -1550,13 +1565,16 @@ export function useDialogueFlow({
       return;
     }
 
-    // Regular dialogue advance — check if session is still available
+    // Regular dialogue advance — check if session is still available (after
+    // reporting the reader's current position for catch-up pacing).
+    getRegularConversation(selectedAnimal);
     const availability = await checkDialogueAvailability(selectedAnimal.id, 0);
     if (!availability.available) {
       const animalId = selectedAnimal.id;
       const animalName = selectedAnimal.name;
+      const animalType = selectedAnimal.type;
       await closeDialogue(true);
-      setCooldownMessage(sessionEndMessage(animalName, isOnCooldown(animalId)));
+      setCooldownMessage(sessionEndMessage(animalName, animalType, isOnCooldown(animalId), progress?.currentPhase ?? 0));
       return;
     }
 
@@ -1602,7 +1620,7 @@ export function useDialogueFlow({
           const resting = isOnCooldown(updated.id);
           setAnimals(prev => prev.map(animal => animal.id === updated.id
             ? { ...animal, hasNewDialogue: !resting && hasNews } : animal));
-          setCooldownMessage(sessionEndMessage(updated.name, resting));
+          setCooldownMessage(sessionEndMessage(updated.name, updated.type, resting, progress?.currentPhase ?? 0));
         }
       } catch (error) {
         if (generation === visitGenerationRef.current) {
@@ -1769,7 +1787,7 @@ export function useDialogueFlow({
               : a
           )
         );
-        setCooldownMessage(sessionEndMessage(animalName, restingNow));
+        setCooldownMessage(sessionEndMessage(animalName, animalId, restingNow, progress?.currentPhase ?? 0));
         return;
       }
     } else {

@@ -88,6 +88,9 @@ export const BannerAd: React.FC<BannerAdProps> = ({ phase, onboarding = false })
   const size = mod?.BannerAdSize?.ANCHORED_ADAPTIVE_BANNER ?? 'ANCHORED_ADAPTIVE_BANNER';
   // Mounting the SDK's banner view makes an ad request. The same consent and
   // initialized-SDK gate as interstitial/rewarded ads must therefore precede it.
+  // `adsReady` also implies the global request configuration (maxAdContentRating
+  // T, not child-directed) is already set, since the AdMob adapter applies it
+  // before initializing the SDK; the banner's request inherits that ceiling.
   const canRenderNative = adsReady && !!(NativeBanner && unitId);
 
   // A subtle phase-aware "shelf" so the raw Google rectangle sits on the cottage

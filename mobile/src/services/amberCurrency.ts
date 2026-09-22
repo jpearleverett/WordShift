@@ -62,6 +62,7 @@ const MODIFIER_STACKING_INTRO_SEEN_KEY = 'wordshift_modifier_stacking_intro_seen
 // nothing the player can see on the board, so it needed one most of all.
 const BLIND_INTRO_SEEN_KEY = 'wordshift_blind_intro_seen';
 const LEXICON_INTRO_SEEN_KEY = 'wordshift_lexicon_intro_seen';
+const EXPERT_INTRO_SEEN_KEY = 'wordshift_expert_intro_seen';
 const GATED_UNLOCK_INTRO_SEEN_KEY = 'wordshift_gated_unlock_intro_seen';
 const HARVEST_HOME_INTRO_SEEN_KEY = 'wordshift_harvest_home_intro_seen';
 const FULL_HOUSE_INTRO_SEEN_KEY = 'wordshift_full_house_intro_seen';
@@ -2084,6 +2085,21 @@ export async function isPostRevelation(): Promise<boolean> {
   return progress.postRevelation === true;
 }
 
+/**
+ * The puzzle board's presentation phase after the Arrival. The durable phase
+ * stays 4 until the next win pins 5 (markPostRevelation plays After), but the
+ * board in between is played after the ending, not before it: presenting it in
+ * the reveal's register ("WHY DOES IT MATTER?", dread music, crimson) was
+ * whiplash straight out of the Arrival. Same rule as
+ * hasAnimalConversationArrivalOccurred: the Arrival ceremony must have been
+ * acknowledged, so the board that plays it is untouched.
+ */
+export async function hasArrivalBeenPresented(): Promise<boolean> {
+  const progress = await loadProgress();
+  return progress.postRevelation === true || (progress.finalPuzzleCompleted === true &&
+    !(progress.pendingCeremonies ?? []).some(entry => entry.kind === 'arrival'));
+}
+
 // ============================================================================
 // NEW CYCLE (NG+)
 // ============================================================================
@@ -2350,6 +2366,20 @@ export async function hasSeenLexiconIntro(): Promise<boolean> {
 export async function markLexiconIntroSeen(): Promise<void> {
   try {
     await AsyncStorage.setItem(LEXICON_INTRO_SEEN_KEY, 'true');
+  } catch {}
+}
+
+export async function hasSeenExpertIntro(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(EXPERT_INTRO_SEEN_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markExpertIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(EXPERT_INTRO_SEEN_KEY, 'true');
   } catch {}
 }
 

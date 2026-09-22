@@ -1,7 +1,0 @@
-{
-  "reviewed": false,
-  "coordinate_system": "Each rectangle uses normalized left, top, width and height from 0 to 1 in its original capture.",
-  "before": null,
-  "after": null,
-  "instructions": "Inspect the genuine before and after images. Set rectangles around their two relevant word rows, verify that no meaningful gameplay state is removed, then set reviewed to true. No crop bounds have been visually verified in this environment."
-}

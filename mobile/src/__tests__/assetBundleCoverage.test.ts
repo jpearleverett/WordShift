@@ -101,7 +101,10 @@ describe('asset bundle coverage', () => {
   });
 
   test('the story scene art is bundled (its absence shipped the finale blank)', () => {
-    expect(patterns).toContain('assets/story/**');
+    expect(patterns).toContain('assets/story/optimized/**');
+    expect(patterns).toContain('assets/story/pages/**');
+    // The painted masters are optimizeStoryAssets.mjs inputs, not shipped art.
+    expect(covered('assets/story/outward-road.png')).toBe(false);
     expect(covered('assets/story/optimized/outward-road-hero.webp')).toBe(true);
   });
 

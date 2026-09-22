@@ -89,8 +89,10 @@ jest.mock('../services/haptics', () => ({
 jest.mock('../services/eventLogger', () => ({
   logEvent: jest.fn(),
 }));
+let mockPuzzlesSolved = 0;
 jest.mock('../services/amberCurrency', () => ({
   markTutorialSeedsPlanted: jest.fn(async () => {}),
+  getFullProgress: jest.fn(async () => ({ puzzlesSolved: mockPuzzlesSolved })),
 }));
 jest.mock('../services/puzzleSaveState', () => ({
   clearPuzzleState: jest.fn(async () => {}),
@@ -247,6 +249,18 @@ describe('fresh-install cold open', () => {
     expect(state.onboardingStep).toBe('cold_open_puzzle');
     expect(state.onboardingReady).toBe(true);
     expect(await getOnboardingStep()).toBe('cold_open_puzzle');
+  });
+
+  test('a player with solved puzzles is never sent back through the cold open', async () => {
+    mockPuzzlesSolved = 42;
+    try {
+      const cbs = makeCallbacks();
+      const [state] = await mountAtStep('not_started', cbs);
+      expect(state.onboardingStep).toBe('complete');
+      expect(await getOnboardingStep()).toBe('complete');
+    } finally {
+      mockPuzzlesSolved = 0;
+    }
   });
 });
 

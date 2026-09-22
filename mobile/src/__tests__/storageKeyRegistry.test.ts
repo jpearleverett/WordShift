@@ -30,6 +30,7 @@ import { SYNC_KEYS, SYNC_KEY_PREFIXES } from '../services/cloudSave';
 const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
   wordshift_storage_commit: 'Local write-ahead transaction journal; replay before any gameplay reads.',
   wordshift_pending_victory: 'Local unfinished completion intent; restored saves discard it, Reset clears it.',
+  wordshift_pending_victory_quarantine: 'Local copy of an unreadable completion intent set aside so boot can open; support evidence only, cleared by Reset.',
   wordshift_victory_receipt: 'Local idempotency receipt for the most recent completion, not transferable progress.',
   wordshift_cloud_legacy_owner: 'Private legacy recovery reference retained for reviewed support; never synced or merged.',
   wordshift_support_id: 'Non-secret per-install support lookup, not a recovery credential; survives Reset.',
@@ -43,6 +44,7 @@ const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
   wordshift_event_log: 'Local analytics ring buffer, uploaded separately.',
   wordshift_entitlements: 'Store-authoritative: restored from the billing provider, never from a save.',
   wordshift_iap_checkout_receipts: 'Store-time checkout aliases survive relaunch and Reset All; syncing would re-grant spent purchases.',
+  wordshift_iap_checkout_receipts_quarantine: 'A malformed checkout-receipt record parked for diagnosis instead of trapping purchases in a retry loop; device-local like the record it came from.',
   wordshift_iap_history_baseline: 'Installation-local boundary for old already-spent store receipts; retained through reset and never cloud-restored.',
   wordshift_iap_amber_purchase_made: 'Store purchase history retains the first-ever amber bonus through local resets; verified billing history seeds a new installation.',
   wordshift_applied_iap_grants: 'Device-local paid transaction receipts; retained through reset to prevent duplicate grants.',

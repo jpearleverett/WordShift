@@ -332,3 +332,32 @@ test('a checkout already linked to one receipt cannot swallow a second near-time
   await reconcileStorePurchaseHistory([receipt('two-rc', PRODUCT_IDS.AMBER_SMALL, storeTime + 500)]);
   expect(await getAmberBalance()).toBe(purchase.reward!.amount + AMBER_PACK_GRANTS.small);
 });
+
+test('a malformed checkout-receipt record is quarantined instead of trapping purchase and recovery in retry', async () => {
+  await initializeStorePurchaseHistory([]);
+  const garbage = '{"not":"an array"';
+  await NativeStorage.setItem('wordshift_iap_checkout_receipts', garbage);
+  const provider = install(async () => ({ success: true, transactionId: 'after-corruption', purchasedAt: Date.now() }));
+  const purchase = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+  expect(purchase.success).toBe(true);
+  expect(alerts).toHaveLength(0);
+  await settleConsumableGrant(purchase.grantId!);
+  expect(await getAmberBalance()).toBe(purchase.reward!.amount);
+  expect(await NativeStorage.getItem('wordshift_iap_checkout_receipts_quarantine')).toBe(garbage);
+  expect(JSON.parse((await NativeStorage.getItem('wordshift_iap_checkout_receipts'))!)).toEqual([
+    expect.objectContaining({ grantId: 'after-corruption' }),
+  ]);
+  // Recovery of the same purchase is still deduped by the applied-grant set.
+  await reconcileStorePurchaseHistory([receipt('after-corruption', PRODUCT_IDS.AMBER_SMALL, Date.now())]);
+  expect(await getAmberBalance()).toBe(purchase.reward!.amount);
+  expect(provider.purchase).toHaveBeenCalledTimes(1);
+});
+
+test('a malformed receipt record found during recovery does not block a genuine recovered purchase', async () => {
+  await initializeStorePurchaseHistory([]);
+  await NativeStorage.setItem('wordshift_iap_checkout_receipts', '[{"grantId":7}]');
+  await reconcileStorePurchaseHistory([receipt('recovered-after-corruption')]);
+  expect(alerts).toHaveLength(0);
+  expect(await getAmberBalance()).toBe(AMBER_PACK_GRANTS.small * FIRST_PURCHASE_AMBER_MULTIPLIER);
+  expect(await NativeStorage.getItem('wordshift_iap_checkout_receipts_quarantine')).toBe('[{"grantId":7}]');
+});

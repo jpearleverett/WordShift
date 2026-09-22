@@ -240,7 +240,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // pit, so the player must hear where it lives before onboarding lets go of
   // their hand.
   unlock_explained: [
-    "That's the whole of it! Solve puzzles, offer your words, and the amber builds our rooms and brings more friends.\nThe pit sits just below the house. Scroll down whenever you have words waiting, and give it a tap.",
+    "That's the whole of it! Shift your letters, offer your words, and the amber builds our rooms and brings more friends.\nThe pit sits just below the house. Scroll down whenever you have words waiting, and give it a tap.",
     "Come back when you like. I will keep a place by the hearth.",
   ],
 };

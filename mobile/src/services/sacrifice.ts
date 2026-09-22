@@ -65,10 +65,10 @@ const FIRST_OFFERING = 'The arrangement accepts your offering. The house glows, 
 // keywords here are part of the mechanic's contract (see sacrifice.test.ts).
 const SACRIFICE_MILESTONES: Record<number, string> = {
   2: 'Twice now. The walls remember.',
-  3: 'Three offerings. The animals have noticed.',
+  3: 'Three offerings. The others have noticed. In the kitchen, somebody has stopped stirring.',
   5: 'Five times now. The pattern thanks you. If patterns could thank.',
   10: 'Ten offerings. The house is warmer. Why is the house warmer?',
-  25: 'Twenty-five voluntary offerings. The keepers speak of your devotion.',
+  25: 'Twenty-five offerings, all freely given. The house talks about you now. Not everyone in it agrees on what to say.',
   50: 'Fifty. A long row of small lights remains where the amber settled.',
   100: 'One hundred offerings. The arrangement remembers each one. Your next decision is still yours.',
 };
@@ -141,7 +141,7 @@ export const DEVOTION_TIERS: DevotionTier[] = [
   { threshold: 3, title: 'Marked', regard: 'It knows your hands now.' },
   { threshold: 8, title: 'Known', regard: 'It recognizes the approach of your hands.' },
   { threshold: 20, title: 'Kept', regard: 'A record of your offerings has been kept.' },
-  { threshold: 50, title: 'Beloved of the Pattern', regard: 'The keepers speak of your devotion.' },
+  { threshold: 50, title: 'Beloved of the Pattern', regard: 'It turns toward the stairs before you reach them.' },
   { threshold: 100, title: 'One of the Arrangement', regard: 'It remembers a hundred visits. Each visit still had an ending.' },
 ];
 
@@ -415,7 +415,7 @@ export function getSacrificePrompt(phase: number): { title: string; subtitle: st
  */
 export function getArrangementHoldsLine(total: number, phase: number): string {
   if (phase >= 5) {
-    return `The arrangement holds ${total} amber of yours. It is at peace with the weight.`;
+    return `The arrangement holds ${total} amber of yours. It is at peace with the weight. You do not have to be.`;
   }
   return `The arrangement holds ${total} amber of yours. It remembers every offering.`;
 }

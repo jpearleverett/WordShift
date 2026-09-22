@@ -3,7 +3,7 @@
     "name": "WordShift",
     "slug": "wordshift",
     "scheme": "wordshift",
-    "version": "1.4.4",
+    "version": "1.4.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -21,7 +21,8 @@
       "assets/music/**",
       "assets/rooms/**",
       "assets/sounds/**",
-      "assets/story/**",
+      "assets/story/optimized/**",
+      "assets/story/pages/**",
       "assets/ui/**",
       "assets/*.png"
     ],
@@ -50,7 +51,7 @@
         "backgroundColor": "#F3E2BF"
       },
       "package": "com.wordshift.app",
-      "versionCode": 109,
+      "versionCode": 110,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
@@ -79,7 +80,14 @@
         "@sentry/react-native",
         {
           "organization": "iridescent-games-9n",
-          "project": "wordshift"
+          "project": "wordshift",
+          "experimental_android": {
+            "enableAndroidGradlePlugin": true,
+            "autoUploadProguardMapping": true,
+            "uploadNativeSymbols": true,
+            "autoUploadNativeSymbols": true,
+            "includeNativeSources": false
+          }
         }
       ],
       [
@@ -268,7 +276,8 @@
           "userTrackingPermission": "WordShift uses your data to show ads that are more relevant to you. You can play fully without allowing tracking."
         }
       ],
-      "./plugins/withAndroidOptimization"
+      "./plugins/withAndroidOptimization",
+      "./plugins/withGameCategory"
     ],
     "extra": {
       "telemetryEndpoint": "",

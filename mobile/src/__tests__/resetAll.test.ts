@@ -266,6 +266,12 @@ describe('performFullReset', () => {
     expect(await AsyncStorage.getItem(receiptKeyFor('spark_hearth'))).toBeNull();
   });
 
+  test('clears the post-Arrival recollection lead-in so a replay frames resumed lines again', async () => {
+    await AsyncStorage.setItem('wordshift_arrival_resume_framing_seen', '["fox"]');
+    expect(await performFullReset()).toEqual([]);
+    expect(await AsyncStorage.getItem('wordshift_arrival_resume_framing_seen')).toBeNull();
+  });
+
   test('is idempotent — running on an already-virgin save succeeds cleanly', async () => {
     const failures = await performFullReset();
     expect(failures).toEqual([]);

@@ -88,6 +88,20 @@ export const SHOP_ART: { [key: string]: ImageSourcePropType } = {
   shop_placeholder: require('../../../assets/ui/shop/shop_placeholder.png'),
 };
 
+/**
+ * Keys that deliberately share another key's art. The season rotation's
+ * premium palettes all wear the season crest (`confetti_season`): they are one
+ * product line, earned the same way, and the row's live palette preview tells
+ * them apart. Every alias must point at a real SHOP_ART key (shopArt.test.ts).
+ */
+export const SHOP_ART_ALIASES: { readonly [key: string]: string } = {
+  confetti_season_2: 'confetti_season',
+  confetti_season_3: 'confetti_season',
+  confetti_season_4: 'confetti_season',
+  confetti_season_5: 'confetti_season',
+  confetti_season_6: 'confetti_season',
+};
+
 /** Registry key of the parcel fallback. */
 export const SHOP_ART_PLACEHOLDER_KEY = 'shop_placeholder';
 
@@ -112,12 +126,16 @@ export const PENDING_SHOP_ART: readonly string[] = [
  * can never render a hole in the row. Never returns undefined.
  */
 export function getShopArt(key: string): ImageSourcePropType {
-  return SHOP_ART[key] ?? SHOP_ART[SHOP_ART_PLACEHOLDER_KEY];
+  const alias = SHOP_ART_ALIASES[key];
+  return SHOP_ART[key] ?? (alias !== undefined ? SHOP_ART[alias] : undefined) ?? SHOP_ART[SHOP_ART_PLACEHOLDER_KEY];
 }
 
-/** True when `key` has its own art (false for anything that would fall back). */
+/** True when `key` has art (its own or an alias's; false for the fallback). */
 export function hasShopArt(key: string): boolean {
-  return key in SHOP_ART && key !== SHOP_ART_PLACEHOLDER_KEY;
+  if (key === SHOP_ART_PLACEHOLDER_KEY) return false;
+  if (key in SHOP_ART) return true;
+  const alias = SHOP_ART_ALIASES[key];
+  return alias !== undefined && alias !== SHOP_ART_PLACEHOLDER_KEY && alias in SHOP_ART;
 }
 
 /**

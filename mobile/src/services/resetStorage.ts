@@ -9,6 +9,10 @@ const RESET_DEVICE_KEYS = new Set([
   'wordshift_ad_pacing', 'wordshift_monet_prompts', 'wordshift_share_prompts',
   'wordshift_review_prompt', 'wordshift_cloud_sync_status',
   'wordshift_preview_graduation_seen_v2', 'wordshift_pending_victory', 'wordshift_victory_receipt',
+  'wordshift_pending_victory_quarantine',
+  // The post-Arrival recollection lead-in belongs to one playthrough: a reset
+  // or a new cycle reaches the Arrival again and must frame resumed lines again.
+  'wordshift_arrival_resume_framing_seen',
 ]);
 
 /** Device-local key FAMILIES cleared by Reset All. RESET_DEVICE_KEYS is an
@@ -44,6 +48,7 @@ const NEW_CYCLE_NARRATIVE_KEYS = [
   'wordshift_cycle_beats_seen', 'wordshift_offering_requests', 'wordshift_tending',
   'wordshift_in_progress_puzzle', 'wordshift_in_progress_daily',
   'wordshift_in_progress_puzzle_clock', 'wordshift_in_progress_daily_clock',
+  'wordshift_arrival_resume_framing_seen',
 ];
 
 /** Archive the completed cycle and reset its narrative gates in one commit.

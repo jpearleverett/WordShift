@@ -231,8 +231,10 @@ processSprite('pit_raw.png', 'pit_entrance.png', 460, { dropTopFrac: 0.45 });
 // to the current phase. Only rooms with a clear sky window are treated — the
 // aquarium's water and the desert's already-night sky are deliberately left
 // alone (verified against a per-room detection montage).
-const ROOMS_DIR = path.resolve(import.meta.dirname, '../../assets/rooms');
-const WINDOWS_DIR = path.join(ROOMS_DIR, 'windows');
+// The shipped rooms are near-lossless WebP derivatives; the painted PNG
+// originals live, unbundled, in assets/raw/rooms and stay the mask source.
+const ROOMS_DIR = path.resolve(import.meta.dirname, '../../assets/raw/rooms');
+const WINDOWS_DIR = path.resolve(import.meta.dirname, '../../assets/rooms/windows');
 const WINDOW_ROOMS = ['cozy_den', 'kitchen', 'study', 'office', 'garden'];
 
 const isSkyBlue = (r, g, b) => b > 150 && b > r + 20 && g > r + 5 && g > 120;

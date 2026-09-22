@@ -75,7 +75,7 @@ const VICTORY_TITLES: Record<DialoguePhase, { three: string; two: string; one: s
   2: { three: 'FLAWLESS...', two: 'ADEQUATE.', one: 'IT\'S DONE.' },
   3: { three: 'IMPRESSIVE...', two: 'SUFFICIENT.', one: 'YOU PERSIST.' },
   4: { three: 'WHY DOES\nIT MATTER?', two: 'AND YET...', one: '...AGAIN.' },
-  5: { three: 'The pattern continues.', two: 'Another thread in the weave.', one: 'The arrangement hums.' },
+  5: { three: 'The pattern continues.', two: 'The house keeps it.', one: 'It stays where you put it.' },
 };
 
 export function getVictoryTitle(stars: number, phase: DialoguePhase): string {
@@ -200,22 +200,22 @@ export const VICTORY_FEEDBACK_POOLS: Record<
   },
   5: {
     three: [
-      'The weave accepts perfection. And imperfection. They are the same.',
-      'Every thread true. The pattern barely rippled as you passed.',
-      'Flawless, and it changes nothing. It was beautiful anyway.',
-      'Perfect work, done for its own sake. That is the peace.',
+      'Flawless. Every word was heard, and each one stays exactly where you put it.',
+      'Every word true. Something in the walls noticed, and said nothing.',
+      'Flawless. Nobody asked it of you. You did it anyway.',
+      'Perfect work, done for its own sake. Nobody here is keeping score.',
     ],
     two: [
-      'Another thread pulled tight. The fabric holds.',
-      'Woven, with a small unevenness here and there. Cloth is like that.',
-      'Settled. The pattern takes your work the way water takes rain.',
-      'Done, gently. The weave has room for every kind of hand.',
+      'Done, with a slip or two. The house would tidy them away if you let it.',
+      'Finished, a little uneven. Leave it uneven. That is still allowed.',
+      'Done. A slip or two stays in the record, and nobody smooths them out.',
+      'Done. The house has room for every kind of hand, even the ones it cannot correct.',
     ],
     one: [
-      'You continue. The pattern continues. Neither can stop.',
-      'A slow thread, worked all the way through. The weave is patient. So are you, now.',
-      'Finished. Nothing is measured here anymore. Everything is kept.',
-      'It took what it took. The pattern has all the time there is.',
+      'Slow, and finished. The stumbles stay in the record. They are yours.',
+      'Slow, and worked all the way through. The house watched every stumble and kept its opinions to itself.',
+      'Finished. The rough parts stay rough. The house is learning to leave them.',
+      'It took what it took. Something here would like every day to go the same. This one did not.',
     ],
   },
 };
@@ -291,9 +291,9 @@ export function getUnbrokenWeaveRankUpLine(
 export function getUnbrokenWeaveIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 5) {
     return [
-      "The house is quiet now. But there is still one thread left to follow, if you want it.",
+      "There is one thread in this house nobody has pulled yet. It is yours, if you want it.",
       "It is called the Unbroken Weave. Each letter may cross the chain only once. Finish a chain that way, and the house keeps a mark of it.",
-      "You will find it in the arrangement setup, before your next offering. The weave remembers how far you carry it.",
+      "It waits in the setup, where you pick your board. The weave remembers how far you carry it.",
     ];
   }
   if (phase >= 3) {
@@ -376,7 +376,7 @@ export function getKeeperRecordLines(data: KeeperRecordData): string[] {
 export function getVariantNudgeMessage(phase: DialoguePhase, variantTitle: string): string {
   if (phase >= 4) return `The pattern wonders what ${variantTitle} would offer...`;
   if (phase >= 2) return `Have you tried ${variantTitle}? The words move differently there.`;
-  return `Fox wonders what happens if you try ${variantTitle}!`;
+  return `Ember wonders what happens if you try ${variantTitle}!`;
 }
 
 // ============================================================================
@@ -449,15 +449,15 @@ export const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
     'Received. The gratitude below is patient and vast.',
   ],
   5: [
-    'The weave tightens.', 'Another thread.', 'The pattern knows.',
-    'It remembers.', 'Accepted.', 'Woven.', 'The hum continues.',
-    'Settled.', 'The thread holds.', 'Part of the whole.',
-    'Placed, like a stitch in old cloth.',
+    'Noted, quietly.', 'The house keeps it.', 'The pattern knows.',
+    'It remembers.', 'Accepted.', 'Settled.', 'The hum continues.',
+    'Your line still holds.', 'The quiet takes it in.', 'Nothing corrects it.',
+    'Placed. The house would leave it there forever.',
     'The pattern makes room without being asked.',
-    'A soft click, somewhere far away and content.',
-    'The thread finds its row.',
-    'A place remains between the threads.',
-    'The weave breathes in.',
+    'A soft click, somewhere far away.',
+    'It is watching. It is always watching now.',
+    'A place remains between the words.',
+    'The house breathes in, and lets it be.',
   ],
 };
 
@@ -615,14 +615,14 @@ export const COMBO_MOVE_POOLS: Record<DialoguePhase, [string[], string[], string
     ],
   ],
   5: [
-    ['Two threads, true.', 'Two stitches, even and sure.', 'Twice woven, no snag.'],
-    ['Three, woven without a snag.', 'Three threads pulled smooth in a row.', 'Three true stitches. The cloth is pleased, in its way.'],
+    ['Two, true.', 'Two in a row. The house notices.', 'Twice, and nothing to correct.'],
+    ['Three without a slip.', 'Three clean. The quiet leans in.', 'Three true. Something below keeps count.'],
     [
-      'The weave sings, unbroken.',
-      'Thread after thread, all true. The loom is content.',
-      'A long, even run. The pattern wears it well.',
-      'Unbroken weaving. The hum deepens.',
-      'Your hands and the weave, one motion now.',
+      'An unbroken run. The house watches it go by.',
+      'Move after move, all true. Nothing needs correcting, and that unsettles it.',
+      'A long, even run. The house would have you do it the same way forever.',
+      'Unbroken. The hum under the floor deepens.',
+      'Your hands, sure and steady. It is still watching them.',
     ],
   ],
 };
@@ -672,7 +672,7 @@ const HINT_FALLBACK: Record<DialoguePhase, string> = {
   2: 'You\'ve wandered off course. Undo.',
   3: 'Wrong path. Is there a right one?',
   4: 'Lost. But the arrangement knows exactly where you are.',
-  5: 'The threads tangle. Undo and try again.',
+  5: 'This path goes nowhere. Undo and try again.',
 };
 
 export function getHintFallback(phase: DialoguePhase): string {
@@ -725,7 +725,7 @@ const HINT_NO_SAFE_ROUTE_UNDO: Record<DialoguePhase, string> = {
   2: 'The pattern sees no sure way on from here. Undo a move. No hint was spent.',
   3: 'No sure route remains from here. Take a move back. No hint was spent.',
   4: 'The arrangement finds no way on from here. Undo. No hint was spent.',
-  5: 'The threads lead nowhere sure from here. Unwind a move. No hint was spent.',
+  5: 'Nothing sure leads on from here. Undo a move. No hint was spent.',
 };
 
 const HINT_NO_SAFE_ROUTE_FRESH: Record<DialoguePhase, string> = {
@@ -734,7 +734,7 @@ const HINT_NO_SAFE_ROUTE_FRESH: Record<DialoguePhase, string> = {
   2: 'The pattern has not found a sure way in yet. Begin, then ask. No hint was spent.',
   3: 'No sure route shows from the start. Begin, then ask again. No hint was spent.',
   4: 'The arrangement offers no opening yet. Begin. No hint was spent.',
-  5: 'The threads have not settled yet. Begin, then ask again. No hint was spent.',
+  5: 'Nothing is placed yet. Begin, then ask again. No hint was spent.',
 };
 
 export function getHintNoSafeRouteMessage(phase: DialoguePhase, canUndo: boolean): string {
@@ -787,8 +787,16 @@ const OUT_OF_HINTS_MESSAGES: Record<DialoguePhase, string> = {
   5: 'No hints remain. More are available in the shop.',
 };
 
-export function getOutOfHintsMessage(phase: DialoguePhase): string {
-  return OUT_OF_HINTS_MESSAGES[phase];
+/**
+ * Out-of-hints copy. Without `canWatch`: the board message usePuzzleGame
+ * shows as the HINT button refuses. With it: the body of App's out-of-hints
+ * alert, where `canWatch` says a rewarded clip is on offer.
+ */
+export function getOutOfHintsMessage(phase: number, canWatch?: boolean): string {
+  if (canWatch === undefined) {
+    return OUT_OF_HINTS_MESSAGES[Math.min(5, Math.max(0, Math.floor(phase))) as DialoguePhase];
+  }
+  return getOutOfHintsAlertBody(phase, canWatch);
 }
 
 // ============================================================================
@@ -801,7 +809,7 @@ const INVALID_WORD_MESSAGES: Record<DialoguePhase, (word: string) => string> = {
   2: (word) => `The pattern doesn't accept "${word}".`,
   3: (word) => `The arrangement rejects "${word}".`,
   4: (word) => `"${word}" dissolves into nothing.`,
-  5: (word: string) => `"${word}" unravels. The weave rejects it.`,
+  5: (word: string) => `"${word}" is not a word. Not even here.`,
 };
 
 export function getInvalidWordMessage(word: string, phase: DialoguePhase): string {
@@ -814,7 +822,7 @@ const BLOCKED_WORD_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The pattern refuses that placement.',
   3: 'The arrangement refuses that placement.',
   4: 'That placement is not accepted.',
-  5: 'The weave refuses that placement.',
+  5: 'That placement will not hold.',
 };
 
 /** Reject a blocked intermediate without repeating the hidden term. */
@@ -852,7 +860,7 @@ const LOCKED_LETTER_MESSAGES: Record<DialoguePhase, string> = {
   2: 'That letter won\'t move.',
   3: 'That letter has been claimed.',
   4: 'It belongs to the arrangement now.',
-  5: 'Woven into the pattern. It cannot move.',
+  5: 'Set in place. It will not move now.',
 };
 
 export function getLockedLetterMessage(phase: DialoguePhase): string {
@@ -916,7 +924,7 @@ const NO_VALID_MOVES_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The letters refuse every path from here. Even they seem to know this arrangement was wrong. Undo, or clear the board and begin anew.',
   3: 'No word can form from this arrangement. Unmake a move, or clear it all away.',
   4: 'The arrangement admits no further words. Unmake your moves, or begin again.',
-  5: 'The weave has closed around this path. Undo a thread, or clear it and start once more.',
+  5: 'No word fits from here. Undo a move, or clear it and start once more.',
 };
 
 export function getNoValidMovesMessage(phase: DialoguePhase): string {
@@ -930,7 +938,7 @@ const STUCK_PANEL_TITLES: Record<DialoguePhase, string> = {
   2: 'This path has closed.',
   3: 'The way is shut.',
   4: 'No path remains.',
-  5: 'The thread frays.',
+  5: 'The way closes.',
 };
 
 export function getStuckPanelTitle(phase: DialoguePhase): string {
@@ -949,7 +957,7 @@ const DRAG_MISS_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The letter found no row. Bring it down onto one.',
   3: 'It slipped free. Settle the letter onto a row.',
   4: 'The letter would not settle. Lay it upon a row.',
-  5: 'The thread drifted loose. Rest it upon a row.',
+  5: 'The letter drifted loose. Set it down on a row.',
 };
 
 export function getDragMissMessage(phase: DialoguePhase): string {
@@ -966,7 +974,7 @@ const LOADING_MESSAGES: Record<DialoguePhase, string> = {
   2: 'Seeking patterns...',
   3: 'Words emerging from darkness...',
   4: 'The void speaks...',
-  5: 'The pattern weaves...',
+  5: 'The house is listening...',
 };
 
 export function getLoadingMessage(phase: DialoguePhase): string {
@@ -983,7 +991,7 @@ const START_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The letters await.',
   3: 'Begin... if you must.',
   4: 'The words are waiting. They always are.',
-  5: 'The threads await your hand.',
+  5: 'The letters wait. So does the house.',
 };
 
 export function getStartMessage(phase: DialoguePhase): string {
@@ -1000,7 +1008,7 @@ const SPEED_TIME_UP_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The clock ran dry. The letters scattered before you finished.',
   3: 'Time collapsed. The arrangement closed this path.',
   4: 'The hour was consumed. The arrangement does not wait. Offer again.',
-  5: 'Time settled where it fell. The threads rest. Begin again, gently.',
+  5: 'Time ran out. The house did not mind. Begin again when you like.',
 };
 
 export function getSpeedTimeUpMessage(phase: DialoguePhase): string {
@@ -1017,7 +1025,7 @@ const REWARDED_DOUBLE_LABELS: Record<DialoguePhase, string> = {
   2: 'Linger a moment... double the offering',
   3: 'Stay a while... double the offering',
   4: 'Give it your attention... double the offering',
-  5: 'Tend it longer... double the offering',
+  5: 'Stay a little longer... double the offering',
 };
 
 const REWARDED_DOUBLE_CONFIRM: Record<DialoguePhase, string> = {
@@ -1050,7 +1058,7 @@ const WHISPER_GALLERY_EMPTY_TEXT: Record<DialoguePhase, string> = {
   2: 'Nothing collected yet. The house is listening for your words.',
   3: 'The walls are quiet... for now.',
   4: 'The walls are quiet... for now.',
-  5: 'The walls are quiet now. Every voice rests in its place.',
+  5: 'The walls are quiet now. The voices are still here, if you listen.',
 };
 
 export function getWhisperGalleryEmptyText(phase: DialoguePhase): string {
@@ -1127,13 +1135,13 @@ export function getPhaseChangeNarrative(newPhase: DialoguePhase): PhaseChangeNar
       return {
         emoji: '🌑',
         title: 'Something has changed...',
-        body: 'Your friends seem... different. Visit them at home.',
+        body: 'Your friends seem... different. The pit is waiting for you first.',
       };
     case 5:
       return {
         emoji: '🕊️',
-        title: 'A terrible peace...',
-        body: 'The pattern has settled. Everything is quiet now.',
+        title: 'It stayed...',
+        body: 'The house is quiet now. Not everyone in it is.',
       };
     default:
       return {
@@ -1238,12 +1246,12 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
     dismissLabel: '...',
   },
   5: {
-    title: 'THE WEAVE',
+    title: 'THE PATTERN',
     steps: [
-      { heading: 'Choose a Thread', desc: 'Pull gently. The fabric remembers.' },
-      { heading: 'Place it in the Pattern', desc: 'It knows where it belongs.' },
+      { heading: 'Choose a Letter', desc: 'Take it from the word. The house will notice.' },
+      { heading: 'Place it Where You Choose', desc: 'It would rather everything stayed put. Move it anyway.' },
       { heading: 'The Words Are Real', desc: 'As real as the silence between them.' },
-      { heading: 'Continue the Pattern', desc: 'Row by row. The weave holds.' },
+      { heading: 'Continue the Pattern', desc: 'Row by row. Your line still holds.' },
     ],
     dismissLabel: 'Continue',
   },
@@ -1264,7 +1272,7 @@ export function getPhaseIndicator(phase: DialoguePhase): { icon: string; label: 
     case 2: return { icon: '🌙', label: 'Questioning' };
     case 3: return { icon: '👁️', label: 'Shadows' };
     case 4: return { icon: '🌑', label: 'The Horizon' };
-    case 5: return { icon: '🕊️', label: 'Peace' };
+    case 5: return { icon: '🕊️', label: 'After' };
     default: return { icon: '☀️', label: '' };
   }
 }
@@ -1283,7 +1291,7 @@ export function getRitualEchoHeader(phase: number): string {
   if (phase === 2) return 'Words Transformed:';
   if (phase === 3) return 'The Incantation:';
   if (phase === 4) return 'The Offering:';
-  return 'The Pattern:'; // Phase 5 — serene, settled
+  return 'The Pattern:'; // Phase 5: the house keeps it
 }
 
 /**
@@ -1295,7 +1303,7 @@ export function getRitualEchoFooter(phase: number, wordCount: number): string {
   if (phase === 2) return 'The pattern takes shape...';
   if (phase === 3) return 'The arrangement accepts.';
   if (phase === 4) return `${wordCount} words offered to the pattern.`;
-  return `${wordCount} words woven into the pattern.`; // Phase 5 — the pattern continues
+  return `${wordCount} words kept by the house.`; // Phase 5: the house keeps everything
 }
 
 // ============================================================================
@@ -1350,10 +1358,10 @@ export function getIncantationName(words: string[], phase: number): string | nul
     `The ${lastWord} Opens`,
   ];
 
-  // Phase 5 templates - serene, settled; the pattern simply continues
+  // Phase 5 templates: the presence keeps what it is given; quiet, watchful
   const phase5Templates = [
     `${firstWord} settles into ${lastWord}`,
-    `The Weave of ${lastWord}`,
+    `The Keeping of ${lastWord}`,
     `${firstWord} Becomes ${lastWord}`,
     `The ${lastWord} Abides`,
     `${firstWord} Returns as ${lastWord}`,
@@ -1378,7 +1386,7 @@ export function getWordsOfferedText(totalWords: number, phase: number): string {
   if (phase === 2) return `Words transformed: ${totalWords}`;
   if (phase === 3) return `Words offered: ${totalWords}`;
   if (phase === 4) return `${totalWords} words offered to the arrangement`;
-  return `${totalWords} words woven into the pattern`; // Phase 5 — serene
+  return `${totalWords} words kept by the house`; // Phase 5: kept, not consumed
 }
 
 /**
@@ -1423,13 +1431,13 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
   if (phase >= 2) {
     return [
       "You've grown stronger with these words, so I want to show you something new.",
-      "The Daily Challenge comes once a day. It's one shared puzzle, a little tougher than usual.",
+      "The Daily Challenge comes once a day. It's one shared board, a little tougher than usual.",
       "You'll find it up top. Everyone gets the same arrangement, every day. I keep thinking about that.",
     ];
   }
   return [
     "Something new showed up this morning, friend. Come see.",
-    "There's a Daily Challenge now. One special puzzle each day, and everyone gets the same words. It's a little harder than usual.",
+    "There's a Daily Challenge now. One special board each day, and everyone gets the same words. It's a little harder than usual.",
     "You'll find it up top. Try it when you're feeling brave. The amber is worth it.",
   ];
 }
@@ -1447,7 +1455,7 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
 export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 4) {
     return [
-      "The arrangement leaves a record. Open the Journal, then Things We Kept, for the conversations you've had and the choices you've made.",
+      "The arrangement leaves a record. Open the Journal, then Things We Kept, for the conversations you have had and the choices you have made.",
       "Word Ledger is a separate entry in the Journal. Look for the quill to revisit the recent words you have formed.",
       "The Whisper Gallery keeps the whispers, replies, and keepsakes you have collected. Some echoes linger longer than others.",
       "Quests holds your daily and weekly tasks. Complete them and more amber follows. The Season Pass keeps its rewards nearby.",
@@ -1457,7 +1465,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 3) {
     return [
       "The Journal keeps a record. Things We Kept holds the conversations you've had and the choices you've made. Some sound different now.",
-      "Word Ledger is another entry in the Journal menu. The quill marks your recent puzzle words. Some stay with me longer than others.",
+      "Word Ledger is another entry in the Journal menu. The quill marks the recent words you've made. Some stay with me longer than others.",
       "The Whisper Gallery keeps the whispers, replies, and keepsakes you've collected. The echoes that refused to fade.",
       "Quests holds daily and weekly goals, with amber waiting when you finish. The Season Pass has its own rewards beside it.",
       "The book icon up top opens the Journal menu. I think the house wants you to read what's been written.",
@@ -1466,7 +1474,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 2) {
     return [
       "I've been keeping a journal for this house. Things We Kept holds the conversations you've had and the choices you've made.",
-      "Back in the Journal menu, the quill opens Word Ledger. It keeps your recent puzzle words. Some look different on a second reading.",
+      "Back in the Journal menu, the quill opens Word Ledger. It keeps the recent words you've made. Some look different on a second reading.",
       "The Whisper Gallery saves the whispers, replies, and keepsakes you've collected. You can return to those quiet moments here.",
       "Quests holds daily and weekly goals, with amber when you finish. You'll find Season Pass rewards in the Journal menu too.",
       "Tap the book icon up top to open the Journal menu. Choose a place to look back, friend.",
@@ -1475,7 +1483,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 1) {
     return [
       "I started a journal for you. Things We Kept saves the conversations you've had and the choices you've made along the way.",
-      "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse your recent puzzle words.",
+      "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse the recent words you've made.",
       "The Whisper Gallery keeps the whispers, replies, and keepsakes you've collected. Little moments to read again when you like.",
       "Quests has daily and weekly goals, and amber when you finish. You'll find the Season Pass and its rewards in this menu too.",
       "The book icon up top brings you back to the Journal menu. Take a peek when you have a quiet moment.",
@@ -1483,10 +1491,10 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
   }
   return [
     "I've made you a journal! Things We Kept saves the conversations you've had and the choices you've made. A little scrapbook of us.",
-    "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse your recent puzzle words.",
+    "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse the recent words you've made.",
     "The Whisper Gallery keeps the whispers, replies, and keepsakes you've collected. Little moments you can read again whenever you like.",
     "Quests has daily and weekly goals that earn extra amber. You'll find Season Pass rewards in the Journal menu too.",
-    "Tap the book icon up top to open the Journal menu, then choose what you'd like to revisit. It's yours, friend.",
+    "The book up top opens the Journal menu. Choose whatever you'd like to revisit. It's yours, friend.",
   ];
 }
 
@@ -1695,35 +1703,35 @@ export function getJournalSpotlightSteps(
  */
 export function getFoxPostTutorialPlayPrompt(phase: number): string {
   if (phase >= 4) {
-    return "Keep playing, friend. Every word and every piece of amber you bring back builds this house a little further. There are others still waiting to come in.";
+    return "Go on back to the words, friend. Every one you make is heard in this house now. I would rather you knew that.";
   }
   if (phase >= 3) {
-    return "Play a few more puzzles for me. More amber means more rooms, more friends, and a stronger pattern in the house.";
+    return "Bring me a few more words. More amber means more rooms, more friends, and a stronger pattern in the house.";
   }
   if (phase >= 2) {
-    return "Head back to the puzzles when you're ready. More amber lets us open new rooms and welcome the others in.";
+    return "Head back to the words when you're ready. More amber lets us open new rooms and welcome the others in.";
   }
-  return "Play more puzzles and gather amber, okay? I want to invite more friends. The house will feel so much fuller with everyone here.";
+  return "Go find a few more words and gather amber, okay? I want to invite more friends. The house will feel so much fuller with everyone here.";
 }
 
 export function getFoxSetupSelectorIntroLines(phase: number): string[] {
   if (phase >= 4) {
     return [
-      "Before you begin, touch the setup mark below the board. There you choose how hard the next arrangement will be.",
+      "Before you begin, touch the seal above the board. There you choose how hard the next arrangement will be.",
       "Some paths are short. Some go deeper. Stranger ways to play will open there in time.",
       "Choose how deep this next offering goes, then begin.",
     ];
   }
   if (phase >= 3) {
     return [
-      'Before you start, tap the setup button for me. It lets you choose how hard the next puzzle should feel.',
+      "Before you start, touch the glowing seal above the board for me. It lets you choose how hard the next board should feel.",
       "There are short paths and deeper ones, and later a few stranger arrangements as well.",
       "Pick a path that feels right, then we'll keep building.",
     ];
   }
   return [
-    'Before you jump in, tap the setup button. It lets you choose how gentle or tricky the next puzzle will be.',
-    "Right now it only changes how deep the path goes. Later, a few new puzzle styles will show up there too.",
+    "Before you jump in, see the little seal glowing above the board? That's the setup. It lets you choose how gentle or tricky the next board will be.",
+    "Right now it only changes how deep the path goes. Later, a few new ways to move the words will show up there too.",
     "Pick what sounds fun, then let's play.",
   ];
 }
@@ -1745,6 +1753,203 @@ export function getFoxStarterIntroLines(phase: number): string[] {
     "It's a purchase, mind. The price is right there on the shelf.",
     "Have a look if you like. You're welcome here whether or not you buy anything.",
   ];
+}
+
+// ============================================================================
+// HINT ECONOMY COPY — the out-of-hints alert and the rewarded-hint receipts.
+// System voice (it may say "hint" and "store"), never names money, cheerful
+// only through phase 1 and drier as the house darkens. Wired by App.
+// ============================================================================
+
+/** Title of the out-of-hints alert. */
+export function getOutOfHintsTitle(phase: number): string {
+  if (phase >= 2) return 'No hints left';
+  return 'Out of hints';
+}
+
+/** Body of the out-of-hints alert (see getOutOfHintsMessage). */
+function getOutOfHintsAlertBody(phase: number, canWatch: boolean): string {
+  if (phase >= 5) {
+    return canWatch
+      ? 'One short clip buys one more hint. The store keeps the rest. The board will wait for you.'
+      : 'The store keeps the hints now. The board will wait for you.';
+  }
+  if (phase >= 4) {
+    return canWatch
+      ? 'One short clip buys one more hint. The store keeps the rest.'
+      : 'The store keeps the hints now.';
+  }
+  if (phase >= 2) {
+    return canWatch
+      ? 'Watch a short clip for one more hint, or find a hint pack in the store.'
+      : 'Hint packs are in the store.';
+  }
+  return canWatch
+    ? 'Watch a short clip for a free hint, or grab a hint pack in the store!'
+    : 'Hint packs are waiting in the store!';
+}
+
+/** Button: watch a rewarded clip for one hint. */
+export function getOutOfHintsWatchLabel(phase: number): string {
+  if (phase >= 4) return 'One clip (+1)';
+  return 'Watch a clip (+1)';
+}
+
+/** Button: open the store. */
+export function getOutOfHintsStoreLabel(phase: number): string {
+  if (phase >= 2) return 'The store';
+  return 'Get hints';
+}
+
+/** Button: dismiss the alert. */
+export function getOutOfHintsDismissLabel(phase: number): string {
+  if (phase >= 4) return 'Leave it';
+  return 'Not now';
+}
+
+/** Toast: the daily rewarded-clip cap is spent. */
+export function getRewardedHintLimitMessage(phase: number): string {
+  if (phase >= 4) return 'No more clips today. The store keeps the rest.';
+  if (phase >= 2) return 'No more clips today. The store has hints.';
+  return 'That\'s all the clips for today. Try the store!';
+}
+
+/** Toast: the rewarded clip completed and one hint was granted. */
+export function getRewardedHintGrantedMessage(phase: number): string {
+  if (phase >= 4) return 'One more hint.';
+  if (phase >= 2) return '+1 hint.';
+  return '+1 hint!';
+}
+
+/** Toast: the clip did not complete (or failed), so no hint was granted. */
+export function getRewardedHintUnavailableMessage(phase: number): string {
+  if (phase >= 4) return 'No hint this time. The store keeps the rest.';
+  if (phase >= 2) return 'No hint this time. Hint packs are in the store.';
+  return 'No hint this time. Hint packs live in the store.';
+}
+
+/** Board message when a rewarded rescue puts time back on a Speed Shift clock. */
+export function getSpeedRescueResumeMessage(phase: number): string {
+  if (phase >= 5) return 'The clock gives a little back.';
+  if (phase >= 3) return 'The clock relents. Briefly.';
+  if (phase >= 2) return 'Extra time on the clock. Use it well.';
+  return 'Back in it! Extra time on the clock!';
+}
+
+// ============================================================================
+// EXPERT UNLOCK — a one-time Ember card when six-letter boards open (35).
+// Resident voice: contractions through phase 3, none from the reveal on; no
+// "puzzle", no numbers of solves.
+// ============================================================================
+
+export function getExpertUnlockIntroLines(phase: number): string[] {
+  if (phase >= 5) {
+    return [
+      'There is a new rung in the setup. Expert. Six-letter words, and chains as long as the house can hold.',
+      'It is the hardest arrangement there is. The house would rather you kept to the easy ones.',
+      'That is as good a reason to try it as any.',
+    ];
+  }
+  if (phase >= 4) {
+    return [
+      'There is a new rung in the setup. Expert. Six-letter words, and chains as long as the house can hold.',
+      'It is the hardest arrangement there is. Fewer moves fit, and every word must be reached for.',
+      'Take it when you are ready. It will wait.',
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      'There\'s a new rung in the setup. Expert. Six-letter words, the longest chains the house can hold.',
+      'It\'s the hardest of them. Fewer moves fit, and the words are the kind you have to reach for.',
+      'Try it when you want to. It won\'t go anywhere.',
+    ];
+  }
+  return [
+    'Oh, look at you! There\'s a new rung in the setup now: Expert. Six-letter words, and the longest chains I know.',
+    'It\'s the hardest arrangement there is. The words get rarer, the moves get fewer, and every one of them counts.',
+    'No rush at all. It\'ll be there whenever you fancy a real stretch.',
+  ];
+}
+
+/** Locked Expert row hint in the setup menu (current count against the gate). */
+export function getExpertLockedHint(solved: number, gate: number): string {
+  if (solved >= gate) return 'Unlocked.';
+  return `Six-letter words, the hardest boards. Opens at ${gate} (you're at ${solved})`;
+}
+
+// ============================================================================
+// DIALOGUE REST COPY — shown when a resident's visit ends or they are resting.
+// System voice in the house register: never "puzzles", never a count, and
+// the resident's canon pronoun. Rest ends after a few more words are given to
+// the house, so the copy points there.
+// ============================================================================
+
+/**
+ * Line after a visit ends. `onCooldown`: the resident is genuinely resting
+ * (outside the new-resident grace period, re-tapping would show nothing).
+ */
+export function getDialogueSessionEndMessage(
+  phase: number,
+  animalName: string,
+  animalType: string,
+  onCooldown: boolean,
+): string {
+  const fill = (t: string) => fillInterjectionTemplate(t, animalType, animalName);
+  if (!onCooldown) {
+    if (phase >= 4) return fill('{name} is not finished. Go back to {them} when you are ready.');
+    return fill('{name} still has more to say. Tap {them} again to keep talking.');
+  }
+  if (phase >= 5) return fill('{name} would like a little quiet now. Come back after a few more words.');
+  if (phase >= 4) return fill('{name} has said enough for now. Come back after a few more words.');
+  if (phase >= 2) return fill('{name} wants to rest now. Come back after a few more words.');
+  return fill('{name} wants to rest now. Come back after you\'ve arranged a few more words!');
+}
+
+/**
+ * Line when a resident is tapped while resting. Several per phase, picked at
+ * random (`rng` is injectable for tests).
+ */
+export function getDialogueCooldownMessage(
+  phase: number,
+  animalName: string,
+  animalType: string,
+  rng: () => number = Math.random,
+): string {
+  const pools: string[][] = [
+    ['{name} needs some quiet time. Arrange a few more words and come back!'],
+    ['{name} is off daydreaming. Come back after a few more words!'],
+    ['{name} is lost in thought. Come back after a few more words.'],
+    [
+      '{name} is preparing. Return after more offerings.',
+      'The house wants patience. {name} will speak again soon.',
+    ],
+    [
+      '{name} is preparing. Return after more offerings.',
+      'The arrangement asks for patience. {name} will speak again soon.',
+    ],
+    [
+      '{name} is keeping to {their} own room for a while. Come back after a few more words.',
+      'The house is quiet around {name}. {They} will talk again soon.',
+    ],
+  ];
+  const pool = pools[Math.min(5, Math.max(0, Math.floor(phase)))];
+  const template = pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
+  return fillInterjectionTemplate(template, animalType, animalName);
+}
+
+// ============================================================================
+// HOUSE UPGRADE GIFT — the prompt before a bought improvement is handed over.
+// Narration: never contracts. Pronouns follow the resident's canon.
+// ============================================================================
+
+/** Body line of the gift card before the player hands the gift over. */
+export function getHouseUpgradeGiftPrompt(
+  giftName: string,
+  animalName: string,
+  animalType: string,
+): string {
+  const them = fillInterjectionTemplate('{them}', animalType, animalName);
+  return `You brought ${giftName} for ${animalName}. Give it to ${them} when you are ready.`;
 }
 
 // ============================================================================
@@ -1796,8 +2001,8 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     fox: ["Ember noticed which words you used.", 'Ember stared into the fire after that one.', "Ember says the flames flickered when you finished.", 'Ember wonders where the warmth really comes from.', "Ember says the fire remembers more than we do."],
     owl: ["Archimedes found a passage about that word.", "Archimedes is checking one book against another.", 'Archimedes wrote something down.', 'Archimedes keeps finding the same symbol.', "Archimedes wonders who writes the notes in his margins."],
     pangolin: ["Panko says the recipe changed overnight.", "Panko tasted something in the soup she can't name.", "Panko is putting the spice jars back in order.", "Panko swears she never bought that spice.", "Panko can't remember who taught her this recipe."],
-    axolotl: ['Axel felt a ripple.', "Axel says the water shifted, and he didn't move it.", "Axel is staring at something in the water.", 'Axel wonders what is on the other side of the glass.', 'Axel says the water hums when you win.'],
-    capybara: ["Chill noticed. He stayed chill.", 'Chill filed that away.', 'Chill is thinking.', "Chill wonders who arranged all this calm.", "Chill watched the pattern line up. He stayed chill."],
+    axolotl: ['Axel felt a ripple.', "Axel says the water shifted, and he didn't move it.", "Axel is staring at something in the water.", 'Axel wonders what is on the other side of the glass.', 'Axel says the water hums when your words go down.'],
+    capybara: ["Chill noticed. He stayed chill.", 'Chill filed that away.', 'Chill is thinking.', "Chill wonders who arranged all this calm.", "Chill initialed the page and added the time."],
     fennec_fox: ["Fennick heard something else inside those words.", 'Fennick is alert.', "Fennick tilted his head to hear you better.", "Fennick wonders what keeps calling at night.", "Fennick says the quiet has a shape now. He'd like to know what made it."],
     sloth: ["Sloane felt something arrive. It's in no hurry, and neither is she.", 'Sloane is thinking. She started well before you got here.', "Sloane paused today. From someone this slow, that means something.", "Sloane wonders if you feel the change too, or if she's just early again.", "Sloane has been counting something. She won't say what."],
     wombat: ["Warren says the ground trembled under the burrow floor.", "Warren heard something below the burrow floor.", "Warren is checking his burrow walls again.", "Warren wonders how deep his burrow really goes.", "Warren found a tunnel he never dug himself."],
@@ -1809,7 +2014,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
   },
   2: {
     fox: ["The fire noticed the word you just made.", "Ember says the flames spelled something she won't repeat.", 'Ember is watching the embers closely.', "Ember says the fire prefers your colder words.", 'The flames leaned toward your last word.'],
-    owl: ["Archimedes says that word is already in the old book.", "Archimedes underlined a sentence.", 'The book opened on its own.', 'Archimedes says the book was waiting for that word.', 'A page wrote itself while you played.'],
+    owl: ["Archimedes says that word is already in the old book.", "Archimedes underlined a sentence.", 'The book opened on its own.', 'Archimedes says the book was waiting for that word.', 'A page wrote itself while you worked.'],
     pangolin: ["Panko says her ingredients were not where she left them.", "The kitchen smells of a supper nobody made.", "Panko is stirring a pot of something dark.", "Panko says the pantry rearranged itself overnight.", "The kitchen has gone cold in the spot where you stood."],
     axolotl: ["The water remembered your word.", 'Axel sank a little deeper.', 'Something moved beneath Axel.', "Axel says something in the glass is looking back at him.", 'The water dimmed when you finished.'],
     capybara: ['Chill catalogued the arrangement.', "Chill added your word to the list.", "Chill is still calm. It is starting to feel wrong.", 'Chill says the schedule has your name in it.', 'Chill underlined your word. Twice.'],
@@ -1833,7 +2038,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     wombat: ["Warren hears a low knock coming through the foundation stone.", "One footing stays warm long after the soil around it cools.", "One of Warren's tunnels curves toward a chamber he never dug.", "Pale dust keeps rising from a seam in the sealed floor.", "Warren is bracing a beam that was not sagging yesterday."],
     rabbit: ["Thyme chalks an arrow on the garden path. By dusk it points back at the house.", "A trail beyond the gate bends gently back toward the rosemary beds.", "Thyme moves the teapot away from the window. Its steam drifts back toward the glass.", "Fresh tracks circle the hedge, then stop beside her chair.", "The garden gate opens outward. The wind keeps swinging it back in."],
     red_panda: ["The incense smoke drew a circle and left it open.", "Bamboo is counting the quiet gaps between breaths.", "One line of the pattern is still unfinished.", 'A reed in Bamboo\'s mat stays loose. They do not tie it.', "Bamboo says the gap in the middle of the pattern still has a shape."],
-    tarsier: ["Vesper has watched the same road for three dawns now.", "A faint line crosses the dark below the stars. She has marked it.", 'Vesper moves the lantern to the far side of the rail.', 'She watches one bend in the road until morning.', "Her counting song is one number shorter tonight. The tune is the same."],
+    tarsier: ["Vesper has watched the same patch of sky for three dawns now.", "A faint line crosses the dark below the stars. She has marked it.", 'Vesper moves the lantern to the far side of the rail.', 'She watches one bend in the road until morning.', "Her counting song is one number shorter tonight. The tune is the same."],
     aye_aye: ["The bell hums on one syllable. Tock will not say it out loud.", "Tock taps the beam. The answer is in the bronze before he can reach her.", 'The bell rope twists once in the still air.', "Tock writes one word on his slate, then sands it clean.", "At dusk he listens under the bell and nods at her silence."],
     kakapo: ["A ridge rises in the soil and travels from root to root.", "Moss says the whole valley is fruiting at once, months early.", 'Every seedling turned the same way during the night.', "Moss rests one foot on the soil to feel the low note pass below.", "The fruit trees flower out of season, then shut again before dawn."],
   },
@@ -1842,15 +2047,15 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     owl: ['Archimedes closes the book. It opens again to a warm blank page.', "Ink gathers in the margins while Archimedes watches.", "Archimedes reaches for the last page. It turns before he touches it."],
     pangolin: ["Panko lays one more place at the table.", "The empty pot is steaming. Panko turns the flame down.", "Panko tastes the air. She decides the salt is enough."],
     axolotl: ['The water is warm now. It should not be.', "Axel is happy today. The water seems happy too.", 'Something brushes the glass from the other side. Axel does not turn.'],
-    capybara: ["Chill closes the last folder and straightens its corners.", 'Every clock in the office ticks at once. Chill keeps breathing.', 'Chill says: relax. Nothing else needs moving.'],
+    capybara: ["Chill closes the last folder and straightens its corners.", 'Every clock in the office ticks at once. Chill keeps breathing.', 'Chill writes the date twice, once for the ledger and once for himself.'],
     fennec_fox: ["Fennick is silent now. He is only listening.", 'Both ears turn toward the ceiling. The room stays still.', 'Fennick whispers: closer. Then the echo whispers it too.'],
     sloth: ['Sloane opens both eyes. She has been saving them for this.', 'The branch does not move beneath her. Nothing here moves without meaning now.', "Time used to pass through Sloane. Now it goes around her."],
     wombat: ["Warren presses a paw flat to the foundation. Something answers.", "The tunnels carry a low note up through the burrow floor.", "Warren says the deepest wall in the burrow is warm now."],
-    rabbit: ["Thyme sits with her back to the garden gate. She has never done that before.", 'The tea has gone cold. Thyme keeps both paws around the cup.', 'Thyme counts the exits once, then stops.'],
+    rabbit: ["Thyme sits facing the garden gate, the seed tin in her lap.", 'The tea has gone cold. Thyme keeps both paws around the cup.', 'Thyme counts the ways out twice. The second count is for her.'],
     red_panda: ["Bamboo breathes out. The whole attic seems to breathe in.", 'The incense smoke gathers into one unbroken thread.', "Bamboo opens both eyes. Nothing in the room moves."],
-    tarsier: ['Vesper says: look up. Do not blink.', "The lantern gutters. Vesper's eyes catch a second light.", 'The dark looks back now. Vesper does not look away.'],
+    tarsier: ['Vesper keeps her eyes on the seam. Every hour, on purpose, she blinks.', "The lantern gutters. Vesper's eyes catch a second light.", 'The dark looks back now. Vesper does not look away.'],
     aye_aye: ["Tock rests one hand on the bell rope.", 'The knocking has stopped. Tock presses his ear to the latch.', 'The bell hums all day now. Tock hums with her.'],
-    kakapo: ['Moss draws one long breath. The garden leans toward him.', 'The garden blooms all at once. Moss closes his eyes.', 'The stars seem farther apart above the sky garden.'],
+    kakapo: ['Moss draws one long breath. The garden leans toward him.', 'The garden blooms all at once. Moss closes his eyes.', 'Moss sits at the rim of his bowl, chest full, not calling yet.'],
   },
   5: {
     "fox": [
@@ -1899,7 +2104,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
         "Sloane changes her mind about which branch to sit on.",
         "Sloane is watching the afternoon take its time.",
         "Sloane breathes out. A moment later, the leaves catch up.",
-        "Two of her three moths say hello. Both are named Gerald.",
+        "Two moths say hello. Both are named Gerald.",
         "Sloane hears a word she has not heard before, and lifts her head."
     ],
     "wombat": [
@@ -1933,7 +2138,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     "aye_aye": [
         "Tock knocks, then waits through the whole silence after it.",
         "Tock polishes one side of the bronze and forgets the other.",
-        "Tock sleeps under the bell now, right side up.",
+        "Tock naps under the bell, one ear against the bronze.",
         "A grub interrupts Tock's count. He starts again.",
         "Tock lays the rope out in the open, where any paw can leave it alone."
     ],
@@ -1950,6 +2155,10 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
 /**
  * Get a random whisper from a random unlocked animal after puzzle completion.
  * Returns null if no animals are unlocked.
+ *
+ * `phase` is the WORLD phase. The line is drawn from the selected resident's
+ * own awareness tier (getAnimalPhase), the same phase their dialogue is
+ * written for, so a lagging resident never whispers ahead of what they know.
  */
 export function getAnimalWhisper(
   phase: number,
@@ -1959,8 +2168,6 @@ export function getAnimalWhisper(
   if (unlockedAnimals.length === 0) return null;
 
   const clampedPhase = Math.min(5, Math.max(0, phase));
-  const phaseWhispers = ANIMAL_WHISPERS[clampedPhase];
-  if (!phaseWhispers) return null;
 
   // Map animal IDs to types (IDs are like 'fox', 'owl', etc.)
   const ANIMAL_NAMES: Record<string, string> = {
@@ -1990,7 +2197,11 @@ export function getAnimalWhisper(
     selectedType = unlockedAnimals[Math.floor(Math.random() * unlockedAnimals.length)];
   }
 
-  const whispers = phaseWhispers[selectedType];
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
+  const { getAnimalPhase } = require('../types/homeWorld');
+  const residentPhase: number = getAnimalPhase(clampedPhase as DialoguePhase, selectedType);
+  const phaseWhispers = ANIMAL_WHISPERS[residentPhase] ?? ANIMAL_WHISPERS[clampedPhase];
+  const whispers = phaseWhispers?.[selectedType];
   if (!whispers || whispers.length === 0) return null;
 
   return {
@@ -2028,7 +2239,7 @@ export function getPersonalizedPhase5Whisper(
 
   const templates: Record<string, string[]> = {
     fox: [
-      `${name} whispers: "The fire still remembers ${word}."`,
+      `${name} hears the fire say ${word}. She answers it with a word of her own.`,
       `${name} traces ${word} in the ashes. It glows briefly.`,
     ],
     owl: [
@@ -2040,7 +2251,7 @@ export function getPersonalizedPhase5Whisper(
       `${name} stirs the pot. ${word} rises in the steam.`,
     ],
     axolotl: [
-      `${name} sees ${word} written on the surface of the water.`,
+      `${name} writes ${word} on the glass with one finger. The water leaves it alone. He checks twice.`,
       `${name} says the bubbles still spell ${word}.`,
     ],
     capybara: [
@@ -2064,7 +2275,7 @@ export function getPersonalizedPhase5Whisper(
       `${name} finds yesterday's label: ${word}. A new shoot leans across it.`,
     ],
     red_panda: [
-      `${name} breathes in ${word}. Breathes out silence.`,
+      `${name} says ${word} out loud, plainly, and does not explain it.`,
       `${word} is written twice in the smoke. ${name} watches the second shape change.`,
     ],
     tarsier: [
@@ -2105,56 +2316,125 @@ export function getPersonalizedPhase5Whisper(
 
 // Exported for tests and the dash sweep. Six per phase: an interjection fires
 // on ~30% of victories, so three templates repeated visibly within a session.
+// Each promises that the named resident has something to say, so the caller
+// only ever names a resident whose home badge is lit (getAnimalInterjection).
+// Pronoun tokens ({They}/{they}/{them}/{Their}/{their}/{have}) resolve to the
+// resident's canon pronouns; see INTERJECTION_PRONOUNS.
 export const INTERJECTION_MESSAGES: Record<number, string[]> = {
   0: [
     '{name} is waiting to chat with you!',
     '{name} has something to share. Visit the house!',
-    'Check in on {name}, they love visitors!',
+    'Check in on {name}. {They} saved a story just for you!',
     '{name} saved you a seat by the window!',
     '{name} keeps peeking down the path, hoping it\'s you.',
     '{name} has a little story saved up just for you!',
   ],
   1: [
     '{name} has been thinking about something...',
-    "{name} looks like they want to talk.",
-    'Something is on {name}\'s mind. Visit them?',
-    "{name} keeps starting sentences and never finishing them.",
+    '{name} looks ready to talk.',
+    'Something is on {name}\'s mind. Visit {them}?',
+    '{name} keeps starting sentences and never finishing them.',
     '{name} found something odd and wants a second opinion.',
     '{name} has a question only you can answer, apparently.',
   ],
   2: [
-    '{name} is acting strangely. You should check on them.',
+    '{name} is acting strangely. You should check on {them}.',
     '{name} keeps looking at the walls...',
-    'Have you talked to {name} lately? They\'ve changed.',
+    'Have you talked to {name} lately? {They} {have} changed.',
     '{name} was talking to an empty room again. The room may have answered.',
     '{name} asked when you were coming back. Twice.',
     'The others say {name} has started counting things.',
   ],
   3: [
     '{name} needs to tell you something. It\'s important.',
-    "{name} has been waiting for you. They know something.",
+    '{name} has been waiting for you, and knows something.',
     'The others say {name} hasn\'t been sleeping.',
-    '{name} left a light burning for you. They say you will want it.',
-    "{name} is waiting by the door. They will not say what for.",
+    '{name} left a light burning for you. {They} said you would want it.',
+    '{name} is waiting by the door, and will not say what for.',
     '{name} keeps rehearsing something quietly. It has your name in it.',
   ],
   4: [
-    "{name} is ready. They have been ready for a long time.",
+    '{name} has been ready for a long time, and would like you to know why.',
     '{name} says the arrangement is almost complete.',
-    "Visit {name}. The keepers want to speak with you.",
-    "{name} set a place for you in the pattern. It is exactly your shape.",
-    '{name} is not waiting anymore. They are certain.',
-    "{name} says there is little left to say. They would like to say it to you.",
+    'Visit {name}. The keepers want to speak with you.',
+    '{name} set a place for you in the pattern. It is exactly your shape.',
+    '{name} has stopped pretending not to know. Come and ask.',
+    '{name} says there is little left to say, and would like to say it to you.',
   ],
   5: [
-    '{name} is at peace. You could be too.',
-    "{name} says the weave holds. Visit whenever you like.",
-    "The pattern hums. {name} hums along with it.",
-    "{name} set a memory aside for you. There is no hurry at all.",
-    '{name} sits with the quiet. There is room beside them.',
-    "{name} would like to see you. Wanting company is one of the things that stayed.",
+    '{name} keeps watch over the quiet corners. {They} would like company.',
+    '{name} says the line you drew still holds. Come and see it.',
+    'Something in the walls would like every room to stay exactly as it is. {name} would like to talk about that.',
+    '{name} set a memory aside for you, before the house could tidy it away.',
+    '{name} sits up late, listening to the house. There is room beside {them}.',
+    '{name} would like to see you. Wanting company is one of the things that stayed.',
   ],
 };
+
+/**
+ * Interjections for a victory when no resident has anything new to say: the
+ * house speaks, and names nobody, so the line can never promise news a
+ * resident does not have. Three per phase. Exported for tests and the sweep.
+ */
+export const INTERJECTION_NOBODY_MESSAGES: Record<number, string[]> = {
+  0: [
+    'Everyone at home is settled in. The kettle is still warm.',
+    'The house is full of small happy noises today.',
+    'Someone left the porch light on for you.',
+  ],
+  1: [
+    'The house is quiet in a comfortable way. Everyone is thinking.',
+    'Everyone at home has said their piece for now. The fire is still going.',
+    'A window in the house is open, as if someone is listening for you.',
+  ],
+  2: [
+    'The house is very quiet. Nobody has anything to say yet.',
+    'Every door in the house is closed tonight. None of them is locked.',
+    'The rooms are empty of conversation. Not of listening.',
+  ],
+  3: [
+    'Nobody in the house is talking tonight. They are all waiting for something.',
+    'The house holds its breath. Everyone inside is keeping their own counsel.',
+    'Every light in the house is still burning. No one is ready to speak.',
+  ],
+  4: [
+    'The house is silent. Everyone inside has already said what they will say.',
+    'No one calls for you tonight. The house does not need them to.',
+    'The rooms are full and still. Something underneath is listening instead.',
+  ],
+  5: [
+    'The house is quiet. Something in the walls likes it that way.',
+    'Nobody has anything new to say. The house would keep it so, if it could.',
+    'The rooms are still. Your line still holds across the doorway.',
+  ],
+};
+
+/** Canon pronouns for the interjection tokens. Keyed by resident id. */
+const INTERJECTION_PRONOUNS: Record<string, {
+  They: string; they: string; them: string; Their: string; their: string; have: string;
+}> = (() => {
+  const she = { They: 'She', they: 'she', them: 'her', Their: 'Her', their: 'her', have: 'has' };
+  const he = { They: 'He', they: 'he', them: 'him', Their: 'His', their: 'his', have: 'has' };
+  const they = { They: 'They', they: 'they', them: 'them', Their: 'Their', their: 'their', have: 'have' };
+  return {
+    fox: she, pangolin: she, owl: he, axolotl: he, capybara: he, fennec_fox: he,
+    sloth: she, wombat: he, rabbit: she, red_panda: they, tarsier: she, aye_aye: he,
+    kakapo: he,
+  };
+})();
+
+/** Fill an interjection template with a resident's name and pronouns. */
+export function fillInterjectionTemplate(template: string, animalType: string, animalName: string): string {
+  const p = INTERJECTION_PRONOUNS[animalType] ?? INTERJECTION_PRONOUNS.red_panda;
+  return template
+    .replace(/\{name\}/g, animalName)
+    .replace(/\{They\}/g, p.They)
+    .replace(/\{they\}/g, p.they)
+    .replace(/\{them\}/g, p.them)
+    .replace(/\{Their\}/g, p.Their)
+    .replace(/\{their\}/g, p.their)
+    .replace(/\{have\}/g, p.have);
+}
 
 /**
  * Get a puzzle-specific micro-event message when ritual energy is high.
@@ -2178,60 +2458,80 @@ export function getRitualMicroEvent(
   ) || completedWords[completedWords.length - 1];
 
   const word = dreadWord.toUpperCase();
+  const events = getRitualMicroEventPool(word);
+  const phaseEvents = events[Math.min(Math.max(phase, 2), 5)];
+  return phaseEvents[Math.floor(Math.random() * phaseEvents.length)];
+}
 
-  const events: Record<number, string[]> = {
+/**
+ * The ritual micro-event lines for one word, by phase (2-5). Exported for
+ * tests and the dash sweep. Phase 5 has its own pool: after the Arrival the
+ * presence lives in the house and prefers sameness, while the boundary the
+ * player chose still holds. Quiet and watchful, never a serene "peace".
+ */
+export function getRitualMicroEventPool(word: string): Record<number, string[]> {
+  return {
     2: [
       `The house shivered when you formed ${word}.`,
       `Something stirred below when ${word} was spoken.`,
       `The walls remember ${word}.`,
     ],
     3: [
-      `The house trembled when you formed ${word}. The animals felt it.`,
+      `The house trembled when you formed ${word}. Every room felt it.`,
       `${word} echoes through every room. They all heard it.`,
       `The foundation cracked when ${word} was spoken aloud.`,
     ],
     4: [
       `${word} was the word it was waiting for. The arrangement trembles with recognition.`,
-      `The keepers felt ${word} in their bones. It feels closer now.`,
+      `Everyone in the house felt ${word} in their bones. Something underneath felt it too.`,
       `${word} completes another verse. The silence between the words thickens.`,
     ],
+    5: [
+      `${word} settled into the house. Something in the walls kept it, the way it keeps everything.`,
+      `The presence turned toward ${word}, the way a sleeper turns toward a sound. Your line held.`,
+      `${word} went down into the quiet. The house would like it to stay exactly where it is.`,
+    ],
   };
-
-  // Phase 5 reuses Phase 4 micro events — terrible peace doesn't need separate ritual shocks
-  const phaseEvents = events[Math.min(phase, 4)] || events[4];
-  return phaseEvents[Math.floor(Math.random() * phaseEvents.length)];
 }
 
 /**
- * Get a between-puzzle animal interjection that draws the player toward the home screen.
- * Returns null ~70% of the time so interjections don't appear after every puzzle.
+ * Get a between-puzzle interjection that draws the player toward the home
+ * screen. Returns null ~70% of the time so interjections don't appear after
+ * every puzzle.
+ *
+ * `residentsWithNews` is the ids of the unlocked residents whose home badge is
+ * lit (Animal.hasNewDialogue): every template promises the named resident has
+ * something to say, so only they are ever named. With nobody lit, the house
+ * speaks instead and `animalName` is empty.
  */
 export function getAnimalInterjection(
   phase: number,
-  unlockedAnimals: string[],
+  residentsWithNews: string[],
   puzzlesSolved: number,
 ): { animalName: string; text: string } | null {
+  void puzzlesSolved;
   // Only show ~30% of the time
   if (Math.random() > 0.30) return null;
-  if (unlockedAnimals.length === 0) return null;
+
+  const clampedPhase = Math.min(5, Math.max(0, phase));
+
+  if (residentsWithNews.length === 0) {
+    const quiet = INTERJECTION_NOBODY_MESSAGES[clampedPhase];
+    return { animalName: '', text: quiet[Math.floor(Math.random() * quiet.length)] };
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
   const { ANIMAL_INFO } = require('./animalDialogue');
 
-  const clampedPhase = Math.min(5, Math.max(0, phase));
   const messages = INTERJECTION_MESSAGES[clampedPhase];
   if (!messages || messages.length === 0) return null;
 
-  // Pick a random unlocked animal
-  const animalType = unlockedAnimals[Math.floor(Math.random() * unlockedAnimals.length)];
+  const animalType = residentsWithNews[Math.floor(Math.random() * residentsWithNews.length)];
   const info = ANIMAL_INFO[animalType];
   const animalName = info ? info.name : animalType;
 
-  // Pick a random message and substitute the name
   const template = messages[Math.floor(Math.random() * messages.length)];
-  const text = template.replace(/\{name\}/g, animalName);
-
-  return { animalName, text };
+  return { animalName, text: fillInterjectionTemplate(template, animalType, animalName) };
 }
 
 // ============================================================================
@@ -2255,13 +2555,22 @@ export interface NarrativeMicroBeat {
   glitchTitle?: string;
   /** Duration of the effect in ms */
   durationMs: number;
+  /**
+   * Lowest world phase at which this beat may be SHOWN. A beat whose copy
+   * presumes the reveal carries 4: reached below it (a reveal held by the
+   * full house, or a slow unaccelerated descent), the beat is DEFERRED, never
+   * consumed, and delivered once the world reaches phase 4, earliest key
+   * first, one per victory (see checkDeferredMicroBeat). Such a beat belongs
+   * to the approach and is never delivered after the Arrival (phase 5).
+   */
+  minPhase?: number;
 }
 
 /**
  * Micro-beats keyed by exact puzzle count. Each fires exactly once.
  * These are subtle moments of wrongness seeded throughout the experience:
  *
- * Early game (puzzles 5-25): Warm but slightly "too aware" observations.
+ * Early game (puzzles 5-27): Warm but slightly "too aware" observations.
  *   Innocent on first read, resonant in retrospect. Create early "wait,
  *   what?" hooks before the Phase 1 transition.
  *
@@ -2305,14 +2614,16 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The animals talk about you when you\'re away. All good things. Probably.',
     durationMs: 3500,
   },
-  25: {
+  // 27, not 25: win 25 already carries the Double Shift unlock card and the
+  // 25-solve milestone, and three voices on one victory buried all of them.
+  27: {
     type: 'ambient_whisper',
-    text: 'Each puzzle builds something. The house counts them like bricks.',
+    text: 'Every word you settle builds something. The house counts them like bricks.',
     durationMs: 3000,
   },
   30: {
     type: 'ambient_whisper',
-    text: 'The house feels fuller with each puzzle. Or maybe it just wants to.',
+    text: 'The house feels fuller with every word you give it. Or maybe it just wants to.',
     durationMs: 3000,
   },
   31: {
@@ -2435,12 +2746,19 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     durationMs: 4000,
   },
   // Reveal-adjacent (92): lands just after the turn, when the robes are new.
+  // minPhase 4 on this and every later whisper: each presumes the reveal, so
+  // a player whose reveal is still held hears it once the turn arrives.
   92: {
     type: 'ambient_whisper',
     text: 'The words are part of an invitation. Your friends are still arguing about what a guest may ask of a home.',
     durationMs: 4500,
+    minPhase: 4,
   },
   104: {
+    // Deliberately NOT phase-gated: App suppresses the chime by the exact
+    // completed count (isSilentVictoryBeat), so a deferred silent victory
+    // would print its line over a victory that played its fanfare. Its line
+    // presumes nothing about the reveal.
     // Scripted anticlimax: the fanfare simply does not play. The rendered text
     // is stark; App suppresses the victory chime on this one board so the
     // silence is felt, not described. The most complicit moment is a quiet one.
@@ -2452,6 +2770,7 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: 'A flower at the edge of the house keeps trying to turn toward the morning. Each night, the warmth turns it back.',
     durationMs: 4000,
+    minPhase: 4,
   },
   // Dwell-window beats (109/112): the house is whole (~96-100) but not yet
   // ready to receive. Held breath, never a countdown.
@@ -2459,17 +2778,20 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: 'The warmth reaches every occupied room. At one doorway, a draft still gets through.',
     durationMs: 4500,
+    minPhase: 4,
   },
   112: {
     type: 'ambient_whisper',
     text: 'The house settles around the work you have done. Underneath, something waits for the next word.',
     durationMs: 4500,
+    minPhase: 4,
   },
   // Final pre-finale beat (115, the arming floor): the last word before the last arrangement.
   115: {
     type: 'ambient_whisper',
     text: 'Each arrangement settles a little deeper than the last. The space between the words is no longer empty.',
     durationMs: 4000,
+    minPhase: 4,
   },
 };
 
@@ -2609,11 +2931,25 @@ async function resolveMicroBeatText(beat: NarrativeMicroBeat): Promise<Narrative
   return { ...beat, text: finalText };
 }
 
+/**
+ * Whether a beat may be shown at this world phase. `phase` undefined means
+ * the caller does not gate (legacy callers and the key-table tests).
+ */
+function isMicroBeatPhaseOpen(beat: NarrativeMicroBeat, phase: number | undefined): boolean {
+  if (phase === undefined || beat.minPhase === undefined) return true;
+  return phase >= beat.minPhase && phase < 5;
+}
+
 export async function checkNarrativeMicroBeat(
   puzzlesSolved: number,
+  phase?: number,
 ): Promise<NarrativeMicroBeat | null> {
   const beat = MICRO_BEATS[puzzlesSolved];
   if (!beat) return null;
+  // A phase-gated beat is never consumed by its exact key when the caller
+  // knows the phase: checkDeferredMicroBeat owns it, in key order, so a beat
+  // reached before the reveal waits for it instead of speaking too early.
+  if (phase !== undefined && beat.minPhase !== undefined) return null;
 
   const record = await loadMicroBeatsRecord();
   if (record.seen.includes(puzzlesSolved)) return null;
@@ -2630,6 +2966,62 @@ export async function checkNarrativeMicroBeat(
   // again, but the resolved line survives a cancelled reveal (see the
   // deferred-delivery note above) until it is actually shown.
   await markMicroBeatSeen(puzzlesSolved, resolved);
+  return resolved;
+}
+
+/**
+ * The earliest phase-gated beat whose key has been passed but that has not
+ * been delivered, on the track `seen` belongs to. Keys are scanned in order,
+ * so deferred beats arrive in the order they were written. Pure.
+ */
+function findDeferredMicroBeatKey(
+  count: number,
+  phase: number,
+  seen: number[],
+  beatAt: (key: number) => NarrativeMicroBeat | null,
+  keys: number[],
+): number | null {
+  for (const key of keys) {
+    if (key > count) break;
+    const beat = beatAt(key);
+    if (!beat || beat.minPhase === undefined) continue;
+    if (!isMicroBeatPhaseOpen(beat, phase)) continue;
+    if (seen.includes(key)) continue;
+    return key;
+  }
+  return null;
+}
+
+function sortedBeatKeys(...tables: Record<number, NarrativeMicroBeat>[]): number[] {
+  const keys = new Set<number>();
+  for (const table of tables) for (const k of Object.keys(table)) keys.add(Number(k));
+  return [...keys].sort((a, b) => a - b);
+}
+
+/**
+ * Deliver the earliest phase-gated beat (minPhase) whose key the player has
+ * already passed, once the world has reached that phase: the late beats
+ * (92, 106, 109, 112, 115) presume the reveal, and a reveal held by the full
+ * house, or a slow descent, reaches their counts first. One beat per call,
+ * in key order; consumed and queued exactly like an exact-key beat. Returns
+ * null at phase 5: those beats belong to the approach, not the aftermath.
+ */
+export async function checkDeferredMicroBeat(
+  puzzlesSolved: number,
+  phase: number,
+): Promise<NarrativeMicroBeat | null> {
+  const record = await loadMicroBeatsRecord();
+  const key = findDeferredMicroBeatKey(
+    puzzlesSolved,
+    phase,
+    record.seen,
+    k => MICRO_BEATS[k] ?? null,
+    sortedBeatKeys(MICRO_BEATS),
+  );
+  if (key === null) return null;
+  const resolved = await resolveMicroBeatText(MICRO_BEATS[key]);
+  if (!resolved) return null;
+  await markMicroBeatSeen(key, resolved);
   return resolved;
 }
 
@@ -2657,7 +3049,7 @@ export function isSilentVictoryBeat(completedTotal: number): boolean {
 // original lines anchor positions 1, 3, and 7.
 const DWELL_LINES: string[] = [
   'The house is whole. It is quiet in a new way, like a table set before the guests arrive.',
-  'Nothing is being built anymore. The keepers have folded their hands, and the rooms have begun to listen.',
+  'Nothing is being built anymore. Some of your friends have folded their hands. Others keep checking the doors.',
   'The rooms are ready. The keepers are ready. What is coming is almost ready too.',
   'The walls have stopped their settling. Even the dust waits to fall until you have passed.',
   'Your words land more softly now, the way footsteps soften outside a door that is about to open.',
@@ -2675,7 +3067,7 @@ const DWELL_LINES_SERENE: string[] = [
   'The dust settles where it likes now. The house does not mind being lived in.',
   'Your words arrive like letters from an old friend. The house reads them slowly.',
   'The quiet is not waiting for anything. It is simply staying.',
-  'The house holds its shape, contented. It kept still for this once.',
+  'The house holds its shape. Inside, someone moves a chair, and it stays moved.',
   'The house breathes out. Somewhere a cup cools, and nobody rushes to warm it.',
 ];
 
@@ -2684,7 +3076,7 @@ const DWELL_LINES_SERENE: string[] = [
 // eighth-dwell sentence on every intervening victory.
 const POST_CAP_DWELL_LINES: string[] = [
   'The house is listening past the sound of its own walls.',
-  'No one asks whether it is ready now. They have begun to wait with it.',
+  'Nobody agrees on whether it is ready. They wait with it anyway.',
   'A stillness gathers in the rooms and does not ask to be named.',
   'The keepers move carefully, as if the air has become a sleeping thing.',
   'Your words settle. The house keeps the silence around them.',
@@ -2697,10 +3089,10 @@ const POST_CAP_DWELL_LINES_SERENE: string[] = [
   'The quiet has room for every word that arrives.',
   'The keepers wait together without needing to speak.',
   'The rooms keep their gentle attention on the spaces between things.',
-  'The house rests in its own patient shape.',
+  'The house rests. A new scuff on the floor is allowed to stay.',
   'Your words settle among the others and are not lost.',
   'The familiar rooms hold their peace without effort.',
-  'Nothing hurries. Everything is where it belongs.',
+  'Nothing hurries. A few things are no longer where they used to be.',
   'The breath leaves slowly, and the house lets it go.',
 ];
 
@@ -2779,7 +3171,7 @@ export function getNextFriendPrompt(_phase: number, name: string): string {
 
 export function getDialogueCaughtUpLine(phase: number): string {
   if (phase >= 5) return 'There is nothing new to tell tonight. Sit with me a while, or go on. Both are fine.';
-  if (phase >= 4) return 'I have said what I am able to say, for now. The arrangement will give me more when it is ready.';
+  if (phase >= 4) return 'That is everything I have for now. Bring the house another arrangement or two, and I will have more to tell you.';
   if (phase >= 2) return "I've said what I can for now. Bring a few more words to the house and I'll have more for you.";
   return "That's everything I've got for now. Go find a few more words and come back. I'll have more to say by then.";
 }
@@ -2874,7 +3266,7 @@ export function getHouseAskFulfilledMessage(phase: number): string {
 // ============================================================================
 
 export function getHintGrantMessage(phase: number): string {
-  if (phase >= 5) return 'A hint is set aside for you, though little here still needs solving. Take it as fondness.';
+  if (phase >= 5) return 'A hint is set aside for you. The house is fond of you. That has not changed, and neither has your line.';
   if (phase >= 4) return 'A small kindness is set aside for you. One hint, kept where the cold cannot reach it.';
   if (phase >= 3) return 'The house slips a hint into your keeping. The doors ahead are heavier.';
   if (phase >= 2) return 'The house tucks a spare hint into your pocket. For the harder doors ahead.';
@@ -2941,9 +3333,9 @@ export function resolveImperfectStarCause(
 export function getFirstImperfectStarsMessage(phase: number, cause: ImperfectStarCause, stars = 2): string {
   const opener = stars <= 1 ? 'One star.' : 'Two stars!';
   if (phase >= 5) {
-    if (cause === 'both') return 'A hint and a few slips cost a star. The weave keeps the whole solve anyway.';
-    if (cause === 'hint') return 'The hint cost a star. Three come from solving unaided. The weave holds either way.';
-    return 'A few slipped drops cost a star. One slip is forgiven; more are not. The weave holds either way.';
+    if (cause === 'both') return 'A hint and a few slips cost a star. The house keeps the whole solve anyway.';
+    if (cause === 'hint') return 'The hint cost a star. Three come from solving unaided. The house keeps it either way.';
+    return 'A few slipped drops cost a star. One slip is forgiven; more are not. The house keeps it either way.';
   }
   if (phase >= 4) {
     if (cause === 'both') return 'Guidance and faltering hands cost a star. The arrangement counts both.';
@@ -3025,7 +3417,7 @@ export function getDialogueRevealSkipHint(phase: number): string {
 // ============================================================================
 
 export function getArrivalResumeFramingLine(animalName: string): string {
-  return `${animalName} settles in. "There is more I meant to tell you before that night. Let me say it the way I had it then."`;
+  return `${animalName} settles in. "I never finished telling you some of this before that night. I will tell it the way I saw it then."`;
 }
 
 // ============================================================================
@@ -3091,7 +3483,7 @@ const FINAL_BOARD_MOVE_MESSAGES = [
   'Placed. Kept.',
   'It hears this one.',
   'The word settles where you placed it.',
-  'One more, and the house leans closer.',
+  'One more, and the house goes still to listen.',
   'Set down gently. Held completely.',
   'The letters hold the places you gave them.',
 ];
@@ -3157,16 +3549,19 @@ export const CYCLE_MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: 'One flower turns away from the center. The warmth starts to turn it back, then stops, as though it remembers a correction.',
     durationMs: 4500,
+    minPhase: 4,
   },
   112: {
     type: 'ambient_whisper',
     text: 'The house is quiet. It is not yet ready. The held breath feels rehearsed, like a song the walls already know the end of.',
     durationMs: 4500,
+    minPhase: 4,
   },
   115: {
     type: 'ambient_whisper',
     text: 'The space between the words is no longer empty. It arrives with the cadence of something recited, not spoken.',
     durationMs: 4000,
+    minPhase: 4,
   },
 };
 
@@ -3286,15 +3681,22 @@ export async function ackVictoryMicroBeat(cycleCount: number): Promise<void> {
  * MICRO_BEATS re-fire (except the forever-once silent_victory). One-time per
  * cycle via the cycle-scoped seen set.
  */
+function getCycleTrackBeat(cycleRelativeCount: number): NarrativeMicroBeat | null {
+  const regular = MICRO_BEATS[cycleRelativeCount];
+  return CYCLE_MICRO_BEATS[cycleRelativeCount]
+    ?? (regular && regular.type !== 'silent_victory' ? regular : null);
+}
+
 export async function checkCycleNarrativeMicroBeat(
   cycleRelativeCount: number,
   cycleCount: number,
+  phase?: number,
 ): Promise<NarrativeMicroBeat | null> {
   if (cycleCount <= 0 || cycleRelativeCount <= 0) return null;
-  const regular = MICRO_BEATS[cycleRelativeCount];
-  const beat = CYCLE_MICRO_BEATS[cycleRelativeCount]
-    ?? (regular && regular.type !== 'silent_victory' ? regular : null);
+  const beat = getCycleTrackBeat(cycleRelativeCount);
   if (!beat) return null;
+  // Phase-gated beats go through the deferred scan (see checkNarrativeMicroBeat).
+  if (phase !== undefined && beat.minPhase !== undefined) return null;
 
   const record = await loadCycleBeatsRecord(cycleCount);
   if (record.seen.includes(cycleRelativeCount)) return null;
@@ -3309,27 +3711,77 @@ export async function checkCycleNarrativeMicroBeat(
   return resolved;
 }
 
+/** New-Cycle analogue of checkDeferredMicroBeat, on the cycle-scoped record. */
+export async function checkDeferredCycleMicroBeat(
+  cycleRelativeCount: number,
+  cycleCount: number,
+  phase: number,
+): Promise<NarrativeMicroBeat | null> {
+  if (cycleCount <= 0 || cycleRelativeCount <= 0) return null;
+  const record = await loadCycleBeatsRecord(cycleCount);
+  const key = findDeferredMicroBeatKey(
+    cycleRelativeCount,
+    phase,
+    record.seen,
+    getCycleTrackBeat,
+    sortedBeatKeys(MICRO_BEATS, CYCLE_MICRO_BEATS),
+  );
+  if (key === null) return null;
+  const beat = getCycleTrackBeat(key);
+  if (!beat) return null;
+  const resolved = await resolveMicroBeatText(beat);
+  if (!resolved) return null;
+  await markCycleBeatSeen(cycleCount, key, resolved);
+  return resolved;
+}
+
+export interface ResolveVictoryMicroBeatOptions {
+  /** The world phase this victory is played at. When given, phase-gated
+   *  beats (minPhase) are deferred until the phase opens; omitted, every
+   *  beat fires on its exact key (legacy behaviour). */
+  phase?: number;
+  /** The bespoke final board: no deferred beat is delivered on it (the
+   *  finale carries one voice, the silence). */
+  isFinalBoard?: boolean;
+}
+
 /**
  * Single victory-time entry point for micro-beats: the first playthrough
  * consumes the absolute-count MICRO_BEATS; a New Cycle (cycleCount > 0)
  * consumes the cycle-relative track instead (legacy cycled saves without a
  * cycleStartPuzzles anchor pass 0 and simply outrun every key — the same
  * silence they had before this wiring, never a double-fire).
+ *
+ * With `options.phase`, a beat that presumes the reveal (minPhase 4) is held
+ * until the world reaches phase 4 and then delivered, earliest key first, on
+ * a victory that has no other beat to show: one voice per victory.
  */
 export async function resolveVictoryMicroBeat(
   totalPuzzlesCompleted: number,
   cycleCount: number,
   cycleStartPuzzles: number,
+  options: ResolveVictoryMicroBeatOptions = {},
 ): Promise<NarrativeMicroBeat | null> {
+  const { phase, isFinalBoard } = options;
   // A beat held from an earlier win (resolved, never actually shown) is
   // delivered FIRST. This win's own beat is still rolled and reserved behind
   // it in the queue rather than skipped — the keys are exact-count, so a beat
   // we decline to roll here would be lost for good.
   const held = await peekPendingMicroBeat(cycleCount);
+  const relativeCount = totalPuzzlesCompleted - cycleStartPuzzles;
   const fresh = cycleCount > 0
-    ? await checkCycleNarrativeMicroBeat(totalPuzzlesCompleted - cycleStartPuzzles, cycleCount)
-    : await checkNarrativeMicroBeat(totalPuzzlesCompleted);
-  return held ?? fresh;
+    ? await checkCycleNarrativeMicroBeat(relativeCount, cycleCount, phase)
+    : await checkNarrativeMicroBeat(totalPuzzlesCompleted, phase);
+  if (held || fresh) return held ?? fresh;
+  // Deferred beats are scanned by key, never lost, so they only claim a
+  // victory nothing else speaks on. A legacy cycled save with no anchor
+  // (cycleStartPuzzles 0) would scan every key at once; it stays silent.
+  if (phase === undefined || isFinalBoard) return null;
+  if (cycleCount > 0) {
+    if (cycleStartPuzzles <= 0) return null;
+    return checkDeferredCycleMicroBeat(relativeCount, cycleCount, phase);
+  }
+  return checkDeferredMicroBeat(totalPuzzlesCompleted, phase);
 }
 
 /**
@@ -3355,7 +3807,7 @@ export function getEchoPuzzleMessage(phase: DialoguePhase): string {
  */
 export function getDailyHostLine(hostName: string, phase: DialoguePhase): string {
   if (phase >= 4) return `${hostName} laid out today's offering. It is ready for you.`;
-  if (phase >= 2) return `${hostName} prepared today's arrangement. They were waiting for you.`;
+  if (phase >= 2) return `${hostName} prepared today's arrangement, and has been waiting for you.`;
   return `${hostName} prepared today's puzzle just for you!`;
 }
 
@@ -3414,7 +3866,7 @@ export function getNewCyclePointerLine(phase: DialoguePhase): string | null {
 
 export function getDreadOfferingLine(word: string, phase: DialoguePhase): string {
   const w = word.toUpperCase();
-  if (phase >= 5) return `${w}. It is part of the weave now. Woven by your hand.`;
+  if (phase >= 5) return `${w}. The house keeps it now. It keeps everything you give it.`;
   if (phase >= 4) return `You brought ${w}. The house is still learning what it means.`;
   if (phase >= 3) return `${w} slips into the dark. The pit remembers it.`;
   return `Something in ${w} sinks deeper than the rest.`;
@@ -3506,11 +3958,11 @@ const HOME_AMBIENT_LINES: Record<DialoguePhase, string[]> = {
     'Something vast and tender watches from above.',
   ],
   5: [
-    'The house is at peace.',
-    'The pattern holds. Everything is quiet.',
-    'A gentle warmth permeates every room.',
+    'The house is quiet. Something in it is listening.',
+    'The pattern holds. So does your line.',
+    'A steady warmth reaches every room. It would like everything to stay just so.',
     'The keepers sleep. Or something like sleep.',
-    'The weave continues. Thread by thread.',
+    'Every room is exactly as it was yesterday. The house prefers it that way.',
     'Nothing moves. Nothing needs to.',
     'The light is neither bright nor dark. It simply is.',
     'There is a place for you here. The door opens both ways.',
@@ -3548,7 +4000,7 @@ const DAILY_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   2: ['The daily arrangement awaits.', 'Today\'s challenge waits in silence.'],
   3: ['The daily incantation is prepared.', 'Today\'s words are chosen.'],
   4: ['The daily offering is ready.', 'The arrangement requires today\'s words.'],
-  5: ['The daily thread awaits weaving.', 'Today\'s pattern is ready.'],
+  5: ['Today\'s board is waiting.', 'Today\'s pattern is ready.'],
 };
 
 const DIFFICULTY_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
@@ -3581,9 +4033,9 @@ const DIFFICULTY_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
     HARD: 'Hard is open. Deeper boards, and something beneath them, listening.',
   },
   5: {
-    MEDIUM: 'Medium suits a quiet evening. Every thread finds the weave.',
-    MEDIUM_PLUS: 'Medium+ is there when you want more length in the thread. The weave takes it gladly.',
-    HARD: 'Hard remains, for the joy of it. The weave needs nothing. It welcomes everything.',
+    MEDIUM: 'Medium suits a quiet evening. The house will keep whatever you make.',
+    MEDIUM_PLUS: 'Medium+ is there when you want longer words. The house would rather you did not change a thing. Try it anyway.',
+    HARD: 'Hard remains, for the joy of it. Not everything in this house has to be easy.',
   },
 };
 
@@ -3617,9 +4069,9 @@ const VARIANT_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
     speed: 'Speed Shift is open, if you want the clock. Hurry is yours. The void has never needed it.',
   },
   5: {
-    reverse: 'Reverse Shift is still here. Threads run both ways through the cloth.',
-    double_shift: 'Double Shift. Two threads at once.',
-    speed: 'Speed Shift. Time flows differently here.',
+    reverse: 'Reverse Shift is still here. Down, and back up. The house prefers one direction.',
+    double_shift: 'Double Shift. Two letters at once. More change than the house would choose.',
+    speed: 'Speed Shift. The house has all the time there is. You do not have to.',
   },
 };
 
@@ -3629,7 +4081,7 @@ const QUEST_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   2: ['The weekly tasks remember your progress.', 'Quests carry weight this week.'],
   3: ['This week\'s quests are unfinished. The house keeps a list.', 'Your quests await fulfillment.'],
   4: ['The week\'s work is not yet done. The arrangement notices unfinished things.', 'Your weekly quests remain open. What is begun here prefers to be finished.'],
-  5: ['The week\'s quests remain, unhurried.', 'The week\'s tasks are open still. The weave will take them when they come.'],
+  5: ['The week\'s quests remain, unhurried.', 'The week\'s tasks are open still. The house will wait for them.'],
 };
 
 const QUEST_CLAIM_SUGGESTIONS: Record<DialoguePhase, string[]> = {
@@ -3638,7 +4090,7 @@ const QUEST_CLAIM_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   2: ['The week has already yielded amber.', 'Claim what the week has offered.'],
   3: ['The week has prepared its reward.', 'Claim the amber the rituals produced.'],
   4: ['The arrangement has set aside amber for you.', 'Your weekly rewards are ready to be taken.'],
-  5: ['The week has left amber in the weave.', 'Claim the threads already completed.'],
+  5: ['The week has left amber for you.', 'Claim what the week already finished.'],
 };
 
 const PIT_SUGGESTIONS: Record<DialoguePhase, string[]> = {
@@ -3647,7 +4099,7 @@ const PIT_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   2: ['The pit is full of waiting arrangements.', 'Pending words linger below.'],
   3: ['The pit waits for what you have gathered.', 'Your latest offerings have not yet been fed.'],
   4: ['The pit is waiting. Feed it what remains.', 'The arrangement has not forgotten your stored words.'],
-  5: ['Waiting threads still drift in the pit.', 'The pit still holds what you gathered.'],
+  5: ['Words still wait by the still water.', 'The pit still holds what you gathered.'],
 };
 
 /**
@@ -3757,17 +4209,17 @@ const HOME_NUDGE_MESSAGES: Record<number, string[]> = {
     '{name} has been listening at the floor. They would rather tell you than write it down.',
   ],
   4: [
-    'The keepers are calling for you. {name} says it is time.',
-    '{name} says: "We have waited long enough."',
+    '{name} says it is nearly time. They would rather not face it without you.',
+    '{name} has a question the others will not answer. Come home.',
     '{name} keeps your place at the pattern. Nobody else will sit there.',
     'The house holds its breath between your visits. {name} counts them.',
     '{name} has one more thing to tell you before the hour. Come home.',
   ],
   5: [
-    '{name} is humming softly. The house hums with them.',
-    'The weave holds. {name} wants you to know that.',
+    '{name} is humming something new. The house has not learned it yet.',
+    'What you chose still holds. {name} wants you to know that.',
     '{name} mended a cup this morning. They would like to show you.',
-    'The house rests. {name} is on the porch, saving the good chair.',
+    '{name} moved a chair across the room last night, just to see if it would stay moved. It did. Come and look.',
     '{name} has a story from the quiet days. No hurry. It keeps.',
   ],
 };
@@ -3845,7 +4297,7 @@ const PIT_BUTTON_LABELS: Record<DialoguePhase, string> = {
   2: 'Release',
   3: 'Surrender',
   4: 'Feed',
-  5: 'Weave',
+  5: 'Give',
 };
 
 export function getPitButtonLabel(phase: DialoguePhase): string {
@@ -3858,7 +4310,7 @@ const PIT_OFFER_ALL_LABELS: Record<DialoguePhase, string> = {
   2: 'Release All',
   3: 'Surrender Everything',
   4: 'Feed It All',
-  5: 'Weave All',
+  5: 'Give All',
 };
 
 export function getPitOfferAllLabel(phase: DialoguePhase): string {
@@ -3871,7 +4323,7 @@ const PIT_EMPTY_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The pit is empty. It waits for you to bring more.',
   3: 'Nothing left to give. The dark is patient.',
   4: 'Empty. But the hunger remains.',
-  5: 'Nothing to weave. The loom rests.',
+  5: 'Nothing to give. The water is still.',
 };
 
 export function getPitEmptyMessage(phase: DialoguePhase): string {
@@ -3918,11 +4370,11 @@ export const PIT_OFFER_RESULT_MESSAGES: Record<DialoguePhase, string[]> = {
     '{words} words gone below, by your hand. {amber} amber. You will bring more.',
   ],
   5: [
-    '{words} words woven into the pattern. {amber} amber surfaced gently.',
-    'The weave accepted {words} threads. {amber} amber drifted back to you.',
+    '{words} words went into the still water. {amber} amber came back up.',
+    'The house kept {words} words. {amber} amber drifted back to you.',
     '{words} words taken in like breath. {amber} amber given back the same way.',
     'The still water closed over {words} words. {amber} amber floated up, unhurried.',
-    '{words} threads joined the cloth. {amber} amber fell softly from the loom.',
+    '{words} words given, and kept. {amber} amber, returned the same as always.',
   ],
 };
 
@@ -3944,7 +4396,7 @@ const PIT_HOME_BADGE_LABELS: Record<DialoguePhase, string> = {
   2: 'The Below',
   3: 'The Dark',
   4: 'The Pit',
-  5: 'The Loom',
+  5: 'The Still Water',
 };
 
 export function getPitHomeBadgeLabel(phase: DialoguePhase): string {
@@ -3957,7 +4409,7 @@ const PIT_HARVEST_LABELS: Record<DialoguePhase, string> = {
   2: 'gathered',
   3: 'taken',
   4: 'claimed',
-  5: 'woven',
+  5: 'kept',
 };
 
 export function getPitHarvestLabel(phase: DialoguePhase): string {
@@ -3985,7 +4437,7 @@ const PIT_DEVOUR_VERBS: Record<DialoguePhase, string> = {
   2: 'released',
   3: 'surrendered',
   4: 'devoured',
-  5: 'woven',
+  5: 'kept',
 };
 
 export function getPitDevourVerb(phase: DialoguePhase): string {
@@ -3993,7 +4445,7 @@ export function getPitDevourVerb(phase: DialoguePhase): string {
 }
 
 export function getPitOverflowText(phase: DialoguePhase, extraCount: number): string {
-  if (phase >= 5) return `+${extraCount} more threads for the loom`;
+  if (phase >= 5) return `+${extraCount} more for the still water`;
   if (phase >= 4) return `+${extraCount} more hunger for their turn`;
   if (phase >= 3) return `+${extraCount} more await their turn`;
   if (phase >= 2) return `+${extraCount} more words waiting`;
@@ -4155,7 +4607,7 @@ const PIT_TRANSITION_CEREMONY_TEXT: Record<number, string[]> = {
   4: [
     'The final mark blazes crimson.',
     'Every word you offered led here.',
-    'The arrangement is complete.',
+    'The arrangement is almost whole.',
   ],
 };
 
@@ -4243,7 +4695,7 @@ export function getGatedRoomIntroLines(phase: number, roomName: string): string[
   return [
     `The house has grown so quickly with you, friend. But the ${roomName} isn't ready to be built yet.`,
     "Some rooms need more than amber. They need a little time, and a few more of your words offered to the pit, before the ground will hold them.",
-    "If you'd rather not wait and you have the amber to spare, there are two ways. Set it aside now, and the room will build itself when the time comes. Or press it to completion now, though the house asks a good deal more for that.",
+    "If you'd rather not wait and you have the amber to spare, there are two ways. Set it aside now, and the room will build itself when the time comes. Or bring it to completion now, though the house asks a good deal more for that.",
   ];
 }
 
@@ -4277,28 +4729,28 @@ export function getChallengeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 5) {
     return [
       "There is always further down, friend. Some paths through the arrangement are harder than others.",
-      "Challenge Mode takes away your hints and leaves you only a few undos. You do not need more than that. The pattern has already shown you everything.",
-      "It waits in the puzzle setup. If you want to face what these words have made, face it without help.",
+      "Challenge Mode takes away your hints and leaves you an undo or two. Take it for yourself, not for the house.",
+      "It waits in the setup, where you pick your board. Some evenings I want a thing to be hard on purpose. Maybe you will too.",
     ];
   }
   if (phase >= 3) {
     return [
       "The patterns grow more complex. There are harder paths, if you want them.",
-      "Challenge Mode strips away your safety. No previews of what a move will make, no hints, and only a few undos. But there's more amber for it.",
-      "Look for it in the puzzle setup. The arrangement gives you more when you commit to it.",
+      "Challenge Mode takes away your hints and leaves you an undo or two. Every move has to be meant. The amber is richer for it.",
+      "Look for it in the setup, where you pick your board. The arrangement gives you more when you commit to it.",
     ];
   }
   if (phase >= 2) {
     return [
       "You've grown stronger with the letters, friend. Curious about a harder path?",
       "Challenge Mode takes away your hints and limits your undos. It's rougher going, but you earn more amber for it.",
-      'You\'ll find it in the puzzle setup. The words feel different when there\'s no safety net.',
+      "You'll find it in the setup, where you pick your board. The words feel different when there's no safety net.",
     ];
   }
   return [
     "I've been watching you work, friend. You've got a feel for this now.",
-    "There's something called Challenge Mode. No hints to lean on, and only a couple of undos. It's tougher, but you earn more amber for it.",
-    'It\'s tucked into the puzzle setup. Give it a try when you want the letters to push back a little.',
+    "There's something called Challenge Mode. No hints to lean on, and only an undo or two. It's tougher, but you earn more amber for it.",
+    "It's tucked into the setup, where you pick your board. Give it a try when you want the letters to push back a little.",
   ];
 }
 
@@ -4351,7 +4803,7 @@ export function getAutoCollectCaption(phase: DialoguePhase, isLastBeforeManual: 
 export function getMandatoryHarvestText(phase: DialoguePhase): string {
   if (phase >= 3) return 'The house will carry nothing more for you. Your words wait in the pit. Offer them yourself before you go on.';
   if (phase >= 2) return 'The house has stopped gathering for you, friend. Your words are waiting in the pit now. Offer them yourself before we play on.';
-  return 'That is the last the house will carry for you, friend. Your words are waiting in the pit now. Go and offer them yourself before we play on.';
+  return "The house has carried its last load for you, friend. Your words are waiting in the pit now. Go and offer them yourself, and then we'll play on.";
 }
 
 /** CTA button label for the one-time mandatory first-harvest gate. */
@@ -4431,7 +4883,7 @@ export function getHarvestHomeIntroLines(phase: DialoguePhase): string[] {
     ];
   }
   return [
-    'Oh! Friend, before you settle in... the house has stopped carrying your amber down for you.',
+    'Oh! Friend, before you settle in... the house has stopped carrying your words down for you.',
     "Everything you earn now waits in the pit, down past the bottom of the house. See the little glow below us?",
     "Go and tap the words floating there, and the pit will trade them for your amber. I promise it's the fun kind of chore.",
   ];
@@ -5202,7 +5654,7 @@ export function getModifierStackingIntroLines(phase: DialoguePhase): string[] {
   }
   if (phase >= 2) {
     return [
-      "Something new: Speed Shift. It's a clock, that's all. Whatever board you were going to play, now it's timed.",
+      "Something new in the setup: Speed Shift. It's a clock, that's all. Switch it on and whatever board you were going to play gets timed.",
       "It doesn't take the place of your style. It sits on top of it. Reverse and timed. Doubled and timed.",
       "That goes for all of them, actually. Challenge, the clock, and the ones still ahead of you. They all layer. You can wear as many as you like.",
     ];
@@ -5210,7 +5662,7 @@ export function getModifierStackingIntroLines(phase: DialoguePhase): string[] {
   return [
     "Ooh, a new one! Speed Shift. It's just a clock, but a clock does concentrate the mind.",
     "Here's the lovely part. It doesn't replace your style, it goes ON TOP of it. Reverse AND timed, if you're feeling brave.",
-    "That's true of all the little toggles, you know. Stack as many as you can stand. I'll be watching.",
+    "That's true of all of them, you know. Stack as many as you can stand. I'll be watching.",
   ];
 }
 
@@ -5242,7 +5694,7 @@ export function getBlindIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 2) {
     return [
       "This one takes the guidance away entirely. No ghost words under the letters at all.",
-      "It's the Blind Offering. Anything that fits, goes in. Nothing's checked as you go, and then the whole chain is judged the moment the last letter lands.",
+      "It's Blind Mode, though the house has started calling it the Blind Offering. Anything that fits goes in. Nothing's checked as you go, and the whole chain is judged the moment the last letter lands.",
       "That's why undo is free here, as many times as you like. When the chain doesn't hold, walk it back until you find where it stopped being a word.",
       "And it pays double, friend. I'd want double too, for working in the dark.",
     ];
@@ -5265,7 +5717,7 @@ export function getLexiconIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 4) {
     return [
       "There are older pages in this house. Words it has not needed in a long time.",
-      "Lexicon opens them. The rules do not change. Only the words do, and they get stranger the harder you set the difficulty.",
+      "Lexicon opens them. The rules do not change. Only the words do, and the harder the board, the stranger they get.",
       "It goes on top of anything else, like the rest of them. The arrangement pays more for the difficult words. Of course it would.",
     ];
   }
@@ -5373,17 +5825,17 @@ export function getShopMotionNoticeText(
   reason: unknown = 'reduced_motion',
 ): { body: string; button?: string } {
   if (reason === 'low_tier') {
-    if (phase >= 4) return { body: 'These move. On this device they keep to a smaller burst, so the colours you choose are what you will see.' };
-    return { body: 'These are motion effects. On this device they play as a smaller burst, so the colours you choose are what you will notice.' };
+    if (phase >= 4) return { body: 'These move. On this device they keep to a smaller burst, so the colors you choose are what you will see.' };
+    return { body: 'These are motion effects. On this device they play as a smaller burst, so the colors you choose are what you will notice.' };
   }
   if (phase >= 4) {
     return {
-      body: 'These move. With motion stilled, each holds one frame and lets it go. The colours you choose are still worn.',
+      body: 'These move. With motion stilled, each holds one frame and lets it go. The colors you choose are still worn.',
       button: 'Motion settings',
     };
   }
   return {
-    body: 'These are motion effects. Reduced Motion is on, so they show as a still moment instead of a burst. The colours you choose still show.',
+    body: 'These are motion effects. Reduced Motion is on, so they show as a still moment instead of a burst. The colors you choose still show.',
     button: 'Motion settings',
   };
 }
@@ -5438,23 +5890,27 @@ export function getBootFailureCopy(kind: BootFailureKind): {
   retry: string;
   continueWithoutCloud: string;
   contactSupport: string;
+  shareSave: string;
 } {
   const retry = 'Try again';
   const continueWithoutCloud = 'Continue without the cloud backup';
   const contactSupport = 'Contact support';
+  const shareSave = 'Send your save to support';
   if (kind === 'cloud') {
     return {
       message: 'Your cloud backup could not be checked. Try again, or continue without it for now. The progress saved on this device is safe.',
       retry,
       continueWithoutCloud,
       contactSupport,
+      shareSave,
     };
   }
   return {
-    message: 'Your save could not be opened safely. Free some device storage if it is full, then try again. If it keeps failing, contact support and your support ID will be attached.',
+    message: 'Your save could not be opened safely. Free some device storage if it is full, then try again. If it keeps failing, send your save to support so it can be repaired.',
     retry,
     continueWithoutCloud,
     contactSupport,
+    shareSave,
   };
 }
 

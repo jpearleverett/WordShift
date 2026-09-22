@@ -43,6 +43,9 @@ import {
   markJournalIntroSeen,
   setSurpriseRng,
   markPostRevelation,
+  hasArrivalBeenPresented,
+  getPendingCeremonies,
+  acknowledgeCeremony,
   isPostRevelation,
   recordPhase4Dwell,
   getPhase4DwellCount,
@@ -1197,6 +1200,18 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     const progress = await getFullProgress();
     expect(progress.finalPuzzleCompleted).toBe(true);
     expect(progress.finaleArmed).toBe(false);
+  });
+
+  test('the board after the Arrival presents as phase 5 only once the Arrival ceremony is acknowledged', async () => {
+    expect(await hasArrivalBeenPresented()).toBe(false);
+    await markFinalPuzzleCompleted();
+    // Arrival still queued: the final board's own victory is untouched.
+    expect(await hasArrivalBeenPresented()).toBe(false);
+    const arrival = (await getPendingCeremonies()).find(entry => entry.kind === 'arrival')!;
+    await acknowledgeCeremony(arrival.id);
+    expect(await hasArrivalBeenPresented()).toBe(true);
+    // Presentation only: the durable post-revelation pin still waits for the next win.
+    expect((await getFullProgress()).postRevelation).not.toBe(true);
   });
 
   test('armFinale is a no-op once the final puzzle is completed', async () => {

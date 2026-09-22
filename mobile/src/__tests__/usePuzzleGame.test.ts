@@ -103,6 +103,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getHintMessage: jest.fn((_l: string, _w: string, _p: number) => 'Hint: move letter'),
   getHintFallback: jest.fn(() => 'Try undoing!'),
   getOutOfHintsMessage: jest.fn((_p: number) => 'Out of hints!'),
+  getSpeedRescueResumeMessage: jest.fn((_p: number) => 'Extra time!'),
   getLoadingMessage: jest.fn(() => 'Loading...'),
   getStartMessage: jest.fn(() => 'Tap a tile to begin!'),
   getInvalidWordMessage: jest.fn((word: string, _p: number) => `${word} isn't a word!`),

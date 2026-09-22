@@ -1073,14 +1073,8 @@ function drawZ(cv, cx, cy, size, th, color, alpha = 1) {
   savePNG(path.join(UI, 'emote_pale_heart.png'), W, W, down2(cv, W, W));
 }
 
-// emote_sleep.png — three ascending Z's (drowsy / at rest)
-{
-  const W = 128, cv = C(W * 2, W * 2), c = W;
-  const zs = [[c - 46, c + 62, 56, '#4FA8E8'], [c + 6, c + 6, 78, '#5AB0EE'], [c + 66, c - 66, 102, '#7EC7F5']];
-  for (const [x, y, s] of zs) drawZ(cv, x, y, s, s * 0.34, '#274A5E');  // ink
-  for (const [x, y, s, body] of zs) drawZ(cv, x, y, s, s * 0.24, body); // body
-  savePNG(path.join(UI, 'emote_sleep.png'), W, W, down2(cv, W, W));
-}
+// emote_sleep.png is no longer drawn: nothing requires it (the sloth's doze
+// uses the SleepingZs component), and a regenerated copy would ship unused.
 
 // ------------------------- Phase-mood icons (256 sq) -------------------------
 
