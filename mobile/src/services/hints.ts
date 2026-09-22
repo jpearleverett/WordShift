@@ -151,8 +151,10 @@ async function persistSpend(previous: HintState, spent: HintState): Promise<void
   } catch (error) {
     // The journal is on disk: recovery will apply this debit, keep it.
     if (error instanceof StorageRecoveryRequiredError) return;
-    // A failed debit must not erase every remaining paid hint. Roll back only
-    // this exact optimistic state; a later spend/grant/restore owns its mirror.
+    // A failed debit restores availability without discarding the other paid
+    // hints. Roll back only this exact optimistic state: because writes are
+    // queued, a later grant has not run yet (or already includes this state),
+    // so a rollback can never erase a newer grant.
     if (cache === spent) {
       cache = previous;
       mirror(previous);

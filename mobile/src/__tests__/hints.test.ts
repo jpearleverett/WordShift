@@ -186,5 +186,6 @@ describe('hint debit and grant ordering (GP-C)', () => {
       (AsyncStorage.setItem as jest.Mock).mockImplementation(original);
     }
     expect(getHintBalanceSync()).toBe(start);
+    expect(JSON.parse((await AsyncStorage.getItem('wordshift_hints'))!).balance).toBe(start);
   });
 });
