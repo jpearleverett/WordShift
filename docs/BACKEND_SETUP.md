@@ -11,9 +11,21 @@ no retention job or provider dashboard was executed here.
 > retention) are **applied to the hosted project**: a read-only probe with the
 > shipped publishable key on 2026-09-14 found every v2 RPC deployed, the
 > operator RPCs denied to `anon`, the legacy save RPCs revoked and every table
-> denied to `anon`. The one migration still open is
-> [`rate_limits_v1.sql`](supabase/rate_limits_v1.sql) (request budgets, daily
-> score plausibility, cohort purge), added 2026-09-14 and rehearsed locally only.
+> denied to `anon`. [`rate_limits_v1.sql`](supabase/rate_limits_v1.sql)
+> (request budgets, daily score plausibility, cohort purge) was applied by the
+> owner on 2026-09-15 (see section 1).
+>
+> **Pending owner application (added 2026-09-22, rehearsed locally only):**
+> [`save_and_board_limits_v1.sql`](supabase/save_and_board_limits_v1.sql),
+> [`analytics_views_v1.sql`](supabase/analytics_views_v1.sql) and
+> [`event_retention_v2.sql`](supabase/event_retention_v2.sql), files 9 to 11
+> below. They come from the
+> [2026-09-22 launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-22.md)
+> (BO-1, BO-3, BO-4, BO-7). All three are backward compatible with every
+> shipped client: the matching client changes (the install id on the word
+> counter, the season-pass premium unlock logged as its own event) ride the
+> current build, app **1.4.5** / Android versionCode **110**, but neither is
+> required by the SQL.
 
 The current `mobile/app.json` has Supabase credentials and a Sentry DSN, so these
 services are enabled when reachable; `telemetryEndpoint` is blank and analytics
@@ -65,14 +77,65 @@ For a new project, apply the following as `postgres`, in order:
 7. [`event_retention.sql`](supabase/event_retention.sql).
 8. [`rate_limits_v1.sql`](supabase/rate_limits_v1.sql) (per-install request
    budgets, daily score plausibility, legacy daily RPC revocation, cohort purge).
+9. [`save_and_board_limits_v1.sql`](supabase/save_and_board_limits_v1.sql)
+   (budgets on the `upsert_save_v2` create path; a Daily entrant must have a
+   linked backup; Daily floor raised to 2,000 ms per row, 5,000 ms minimum).
+10. [`analytics_views_v1.sql`](supabase/analytics_views_v1.sql) (service-role
+    rollout views: retention cohorts, FTUE funnel, `phase_reached`, purchase
+    funnel; see [analytics delivery](ANALYTICS_DELIVERY.md#rollout-views-and-kill-criteria)).
+11. [`event_retention_v2.sql`](supabase/event_retention_v2.sql) (raw events kept
+    180 days, a permanent daily count rollup written before pruning; the
+    existing cron job picks it up with no re-scheduling).
 
 For the existing WordShift project, skip the base schema and run
 `psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f docs/supabase/apply_upgrade.sql`,
-or run files 2–8 above in the dashboard SQL editor (every file is transactional
-and rerunnable, so re-running the already-applied 2 to 7 is harmless; only file
-8 changes anything on the hosted project today). Once Supabase Cron is enabled,
-apply [`schedule_event_retention.sql`](supabase/schedule_event_retention.sql) and
-record a successful scheduled run.
+or run files 2–11 above in the dashboard SQL editor, in order (every file is
+transactional and rerunnable, so re-running the already-applied 2 to 8 is
+harmless; only files 9 to 11 change anything on the hosted project today).
+**Order matters on any partial re-run:** files 9 and 11 replace functions that
+files 8 and 7 define, so re-running `rate_limits_v1.sql` or
+`event_retention.sql` on its own reverts them; re-run 9 to 11 afterwards. The
+retention cron job was scheduled on 2026-09-15 and calls
+`prune_expired_events(10000)`, which file 11 replaces in place, so do NOT re-run
+[`schedule_event_retention.sql`](supabase/schedule_event_retention.sql) for it
+(its comments and overdue query still describe the 24-month window).
+
+### Verifying files 9 to 11 (read-only)
+
+Run as `postgres` in the SQL editor after applying. Nothing below writes:
+
+```sql
+-- Exactly one overload of each replaced function (an extra one makes
+-- PostgREST answer 300 "ambiguous").
+select proname, count(*) from pg_proc
+where pronamespace = 'public'::regnamespace
+  and proname in ('upsert_save_v2','daily_owner_has_activity','daily_time_floor_ms',
+                  'prune_expired_events','rollup_event_days','bump_words_offered')
+group by proname;                                   -- every count = 1
+select public.daily_time_floor_ms('2026-09-07');    -- Monday: 8000
+select public.daily_time_floor_ms('2026-09-05');    -- Saturday: 10000
+select pg_get_functiondef('public.daily_owner_has_activity(text)'::regprocedure)
+  not like '%public.events%' as events_clause_gone;  -- true
+select pg_get_functiondef('public.upsert_save_v2(text,integer,bigint,text,text,bigint,boolean,text,text)'::regprocedure)
+  like '%save_create_addr%' as create_budget_live;   -- true
+-- Private views: anon/authenticated must see nothing.
+select c.relname, has_table_privilege('anon', c.oid, 'SELECT') as anon_select
+from pg_class c where c.relnamespace = 'public'::regnamespace
+  and c.relname like 'analytics_%';                  -- every anon_select = false
+select * from public.analytics_retention_cohorts order by cohort_day desc limit 5;
+-- After the next hourly cron run (it rolls up, then prunes):
+select * from public.analytics_rollup_state;         -- last_rolled_day = yesterday (UTC) once caught up
+select status, start_time, return_message from cron.job_run_details
+where jobid in (select jobid from cron.job where jobname = 'wordshift-event-retention')
+order by start_time desc limit 3;
+select min(received_at) as oldest_event,
+  count(*) filter (where received_at < now() - interval '180 days') as overdue
+from public.events;                                  -- overdue falls to 0 as the backlog drains
+```
+
+The anonymous probe below still applies unchanged: every client RPC keeps its
+signature, and `upsert_save_v2` with an invalid owner still answers
+`{"status":"unavailable"}` before any budget or write.
 
 Do not re-run the base script alone after upgrading: it would re-enable weak
 legacy save RPCs. Rehearse the sequence and permissions in a disposable project;
@@ -111,14 +174,22 @@ model:
   Private support/deletion/retention routines are operator-only. Client RPCs
   return the caller's authorized data or aggregates:
   - `get_save_v2(p_owner)` / `upsert_save_v2(...)`
-    — cloud save, one row per capability, 1 MB payload cap.
+    — cloud save, one row per capability, 1 MB payload cap. With
+    `save_and_board_limits_v1.sql`, CREATING a new owner row is budgeted per
+    hour: 20 per install id, 300 and ~120 MB of payload per client address, or
+    5,000 across all callers when no address header arrives. Updates to an
+    existing row are never charged.
   - `submit_daily_score_v2(...)` — upserts only the caller's `(owner, date, board_version)` row,
     with hard bounds (time ≤ 24 h, stars 0–3, hints 0–50, handle ≤ 24 chars)
     so a poisoned client can't submit absurd scores. With `rate_limits_v1.sql`
     it also refuses implausible results (time under 3,000 ms or under 1,500 ms
     per row of that weekday's Daily ramp; 3 stars with a hint, 2 stars with two),
     refuses owners the project has never seen (no linked backup, telemetry
-    upload or save), and budgets 30 submissions per owner per hour. The legacy
+    upload or save), and budgets 30 submissions per owner per hour. Once
+    `save_and_board_limits_v1.sql` is applied the floor is 5,000 ms or
+    2,000 ms per row, and a telemetry upload alone no longer makes an owner
+    known: it needs a linked cloud backup (every client uploads one at launch
+    and after each win, and the Daily unlocks at 8 wins). The legacy
     `submit_daily_score`/`daily_rank` names lose their `anon` grant; the v2
     functions still reach them internally for the `legacy_v1` cohort.
   - `daily_rank_v2(p_date, p_owner, p_board_version)` — aggregate-only standing
@@ -127,7 +198,8 @@ model:
     shipped board has 7 rows; 600 calls per hour per install id or client
     address) / `aggregate_proof(...)` — two anonymous global numbers, nothing
     per-player. The optional third `p_install_id` parameter defaults to null so
-    the shipped two-argument call is unchanged.
+    older two-argument clients are unchanged; from 1.4.5 the client sends it, so
+    the budget is per install instead of per (possibly carrier-shared) address.
 - **The `events` telemetry table is INSERT-only** for `anon` (no select). The
   current client calls `ingest_events_v2` to deduplicate stable event IDs without
   granting SELECT access. `rate_limits_v1.sql` budgets 240 calls and 6,000 rows
@@ -149,7 +221,9 @@ model:
   accepted. `rate_limits_v1.sql` bounds what one install id (or one client
   address, when the gateway forwards it) can write per hour, which turns an
   unbounded flood into a per-key ceiling; an attacker minting fresh install ids
-  is still only bounded by the address budget. The `events` table shares the
+  is still only bounded by the address budget, and the same holds for minting
+  fresh save owners once `save_and_board_limits_v1.sql` budgets the create path.
+  `event_retention_v2.sql` caps raw events at 180 days. The `events` table shares the
   project's disk with `saves`, so **turn on Supabase disk/usage alerts** and
   confirm the plan tier (free-tier disk exhaustion would stop cloud backups and
   recovery codes for everyone). Likewise `bump_words_offered` can be nudged

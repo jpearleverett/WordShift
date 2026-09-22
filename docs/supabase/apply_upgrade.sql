@@ -10,4 +10,7 @@
 \ir analytics_funnels.sql
 \ir event_retention.sql
 \ir rate_limits_v1.sql
+\ir save_and_board_limits_v1.sql
+\ir analytics_views_v1.sql
+\ir event_retention_v2.sql
 -- Scheduling remains separate because pg_cron must be enabled in this project.

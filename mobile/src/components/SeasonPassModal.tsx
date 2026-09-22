@@ -318,7 +318,13 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
       }
       hapticMedium();
       if (typeof spend.newBalance === 'number') onAmberChange(spend.newBalance);
-      logEvent({ type: 'iap_purchase', data: { productId: 'season_premium_amber', kind: 'season', amber: cost } });
+      // An amber spend, not a checkout: its own event keeps it out of the
+      // store -> purchase funnel (docs/supabase/analytics_views_v1.sql).
+      // The cast stands until eventLogger's EventType union lists the name.
+      logEvent({
+        type: 'season_premium_unlocked' as Parameters<typeof logEvent>[0]['type'],
+        data: { productId: 'season_premium_amber', kind: 'season', amber: cost },
+      });
       await refresh();
     } catch {
       showGameAlert('Save interrupted', 'Please try again. Any pending unlock will be recovered before continuing.');
