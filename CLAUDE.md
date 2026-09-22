@@ -145,6 +145,46 @@ A player report that lines needed re-reading turned out to be measurable, and th
 
 **Delivery.** `DIALOGUE_PAGE_CHAR_BUDGET` 420 -> **200** (8.4 rendered lines per page -> 4.8; pages of 7+ lines 80% -> 13%; reveal 5.6s -> 3.0s). The typewriter cadence is phase-aware (`getDialogueRevealCharMs`): **15 ms/char through Phase 1** (`DIALOGUE_REVEAL_CHAR_MS_BRIGHT`, the 3.0 s page above) and **22 ms from Phase 2** (`DIALOGUE_REVEAL_CHAR_MS`, where the slowness is the point). The bubble has always been tap-to-complete; the hook now exposes `revealSkipHint` (phase-aware copy from `getDialogueRevealSkipHint`, device-local key `wordshift_reveal_skip_hint_seen`), non-null only while the first reveal this device ever shows is in progress, for the host to render faintly under the bubble. `components/home/DialogueBody` renders **one sentence per block** with a 7dp gap so the eye has a landing point per thought; the splitter (`services/dialogueText.splitIntoSentences`) is presentation-only and **lossless** — re-joining with one space reproduces the input, including on a growing typewriter PREFIX (pinned by `dialogueBody.test.ts`), which matters because the dialogue flow compares `dialogueText` against choice prompts by equality and the gallery records the unsplit line. The bubble also steps up from the 15/25 chrome body to **16/27**, being the one long-form reading surface in the game.
 
+### Scene Dialogue Register Pass (2026-09-22)
+
+The 2026-09-02 pass repaired the house corpus and never reached the SCENE
+pools, so the story spine, the phase-3 choice scenes, the ceremony cinematics
+and the Fox cards kept the old flat register. Measured before: spine spoken
+lines at phases 0-3 were far below the corpus's 83-90%, the phase-3 choices
+sat at 16% file-wide, and `phaseTransitionReactions` was CONTRACTING at phases
+4-5, where the device says it must not.
+
+Three rules now govern every scene pool, pinned by `sceneDialogueRegister.test.ts`:
+
+1. **A line's band is the phase its scene is DELIVERED at, never the file it
+   lives in.** Story gates: cup/old_mark 0; echo/witness/plum 1;
+   supper/plan/shelter 2; record 3; seeds/promise/returned/council 4;
+   after/reply 5. File-level contraction rates are averages of a correct band
+   and a broken one, and chasing them damages finished work: `phaseEvents` reads
+   6% only because it is ~95% narration, and `dialogueChoices` reads 16% only
+   because its phase-4 callbacks are correctly at 0%. **Never "raise a file to
+   78%".**
+2. **Narration never contracts, at any phase.** The narrator is the fixed
+   baseline the residents' phase-4 turn is measured against; contract it at 0-3
+   and stop at 4 and the reader cannot tell whether the residents changed or the
+   book did. That covers every `narrator(...)` call and `memory:` string in
+   storySpine, the `prompt`/`convergence` stage directions in dialogueChoices,
+   and essentially all of phaseEvents. A narrator line that reads badly is fixed
+   by promoting a real subject over an existential opener, never by register.
+3. **The player contracts at every phase, 4 and 5 included.** The player never
+   joined the liturgy. This covers `speaker: 'player'` lines and every option
+   `label`.
+
+Residents are **0%** from the reveal on: not "few", zero. The shipped phase-4
+house corpus is 0 contractions against 312 expanded forms, and phase-5
+post-revelation plus Tending is 0 against 248, so a spine that contracts while
+Ember speaks liturgy at her own door in the same session is worse than either
+choice made consistently. Phases 0-3 sit at 82% of all sites, which is 100% of
+the CONTRACTIBLE ones: the remainder are stranded positive auxiliaries ("safer
+than it is."), quoted written text ("I am afraid", whose own sentence counts
+three words) and "this is" / "on it is", which have no spoken contraction.
+Stranded NEGATIVES are legal and are the preferred fix ("It isn't.").
+
 ## Tech Stack
 
 - **Framework**: React Native with Expo SDK 57

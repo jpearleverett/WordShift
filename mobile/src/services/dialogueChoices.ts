@@ -73,7 +73,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       "refuse": "Leave my words out of the comparison."
     },
     "responses": {
-      "ask": "Here is the line. The old page says the guest will preserve us. Yesterday my notebook said protect. I have kept both versions. A correction that erases its earlier wording is not evidence I trust.",
+      "ask": "Here's the line. The old page says the guest will preserve us. Yesterday my notebook said protect. I've kept both versions. A correction that erases its earlier wording isn't evidence I trust.",
       "refuse": "Your words stay out of my notes, then. I can compare the two inks without turning you into a specimen."
     },
     "convergence": "Archimedes dates a fresh page and leaves the earlier one untouched."
@@ -81,11 +81,11 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
   "pangolin": {
     "prompt": "Panko holds a bruised pear over the pot. The bruise fades away in her paw, and the pear looks new.",
     "options": {
-      "ask": "Put the pear aside. Let us see what happens.",
-      "refuse": "I would rather not test the pear."
+      "ask": "Put the pear aside. Let's see what happens.",
+      "refuse": "I'd rather not test the pear."
     },
     "responses": {
-      "ask": "A saucer, then, and we will watch it. The pear looks fresh again, but it still smells ripe. I don't know whether the warmth healed it or only stopped it ripening.",
+      "ask": "A saucer, then, and we'll watch it. The pear looks fresh again, but it still smells ripe. I don't know whether the warmth healed it or only stopped it ripening.",
       "refuse": "No experiment, then. I'll label the saucer the pear is sitting on, and keep it off the supper table."
     },
     "convergence": "Panko takes the pot off the heat before she reaches for the label."
@@ -122,7 +122,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
     },
     "responses": {
       "ask": "There. Your sleeve against the chair. I had to reach for it twice before I could hear it. The large note is making everything else sound unimportant.",
-      "refuse": "Yes. Sit with me while I stop. I have never been good at putting the watch down. Company helps."
+      "refuse": "Yes. Sit with me while I stop. I've never been good at putting the watch down. Company helps."
     },
     "convergence": "Fennick lowers both ears. He keeps his paws on the sand."
   },
@@ -133,7 +133,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       "refuse": "Don't promise me it will be kind."
     },
     "responses": {
-      "ask": "I know the waiting. I know the signs. I do not know the guest. I've wanted an answer for so long that I sometimes call my wanting knowledge. Correct me when I do.",
+      "ask": "I know the waiting. I know the signs. I don't know the guest. I've wanted an answer for so long that I sometimes call my wanting knowledge. Correct me when I do.",
       "refuse": "Then I'll make a smaller promise. I'll sit here with you while neither of us knows."
     },
     "convergence": "Sloane shifts along the branch and leaves room."
@@ -157,20 +157,20 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       "refuse": "Keep the map between us."
     },
     "responses": {
-      "ask": "Thank you. We can walk to the rosemary gate and back. I want to see where that path goes today, not where somebody says it has always gone.",
-      "refuse": "Between us, then. Please don't turn my map into a report about how frightened I am. It is a map, and I worked hard on it."
+      "ask": "Thank you. We can walk to the rosemary gate and back. I want to see where that path goes today, not where somebody says it's always gone.",
+      "refuse": "Between us, then. Please don't turn my map into a report about how frightened I am. It's a map, and I worked hard on it."
     },
     "convergence": "Thyme leaves the map unfolded on her own side of the table."
   },
   "red_panda": {
     "prompt": "Bamboo draws a circle in the incense smoke and leaves one gap in it. The smoke drifts across and closes the gap.",
     "options": {
-      "ask": "Are you sure that is peace?",
+      "ask": "Are you sure that's peace?",
       "refuse": "Leave me a place outside the circle."
     },
     "responses": {
       "ask": "No. I call it peace because I know how to sit still inside it. That may say more about my practice than about the pattern.",
-      "refuse": "I can leave a gap when I draw the circle. I cannot promise the pattern will respect it. I should not have spoken as though I could."
+      "refuse": "I can leave a gap when I draw the circle. I can't promise the pattern will respect it. I shouldn't have spoken as though I could."
     },
     "convergence": "Bamboo opens the gap in the circle again and watches the smoke."
   },
@@ -193,8 +193,8 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       "refuse": "Leave the bell quiet for now."
     },
     "responses": {
-      "ask": "Yes. A bell is heard by everyone, wanted or not. So I will ask before the first pull, and wait for an answer. She has been silent sixty years, and that rule is what the silence was for.",
-      "refuse": "Quiet, then. I have kept her silent a long while already. Keeping her quiet is not a favor, and nobody owes me anything for it."
+      "ask": "Yes. A bell is heard by everyone, wanted or not. So I'll ask before the first pull, and wait for an answer. She's been silent sixty years, and that rule is what the silence was for.",
+      "refuse": "Quiet, then. I've kept her silent a long while already. Keeping her quiet isn't a favor, and nobody owes me anything for it."
     },
     "convergence": "Tock lays the rope across the rail instead of winding it around his wrist."
   },
@@ -202,10 +202,10 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
     "prompt": "Moss holds up a seedpod. It should have dried and opened by now, but it has stayed green long past its season.",
     "options": {
       "ask": "Leave one seed unplanted.",
-      "refuse": "I would rather not join the experiment."
+      "refuse": "I'd rather not join the experiment."
     },
     "responses": {
-      "ask": "One seed for the dry tin, then. The rest go in the bed. It is good for a garden to keep something back, instead of growing everything it has.",
+      "ask": "One seed for the dry tin, then. The rest go in the bed. It's good for a garden to keep something back, instead of growing everything it has.",
       "refuse": "Fair enough. I can keep a gardening notebook without putting your name on it."
     },
     "convergence": "Moss writes the date on the tin, leaving space below it for the next one."

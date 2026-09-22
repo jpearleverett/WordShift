@@ -612,7 +612,7 @@ export function buildPostRevelationEvent(context?: FinalArrivalContext): PhaseTr
     ? context.keptRecord
       ? 'The old page and its correction lie side by side.\nKeeping a memory does not make it the only truth.'
       : 'A sentence is written again.\nThis time nobody turns it into a reassurance.'
-    : 'There is warmth at the door when someone returns.\nIt reaches no further than they ask.';
+    : 'Warmth waits at the door when someone returns.\nIt reaches no further than they ask.';
   const image = context.boundary === 'remember' ? 'private_room' : 'outward_road';
   scenes[1].image = image;
   scenes[1].imageOpacity = 1;
@@ -674,7 +674,7 @@ export const NEW_CYCLE_EVENT: PhaseTransitionEvent = {
       duration: 3500,
     },
     {
-      text: 'They will greet you as if for the first time.\nOne small boundary may be older than the morning.',
+      text: 'Your friends will greet you as if for the first time.\nOne small boundary may be older than the morning.',
       image: 'private_room',
       imageOpacity: 1,
       imageFraming: 'detail',
