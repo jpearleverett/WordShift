@@ -10,7 +10,7 @@
  * count resets when the local calendar day rolls over.
  */
 import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
-import { getLocalDateString } from './dateUtils';
+import { getLocalDateString, parseLocalDate } from './dateUtils';
 import { DAILY_AMBER_DAILY_CAP, DAILY_AMBER_REWARD } from '../constants/gameBalance';
 import { awardBonusAmberInTransaction, getFullProgress, invalidateProgressCache } from './amberCurrency';
 
@@ -23,6 +23,35 @@ interface DailyAmberState {
   count: number;
   /** Durable identities of completed rewards, including claims before midnight. */
   claimReceipts?: string[];
+  /**
+   * Local day each receipt was recorded on (receipt id -> YYYY-MM-DD). Receipts
+   * older than yesterday are pruned on the next claim. A legacy receipt with no
+   * recorded day is dated to `date`, the latest day it can belong to.
+   */
+  claimReceiptDays?: Record<string, string>;
+}
+
+/** Receipts are kept for today and yesterday: enough for a midnight retry. */
+const RECEIPT_RETENTION_DAYS = 2;
+
+/** The local day `days` before `day` (YYYY-MM-DD), from local components. */
+function localDayBefore(day: string, days: number): string {
+  const date = parseLocalDate(day);
+  date.setDate(date.getDate() - days);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Drop receipts recorded before yesterday; they can no longer be retried. */
+function prunedReceipts(state: DailyAmberState, today: string): { ids: string[]; days: Record<string, string> } {
+  const oldestKept = localDayBefore(today, RECEIPT_RETENTION_DAYS - 1);
+  const ids: string[] = [];
+  const days: Record<string, string> = {};
+  for (const id of state.claimReceipts ?? []) {
+    const day = state.claimReceiptDays?.[id] ?? state.date ?? today;
+    if (day >= oldestKept) { ids.push(id); days[id] = day; }
+  }
+  return { ids, days };
 }
 
 export interface DailyAmberStatus {
@@ -70,7 +99,10 @@ async function load(): Promise<DailyAmberState> {
     if (!state || (state.date !== null && typeof state.date !== 'string') ||
         !Number.isInteger(state.count) || state.count < 0 ||
         (state.claimReceipts !== undefined && (!Array.isArray(state.claimReceipts) ||
-          !state.claimReceipts.every(id => typeof id === 'string')))) {
+          !state.claimReceipts.every(id => typeof id === 'string'))) ||
+        (state.claimReceiptDays !== undefined && (state.claimReceiptDays === null ||
+          typeof state.claimReceiptDays !== 'object' || Array.isArray(state.claimReceiptDays) ||
+          !Object.values(state.claimReceiptDays).every(day => typeof day === 'string')))) {
       throw new Error('Your daily amber record could not be read. Please retry.');
     }
     cache = state;
@@ -136,7 +168,8 @@ export function createDailyAmberClaimId(): string {
  * Complete an earned reward durably. The receipt and credit share the journal,
  * so a retry that first recovers that journal reports zero newly granted amber.
  * Receipts remain across local-day rollover: a midnight retry is still the same
- * reward. There are at most two new receipts per day.
+ * reward. Receipts older than yesterday are pruned on each new claim, so the
+ * record stays bounded (at most two days of receipts).
  */
 export async function claimDailyAmberReward(claimId: string): Promise<DailyAmberGrantResult> {
   if (!claimId.trim()) throw new Error('A daily amber claim needs its original reward ID.');
@@ -152,9 +185,12 @@ export async function claimDailyAmberReward(claimId: string): Promise<DailyAmber
       if (state.claimReceipts?.includes(claimId) || !status.available) {
         return { ...status, recorded: false, grantedAmount: 0, newBalance: progress.amber };
       }
+      const today = getLocalDateString();
+      const kept = prunedReceipts(state, today);
       const updated: DailyAmberState = {
-        date: getLocalDateString(), count: status.claimedToday + 1,
-        claimReceipts: [...(state.claimReceipts ?? []), claimId],
+        date: today, count: status.claimedToday + 1,
+        claimReceipts: [...kept.ids, claimId],
+        claimReceiptDays: { ...kept.days, [claimId]: today },
       };
       const newBalance = await awardBonusAmberInTransaction(DAILY_AMBER_REWARD, 'rewarded_daily_amber');
       await save(updated);
