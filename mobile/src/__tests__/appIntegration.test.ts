@@ -528,7 +528,7 @@ describe('proactive share prompt', () => {
 
   test('declining the rewarded hint clip never force-opens the Store', () => {
     // Backing out of an ad is a quiet toast; the Store opens only from the
-    // out-of-hints alert's explicit 'Get hints' button.
+    // out-of-hints alert's explicit store button (getOutOfHintsStoreLabel).
     const claim = APP_TSX.slice(
       APP_TSX.indexOf('const handleClaimRewardedHint = useCallback'),
       APP_TSX.indexOf('const handleOutOfHints = useCallback')
@@ -536,7 +536,7 @@ describe('proactive share prompt', () => {
     expect(claim.length).toBeGreaterThan(0);
     expect(claim).not.toContain('setShowStoreModal');
     // The explicit store path stays available in the out-of-hints alert.
-    expect(APP_TSX).toMatch(/text: 'Get hints', onPress: \(\) => \{ done\(\); setShowStoreModal\(true\); \}/);
+    expect(APP_TSX).toMatch(/text: getOutOfHintsStoreLabel\(phase\), onPress: \(\) => \{ done\(\); setShowStoreModal\(true\); \}/);
   });
 
   test('the prominent opening glitch fires on the first FREE win, not the tutorial', () => {

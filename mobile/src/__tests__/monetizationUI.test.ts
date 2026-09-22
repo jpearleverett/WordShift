@@ -41,6 +41,7 @@ function rewindHookIndices() {
   effectCallbacks = [];
 }
 
+jest.mock('../hooks/useScreenInsets', () => ({ useScreenInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }) }));
 jest.mock('react', () => {
   const actual = jest.requireActual('react');
   return {
@@ -81,6 +82,7 @@ jest.mock('react', () => {
 // ---------------------------------------------------------------------------
 
 jest.mock('react-native', () => ({
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
   View: 'View',
   Text: 'Text',
   TouchableOpacity: 'TouchableOpacity',

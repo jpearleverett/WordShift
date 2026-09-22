@@ -89,6 +89,8 @@ import {
   markBlindIntroSeen,
   hasSeenLexiconIntro,
   markLexiconIntroSeen,
+  hasSeenExpertIntro,
+  markExpertIntroSeen,
   getPendingVariantTutorials,
   acknowledgeVariantTutorial,
   checkFreeStreakFreeze,
@@ -178,6 +180,16 @@ import {
   getStoryPreparationRetryCopy,
   getDailyPreparationRetryCopy,
   getBootFailureCopy,
+  getRewardedHintGrantedMessage,
+  getRewardedHintLimitMessage,
+  getRewardedHintUnavailableMessage,
+  getOutOfHintsTitle,
+  getOutOfHintsMessage,
+  getOutOfHintsWatchLabel,
+  getOutOfHintsStoreLabel,
+  getOutOfHintsDismissLabel,
+  getExpertUnlockIntroLines,
+  getExpertLockedHint,
 } from './src/services/phaseNarrative';
 import { consumeCosmeticFirstShowing, peekCosmeticFirstShowing, markCosmeticFirstShowingShown } from './src/services/cosmeticReceipts';
 import {
@@ -320,7 +332,7 @@ type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery'
 
 type PostVictoryIntro =
   | { kind: 'variant_unlock'; variant: PuzzleVariant; lines: string[] }
-  | { kind: 'modifier_stacking' | 'blind_unlock' | 'lexicon_unlock' | 'starter_pack'; lines: string[] };
+  | { kind: 'modifier_stacking' | 'blind_unlock' | 'lexicon_unlock' | 'expert_unlock' | 'starter_pack'; lines: string[] };
 
 
 // Speed rescue: seconds granted by the one-per-board rewarded continue.
@@ -1968,6 +1980,9 @@ function MainApp() {
       if (dismissedKind === 'lexicon_unlock') {
         await markLexiconIntroSeen();
       }
+      if (dismissedKind === 'expert_unlock') {
+        await markExpertIntroSeen();
+      }
       setPostVictoryIntro(null);
       await advanceQueuedPostVictoryIntro();
       // After the starter intro closes, open the Store so the "welcome" Fox
@@ -3072,6 +3087,19 @@ function MainApp() {
           lines: getBlindIntroLines(finalVictory.newPhase),
         });
       }
+      // EXPERT's unlock beat. Every other unlock (each style and modifier) gets
+      // a card, and EXPERT used to change only a locked menu row, so the tier
+      // meant to fill the Desert-to-Office gap went unnoticed.
+      if (
+        immediateIntros.length === 0 &&
+        completedTotal >= EXPERT_DIFFICULTY_UNLOCK_PUZZLES &&
+        !(await hasSeenExpertIntro())
+      ) {
+        immediateIntros.push({
+          kind: 'expert_unlock',
+          lines: getExpertUnlockIntroLines(finalVictory.newPhase),
+        });
+      }
       // Lexicon's own unlock beat. It is the one mode that changes nothing the
       // player can SEE (blind's previews visibly vanish, the clock counts
       // down), so it needs saying out loud more than any of them.
@@ -4096,16 +4124,16 @@ function MainApp() {
         });
         puzzleActions.refreshHintBalance();
         hapticSuccess();
-        puzzleActions.setMessage(`+${REWARDED_HINT_GRANT} hint`);
+        puzzleActions.setMessage(getRewardedHintGrantedMessage(persistence.currentPhase));
       } else if (res.reason === 'daily_cap') {
-        puzzleActions.setMessage('Daily clip limit reached. Try the store.');
+        puzzleActions.setMessage(getRewardedHintLimitMessage(persistence.currentPhase));
       } else {
-        puzzleActions.setMessage('No hint this time. Hint packs live in the store.');
+        puzzleActions.setMessage(getRewardedHintUnavailableMessage(persistence.currentPhase));
       }
     } catch {
-      puzzleActions.setMessage('No hint this time. Hint packs live in the store.');
+      puzzleActions.setMessage(getRewardedHintUnavailableMessage(persistence.currentPhase));
     }
-  }, [puzzleActions]);
+  }, [puzzleActions, persistence.currentPhase]);
 
   // Raised by the hint button when the balance is empty. Offers a rewarded clip
   // (when under the daily cap) or the store. Guarded against re-entrant alerts.
@@ -4117,19 +4145,14 @@ function MainApp() {
     const capReached = await isRewardedCapReached().catch(() => false);
     const buttons: { text: string; style?: 'cancel'; onPress?: () => void }[] = [];
     const clipAvailable = !capReached && isAdsReady();
+    const phase = persistence.currentPhase;
     if (clipAvailable) {
-      buttons.push({ text: 'Watch a clip (+1)', onPress: () => { done(); handleClaimRewardedHint(); } });
+      buttons.push({ text: getOutOfHintsWatchLabel(phase), onPress: () => { done(); handleClaimRewardedHint(); } });
     }
-    buttons.push({ text: 'Get hints', onPress: () => { done(); setShowStoreModal(true); } });
-    buttons.push({ text: 'Not now', style: 'cancel', onPress: done });
-    showGameAlert(
-      'Out of hints',
-      clipAvailable
-        ? 'Watch a short clip for a free hint, or grab a hint pack in the store.'
-        : 'Hint packs are available in the store.',
-      buttons,
-    );
-  }, [handleClaimRewardedHint]);
+    buttons.push({ text: getOutOfHintsStoreLabel(phase), onPress: () => { done(); setShowStoreModal(true); } });
+    buttons.push({ text: getOutOfHintsDismissLabel(phase), style: 'cancel', onPress: done });
+    showGameAlert(getOutOfHintsTitle(phase), getOutOfHintsMessage(phase, clipAvailable), buttons);
+  }, [handleClaimRewardedHint, persistence.currentPhase]);
 
   const prevOutOfHintsSignal = useRef(0);
   useEffect(() => {
@@ -5646,7 +5669,7 @@ function MainApp() {
             blindLocked={puzzlesSolvedForVariantUnlocks < BLIND_TOGGLE_UNLOCK_PUZZLES}
             blindUnlockHint={getBlindUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
             expertLocked={puzzlesSolvedForVariantUnlocks < EXPERT_DIFFICULTY_UNLOCK_PUZZLES}
-            expertUnlockHint={`6-letter apex. Opens at ${EXPERT_DIFFICULTY_UNLOCK_PUZZLES} (you're at ${puzzlesSolvedForVariantUnlocks})`}
+            expertUnlockHint={getExpertLockedHint(puzzlesSolvedForVariantUnlocks, EXPERT_DIFFICULTY_UNLOCK_PUZZLES)}
             speedActive={puzzle.speedMode}
             onToggleSpeedMode={handleToggleSpeedMode}
             // Speed joins the modifier list the moment that section first
