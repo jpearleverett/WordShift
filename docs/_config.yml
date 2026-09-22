@@ -16,30 +16,47 @@ theme: jekyll-theme-minimal
 # creator-kit fast-forward instructions (era=reveal), the checklists list
 # unfinished work, and review-2026-09-06/ holds dark-phase screenshots.
 #
-# ADD EVERY NEW INTERNAL DOC HERE. An un-excluded file publishes silently.
+# ADD EVERY NEW INTERNAL DOC HERE. An un-excluded file publishes silently, so
+# mobile/src/__tests__/docsSitePublication.test.ts fails CI for any file or
+# folder in docs/ that is neither one of the four public pages nor listed
+# below. Names are exact (a trailing slash marks a folder); the few globs are a
+# second net, not a substitute for listing the file.
 exclude:
+  # Internal docs (release, operations, design and story).
+  - ANALYTICS_DELIVERY.md
+  - ANIMAL_WALK_REVIEW_2026-09-17.md
+  - ART_COVERAGE_REVIEW_2026-09-19.md
+  - ASSESSMENT_RESOLUTION_2026-09-17.md
   - BACKEND_SETUP.md
+  - BUILD_AND_UPLOAD.md
   - COMPLETION_CHECKLIST.md
+  - CURRENT_BUILD.md
+  - DIALOGUE_REVIEW_2026-09-22.md
   - GROWTH_STRATEGY.md
   - LAUNCH_CHECKLIST.md
+  - LAUNCH_READINESS_REVIEW_2026-09-14.md
+  - LAUNCH_READINESS_REVIEW_2026-09-22.md
   - MONETIZATION_SETUP.md
   - OTA_UPDATES.md
   - PRESS_KIT.md
-  - STORE_LISTING.md
-  - supabase/
-  - ANALYTICS_DELIVERY.md
+  - PUZZLE_BANK_TOP_UP_2026-09-06.md
   - SAVE_INTEGRITY_UPGRADE.md
+  - STORE_LISTING.md
   - STORY_AND_VISUAL_IMPLEMENTATION.md
   - STORY_PLAYTEST_PROTOCOL.md
   - SUPPORT_AND_RETENTION_RUNBOOK.md
   - VOCABULARY_AUDIT_2026-09-05.md
-  - reports/
-  - device-evidence/
   - VOCABULARY_EDITORIAL_DECISIONS_2026-09-06.md
-  - PUZZLE_BANK_TOP_UP_2026-09-06.md
+  # Play Console Graphics mirrors: manual uploads, not used by the public pages.
+  - feature-graphic.png
+  - store-icon-512.png
+  # Internal folders (SQL, evidence, generated review output).
+  - supabase/
+  - reports/
   - review-2026-09-06/
-  - CURRENT_BUILD.md
-  - BUILD_AND_UPLOAD.md
-  - LAUNCH_READINESS_REVIEW_2026-09-14.md
-  - LAUNCH_READINESS_REVIEW_2026-09-22.md
-  - DIALOGUE_REVIEW_2026-09-22.md
+  - visual-review/
+  - device-evidence/
+  # Second net for stray evidence and generated files.
+  - "*.json"
+  - "*.log"
+  - "*_20[0-9][0-9]-[0-9][0-9]-[0-9][0-9].md"

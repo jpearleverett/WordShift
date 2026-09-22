@@ -38,8 +38,10 @@ uncropped extremities, and readability at the actual 90px sprite-box size.
 All thirteen chronological strips were independently reviewed, including the
 opposing sloth/wombat contact and passing poses in both outfits. The generated
 HTML was exercised at game size and double size with pause, complete-cycle
-scrubbing, direction reversal and resume. See the [frame strips and reproducible
-playback instructions](visual-review/walking/README.md).
+scrubbing, direction reversal and resume. The frame strips were retired from `docs/` on
+2026-09-22 (git history holds them); regenerate them with
+`node scripts/tools/buildWalkReview.mjs --html <file> --evidence-dir <dir>`
+from `mobile/`, writing outside `docs/` so they are never published.
 
 ## Validation
 

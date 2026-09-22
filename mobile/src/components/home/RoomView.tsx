@@ -67,23 +67,23 @@ const ANIMAL_PLAQUE_FONT_SCALE = 1.3; // 8.0pt label (was 8.7 at the old 0.62)
 // proportional downscale keeps alignment). jungle (1092x540) / office
 // (1092x534) are accepted as-is (both exceed 750px).
 const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
-  cozy_den: require('../../../assets/rooms/cozy_den.png'),
-  kitchen: require('../../../assets/rooms/kitchen.png'),
-  study: require('../../../assets/rooms/study.png'),
-  aquarium: require('../../../assets/rooms/aquarium.png'),
-  jungle: require('../../../assets/rooms/jungle.png'),
-  desert: require('../../../assets/rooms/desert.png'),
-  office: require('../../../assets/rooms/office.png'),
-  burrow: require('../../../assets/rooms/burrow.png'),
-  garden: require('../../../assets/rooms/garden.png'),
-  bamboo: require('../../../assets/rooms/bamboo.png'),
+  cozy_den: require('../../../assets/rooms/cozy_den.webp'),
+  kitchen: require('../../../assets/rooms/kitchen.webp'),
+  study: require('../../../assets/rooms/study.webp'),
+  aquarium: require('../../../assets/rooms/aquarium.webp'),
+  jungle: require('../../../assets/rooms/jungle.webp'),
+  desert: require('../../../assets/rooms/desert.webp'),
+  office: require('../../../assets/rooms/office.webp'),
+  burrow: require('../../../assets/rooms/burrow.webp'),
+  garden: require('../../../assets/rooms/garden.webp'),
+  bamboo: require('../../../assets/rooms/bamboo.webp'),
   // The descent trio's real art (hand-authored, processed to 1456x720). The
   // filenames carry the art's own concept names; the in-game rooms keep their
   // canon names (Star Loft / Belfry / Sky Garden — the belfry art shows the
   // workshop floor, the bell hangs up the tower shaft, out of frame).
-  star_loft: require('../../../assets/rooms/observatory.png'),
-  belfry: require('../../../assets/rooms/workshop.png'),
-  sky_garden: require('../../../assets/rooms/rainforest.png'),
+  star_loft: require('../../../assets/rooms/observatory.webp'),
+  belfry: require('../../../assets/rooms/workshop.webp'),
+  sky_garden: require('../../../assets/rooms/rainforest.webp'),
 };
 
 // Phase-appropriate windows. The room art paints bright day-view windows that
