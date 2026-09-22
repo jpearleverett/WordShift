@@ -95,11 +95,17 @@ describe('StorySceneModal saving affordance is delayed, never per-page', () => {
     expect(flat).toMatch(/hiddenAction: \{ opacity: 0 \}/);
   });
 
-  it('never attributes narration to "The house" and never draws the player', () => {
-    // The nameplate is skipped for the narrator before the name is even looked
-    // up; the resident's idle portrait stays in view (see the rendering test).
+  it('never attributes narration to "The house", captions the sprite, never draws the player', () => {
+    // The ATTRIBUTION is skipped for the narrator before the name is even
+    // looked up, so "The house" can never be spoken by a resident's portrait.
     expect(flat).toContain("const speakerName = line && line.speaker !== 'narrator' ? getStorySpeakerName(line.speaker) : '';");
-    expect(flat).toContain('{!!speakerName && <AppText textRole="label" testID="story-scene-speaker"');
+    // But the drawn resident is still named: a sprite with no label left the
+    // player nothing to call the animal they were looking at. The caption is
+    // the PORTRAIT's name, in the muted ink, only where there is no speaker.
+    expect(flat).toContain("const portraitName = portraitSpeaker && line && line.speaker !== 'player' ? getStorySpeakerName(portraitSpeaker) : '';");
+    expect(flat).toContain('const nameplate = speakerName || portraitName;');
+    expect(flat).toContain('{!!nameplate && <AppText textRole="label" testID="story-scene-speaker"');
+    expect(flat).toContain('color: speakerName ? theme.title : theme.muted');
     // The player has no sprite, so the player's own line shows the nameplate
     // alone, and the row keeps the portrait's height so the text never jumps.
     expect(flat).toContain("{portraitSpeaker && line?.speaker !== 'player' && <StoryPortrait");

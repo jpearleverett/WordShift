@@ -54,10 +54,9 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const visiblePage = memory ? Math.min(readingPage, memory.page, pages.length - 1) : 0;
   const error = errorPage === pageKey && visiblePage === memory?.page;
   const line = memory ? pages[visiblePage] : undefined;
-  // Narration carries no nameplate. The resident stays in view (idle) while the
-  // narrator describes the room, but the line is never attributed to "The
-  // house": with Ember's portrait beside it that read as Ember speaking AS the
-  // house, and the house is the one thing in this story that must not narrate.
+  // Narration is never ATTRIBUTED. The line has no speaker, and naming "The
+  // house" beside Ember's portrait read as Ember speaking AS the house, which
+  // is the one thing in this story that must not narrate.
   const speakerName = line && line.speaker !== 'narrator' ? getStorySpeakerName(line.speaker) : '';
   const options = memory && visiblePage === memory.page && !memory.choice && memory.page === memory.scene.lines.length - 1 ? memory.scene.options : undefined;
   const presentationPhase = memory ? getStoryPresentationPhase(memory) : phase;
@@ -66,6 +65,13 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const layout = getStorySceneLayout(width, height, insets.top, insets.bottom, fontScale);
   const illustration = memory && line ? getStoryPageArt(memory, visiblePage) : null;
   const portraitSpeaker = memory ? getStoryPortraitSpeaker(memory, visiblePage) : null;
+  // ...but a face with no name at all is worse than the attribution it
+  // replaced: the player met a sprite and had nothing to call it. So the
+  // drawn resident is always CAPTIONED, in the muted ink and only when there
+  // is no attribution, so the label reads as "who is on screen" rather than
+  // "who said this" (the narration itself stays italic, `styles.narration`).
+  const portraitName = portraitSpeaker && line && line.speaker !== 'player' ? getStorySpeakerName(portraitSpeaker) : '';
+  const nameplate = speakerName || portraitName;
   useEffect(() => {
     retry.current = null;
   }, [pageKey]);
@@ -105,7 +111,7 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
               no portrait: the player is never drawn) sit the text at one height. */}
           <View style={[styles.speakerRow, { minHeight: layout.portraitSize }]}>
             {portraitSpeaker && line?.speaker !== 'player' && <StoryPortrait speaker={portraitSpeaker} phase={presentationPhase} passage={`${memory?.scene.id}:${visiblePage}`} size={layout.portraitSize} speaking={line?.speaker === portraitSpeaker} />}
-            {!!speakerName && <AppText textRole="label" testID="story-scene-speaker" style={[styles.speaker, { color: theme.title }]}>{speakerName}</AppText>}
+            {!!nameplate && <AppText textRole="label" testID="story-scene-speaker" style={[styles.speaker, { color: speakerName ? theme.title : theme.muted }]}>{nameplate}</AppText>}
           </View>
           <AppText testID="story-scene-text" textRole="reading" style={[styles.body, line?.speaker === 'narrator' && styles.narration, { color: theme.body }]}>{line?.text}</AppText>
           <View style={styles.actions}>

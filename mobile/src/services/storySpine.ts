@@ -1,5 +1,6 @@
 import AsyncStorage from './persistenceStorage';
 import { AnimalType, DialoguePhase } from '../types/homeWorld';
+import { ANIMAL_INFO } from './dialogue/animalDialogueBase';
 
 export type StoryBoundary = 'remember' | 'release';
 export type StorySpeaker = AnimalType | 'narrator' | 'player';
@@ -297,7 +298,7 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
       narrator("The word sinks. Its reflection stays on the surface one moment longer.", 'echo-06'),
     ], `The word ${word} appeared twice, once before you formed it.`);
     case 'witness': return scene('Who gets to know', [
-      narrator('You write down what happened by the rim: the same word, already there before you offered it. You put the date beneath it.', 'witness-01'),
+      narrator('You write down what happened at the rim: the same word, already there before you offered it. You put the date beneath it.', 'witness-01'),
       ember("I would like to fold that page away, friend. I can hear myself reaching for another comforting explanation.", 'witness-02'),
       ember("But you were there too. Shall we tell the household what we saw, or keep the account between us while we look into it?", 'witness-03'),
     ], 'You decided who would hear the first account of the word that appeared twice.', [
@@ -311,12 +312,12 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
       ] },
     ]);
     case 'supper': return scene('Before it goes cold', [
-      ...(cup ? [narrator(`Ember sets ${cupName} at your place. ${cup === 'flower' ? "She has been working on the cocoa recipe again." : "She remembered that you asked for tea."}`, 'supper-01')] : []),
-      ...(has('pangolin') ? [say('pangolin', "Supper. Now. The empty place at the table can wait. The rest of us have stomachs.", 'supper-02'), narrator("She sets the covered dish aside on the floor and serves everyone from the ordinary pot.", 'supper-03')] : [ember("I spent the whole afternoon keeping a place warm for someone who has not come. Your drink went cold while I did it. That is ridiculous of me, friend.", 'supper-04'), narrator(`The empty cup is moved aside. Fresh ${cup ? drink : 'tea'} goes in ${cup ? cupName : 'yours'}.`, 'supper-05')]),
-      ...(has('rabbit') ? [say('rabbit', 'Is it safe?', 'supper-06'), ...(has('pangolin') ? [say('pangolin', "It is soup. I made it myself. Ask me about the house after you have eaten.", 'supper-07')] : [ember("The tea is safe. I cannot promise you anything else tonight.", 'supper-08')])] : [narrator("For a while the room sounds like an ordinary supper, not like a room listening for something.", 'supper-09')]),
+      ...(cup ? [narrator(`Ember puts ${cupName} down where you sit. ${cup === 'flower' ? "She has been at the cocoa recipe again." : "She remembered you asked for tea."}`, 'supper-01')] : []),
+      ...(has('pangolin') ? [say('pangolin', "Supper. Now. The empty place at the table can wait. The rest of us have stomachs.", 'supper-02'), narrator("She puts the covered dish on the floor, out of the way, and serves everyone from the ordinary pot.", 'supper-03')] : [ember("I spent the whole afternoon keeping a place warm for someone who has not come. Your drink went cold while I did it. That is ridiculous of me, friend.", 'supper-04'), narrator(`She moves the empty cup aside and fills ${cup ? cupName : 'yours'} with fresh ${cup ? drink : 'tea'}.`, 'supper-05')]),
+      ...(has('rabbit') ? [say('rabbit', 'Is it safe?', 'supper-06'), ...(has('pangolin') ? [say('pangolin', "It is soup. I made it myself. Ask me about the house after you have eaten.", 'supper-07')] : [ember("The tea is safe. I cannot promise you anything else tonight.", 'supper-08')])] : [narrator("For a while it sounds like an ordinary supper in here, and not like a house holding still to listen.", 'supper-09')]),
       ...(witness === 'share' ? [narrator('The dated account lies between the dishes, its row of initials visible.', 'supper-10'), ember("You asked us to tell everyone. If anyone has seen something else, this is a good place to say it.", 'supper-11')]
         : witness === 'private' ? [narrator('The folded account is still in your pocket. Ember glances toward you, then leaves it for you to bring up.', 'supper-12')] : []),
-      narrator("Under the table, the low hum below the floor slips out of rhythm. Nobody hurries to set it right.", 'supper-13'),
+      narrator("The low hum under the floor slips out of rhythm. Nobody at the table hurries to set it right.", 'supper-13'),
     ], "Someone stopped the preparations for an evening and looked after the people who were already here.");
     case 'plan': return scene('Which way the door faces', [
       ...(has('wombat') ? [say('wombat', "I always read this line on the old plan as a brace. Look which way it points.", 'plan-01'), narrator("Warren turns a drawing of the foundations so the doorway faces you.", 'plan-02')] : [narrator("A loose plan lies under the oldest hearthstone. Its arrows point in toward the house, not away from it.", 'plan-03')]),
@@ -536,13 +537,39 @@ function getPreparationArtId(text: string): string {
   return 'after-room-release';
 }
 
-/** Keep the resident in view while the narrator or player takes a turn. */
+/**
+ * Keep the resident in view while the narrator or player takes a turn.
+ *
+ * Residents the narrator can name, as word-boundary patterns. A narration page
+ * carries no speaker, so when one OPENS a scene there is no portrait yet to
+ * hold over: the old fallback took "the first animal who speaks anywhere in
+ * this scene", which put Panko's face beside the supper scene's opening line,
+ * `Ember sets your flower cup at your place.` The line's own text is the only
+ * signal that page carries, so it is read before reaching for the scene.
+ */
+const NAMED_RESIDENTS: readonly (readonly [RegExp, AnimalType])[] =
+  (Object.keys(ANIMAL_INFO) as AnimalType[]).map(
+    type => [new RegExp(`\\b${ANIMAL_INFO[type].name}\\b`), type] as const,
+  );
+
+function residentNamedIn(text: string): AnimalType | null {
+  for (const [pattern, type] of NAMED_RESIDENTS) if (pattern.test(text)) return type;
+  return null;
+}
+
 export function getStoryPortraitSpeaker(memory: StoryMemory, page: number): AnimalType {
   const pages = getStoryPages(memory);
   const isAnimal = (speaker: StorySpeaker): speaker is AnimalType => speaker !== 'narrator' && speaker !== 'player';
-  for (let index = Math.min(page, pages.length - 1); index >= 0; index -= 1) {
+  const at = Math.min(page, pages.length - 1);
+  // Whoever is already in view STAYS in view while the narrator describes the
+  // room -- continuity is the point, so a narrated beat never swaps the face.
+  for (let index = at; index >= 0; index -= 1) {
     if (isAnimal(pages[index].speaker)) return pages[index].speaker as AnimalType;
   }
+  // Nobody has spoken yet. Show the resident this page is actually about,
+  // then whoever speaks first, then Ember (a narrator-only transcript).
+  const named = at >= 0 ? residentNamedIn(pages[at].text) : null;
+  if (named) return named;
   return pages.find(line => isAnimal(line.speaker))?.speaker as AnimalType ?? 'fox';
 }
 

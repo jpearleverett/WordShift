@@ -575,6 +575,42 @@ describe('drag z-order contract', () => {
 });
 
 // ===========================================================================
+// The DROP row's word previews hang OUTSIDE the row (~11dp below it and ~44dp
+// past each end), so the row must never composite its subtree into an
+// offscreen alpha layer: that layer is sized to the row's own bounds and
+// silently discards everything a child paints outside them. With it on, every
+// preview lost its bottom edge and the first/last slot lost the start and end
+// of its word -- the words read as cut off by the row panel. `overflow:
+// 'visible'` cannot rescue it; the clip is the compositing layer, not the
+// view's child clipping.
+// ===========================================================================
+describe('drop-row preview clip contract', () => {
+  const ROW_SRC = fs.readFileSync(
+    path.resolve(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+
+  it('does not force offscreen alpha compositing on the DROP row', () => {
+    // Bare `needsOffscreenAlphaCompositing` (no value) on the row-transition
+    // wrapper is what clipped the previews; it must carry the target opt-out.
+    expect(ROW_SRC).toMatch(/needsOffscreenAlphaCompositing=\{!isTarget\}/);
+    const wrapper = ROW_SRC.slice(ROW_SRC.indexOf('styles.rowWrapper,') - 1400);
+    const head = wrapper.slice(0, wrapper.indexOf('styles.rowWrapper,'));
+    expect(head).not.toMatch(/needsOffscreenAlphaCompositing\s*\n/);
+  });
+
+  it('keeps the preview box overhanging, so the opt-out stays load-bearing', () => {
+    const block = ROW_SRC.slice(ROW_SRC.indexOf('slotPreviewContainer: {'));
+    const decl = block.slice(0, block.indexOf('},'));
+    // Hangs below the slot and spills past both ends: the exact geometry an
+    // offscreen layer would eat.
+    expect(decl).toMatch(/bottom:\s*-\d+/);
+    expect(decl).toMatch(/left:\s*-\d+/);
+    expect(decl).toMatch(/right:\s*-\d+/);
+  });
+});
+
+// ===========================================================================
 // The modifier list doubles as the player's roadmap, so it reads in UNLOCK
 // order. Speed (55) shipped below Blind (80) and read as the further goal
 // while actually being the nearer one.
