@@ -13,15 +13,14 @@ post-apply probe passed, and the `wordshift-event-retention` cron job is
 scheduled and has completed a successful run; keep that run row with the
 release record.
 
-**Pending owner application (2026-09-22):**
+**Applied by the owner on 2026-09-22:**
 [`save_and_board_limits_v1.sql`](supabase/save_and_board_limits_v1.sql)
 (save-creation budgets, a stricter Daily entrant rule, a higher Daily time
 floor), [`analytics_views_v1.sql`](supabase/analytics_views_v1.sql) (private
 rollout views) and [`event_retention_v2.sql`](supabase/event_retention_v2.sql)
-(180-day raw events plus a daily count rollup). Apply them in that order after
-the files already live, as [backend setup](BACKEND_SETUP.md#1-supabase-project)
-describes; until then the sections below that mention them describe the
-pending state. Backend operator access is required. Never put a service key or
+(180-day raw events plus a daily count rollup), in that order, as
+[backend setup](BACKEND_SETUP.md#1-supabase-project) describes; its read-only
+probes were reported passing. Backend operator access is required. Never put a service key or
 recovery code in client configuration, email, analytics, tickets or logs.
 
 ## Locate first, verify separately
@@ -104,17 +103,15 @@ rows for reviewed support work; overwritten historical data may not be recoverab
 ## Retention verification gate
 
 The published target is at most 24 months for analytics/crash diagnostics; a
-policy statement is not proof of an installed job. The installed job prunes at
-24 months today; once `event_retention_v2.sql` is applied it prunes raw events
-at **180 days**, well inside that ceiling. Before public promotion,
+policy statement is not proof of an installed job. Since `event_retention_v2.sql`
+was applied (2026-09-22) the installed job prunes raw events at **180 days**, well inside that ceiling. Before public promotion,
 record the project, actual scheduled job/configuration, last successful run,
 oldest retained row and Sentry plan/project retention. Use read-only checks first:
 
 ```sql
 select min(received_at) as oldest_event,
-       count(*) filter(where received_at < now() - interval '24 months') as overdue
+       count(*) filter(where received_at < now() - interval '180 days') as overdue
 from public.events;
--- After event_retention_v2.sql: use interval '180 days' above, and check the rollup.
 select * from public.analytics_rollup_state;
 ```
 
@@ -149,7 +146,7 @@ is an owner wording decision.
 
 `rate_limits_v1.sql` (applied 2026-09-15) adds per-install hourly budgets, a
 Daily plausibility gate and an operator purge. `save_and_board_limits_v1.sql`
-(pending) tightens that gate: a Daily entrant must be an install linked to a
+(applied 2026-09-22) tightens that gate: a Daily entrant must be an install linked to a
 cloud backup (an events row alone no longer counts), and the time floor rises
 to 5,000 ms or 2,000 ms per row. A player with no successful backup yet gets "no
 standing shown" until their next upload lands; there is nothing to repair on
@@ -170,7 +167,7 @@ local is changed. Budget rows live in `public.rate_limits` (one per scope and
 key). They are small and self-resetting; optional housekeeping:
 `delete from public.rate_limits where window_start < now() - interval '1 day';`.
 To free a legitimate install that somehow hit a budget, delete its rows by key.
-The pending save-creation budgets use the scopes `save_create_install` (key: the
+The save-creation budgets use the scopes `save_create_install` (key: the
 install id), `save_create_addr` and `save_create_kb` (key: `ip:<address>`) and
 `save_create_shared`; a refused create returns `unavailable`, which the client
 retries at its next launch or win. If `save_create_shared` is ever the one

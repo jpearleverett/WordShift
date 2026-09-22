@@ -1,6 +1,6 @@
 # WordShift launch readiness review (2026-09-22)
 
-Reviewed source: branch `claude/wonderful-wright-wg49h9` at `bef7213` (origin/main `5cc5bdf` plus three dialogue commits), app **1.4.4**, Android version code **109**, Expo SDK 57 / React Native 0.86. The owner has Google Play production access and asked whether the game is ready to publish. This follows the [2026-09-14 review](LAUNCH_READINESS_REVIEW_2026-09-14.md), whose blockers B1 (double credit) and B3 (manual production cut) were fixed and whose B2 (no device pass of the shipping toolchain) remained open.
+Reviewed source: branch `claude/wonderful-wright-wg49h9` at `bef7213` (origin/main `5cc5bdf` plus three dialogue commits), app **1.4.4**, Android version code **109**, Expo SDK 57 / React Native 0.86. The owner has Google Play production access and asked whether the game is ready to publish. This follows the 2026-09-14 review (since deleted; git history holds it), whose blockers B1 (double credit) and B3 (manual production cut) were fixed and whose B2 (no device pass of the shipping toolchain) remained open.
 
 ## Verdict
 
@@ -32,13 +32,13 @@ The owner reported a device pass on the 1.4.4 internal build: the game works, pu
 | MON-1 | Receipt linking falls back to the single new receipt for the product within 2 minutes; checkout receipts are always stored; regressions at 3 s, 45 s, missing date and two purchases 10 s apart. Still verify one real purchase on the production build. |
 | MON-2 / BO-6 / N1 | Hold kept by owner decision. Lagging residents now read their reveal chapters at catch-up pace once the house is at phase 4; late micro-beats wait for the reveal. |
 | MON-3 | Owner device pass reported purchases correct; the production-profile single-credit check remains. |
-| MON-4 / SPL-2 | Ad requests set `maxAdContentRating` T (not child-directed). Set the AdMob console ceiling too as a backstop. |
-| MON-5 | Owner task (RTDN). |
+| MON-4 / SPL-2 | Ad requests set `maxAdContentRating` T (not child-directed). The AdMob console ceiling was set by the owner on 2026-09-22 as the backstop. |
+| MON-5 | RTDN connected by the owner on 2026-09-22 (RevenueCat, Cloud Pub/Sub, Play Console); Play's test notification reached RevenueCat. |
 | MON-6 | Restore merges entitlements and drops a key only when explicitly inactive. |
 | MON-7 | The victory double excludes windfalls, and the victory screen shows the same amount. |
 | MON-8 | Malformed checkout receipts are quarantined. |
 | SPL-1 | Internal docs excluded by exact name, superseded docs deleted, and `docsSitePublication.test.ts` fails CI for any unlisted docs file. |
-| SPL-3 | Placeholder removed from the live terms source; the draft clause is in LAUNCH_CHECKLIST for the owner to complete. |
+| SPL-3 | Placeholder removed from the live terms source; the governing-law clause (New York law, courts in New York County) was published as terms section 10 on 2026-09-22. |
 | SPL-4 | The owner confirmed `launch-2026-09` is live; the other campaigns, their copy and scripts were deleted. |
 | SPL-5 | SLAVE, SLAVES and SLAVERY blocked and purged (four Double Shift boards). DRUGS and BEER kept. |
 | SPL-6 | Privacy policy describes network addresses, the RevenueCat identifier and anonymous daily totals; "Support ID" aligned; effective date 2026-09-22. |
@@ -66,10 +66,10 @@ The owner reported a device pass on the 1.4.4 internal build: the game works, pu
 | A11Y-1 | Store, Patron and Season Pass sheets are bounded by the system-bar insets. |
 | A11Y-2 | No change (0.87 scale floor holds). |
 | A11Y-3 | Unreferenced shipped files deleted; bundle patterns narrowed; generators no longer recreate them. |
-| BO-1 | `analytics_views_v1.sql` (retention, FTUE funnel, phase reached, purchase funnel), service-role only. Owner applies. |
-| BO-2 | Sentry fixes above; alert rules are an owner console task. |
-| BO-3 / BO-7 | `save_and_board_limits_v1.sql` limits save creation and requires a linked backup for Daily entrants. Owner applies. |
-| BO-4 | `event_retention_v2.sql` keeps raw events 180 days with daily rollups. Owner applies. |
+| BO-1 | `analytics_views_v1.sql` (retention, FTUE funnel, phase reached, purchase funnel), service-role only. Applied and probed by the owner on 2026-09-22. |
+| BO-2 | Sentry fixes above; alert rules are an owner console task, still to confirm. |
+| BO-3 / BO-7 | `save_and_board_limits_v1.sql` limits save creation and requires a linked backup for Daily entrants. Applied and probed by the owner on 2026-09-22. |
+| BO-4 | `event_retention_v2.sql` keeps raw events 180 days with daily rollups. Applied and probed by the owner on 2026-09-22. |
 | BO-5 | Six season palettes rotate monthly; an owned palette pays amber instead. |
 | BO-8 | The amber unlock logs `season_premium_unlocked`. |
 | BO-9 | The word counter sends the install id. |
@@ -179,7 +179,7 @@ Severity: **high** fix or verify before publishing, **medium** fix during the st
 
 - **SPL-1 medium (regression).** `docs/_config.yml` no longer excludes nine internal docs and `visual-review/`, which are live today, including `ASSESSMENT_2026-09-16.html` (41 defects in detail) and robed-sprite sheets. There is no `robots.txt`. Switch to an allow-list of the four public pages. This review and the dialogue review are excluded on this branch.
 - **SPL-2 medium.** No ad content-rating ceiling. Task 5.
-- **SPL-3 low.** Terms have no governing-law clause, and the `[GOVERNING JURISDICTION]` placeholder is visible in the live page source.
+- **SPL-3 low.** Terms have no governing-law clause, and the jurisdiction placeholder is visible in the live page source.
 - **SPL-4 low.** Two divergent "final" listing copies (`mobile/docs/store-launch/listing-en-US.json` against `mobile/assets/Play_store/launch-2026-09/copy/`). Record which is live and retire the other.
 - **SPL-5 low.** Banks contain SLAVE (8), DRUGS (20), BEER (6); confirm the IARC answers and decide editorially.
 - **SPL-6 low.** Privacy policy omits IP and request data at the backend and Sentry, and the RevenueCat app-user id; it says "Support reference" where the app says "Support ID".

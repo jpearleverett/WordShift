@@ -156,6 +156,9 @@ async function openVictoryIntroCohort(page: Page, phaseThree = false) {
     // This returning cohort already passed the 12-solve preview lesson. A
     // relaunch may serve MEDIUM, where that unrelated lesson would block play.
     localStorage.setItem('wordshift_preview_graduation_seen_v2', 'true');
+    // The EXPERT card (35 solves) is its own one-time beat; this cohort is
+    // past it, and leaving it unseen would queue it ahead of the card under test.
+    localStorage.setItem('wordshift_expert_intro_seen', 'true');
     localStorage.removeItem('wordshift_modifier_stacking_intro_seen');
     const board = JSON.parse(localStorage.getItem('wordshift_in_progress_puzzle')!);
     board.currentPhase = lateGame ? 3 : 1;
