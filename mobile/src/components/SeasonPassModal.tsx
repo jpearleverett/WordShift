@@ -353,7 +353,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
           <Confetti
             active={showFinaleConfetti}
             phase={phase}
-            colors={CONFETTI_THEMES.confetti_season}
+            colors={(view ? CONFETTI_THEMES[view.premiumCosmeticId as keyof typeof CONFETTI_THEMES] : undefined) ?? CONFETTI_THEMES.confetti_season}
             onComplete={() => setShowFinaleConfetti(false)}
           />
           <PixelPlaque phase={phase} label={'SEASON PASS'} style={styles.plaque} />
@@ -395,7 +395,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                   />
                   <Text style={[styles.premiumLocked, { color: t.body }]}>
                     {view.premiumCosmeticOwned
-                      ? 'Season confetti is already in your collection. Your free amber track continues each month.'
+                      ? `This month's confetti is already in your collection. Your free amber track continues, and Supporters receive ${view.premiumCosmeticAmberEquivalent} amber in its place.`
                       : `${copy.lockedLine} The complete premium track adds ${view.tiers.reduce((sum, tier) => sum + tier.premiumAmber, 0)} amber and one confetti palette.`}
                   </Text>
                   {view.canUnlockPremiumWithAmber && <CandyButton
@@ -472,7 +472,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                         {tr.freeClaimed ? ' ' : ''}{tr.freeClaimed ? <Image source={CHROME_ICONS.check} style={styles.inlineMark} /> : null}
                       </Text>
                       <Text style={[styles.tierReward, { color: view.premiumUnlocked ? t.title : t.muted }]}>
-                        Premium: +{tr.premiumAmber} amber{tr.premiumCosmetic ? (view.premiumCosmeticOwned ? ' · confetti owned' : ' + confetti') : ''}
+                        Premium: +{tr.premiumAmber} amber{tr.premiumCosmetic ? (view.premiumCosmeticOwned ? ` + ${view.premiumCosmeticAmberEquivalent} amber (confetti owned)` : ' + confetti') : ''}
                         {tr.premiumClaimed ? ' ' : ''}{tr.premiumClaimed ? <Image source={CHROME_ICONS.check} style={styles.inlineMark} /> : null}
                       </Text>
                     </View>

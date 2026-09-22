@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
+import { getVictoryDoubleAmount } from '../../services/victoryDoubleAmount';
 import { getVictoryTitle, getVictoryFeedback, getPhaseChangeNarrative, getRitualEchoHeader, getRitualEchoFooter, getPitMandatoryText, getPitMandatoryCTA, getAutoCollectCaption, getMandatoryHarvestText, getMandatoryHarvestCTA, getNextStreakMilestoneText, getFlawlessHonorific, getUnbrokenWeaveRankUpLine, getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel, getResonanceBonusLabel, isSilentVictoryBeat, getSwiftVictoriesToggleLabel, getSwiftVictoriesToggledMessage } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
@@ -477,8 +478,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   // / the Stats hero count-ups). This must live at the component top level —
   // hooks cannot run inside the nested amber-breakdown render IIFE below.
   const victoryTotalAmber = victoryData?.amberEarned ?? 0;
+  // The double covers the board's own amber, not its one-time windfalls
+  // (milestone, first completion, streak milestone): the same amount
+  // claimVictoryDouble credits, so the shown total never outruns the balance.
+  const rewardedDoubleBonus = getVictoryDoubleAmount(victoryData);
   const rewardedDoubleTarget =
-    victoryTotalAmber + (rewardedDoubleClaimed ? victoryTotalAmber : 0);
+    victoryTotalAmber + (rewardedDoubleClaimed ? rewardedDoubleBonus : 0);
   // Initialize at the target so the FIRST render (modal open) shows the settled
   // number with no count-up — only a fresh double claim animates.
   const { value: animatedTotal } = useCountUp(rewardedDoubleTarget, {
@@ -1104,13 +1109,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               const firstCompBonus = victoryData.firstCompletionBonus ?? 0;
               const milestoneAmber = victoryData.milestoneBonus ?? 0;
               const streakMilestoneAmber = victoryData.streakMilestoneBonus ?? 0;
-              const totalAmber = victoryData.amberEarned ?? 0;
-              // The rewarded "double" grants a bonus equal to amberEarned (a true
-              // 2x, credited to the balance in App). Reflect it in the breakdown
+              // The rewarded "double" grants the board's own amber again (its
+              // windfalls excluded, credited in App). Reflect it in the breakdown
               // line so the itemization sums to the doubled total. The TOTAL row
               // itself renders the top-level `animatedTotal` (which counts up on
               // a fresh claim), never this static value.
-              const rewardDoubleBonus = rewardedDoubleClaimed ? totalAmber : 0;
+              const rewardDoubleBonus = rewardedDoubleClaimed ? rewardedDoubleBonus : 0;
 
               return (
                 <>
