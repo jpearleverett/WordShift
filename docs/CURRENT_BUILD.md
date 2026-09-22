@@ -24,7 +24,7 @@ This work landed through [PR #453](https://github.com/jpearleverett/WordShift/pu
 
 All 222 collected Jest suites have passing results across the integrated and focused runs; typecheck and zero-warning lint passed. The production Android Hermes JavaScript/assets export passed, including all 185 final story images, and the strict image validator found no missing or invalid assets. `expo-clipboard` is a new native dependency. This work is not a signed Android build or a Play upload, and the next internal-testing build still needs device verification.
 
-The [complete store campaign](../mobile/assets/Play_store/assembled-listing-2026-09/README.md) contains eight 1080 × 1920 portrait images, the feature graphic, icon alternatives, listing copy and a self-contained review. It uses source-asset assembly, including the complete pit path and updated choice art; the separate real-capture workflow remains available. Editing these files does not update the live Play listing.
+The September 19 `assembled-listing-2026-09` store campaign was deleted on 2026-09-22; the live Play listing is the September 7 [launch-2026-09](../mobile/assets/Play_store/launch-2026-09/README.md) campaign (owner-confirmed). Git history holds the deleted campaign.
 
 ## Animal walking follow-ups
 

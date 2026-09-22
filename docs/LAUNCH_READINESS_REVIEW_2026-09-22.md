@@ -39,7 +39,7 @@ The owner reported a device pass on the 1.4.4 internal build: the game works, pu
 | MON-8 | Malformed checkout receipts are quarantined. |
 | SPL-1 | Internal docs excluded by exact name, superseded docs deleted, and `docsSitePublication.test.ts` fails CI for any unlisted docs file. |
 | SPL-3 | Placeholder removed from the live terms source; the draft clause is in LAUNCH_CHECKLIST for the owner to complete. |
-| SPL-4 | Owner decision pending: which Play campaign is live (launch-2026-09, launch-2026-09-v2 or assembled-listing-2026-09). |
+| SPL-4 | The owner confirmed `launch-2026-09` is live; the other campaigns, their copy and scripts were deleted. |
 | SPL-5 | SLAVE, SLAVES and SLAVERY blocked and purged (four Double Shift boards). DRUGS and BEER kept. |
 | SPL-6 | Privacy policy describes network addresses, the RevenueCat identifier and anonymous daily totals; "Support ID" aligned; effective date 2026-09-22. |
 | SPL-7 | The copied-code note tells the player to clear the clipboard. |

@@ -20,12 +20,7 @@
     "profile:android": "node scripts/tools/profileAndroid.mjs",
     "store:build": "node scripts/store/buildLaunch.mjs",
     "store:capture": "node scripts/store/captureLaunch.mjs",
-    "store:package": "python3 scripts/store/packageLaunch.py",
-    "store:refresh": "node scripts/store/refreshStore.mjs",
-    "store:build:refresh": "node scripts/store/buildRefresh.mjs",
-    "store:capture:refresh": "node scripts/store/captureRefresh.mjs",
-    "store:trailer": "node scripts/store/buildTrailer.mjs",
-    "store:package:refresh": "python3 scripts/store/packageRefresh.py"
+    "store:package": "python3 scripts/store/packageLaunch.py"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.15",

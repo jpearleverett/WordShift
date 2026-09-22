@@ -1,6 +1,6 @@
 # WordShift launch checklist
 
-> September 17 refresh: revised copy and nighttime promotional artwork are prepared on `feature/play-store-refresh`; fresh screenshots/trailer and publication remain pending. See [refresh status](../mobile/assets/Play_store/launch-2026-09-v2/README.md). Earlier owner-upload checkmarks below describe the September 7 campaign and do not certify the refresh.
+> **Live Play listing (confirmed by the owner 2026-09-22):** the September 7 campaign in [launch-2026-09](../mobile/assets/Play_store/launch-2026-09/README.md). The unpublished September 17 refresh (`launch-2026-09-v2` and its copy in `mobile/docs/store-launch/`), the September 19 `assembled-listing-2026-09` campaign and the `assembly-experiment` were deleted on 2026-09-22 with the scripts that built them; git history holds them.
 
 Reviewed against main `6f96ebb` on 2026-09-13. [Current build](CURRENT_BUILD.md) is
 the source of truth for merged behavior and configured versions; [build and
