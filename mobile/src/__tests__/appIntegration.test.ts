@@ -854,7 +854,43 @@ describe('a post-victory Fox intro can never be stranded', () => {
     // never consume a beat unseen.
     expect(flow).not.toContain('markStarterIntroSeen');
     expect(flow).not.toContain('markModifierStackingIntroSeen');
+    expect(flow).not.toContain('markBlindIntroSeen');
     expect(flow).not.toContain('markLexiconIntroSeen');
+  });
+
+  // Blind shipped with NO unlock beat while every other modifier had one, so
+  // the mode whose RULES actually change (previews vanish, every legal move
+  // commits unchecked, the chain is judged once at the end) was the only one
+  // the player met cold. The cards must also arrive in the order the gates do,
+  // or a card can describe a mode the player will not own for 20 more solves.
+  test('every composable modifier has a one-time unlock beat, checked in unlock order', () => {
+    const chain = sliceBetween('const immediateIntros:', 'First harvest gate');
+    const order = ['SPEED_TOGGLE_UNLOCK_PUZZLES', 'BLIND_TOGGLE_UNLOCK_PUZZLES', 'LEXICON_UNLOCK_PUZZLES']
+      .map(gate => chain.indexOf(gate));
+    expect(order.every(i => i > -1)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    // Challenge's beat is older and fires from HomeScreen instead, so it is
+    // checked there rather than by position in this chain.
+    expect(
+      require('fs').readFileSync(
+        require('path').join(__dirname, '../components/home/HomeScreen.tsx'), 'utf8')
+    ).toContain('hasSeenChallengeIntro');
+    for (const [gate, seen, lines] of [
+      ['SPEED_TOGGLE_UNLOCK_PUZZLES', 'hasSeenModifierStackingIntro', 'getModifierStackingIntroLines'],
+      ['BLIND_TOGGLE_UNLOCK_PUZZLES', 'hasSeenBlindIntro', 'getBlindIntroLines'],
+      ['LEXICON_UNLOCK_PUZZLES', 'hasSeenLexiconIntro', 'getLexiconIntroLines'],
+    ]) {
+      const block = chain.slice(chain.indexOf(gate));
+      expect(block).toContain(seen);
+      expect(block.slice(0, block.indexOf('immediateIntros.push') + 400)).toContain(lines);
+    }
+  });
+
+  test('the blind beat is marked seen on DISMISSAL, never when it is queued', () => {
+    const dismiss = sliceBetween('const dismissPostVictoryIntro', 'dismissingPostVictoryIntroRef.current = false;');
+    expect(dismiss).toMatch(/if \(dismissedKind === 'blind_unlock'\) \{\s*await markBlindIntroSeen\(\);/);
+    const chain = sliceBetween('const immediateIntros:', 'First harvest gate');
+    expect(chain).not.toContain('markBlindIntroSeen');
   });
 
   test('hardware back is swallowed while an intro owns the puzzle screen, above the WON branch', () => {

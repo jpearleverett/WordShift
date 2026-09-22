@@ -83,6 +83,8 @@ import {
   markStarterIntroSeen,
   hasSeenModifierStackingIntro,
   markModifierStackingIntroSeen,
+  hasSeenBlindIntro,
+  markBlindIntroSeen,
   hasSeenLexiconIntro,
   markLexiconIntroSeen,
   getPendingVariantTutorials,
@@ -129,6 +131,7 @@ import {
   getFoxSetupSelectorIntroLines,
   getFoxStarterIntroLines,
   getModifierStackingIntroLines,
+  getBlindIntroLines,
   getLexiconIntroLines,
   getNotificationPromptText,
   getSpeedTimeUpMessage,
@@ -315,7 +318,7 @@ type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery'
 
 type PostVictoryIntro =
   | { kind: 'variant_unlock'; variant: PuzzleVariant; lines: string[] }
-  | { kind: 'modifier_stacking' | 'lexicon_unlock' | 'starter_pack'; lines: string[] };
+  | { kind: 'modifier_stacking' | 'blind_unlock' | 'lexicon_unlock' | 'starter_pack'; lines: string[] };
 
 
 // Speed rescue: seconds granted by the one-per-board rewarded continue.
@@ -1955,6 +1958,9 @@ function MainApp() {
       if (dismissedKind === 'modifier_stacking') {
         await markModifierStackingIntroSeen();
       }
+      if (dismissedKind === 'blind_unlock') {
+        await markBlindIntroSeen();
+      }
       if (dismissedKind === 'lexicon_unlock') {
         await markLexiconIntroSeen();
       }
@@ -3040,6 +3046,23 @@ function MainApp() {
         immediateIntros.push({
           kind: 'modifier_stacking',
           lines: getModifierStackingIntroLines(finalVictory.newPhase),
+        });
+      }
+      // The Blind Offering's own unlock beat, sitting between Speed's (55) and
+      // Lexicon's (100) so the cards arrive in unlock order. Blind shipped with
+      // no beat at all, which was backwards: it is the one modifier whose RULES
+      // change. Previews do not dim, they vanish; every structurally legal move
+      // commits with no dictionary check; the chain is judged once, when the
+      // final letter lands. Meeting that cold, a player makes an unchecked move,
+      // watches a non-word sit on the board and reads it as the game breaking.
+      if (
+        immediateIntros.length === 0 &&
+        completedTotal >= BLIND_TOGGLE_UNLOCK_PUZZLES &&
+        !(await hasSeenBlindIntro())
+      ) {
+        immediateIntros.push({
+          kind: 'blind_unlock',
+          lines: getBlindIntroLines(finalVictory.newPhase),
         });
       }
       // Lexicon's own unlock beat. It is the one mode that changes nothing the

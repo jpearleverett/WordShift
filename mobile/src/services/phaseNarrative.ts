@@ -5215,6 +5215,47 @@ export function getModifierStackingIntroLines(phase: DialoguePhase): string[] {
 }
 
 /**
+ * One-time Fox beat when the Blind Offering unlocks (80 solves).
+ *
+ * It was the only modifier with no unlock beat at all. Challenge has one at 15,
+ * Speed announces itself and the stacking rule at 55, Lexicon has its own at
+ * 100, and Blind, which arrives between them, said nothing. That is backwards:
+ * Blind is the one whose RULES actually change. Its previews do not just dim,
+ * they vanish; every structurally legal move commits with no dictionary check
+ * at all; the whole chain is judged once, when the final letter lands. A player
+ * meeting that cold makes an unchecked move, watches a non-word sit on the
+ * board, and reads it as the game breaking. So this card has four beats rather
+ * than the usual three: the guidance is gone, anything that fits goes in,
+ * judgment comes at the end, and undo is free without limit because walking the
+ * chain back IS the mode's repair loop. The rate named is blind-alone (+100%);
+ * the menu row owns the stacked figure.
+ */
+export function getBlindIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 4) {
+    return [
+      "The last of the guidance goes now, friend. No ghosts beneath the letters. Nothing to tell you what a move would make.",
+      "It is called the Blind Offering. Every move your hands can make will be accepted. Nothing is weighed until the final letter lands, and then the whole chain is weighed at once.",
+      "So take it back as often as you need. Undo costs nothing here, and there is no limit on it. Walk the chain backward until you find where it stopped being true.",
+      "The arrangement pays double for an offering made in the dark. Of course it does.",
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      "This one takes the guidance away entirely. No ghost words under the letters at all.",
+      "It's the Blind Offering. Anything that fits, goes in. Nothing's checked as you go, and then the whole chain is judged the moment the last letter lands.",
+      "That's why undo is free here, as many times as you like. When the chain doesn't hold, walk it back until you find where it stopped being a word.",
+      "And it pays double, friend. I'd want double too, for working in the dark.",
+    ];
+  }
+  return [
+    "Something new, and it's the hardest one yet. The little ghost words go away completely.",
+    "It's called Blind Mode! Anything that fits will go straight in. Nothing gets checked as you go, and then the whole chain is judged the moment your last letter lands.",
+    "Don't panic if it doesn't hold. Undo is free here, as often as you like. Just walk it back to where it stopped being a word.",
+    "And it pays double. You've earned a look at it.",
+  ];
+}
+
+/**
  * One-time Fox beat when Lexicon unlocks. Lexicon is the only mode that changes
  * nothing the player can SEE on the board (blind's previews visibly vanish; the
  * clock counts down; Lexicon just quietly serves rarer words), so without a
