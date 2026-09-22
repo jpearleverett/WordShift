@@ -54,6 +54,11 @@ import {
   PIT_OFFER_RESULT_MESSAGES,
   getPitOfferResultMessage,
   INTERJECTION_MESSAGES,
+  INTERJECTION_NOBODY_MESSAGES,
+  getAnimalInterjection,
+  getRitualMicroEvent,
+  fillInterjectionTemplate,
+  getRitualMicroEventPool,
   getDwellLine,
   getPostCapDwellLine,
   getStreakHeldMessage,
@@ -2420,5 +2425,115 @@ describe('reveal-gated micro-beats are deferred, never consumed early', () => {
 
   test('a legacy cycled save with no anchor never scans the whole table at once', async () => {
     expect(await resolveVictoryMicroBeat(300, 1, 0, { phase: 4 })).toBeNull();
+  });
+});
+
+// ============================================================================
+// Interjections name only a resident with news (N3), with canon pronouns
+// ============================================================================
+describe('getAnimalInterjection names only residents whose badge is lit', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('with nobody lit, the house speaks and names no one', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      const result = getAnimalInterjection(p, [], 10);
+      expect(result).not.toBeNull();
+      expect(result!.animalName).toBe('');
+      expect(INTERJECTION_NOBODY_MESSAGES[p]).toContain(result!.text);
+    }
+  });
+
+  test('a lit resident is the one named', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const result = getAnimalInterjection(1, ['kakapo'], 10);
+    expect(result!.animalName).toBe('Moss');
+    expect(result!.text).toContain('Moss');
+  });
+
+  test('still silent on ~70% of victories', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.9);
+    expect(getAnimalInterjection(2, ['fox'], 10)).toBeNull();
+    expect(getAnimalInterjection(2, [], 10)).toBeNull();
+  });
+
+  test('every template resolves every token to the canon pronouns', () => {
+    const expected: Record<string, RegExp> = {
+      fox: /\b(she|her|She|Her|has)\b/, owl: /\b(he|him|his|He|His|has)\b/,
+      red_panda: /\b(they|them|their|They|Their|have)\b/,
+    };
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      for (const t of INTERJECTION_MESSAGES[p]) {
+        for (const type of ['fox', 'owl', 'red_panda']) {
+          const text = fillInterjectionTemplate(t, type, 'X');
+          expect(text).not.toMatch(/[{}]/);
+          if (/\{(They|they|them|Their|their|have)\}/.test(t)) {
+            expect(text).toMatch(expected[type]);
+          }
+        }
+        // No literal singular "they" for the resident: pronouns ride tokens.
+        expect(t).not.toMatch(/(?<!\{)\bThey\b|\bthey (have|know|say|are|would|will)\b|beside them|on them\b/);
+      }
+    }
+  });
+
+  test('the nobody lines carry no name slot, dash or phase label', () => {
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      expect(INTERJECTION_NOBODY_MESSAGES[p].length).toBeGreaterThanOrEqual(3);
+      for (const t of INTERJECTION_NOBODY_MESSAGES[p]) {
+        expect(t).not.toMatch(/[{}–—]/);
+        expect(t).not.toMatch(/\bPhase\b|puzzle/i);
+      }
+    }
+  });
+});
+
+// ============================================================================
+// Whispers speak from the resident's own awareness tier (N5)
+// ============================================================================
+describe('getAnimalWhisper uses the resident awareness tier', () => {
+  test('a lagging resident at world phase 3 whispers from their phase-2 pool', () => {
+    // Sloane (sloth) is lagging: world 3 -> 2. Every draw must come from the
+    // phase-2 sloth pool, never the phase-3 one.
+    for (let i = 0; i < 20; i++) {
+      const w = getAnimalWhisper(3, ['sloth']);
+      expect(w).not.toBeNull();
+      expect(ANIMAL_WHISPERS[2].sloth).toContain(w!.text);
+    }
+  });
+
+  test('a vanguard resident at world phase 1 whispers one phase ahead', () => {
+    for (let i = 0; i < 20; i++) {
+      const w = getAnimalWhisper(1, ['fox']);
+      expect(ANIMAL_WHISPERS[2].fox).toContain(w!.text);
+    }
+  });
+
+  test('at the reveal every tier converges', () => {
+    const w = getAnimalWhisper(4, ['sloth']);
+    expect(ANIMAL_WHISPERS[4].sloth).toContain(w!.text);
+  });
+});
+
+// ============================================================================
+// Phase-5 ritual micro-events have their own pool (dialogue review item 4)
+// ============================================================================
+describe('getRitualMicroEvent phase-5 pool', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('phase 5 draws from its own pool, the same size as phase 4', () => {
+    const pool = getRitualMicroEventPool('VOID');
+    expect(pool[5]).toHaveLength(pool[4].length);
+    for (const line of pool[5]) expect(pool[4]).not.toContain(line);
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    expect(pool[5]).toContain(getRitualMicroEvent(9, 5, ['VOID']));
+  });
+
+  test('the phase-5 lines hold the canon: no serene peace, no contractions', () => {
+    for (const line of getRitualMicroEventPool('VOID')[5]) {
+      expect(line).not.toMatch(/peace|serene|weave/i);
+      expect(line).not.toMatch(/\b\w+'(s|re|ve|ll|d|t)\b/i);
+      expect(line).not.toMatch(/[–—]/);
+    }
   });
 });

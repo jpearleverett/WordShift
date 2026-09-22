@@ -1950,6 +1950,10 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
 /**
  * Get a random whisper from a random unlocked animal after puzzle completion.
  * Returns null if no animals are unlocked.
+ *
+ * `phase` is the WORLD phase. The line is drawn from the selected resident's
+ * own awareness tier (getAnimalPhase), the same phase their dialogue is
+ * written for, so a lagging resident never whispers ahead of what they know.
  */
 export function getAnimalWhisper(
   phase: number,
@@ -1959,8 +1963,6 @@ export function getAnimalWhisper(
   if (unlockedAnimals.length === 0) return null;
 
   const clampedPhase = Math.min(5, Math.max(0, phase));
-  const phaseWhispers = ANIMAL_WHISPERS[clampedPhase];
-  if (!phaseWhispers) return null;
 
   // Map animal IDs to types (IDs are like 'fox', 'owl', etc.)
   const ANIMAL_NAMES: Record<string, string> = {
@@ -1990,7 +1992,11 @@ export function getAnimalWhisper(
     selectedType = unlockedAnimals[Math.floor(Math.random() * unlockedAnimals.length)];
   }
 
-  const whispers = phaseWhispers[selectedType];
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
+  const { getAnimalPhase } = require('../types/homeWorld');
+  const residentPhase: number = getAnimalPhase(clampedPhase as DialoguePhase, selectedType);
+  const phaseWhispers = ANIMAL_WHISPERS[residentPhase] ?? ANIMAL_WHISPERS[clampedPhase];
+  const whispers = phaseWhispers?.[selectedType];
   if (!whispers || whispers.length === 0) return null;
 
   return {
@@ -2105,56 +2111,125 @@ export function getPersonalizedPhase5Whisper(
 
 // Exported for tests and the dash sweep. Six per phase: an interjection fires
 // on ~30% of victories, so three templates repeated visibly within a session.
+// Each promises that the named resident has something to say, so the caller
+// only ever names a resident whose home badge is lit (getAnimalInterjection).
+// Pronoun tokens ({They}/{they}/{them}/{Their}/{their}/{have}) resolve to the
+// resident's canon pronouns; see INTERJECTION_PRONOUNS.
 export const INTERJECTION_MESSAGES: Record<number, string[]> = {
   0: [
     '{name} is waiting to chat with you!',
     '{name} has something to share. Visit the house!',
-    'Check in on {name}, they love visitors!',
+    'Check in on {name}. {They} saved a story just for you!',
     '{name} saved you a seat by the window!',
     '{name} keeps peeking down the path, hoping it\'s you.',
     '{name} has a little story saved up just for you!',
   ],
   1: [
     '{name} has been thinking about something...',
-    "{name} looks like they want to talk.",
-    'Something is on {name}\'s mind. Visit them?',
-    "{name} keeps starting sentences and never finishing them.",
+    '{name} looks ready to talk.',
+    'Something is on {name}\'s mind. Visit {them}?',
+    '{name} keeps starting sentences and never finishing them.',
     '{name} found something odd and wants a second opinion.',
     '{name} has a question only you can answer, apparently.',
   ],
   2: [
-    '{name} is acting strangely. You should check on them.',
+    '{name} is acting strangely. You should check on {them}.',
     '{name} keeps looking at the walls...',
-    'Have you talked to {name} lately? They\'ve changed.',
+    'Have you talked to {name} lately? {They} {have} changed.',
     '{name} was talking to an empty room again. The room may have answered.',
     '{name} asked when you were coming back. Twice.',
     'The others say {name} has started counting things.',
   ],
   3: [
     '{name} needs to tell you something. It\'s important.',
-    "{name} has been waiting for you. They know something.",
+    '{name} has been waiting for you, and knows something.',
     'The others say {name} hasn\'t been sleeping.',
-    '{name} left a light burning for you. They say you will want it.',
-    "{name} is waiting by the door. They will not say what for.",
+    '{name} left a light burning for you. {They} said you would want it.',
+    '{name} is waiting by the door, and will not say what for.',
     '{name} keeps rehearsing something quietly. It has your name in it.',
   ],
   4: [
-    "{name} has been up all night. They want to talk before anything else changes.",
+    '{name} has been ready for a long time, and would like you to know why.',
     '{name} says the arrangement is almost complete.',
-    "Visit {name}. There is something they should have told you sooner.",
-    "{name} set a place for you in the pattern. It is exactly your shape.",
-    '{name} has stopped agreeing with the others. They want to tell you why.',
-    "{name} says there is little left to say. They would like to say it to you.",
+    'Visit {name}. The keepers want to speak with you.',
+    '{name} set a place for you in the pattern. It is exactly your shape.',
+    '{name} has stopped pretending not to know. Come and ask.',
+    '{name} says there is little left to say, and would like to say it to you.',
   ],
   5: [
-    '{name} is still working out how they feel about all of it. They would like company while they do.',
-    "{name} says what you chose that night is still holding. Visit whenever you like.",
-    "The pattern hums. {name} is humming a different tune, on purpose.",
-    "{name} set a memory aside for you. There is no hurry at all.",
-    '{name} sits with the quiet. There is room beside them.',
-    "{name} would like to see you. Wanting company is one of the things that stayed.",
+    '{name} keeps watch over the quiet corners. {They} would like company.',
+    '{name} says the line you drew still holds. Come and see it.',
+    'Something in the walls would like every room to stay exactly as it is. {name} would like to talk about that.',
+    '{name} set a memory aside for you, before the house could tidy it away.',
+    '{name} sits up late, listening to the house. There is room beside {them}.',
+    '{name} would like to see you. Wanting company is one of the things that stayed.',
   ],
 };
+
+/**
+ * Interjections for a victory when no resident has anything new to say: the
+ * house speaks, and names nobody, so the line can never promise news a
+ * resident does not have. Three per phase. Exported for tests and the sweep.
+ */
+export const INTERJECTION_NOBODY_MESSAGES: Record<number, string[]> = {
+  0: [
+    'Everyone at home is settled in. The kettle is still warm.',
+    'The house is full of small happy noises today.',
+    'Someone left the porch light on for you.',
+  ],
+  1: [
+    'The house is quiet in a comfortable way. Everyone is thinking.',
+    'Everyone at home has said their piece for now. The fire is still going.',
+    'A window in the house is open, as if someone is listening for you.',
+  ],
+  2: [
+    'The house is very quiet. Nobody has anything to say yet.',
+    'Every door in the house is closed tonight. None of them is locked.',
+    'The rooms are empty of conversation. Not of listening.',
+  ],
+  3: [
+    'Nobody in the house is talking tonight. They are all waiting for something.',
+    'The house holds its breath. Everyone inside is keeping their own counsel.',
+    'Every light in the house is still burning. No one is ready to speak.',
+  ],
+  4: [
+    'The house is silent. Everyone inside has already said what they will say.',
+    'No one calls for you tonight. The house does not need them to.',
+    'The rooms are full and still. Something underneath is listening instead.',
+  ],
+  5: [
+    'The house is quiet. Something in the walls likes it that way.',
+    'Nobody has anything new to say. The house would keep it so, if it could.',
+    'The rooms are still. Your line still holds across the doorway.',
+  ],
+};
+
+/** Canon pronouns for the interjection tokens. Keyed by resident id. */
+const INTERJECTION_PRONOUNS: Record<string, {
+  They: string; they: string; them: string; Their: string; their: string; have: string;
+}> = (() => {
+  const she = { They: 'She', they: 'she', them: 'her', Their: 'Her', their: 'her', have: 'has' };
+  const he = { They: 'He', they: 'he', them: 'him', Their: 'His', their: 'his', have: 'has' };
+  const they = { They: 'They', they: 'they', them: 'them', Their: 'Their', their: 'their', have: 'have' };
+  return {
+    fox: she, pangolin: she, owl: he, axolotl: he, capybara: he, fennec_fox: he,
+    sloth: she, wombat: he, rabbit: she, red_panda: they, tarsier: she, aye_aye: he,
+    kakapo: he,
+  };
+})();
+
+/** Fill an interjection template with a resident's name and pronouns. */
+export function fillInterjectionTemplate(template: string, animalType: string, animalName: string): string {
+  const p = INTERJECTION_PRONOUNS[animalType] ?? INTERJECTION_PRONOUNS.red_panda;
+  return template
+    .replace(/\{name\}/g, animalName)
+    .replace(/\{They\}/g, p.They)
+    .replace(/\{they\}/g, p.they)
+    .replace(/\{them\}/g, p.them)
+    .replace(/\{Their\}/g, p.Their)
+    .replace(/\{their\}/g, p.their)
+    .replace(/\{have\}/g, p.have);
+}
 
 /**
  * Get a puzzle-specific micro-event message when ritual energy is high.
@@ -2178,8 +2253,19 @@ export function getRitualMicroEvent(
   ) || completedWords[completedWords.length - 1];
 
   const word = dreadWord.toUpperCase();
+  const events = getRitualMicroEventPool(word);
+  const phaseEvents = events[Math.min(Math.max(phase, 2), 5)];
+  return phaseEvents[Math.floor(Math.random() * phaseEvents.length)];
+}
 
-  const events: Record<number, string[]> = {
+/**
+ * The ritual micro-event lines for one word, by phase (2-5). Exported for
+ * tests and the dash sweep. Phase 5 has its own pool: after the Arrival the
+ * presence lives in the house and prefers sameness, while the boundary the
+ * player chose still holds. Quiet and watchful, never a serene "peace".
+ */
+export function getRitualMicroEventPool(word: string): Record<number, string[]> {
+  return {
     2: [
       `The house shivered when you formed ${word}.`,
       `Something stirred below when ${word} was spoken.`,
@@ -2195,43 +2281,52 @@ export function getRitualMicroEvent(
       `Everyone in the house felt ${word} in their bones. Something underneath felt it too.`,
       `${word} completes another verse. The silence between the words thickens.`,
     ],
+    5: [
+      `${word} settled into the house. Something in the walls kept it, the way it keeps everything.`,
+      `The presence turned toward ${word}, the way a sleeper turns toward a sound. Your line held.`,
+      `${word} went down into the quiet. The house would like it to stay exactly where it is.`,
+    ],
   };
-
-  // Phase 5 reuses Phase 4 micro events — terrible peace doesn't need separate ritual shocks
-  const phaseEvents = events[Math.min(phase, 4)] || events[4];
-  return phaseEvents[Math.floor(Math.random() * phaseEvents.length)];
 }
 
 /**
- * Get a between-puzzle animal interjection that draws the player toward the home screen.
- * Returns null ~70% of the time so interjections don't appear after every puzzle.
+ * Get a between-puzzle interjection that draws the player toward the home
+ * screen. Returns null ~70% of the time so interjections don't appear after
+ * every puzzle.
+ *
+ * `residentsWithNews` is the ids of the unlocked residents whose home badge is
+ * lit (Animal.hasNewDialogue): every template promises the named resident has
+ * something to say, so only they are ever named. With nobody lit, the house
+ * speaks instead and `animalName` is empty.
  */
 export function getAnimalInterjection(
   phase: number,
-  unlockedAnimals: string[],
+  residentsWithNews: string[],
   puzzlesSolved: number,
 ): { animalName: string; text: string } | null {
+  void puzzlesSolved;
   // Only show ~30% of the time
   if (Math.random() > 0.30) return null;
-  if (unlockedAnimals.length === 0) return null;
+
+  const clampedPhase = Math.min(5, Math.max(0, phase));
+
+  if (residentsWithNews.length === 0) {
+    const quiet = INTERJECTION_NOBODY_MESSAGES[clampedPhase];
+    return { animalName: '', text: quiet[Math.floor(Math.random() * quiet.length)] };
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
   const { ANIMAL_INFO } = require('./animalDialogue');
 
-  const clampedPhase = Math.min(5, Math.max(0, phase));
   const messages = INTERJECTION_MESSAGES[clampedPhase];
   if (!messages || messages.length === 0) return null;
 
-  // Pick a random unlocked animal
-  const animalType = unlockedAnimals[Math.floor(Math.random() * unlockedAnimals.length)];
+  const animalType = residentsWithNews[Math.floor(Math.random() * residentsWithNews.length)];
   const info = ANIMAL_INFO[animalType];
   const animalName = info ? info.name : animalType;
 
-  // Pick a random message and substitute the name
   const template = messages[Math.floor(Math.random() * messages.length)];
-  const text = template.replace(/\{name\}/g, animalName);
-
-  return { animalName, text };
+  return { animalName, text: fillInterjectionTemplate(template, animalType, animalName) };
 }
 
 // ============================================================================
