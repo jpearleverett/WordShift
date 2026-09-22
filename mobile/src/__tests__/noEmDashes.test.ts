@@ -93,7 +93,6 @@ const CURLY_RE = /[\u2018\u2019\u201C\u201D]/;
  * delete its entry. Never raise a number here.
  */
 const CURLY_BASELINE: Record<string, number> = {
-  'src/components/home/HouseUpgradeGiftModal.tsx': 1,
 };
 
 const ANIMAL_TYPES: AnimalType[] = [

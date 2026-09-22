@@ -95,6 +95,7 @@ jest.mock('../services/animalDialogue', () => ({
   TUTORIAL_CALLBACK_DIALOGUES: ['tutorial callback line'],
   getCoordinatedEventLine: jest.fn(() => null),
   getWordThresholdDialogue: jest.fn(() => null),
+  peekWordThresholdPage: jest.fn(async () => null),
   getTotalDialogueCount: jest.fn(() => 24),
   getSacrificeReaction: jest.fn(() => null),
   getPhase2ExtraDialogues: jest.fn(() => []),
@@ -161,6 +162,9 @@ jest.mock('../services/phaseNarrative', () => ({
   getDialogueCaughtUpLine: jest.fn((phase: number) => `caught up (phase ${phase})`),
   getDialogueRevealSkipHint: jest.fn(() => 'Tap the words to skip ahead.'),
   getArrivalResumeFramingLine: jest.fn((name: string) => `${name} settles in (resume framing).`),
+  getDialogueSessionEndMessage: jest.fn((_p: number, name: string, _t: string, resting: boolean) =>
+    resting ? `${name} wants to rest now.` : `${name} still has more to say.`),
+  getDialogueCooldownMessage: jest.fn((_p: number, name: string) => `${name} is resting.`),
 }));
 
 jest.mock('../services/weeklyQuests', () => ({

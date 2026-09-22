@@ -213,6 +213,13 @@ export function getCatchUpSessionBonus(
  * reader catches up, so nothing is skipped and nothing is hurried past the
  * point where the resident's conversation meets the house.
  *
+ * At world phase 4 the gap shrinks to one: any unread line written for an
+ * earlier phase counts as backlog, because the reveal-to-Arrival window can
+ * be as short as the eight dwell wins and a lagging resident still reading
+ * phase-3 material would otherwise meet the Arrival without their reveal
+ * chapter. At phase 5 the ordinary two-phase rule applies again: after the
+ * Arrival the reading is the player's own pace.
+ *
  * `nextLinePhase` is the phase of the resident's next unread regular line
  * (null when there is none).
  */
@@ -220,8 +227,15 @@ export function getConversationBacklogPlan(
   worldPhase: DialoguePhase,
   nextLinePhase: number | null | undefined
 ): { catchingUp: boolean; sessionBonus: number; maxPuzzlesBetweenSessions: number | null } {
-  const catchingUp = typeof nextLinePhase === 'number' &&
-    nextLinePhase <= worldPhase - DIALOGUE_SESSION_CONFIG.BACKLOG_PHASE_GAP;
+  const catchingUp = typeof nextLinePhase === 'number' && (
+    nextLinePhase <= worldPhase - DIALOGUE_SESSION_CONFIG.BACKLOG_PHASE_GAP ||
+    // The reveal window: once the house is at phase 4, ANY unread line below
+    // phase 4 is backlog. The window between the reveal and the Arrival can be
+    // as short as the eight dwell wins (the full-house hold makes that the
+    // common case), and a lagging resident one phase behind would otherwise
+    // reach the Arrival without hearing any of their reveal chapter.
+    (worldPhase === 4 && nextLinePhase < 4)
+  );
   return catchingUp
     ? {
         catchingUp,

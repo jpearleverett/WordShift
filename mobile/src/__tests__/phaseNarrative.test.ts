@@ -25,6 +25,8 @@ import {
   getWhisperGalleryEmptyText,
   getNextStreakMilestoneText,
   checkNarrativeMicroBeat,
+  checkDeferredMicroBeat,
+  checkDeferredCycleMicroBeat,
   resetMicroBeats,
   getHomescreenNudge,
   getHarvestOverflowMessage,
@@ -52,6 +54,25 @@ import {
   PIT_OFFER_RESULT_MESSAGES,
   getPitOfferResultMessage,
   INTERJECTION_MESSAGES,
+  INTERJECTION_NOBODY_MESSAGES,
+  getOutOfHintsTitle,
+  getOutOfHintsMessage,
+  getOutOfHintsWatchLabel,
+  getOutOfHintsStoreLabel,
+  getOutOfHintsDismissLabel,
+  getRewardedHintLimitMessage,
+  getRewardedHintGrantedMessage,
+  getRewardedHintUnavailableMessage,
+  getSpeedRescueResumeMessage,
+  getExpertUnlockIntroLines,
+  getExpertLockedHint,
+  getHouseUpgradeGiftPrompt,
+  getDialogueSessionEndMessage,
+  getDialogueCooldownMessage,
+  getAnimalInterjection,
+  getRitualMicroEvent,
+  fillInterjectionTemplate,
+  getRitualMicroEventPool,
   getDwellLine,
   getPostCapDwellLine,
   getStreakHeldMessage,
@@ -59,6 +80,12 @@ import {
   getHouseAskLine,
   getHouseAskFulfilledMessage,
   getHintGrantMessage,
+  getPitButtonLabel,
+  getPitOfferAllLabel,
+  getPitEmptyMessage,
+  getPitHomeBadgeLabel,
+  getPitHarvestLabel,
+  getPitDevourVerb,
   getPreviewGraduationMessage,
   getSwiftVictoryHintMessage,
   getFinalBoardStartMessage,
@@ -823,7 +850,7 @@ describe('getComboMoveMessage', () => {
   test('signature lines survive as pool members', () => {
     expect(COMBO_MOVE_POOLS[4][2]).toContain('A flawless verse. It hears.');
     expect(COMBO_MOVE_POOLS[0][2]).toContain('On fire! Nothing is stopping you now!');
-    expect(COMBO_MOVE_POOLS[5][2]).toContain('The weave sings, unbroken.');
+    expect(COMBO_MOVE_POOLS[5][2]).toContain('Unbroken. The hum under the floor deepens.');
   });
 
   test('saturates at the top tier for very long streaks', () => {
@@ -1008,7 +1035,7 @@ describe('checkNarrativeMicroBeat', () => {
     }
   });
 
-  test('returns early micro-beats in puzzles 5-25', async () => {
+  test('returns early micro-beats in puzzles 5-27', async () => {
     const beat5 = await checkNarrativeMicroBeat(5);
     expect(beat5).not.toBeNull();
     expect(beat5!.type).toBe('ambient_whisper');
@@ -1034,9 +1061,11 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat20).not.toBeNull();
     expect(beat20!.type).toBe('ambient_whisper');
 
-    const beat25 = await checkNarrativeMicroBeat(25);
-    expect(beat25).not.toBeNull();
-    expect(beat25!.type).toBe('ambient_whisper');
+    const beat27 = await checkNarrativeMicroBeat(27);
+    expect(beat27).not.toBeNull();
+    expect(beat27!.type).toBe('ambient_whisper');
+    // Win 25 already carries the Double Shift card and a milestone.
+    expect(await checkNarrativeMicroBeat(25)).toBeNull();
   });
 
   test('returns a beat at puzzle 35', async () => {
@@ -1159,7 +1188,7 @@ describe('checkNarrativeMicroBeat', () => {
 
   test('all 28 micro-beat thresholds fire independently', async () => {
     const thresholds = [
-      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
+      5, 8, 12, 16, 20, 27, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
       75, 82, 88, 92, 104, 106, 109, 112, 115,
     ];
     for (const t of thresholds) {
@@ -1184,7 +1213,7 @@ describe('MICRO_BEATS geography', () => {
 
   test('keys match the new geography exactly', () => {
     expect(keys).toEqual([
-      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
+      5, 8, 12, 16, 20, 27, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
       72, 75, 78, 82, 86, 88, 92, 104, 106, 109, 112, 115,
     ]);
   });
@@ -1260,6 +1289,30 @@ describe('MICRO_BEATS geography', () => {
 
   test('the pre-completion builder beat sits before the house is whole', () => {
     expect(MICRO_BEATS[88].text).toContain('The house keeps making room');
+  });
+
+  test('win 25 carries no beat: the Double Shift card and a milestone already speak there', () => {
+    expect(MICRO_BEATS[25]).toBeUndefined();
+    expect(CYCLE_MICRO_BEATS[25]).toBeUndefined();
+    expect(CYCLE_MICRO_BEATS[27]).toBeUndefined();
+  });
+
+  test('system beats never say "puzzle" (the house counts words, not puzzles)', () => {
+    for (const k of keys) {
+      expect(MICRO_BEATS[k].text ?? '').not.toMatch(/puzzle/i);
+    }
+  });
+
+  test('every beat that presumes the reveal is gated to phase 4, and only those', () => {
+    const gated = keys.filter(k => MICRO_BEATS[k].minPhase !== undefined);
+    expect(gated).toEqual([92, 106, 109, 112, 115]);
+    for (const k of gated) expect(MICRO_BEATS[k].minPhase).toBe(4);
+    // The silent victory is keyed to its exact board by App (the chime is
+    // suppressed by count), so it can never be deferred.
+    expect(MICRO_BEATS[104].minPhase).toBeUndefined();
+    const cycleGated = Object.keys(CYCLE_MICRO_BEATS).map(Number)
+      .filter(k => CYCLE_MICRO_BEATS[k].minPhase !== undefined);
+    expect(cycleGated).toEqual([106, 112, 115]);
   });
 
   test('no beat says Phase or carries a dash', () => {
@@ -1607,22 +1660,24 @@ describe('getNextStreakMilestoneText', () => {
   });
 });
 
-describe('Phase 5 victory register (serene, distinct from Phase 4 offering)', () => {
+describe('Phase 5 victory register (kept by the house, distinct from Phase 4 offering)', () => {
   it('getRitualEchoHeader gives Phase 5 its own settled header', () => {
     expect(getRitualEchoHeader(4)).toBe('The Offering:');
     expect(getRitualEchoHeader(5)).toBe('The Pattern:');
     expect(getRitualEchoHeader(5)).not.toBe(getRitualEchoHeader(4));
   });
 
-  it('getRitualEchoFooter weaves rather than offers at Phase 5', () => {
+  // The old serene "weave" register was retired (dialogue review 2026-09-22,
+  // item 6): after the Arrival the presence keeps what it is given.
+  it('getRitualEchoFooter keeps rather than offers at Phase 5', () => {
     expect(getRitualEchoFooter(4, 3)).toContain('offered');
-    expect(getRitualEchoFooter(5, 3)).toContain('woven');
+    expect(getRitualEchoFooter(5, 3)).toContain('kept');
     expect(getRitualEchoFooter(5, 3)).not.toBe(getRitualEchoFooter(4, 3));
   });
 
-  it('getWordsOfferedText shifts to the Phase 5 weave register', () => {
+  it('getWordsOfferedText shifts to the Phase 5 register', () => {
     expect(getWordsOfferedText(7, 4)).toContain('arrangement');
-    expect(getWordsOfferedText(7, 5)).toContain('woven');
+    expect(getWordsOfferedText(7, 5)).toContain('kept');
     expect(getWordsOfferedText(7, 5)).not.toBe(getWordsOfferedText(7, 4));
   });
 
@@ -2296,5 +2351,331 @@ describe('getDialogueCaughtUpLine (an exhausted animal never replays its last li
     const distinct = new Set([0, 2, 4, 5].map(getDialogueCaughtUpLine));
     expect(distinct.size).toBe(4);
     expect(getDialogueCaughtUpLine(4)).toMatch(/arrangement/);
+  });
+});
+
+// ============================================================================
+// Reveal-gated micro-beats (N2): the late beats presume the reveal. A reveal
+// held by the full house reaches their counts at phase 3, so they wait and
+// then arrive one per victory, earliest key first, once phase 4 opens.
+// ============================================================================
+describe('reveal-gated micro-beats are deferred, never consumed early', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await resetMicroBeats();
+  });
+
+  test('a gated beat reached at phase 3 is not shown and not consumed', async () => {
+    expect(await resolveVictoryMicroBeat(92, 0, 0, { phase: 3 })).toBeNull();
+    // Not in the seen set: the exact key still resolves for an ungated caller.
+    expect(await checkNarrativeMicroBeat(92)).toEqual(MICRO_BEATS[92]);
+  });
+
+  test('ungated late beats keep their exact keys at phase 3', async () => {
+    expect(await resolveVictoryMicroBeat(88, 0, 0, { phase: 3 })).toEqual(MICRO_BEATS[88]);
+    await ackVictoryMicroBeat(0);
+    expect(await resolveVictoryMicroBeat(104, 0, 0, { phase: 3 })).toEqual(MICRO_BEATS[104]);
+  });
+
+  test('once phase 4 opens, deferred beats arrive in key order, one per victory', async () => {
+    for (const count of [92, 100, 106, 109]) {
+      expect(await resolveVictoryMicroBeat(count, 0, 0, { phase: 3 })).toBeNull();
+    }
+    const delivered: (string | undefined)[] = [];
+    for (const count of [110, 111, 112, 113, 114, 115, 116]) {
+      const beat = await resolveVictoryMicroBeat(count, 0, 0, { phase: 4 });
+      delivered.push(beat?.text);
+      if (beat) await ackVictoryMicroBeat(0);
+    }
+    expect(delivered).toEqual([
+      MICRO_BEATS[92].text,
+      MICRO_BEATS[106].text,
+      MICRO_BEATS[109].text,
+      MICRO_BEATS[112].text,
+      undefined, // 114: every passed key is delivered; 115 is not yet reached
+      MICRO_BEATS[115].text,
+      undefined,
+    ]);
+  });
+
+  test('an older deferred beat speaks before the one keyed to this very victory', async () => {
+    await resolveVictoryMicroBeat(92, 0, 0, { phase: 4 });
+    await ackVictoryMicroBeat(0);
+    await resolveVictoryMicroBeat(106, 0, 0, { phase: 3 });
+    expect((await resolveVictoryMicroBeat(109, 0, 0, { phase: 4 }))?.text).toBe(MICRO_BEATS[106].text);
+    await ackVictoryMicroBeat(0);
+    expect((await resolveVictoryMicroBeat(110, 0, 0, { phase: 4 }))?.text).toBe(MICRO_BEATS[109].text);
+  });
+
+  test('an unaffected player at phase 4 hears 92 on its own key', async () => {
+    expect(await resolveVictoryMicroBeat(92, 0, 0, { phase: 4 })).toEqual(MICRO_BEATS[92]);
+  });
+
+  test('the silent victory keeps its exact board and a deferred beat waits behind it', async () => {
+    await resolveVictoryMicroBeat(92, 0, 0, { phase: 3 });
+    expect(await resolveVictoryMicroBeat(104, 0, 0, { phase: 4 })).toEqual(MICRO_BEATS[104]);
+    await ackVictoryMicroBeat(0);
+    expect((await resolveVictoryMicroBeat(105, 0, 0, { phase: 4 }))?.text).toBe(MICRO_BEATS[92].text);
+  });
+
+  test('a held (unshown) beat is delivered before any deferred beat is rolled', async () => {
+    expect(await resolveVictoryMicroBeat(88, 0, 0, { phase: 3 })).toEqual(MICRO_BEATS[88]);
+    await resolveVictoryMicroBeat(92, 0, 0, { phase: 3 });
+    // The reveal of 88 was cancelled: it is delivered again, and 92 waits.
+    expect(await resolveVictoryMicroBeat(95, 0, 0, { phase: 4 })).toEqual(MICRO_BEATS[88]);
+    await ackVictoryMicroBeat(0);
+    expect((await resolveVictoryMicroBeat(96, 0, 0, { phase: 4 }))?.text).toBe(MICRO_BEATS[92].text);
+  });
+
+  test('no deferred beat is delivered on the final board or after the Arrival', async () => {
+    await resolveVictoryMicroBeat(112, 0, 0, { phase: 3 });
+    expect(await resolveVictoryMicroBeat(116, 0, 0, { phase: 4, isFinalBoard: true })).toBeNull();
+    expect(await resolveVictoryMicroBeat(117, 0, 0, { phase: 5 })).toBeNull();
+    expect(await checkDeferredMicroBeat(117, 5)).toBeNull();
+  });
+
+  test('the New Cycle track defers its gated beats the same way, in key order', async () => {
+    const start = 300;
+    expect(await resolveVictoryMicroBeat(start + 92, 1, start, { phase: 3 })).toBeNull();
+    expect(await resolveVictoryMicroBeat(start + 106, 1, start, { phase: 3 })).toBeNull();
+    expect((await resolveVictoryMicroBeat(start + 107, 1, start, { phase: 4 }))?.text)
+      .toBe(MICRO_BEATS[92].text);
+    await ackVictoryMicroBeat(1);
+    // At 106 the half-memory wins its key, as on the exact-key path.
+    expect(await checkDeferredCycleMicroBeat(108, 1, 4)).toEqual(CYCLE_MICRO_BEATS[106]);
+  });
+
+  test('a legacy cycled save with no anchor never scans the whole table at once', async () => {
+    expect(await resolveVictoryMicroBeat(300, 1, 0, { phase: 4 })).toBeNull();
+  });
+});
+
+// ============================================================================
+// Interjections name only a resident with news (N3), with canon pronouns
+// ============================================================================
+describe('getAnimalInterjection names only residents whose badge is lit', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('with nobody lit, the house speaks and names no one', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      const result = getAnimalInterjection(p, [], 10);
+      expect(result).not.toBeNull();
+      expect(result!.animalName).toBe('');
+      expect(INTERJECTION_NOBODY_MESSAGES[p]).toContain(result!.text);
+    }
+  });
+
+  test('a lit resident is the one named', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const result = getAnimalInterjection(1, ['kakapo'], 10);
+    expect(result!.animalName).toBe('Moss');
+    expect(result!.text).toContain('Moss');
+  });
+
+  test('still silent on ~70% of victories', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.9);
+    expect(getAnimalInterjection(2, ['fox'], 10)).toBeNull();
+    expect(getAnimalInterjection(2, [], 10)).toBeNull();
+  });
+
+  test('every template resolves every token to the canon pronouns', () => {
+    const expected: Record<string, RegExp> = {
+      fox: /\b(she|her|She|Her|has)\b/, owl: /\b(he|him|his|He|His|has)\b/,
+      red_panda: /\b(they|them|their|They|Their|have)\b/,
+    };
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      for (const t of INTERJECTION_MESSAGES[p]) {
+        for (const type of ['fox', 'owl', 'red_panda']) {
+          const text = fillInterjectionTemplate(t, type, 'X');
+          expect(text).not.toMatch(/[{}]/);
+          if (/\{(They|they|them|Their|their|have)\}/.test(t)) {
+            expect(text).toMatch(expected[type]);
+          }
+        }
+        // No literal singular "they" for the resident: pronouns ride tokens.
+        expect(t).not.toMatch(/(?<!\{)\bThey\b|\bthey (have|know|say|are|would|will)\b|beside them|on them\b/);
+      }
+    }
+  });
+
+  test('the nobody lines carry no name slot, dash or phase label', () => {
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      expect(INTERJECTION_NOBODY_MESSAGES[p].length).toBeGreaterThanOrEqual(3);
+      for (const t of INTERJECTION_NOBODY_MESSAGES[p]) {
+        expect(t).not.toMatch(/[{}–—]/);
+        expect(t).not.toMatch(/\bPhase\b|puzzle/i);
+      }
+    }
+  });
+});
+
+// ============================================================================
+// Whispers speak from the resident's own awareness tier (N5)
+// ============================================================================
+describe('getAnimalWhisper uses the resident awareness tier', () => {
+  test('a lagging resident at world phase 3 whispers from their phase-2 pool', () => {
+    // Sloane (sloth) is lagging: world 3 -> 2. Every draw must come from the
+    // phase-2 sloth pool, never the phase-3 one.
+    for (let i = 0; i < 20; i++) {
+      const w = getAnimalWhisper(3, ['sloth']);
+      expect(w).not.toBeNull();
+      expect(ANIMAL_WHISPERS[2].sloth).toContain(w!.text);
+    }
+  });
+
+  test('a vanguard resident at world phase 1 whispers one phase ahead', () => {
+    for (let i = 0; i < 20; i++) {
+      const w = getAnimalWhisper(1, ['fox']);
+      expect(ANIMAL_WHISPERS[2].fox).toContain(w!.text);
+    }
+  });
+
+  test('at the reveal every tier converges', () => {
+    const w = getAnimalWhisper(4, ['sloth']);
+    expect(ANIMAL_WHISPERS[4].sloth).toContain(w!.text);
+  });
+});
+
+// ============================================================================
+// Phase-5 ritual micro-events have their own pool (dialogue review item 4)
+// ============================================================================
+describe('getRitualMicroEvent phase-5 pool', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('phase 5 draws from its own pool, the same size as phase 4', () => {
+    const pool = getRitualMicroEventPool('VOID');
+    expect(pool[5]).toHaveLength(pool[4].length);
+    for (const line of pool[5]) expect(pool[4]).not.toContain(line);
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    expect(pool[5]).toContain(getRitualMicroEvent(9, 5, ['VOID']));
+  });
+
+  test('the phase-5 lines hold the canon: no serene peace, no contractions', () => {
+    for (const line of getRitualMicroEventPool('VOID')[5]) {
+      expect(line).not.toMatch(/peace|serene|weave/i);
+      expect(line).not.toMatch(/\b\w+'(s|re|ve|ll|d|t)\b/i);
+      expect(line).not.toMatch(/[–—]/);
+    }
+  });
+});
+
+// ============================================================================
+// Hint economy, speed rescue, Expert unlock and gift copy (FTUE-D/E, N6)
+// ============================================================================
+describe('launch-readiness copy surfaces', () => {
+  const PHASES = [0, 1, 2, 3, 4, 5];
+  const CONTRACTION = /\b\w+'(s|re|ve|ll|d|t|m)\b/i;
+
+  test('out-of-hints and rewarded-hint copy is phase-aware, never names money', () => {
+    for (const p of PHASES) {
+      const lines = [
+        getOutOfHintsTitle(p),
+        getOutOfHintsMessage(p, true),
+        getOutOfHintsMessage(p, false),
+        getOutOfHintsWatchLabel(p),
+        getOutOfHintsStoreLabel(p),
+        getOutOfHintsDismissLabel(p),
+        getRewardedHintLimitMessage(p),
+        getRewardedHintGrantedMessage(p),
+        getRewardedHintUnavailableMessage(p),
+        getSpeedRescueResumeMessage(p),
+      ];
+      for (const line of lines) {
+        expect(line.length).toBeGreaterThan(0);
+        expect(line).not.toMatch(/[$€£]|\bprice\b|\bbuy\b|\bmoney\b|\bpay\b/i);
+        expect(line).not.toMatch(/[–—‘’“”]/);
+        expect(line).not.toMatch(/\bPhase\b/);
+        // Exclamations are the bright days' voice only.
+        if (p >= 2) expect(line).not.toContain('!');
+      }
+    }
+    expect(getOutOfHintsMessage(0, true)).not.toBe(getOutOfHintsMessage(0, false));
+    // Without canWatch it is still usePuzzleGame's board message.
+    expect(getOutOfHintsMessage(0)).toBe("You're out of hints! Watch a quick clip or grab more to keep going.");
+    expect(getOutOfHintsMessage(4, true)).not.toBe(getOutOfHintsMessage(0, true));
+    expect(getSpeedRescueResumeMessage(0)).not.toBe(getSpeedRescueResumeMessage(3));
+  });
+
+  test('the Expert card is Ember-voiced, three lines, register-correct', () => {
+    for (const p of PHASES) {
+      const lines = getExpertUnlockIntroLines(p);
+      expect(lines.length).toBeGreaterThanOrEqual(2);
+      expect(lines.length).toBeLessThanOrEqual(3);
+      const text = lines.join(' ');
+      expect(text).toMatch(/Expert/);
+      expect(text).toMatch(/[Ss]ix-letter/);
+      expect(text).not.toMatch(/puzzle|\bPhase\b|[–—‘’“”]/i);
+      // Residents drop contractions at the reveal.
+      if (p >= 4) expect(text).not.toMatch(CONTRACTION);
+    }
+  });
+
+  test('the Expert locked hint counts toward the gate', () => {
+    expect(getExpertLockedHint(20, 35)).toContain('35');
+    expect(getExpertLockedHint(20, 35)).toContain('20');
+    expect(getExpertLockedHint(35, 35)).toBe('Unlocked.');
+  });
+
+  test('the gift prompt uses the resident\'s pronoun and straight narration', () => {
+    expect(getHouseUpgradeGiftPrompt('a rug', 'Ember', 'fox')).toBe('You brought a rug for Ember. Give it to her when you are ready.');
+    expect(getHouseUpgradeGiftPrompt('a lamp', 'Tock', 'aye_aye')).toContain('Give it to him');
+    expect(getHouseUpgradeGiftPrompt('a lamp', 'Bamboo', 'red_panda')).toContain('Give it to them');
+  });
+});
+
+// ============================================================================
+// Dialogue rest copy (N7): house register, canon pronouns, never "puzzles"
+// ============================================================================
+describe('dialogue rest copy', () => {
+  test('never says puzzle, a phase or a dash; pronouns follow canon', () => {
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      const lines = [
+        getDialogueSessionEndMessage(p, 'Ember', 'fox', true),
+        getDialogueSessionEndMessage(p, 'Ember', 'fox', false),
+        getDialogueCooldownMessage(p, 'Ember', 'fox', () => 0),
+        getDialogueCooldownMessage(p, 'Ember', 'fox', () => 0.99),
+      ];
+      for (const line of lines) {
+        expect(line).toContain('Ember');
+        expect(line).not.toMatch(/puzzle|\bPhase\b|[–—‘’“”{}]/i);
+        expect(line).not.toMatch(/\b(they|them|They)\b/);
+        if (p >= 2) expect(line).not.toContain('!');
+      }
+    }
+    expect(getDialogueSessionEndMessage(0, 'Bamboo', 'red_panda', false)).toContain('Tap them again');
+    expect(getDialogueSessionEndMessage(0, 'Tock', 'aye_aye', false)).toContain('Tap him again');
+  });
+
+  test('resting and not-resting say different things', () => {
+    expect(getDialogueSessionEndMessage(3, 'Chill', 'capybara', true))
+      .not.toBe(getDialogueSessionEndMessage(3, 'Chill', 'capybara', false));
+  });
+});
+
+// ============================================================================
+// Phase-5 system copy follows the current canon (dialogue review item 6):
+// the presence lives in the house and prefers sameness, the player's line
+// holds. The old serene weave/loom register is gone from system copy (the
+// Unbroken Weave keeps its name: it is a mode, not a register).
+// ============================================================================
+describe('phase-5 system copy leaves the serene weave register', () => {
+  test('no weave, loom or woven in the phase-5 system surfaces', () => {
+    const lines: string[] = [
+      ...Array.from({ length: 40 }, () => getMoveMessage(5)),
+      getHintFallback(5), getLoadingMessage(5), getStartMessage(5),
+      getNoValidMovesMessage(5), getDragMissMessage(5), getSpeedTimeUpMessage(5),
+      getPitButtonLabel(5), getPitOfferAllLabel(5), getPitEmptyMessage(5),
+      getPitHomeBadgeLabel(5), getPitHarvestLabel(5), getPitDevourVerb(5),
+      getRitualEchoFooter(5, 3), getWordsOfferedText(3, 5), getHintGrantMessage(5),
+      ...getRulesText(5).steps.flatMap(st => [st.heading, st.desc]), getRulesText(5).title,
+      ...PIT_OFFER_RESULT_MESSAGES[5],
+      ...COMBO_MOVE_POOLS[5].flat(),
+    ];
+    for (const line of lines) {
+      expect(line).not.toMatch(/weave|loom|woven|\bthreads?\b|at peace|serene/i);
+      expect(line).not.toMatch(/[–—]/);
+    }
+    expect(getPhaseIndicator(5).label).not.toMatch(/peace/i);
   });
 });

@@ -393,6 +393,19 @@ describe('catch-up pacing for a resident whose reading is behind the house', () 
     expect(getConversationBacklogPlan(1, 0).catchingUp).toBe(false);
   });
 
+  test('at the reveal a one-phase gap is backlog, so lagging residents hear phase 4 before the Arrival', () => {
+    expect(getConversationBacklogPlan(4, 3).catchingUp).toBe(true);
+    expect(getConversationBacklogPlan(4, 3).sessionBonus).toBe(BONUS);
+    expect(getConversationBacklogPlan(4, 3).maxPuzzlesBetweenSessions).toBe(REST);
+    expect(getConversationBacklogPlan(4, 4).catchingUp).toBe(false);
+    // Only the reveal window shrinks the gap: phases 1-3 and the aftermath
+    // keep the two-phase rule.
+    expect(getConversationBacklogPlan(3, 2).catchingUp).toBe(false);
+    expect(getConversationBacklogPlan(2, 1).catchingUp).toBe(false);
+    expect(getConversationBacklogPlan(5, 4).catchingUp).toBe(false);
+    expect(getConversationBacklogPlan(5, 3).catchingUp).toBe(true);
+  });
+
   test('a late recruit reading phase-0 lines at world phase 3 gets longer visits', async () => {
     updateSessionPhase(3);
     updateConversationBacklog('kakapo', 0);

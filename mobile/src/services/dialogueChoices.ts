@@ -154,11 +154,11 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
     "prompt": "Thyme unfolds a map on the table. She covers one marked path with her paw.",
     "options": {
       "ask": "Help me check the way out.",
-      "refuse": "Keep the map between us."
+      "refuse": "It's your map. Keep it yours."
     },
     "responses": {
       "ask": "Thank you. We can walk to the rosemary gate and back. I want to see where that path goes today, not where somebody says it's always gone.",
-      "refuse": "Between us, then. Please don't turn my map into a report about how frightened I am. It's a map, and I worked hard on it."
+      "refuse": "Mine, then. Please don't turn my map into a report about how frightened I am. It's a map, and I worked hard on it."
     },
     "convergence": "Thyme leaves the map unfolded on her own side of the table."
   },

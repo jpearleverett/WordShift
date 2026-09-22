@@ -119,6 +119,24 @@ const NARRATIVE_VOICE_RETRY_MS = 200;
 /** Safety cap (~4s of retries) so a stuck voice can never wedge a later one silent forever. */
 const NARRATIVE_VOICE_MAX_ATTEMPTS = 20;
 
+/**
+ * Ids of the unlocked residents whose home badge is lit right now: the same
+ * signal the house shows (Animal.hasNewDialogue from getAnimalsWithStatus).
+ * Lazily required so this hook stays Jest-safe and outside homeWorldData's
+ * import graph; a failed read names nobody rather than guessing.
+ */
+async function getResidentsWithNews(): Promise<string[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- Defer this dependency to preserve native availability and import-cycle boundaries.
+    const { getAnimalsWithStatus } = require('../services/homeWorldData');
+    const animals: { id: string; isUnlocked?: boolean; hasNewDialogue?: boolean }[] =
+      await getAnimalsWithStatus();
+    return animals.filter(a => a.isUnlocked && a.hasNewDialogue).map(a => a.id);
+  } catch {
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -451,10 +469,14 @@ export function useVictoryOrchestration(): [
         const fullProgress = await getFullProgress();
         if (gen !== generationRef.current) return;
         beatCycleCount = fullProgress?.cycleCount ?? 0;
+        // The phase lets a beat that presumes the reveal wait for it (a
+        // reveal held by the full house reaches 92-115 first); deferred beats
+        // are delivered one per victory from phase 4, never on the finale.
         beat = await resolveVictoryMicroBeat(
           totalPuzzlesCompleted,
           beatCycleCount,
           fullProgress?.cycleStartPuzzles ?? 0,
+          { phase, isFinalBoard: suppressCeremonyCues },
         );
         beatIsKeyed = !!beat;
       } catch {
@@ -552,6 +574,8 @@ export function useVictoryOrchestration(): [
                   ? fullProgress.ritualWords
                   : completedWords,
               )
+            // World phase in; the line comes from the selected resident's
+            // own awareness tier (getAnimalPhase inside getAnimalWhisper).
             : getAnimalWhisper(
                 phase,
                 fullProgress.unlockedAnimals || [],
@@ -606,11 +630,14 @@ export function useVictoryOrchestration(): [
             );
             if (payload) homeNudgeShownThisSession = true;
           }
-          // Standard random interjection (30% chance internally)
+          // Standard interjection (30% chance internally). Every line
+          // promises the named resident has something to say, so only a
+          // resident whose home badge is lit may be named; with nobody lit
+          // the house speaks and names no one.
           if (!payload) {
             payload = getAnimalInterjection(
               phase,
-              fullProgress.unlockedAnimals || [],
+              await getResidentsWithNews(),
               fullProgress.puzzlesSolved || 0,
             );
           }
