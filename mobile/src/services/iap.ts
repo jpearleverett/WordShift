@@ -243,8 +243,14 @@ export interface BillingProvider {
   initialize(): Promise<void>;
   getProducts(productIds: ProductId[]): Promise<IapProduct[]>;
   purchase(productId: ProductId): Promise<PurchaseResult>;
-  /** Returns the authoritative set of entitlement keys the store reports as owned. */
-  restorePurchases(): Promise<{ entitlements: EntitlementKey[]; error?: string }>;
+  /**
+   * Returns the entitlement keys the store reports as ACTIVE, plus (optionally)
+   * the keys its explicit records mark INACTIVE (an expired subscription, a
+   * refunded one-time purchase). iap.ts merges: active keys are granted, a
+   * locally held key is dropped only when it is listed in `inactive`. A key the
+   * response merely omits (another store account, a sparse reply) is kept.
+   */
+  restorePurchases(): Promise<{ entitlements: EntitlementKey[]; inactive?: EntitlementKey[]; error?: string }>;
   /**
    * Where the player manages (cancels) their subscription, when the store
    * reports one (RevenueCat: customerInfo.managementURL). Optional; absent or
@@ -483,41 +489,88 @@ interface GrantIntent {
   firstPurchaseDoubled: boolean;
 }
 
-/** Store payloads may round the same purchase time to whole seconds. */
-export const RECEIPT_MATCH_WINDOW_MS = 1000;
+/**
+ * How far apart the checkout's own record of a purchase and the receipt-history
+ * entry for it may be dated and still be treated as the same purchase, when the
+ * checkout could not link the receipt id directly. Play's `purchaseDate` and
+ * RevenueCat's receipt date are produced by different systems and have been
+ * observed to disagree by seconds; a checkout whose store date failed to parse
+ * falls back to the device clock. Two minutes covers both, and it cannot
+ * swallow a distinct repeat purchase: each checkout acquires at most ONE
+ * receipt alias, and a receipt links only to the nearest unlinked checkout.
+ */
+export const RECEIPT_MATCH_WINDOW_MS = 2 * 60_000;
 const CHECKOUT_RECEIPTS_KEY = 'wordshift_iap_checkout_receipts';
+/**
+ * Where a malformed checkout-receipt record is parked instead of trapping every
+ * purchase and recovery in a retry dialog. Device-local, never cloud-synced,
+ * kept for diagnosis; the applied-grant set still dedupes delivered grants.
+ */
+export const CHECKOUT_RECEIPTS_QUARANTINE_KEY = 'wordshift_iap_checkout_receipts_quarantine';
 interface CheckoutReceipt {
   grantId: string;
   productId: ProductId;
   purchasedAt: number;
   linkedIds: string[];
 }
+function isValidCheckoutReceipts(receipts: unknown): receipts is CheckoutReceipt[] {
+  return Array.isArray(receipts) && receipts.every(item => item && typeof item.grantId === 'string' &&
+    typeof item.productId === 'string' && Number.isFinite(item.purchasedAt) &&
+    Array.isArray(item.linkedIds) && item.linkedIds.every((id: unknown) => typeof id === 'string'));
+}
+
+/**
+ * Must run inside a storage transaction. A malformed record used to throw here
+ * forever, which trapped the player in the purchase-retry dialog with no way
+ * out. It is now moved aside (quarantine key) and treated as empty: these
+ * records only ever PREVENT a double credit of a late receipt, while the
+ * applied-grant set still blocks re-crediting every settled grant.
+ */
 async function loadCheckoutReceipts(): Promise<CheckoutReceipt[]> {
   const raw = await AsyncStorage.getItem(CHECKOUT_RECEIPTS_KEY);
   if (raw === null) return [];
-  const receipts: unknown = JSON.parse(raw);
-  if (!Array.isArray(receipts) || !receipts.every(item => item && typeof item.grantId === 'string' &&
-      typeof item.productId === 'string' && Number.isFinite(item.purchasedAt) &&
-      Array.isArray(item.linkedIds) && item.linkedIds.every((id: unknown) => typeof id === 'string'))) {
-    throw new Error('Your purchase receipts need recovery');
-  }
-  return receipts;
+  let receipts: unknown;
+  try { receipts = JSON.parse(raw); } catch { receipts = undefined; }
+  if (isValidCheckoutReceipts(receipts)) return receipts;
+  console.warn('[IAP] Quarantined a malformed checkout-receipt record');
+  await AsyncStorage.setItem(CHECKOUT_RECEIPTS_QUARANTINE_KEY, raw);
+  await AsyncStorage.setItem(CHECKOUT_RECEIPTS_KEY, '[]');
+  return [];
 }
 
 function receiptCoveredByGrant(transaction: StorePurchaseTransaction, receipts: CheckoutReceipt[]): CheckoutReceipt[] {
-  // A checkout may acquire one receipt-history alias. Once linked, it cannot
-  // accidentally swallow a distinct repeat purchase of the same pack.
-  return receipts.filter(grant => grant.productId === transaction.productId && grant.linkedIds.length === 0 &&
-    Math.abs(grant.purchasedAt - transaction.purchasedAt) <= RECEIPT_MATCH_WINDOW_MS);
+  // A checkout may acquire one receipt-history alias, and a receipt links to
+  // ONE checkout only (the nearest in time), so two purchases of the same pack
+  // inside the window each keep their own credit. Once linked, a checkout can
+  // never swallow a distinct repeat purchase of the same pack.
+  let nearest: CheckoutReceipt | null = null;
+  for (const grant of receipts) {
+    if (grant.productId !== transaction.productId || grant.linkedIds.length > 0) continue;
+    const distance = Math.abs(grant.purchasedAt - transaction.purchasedAt);
+    if (distance > RECEIPT_MATCH_WINDOW_MS) continue;
+    if (nearest === null || distance < Math.abs(nearest.purchasedAt - transaction.purchasedAt)) nearest = grant;
+  }
+  if (!nearest) return [];
+  // The starter bundle records its amber and hints halves as two checkout
+  // entries of one purchase; the receipt names both, so both take the alias.
+  if (transaction.productId === PRODUCT_IDS.STARTER_PACK) {
+    const anchor = nearest;
+    return receipts.filter(grant => grant.productId === anchor.productId && grant.linkedIds.length === 0 &&
+      grant.purchasedAt === anchor.purchasedAt);
+  }
+  return [nearest];
 }
 
 async function persistPendingConsumableGrants(entries: GrantIntent[]): Promise<string[]> {
+  // One device instant for the whole batch: a starter bundle's two halves are
+  // one purchase and must carry the same fallback time.
+  const checkoutNow = Date.now();
   const intents: PendingConsumableGrant[] = entries.map(entry => {
     const grantId = entry.transactionId ?? `${entry.productId}:${Date.now()}:${++grantIdSeq}:${Math.random().toString(36).slice(2,8)}`;
     const linkedIds = (entry.linkedTransactionIds ?? [])
       .filter(id => typeof id === 'string' && id.length > 0 && id !== grantId);
     return {
-      grantId, productId: entry.productId, reward: entry.reward, purchasedAt: entry.purchasedAt ?? Date.now(),
+      grantId, productId: entry.productId, reward: entry.reward, purchasedAt: entry.purchasedAt ?? checkoutNow,
       ...(Number.isFinite(entry.purchasedAt) ? { storePurchasedAt: entry.purchasedAt } : {}),
       ...(entry.firstPurchaseDoubled ? {firstPurchaseDoubled:true} : {}),
       ...(linkedIds.length > 0 ? {linkedIds} : {}),
@@ -529,9 +582,12 @@ async function persistPendingConsumableGrants(entries: GrantIntent[]): Promise<s
     const receipts = await loadCheckoutReceipts();
     const applied = new Set<string>(JSON.parse(await AsyncStorage.getItem(APPLIED_GRANTS_KEY) ?? '[]'));
     for (const intent of intents) {
-      if (intent.storePurchasedAt !== undefined && !receipts.some(receipt => receipt.grantId === intent.grantId)) {
+      // Always record the checkout: when the store date was missing or
+      // unparseable the device clock stands in, and the widened match window
+      // absorbs the difference to the receipt's own date.
+      if (!receipts.some(receipt => receipt.grantId === intent.grantId)) {
         receipts.push({ grantId: intent.grantId, productId: intent.productId,
-          purchasedAt: intent.storePurchasedAt, linkedIds: intent.linkedIds ?? [] });
+          purchasedAt: intent.storePurchasedAt ?? intent.purchasedAt, linkedIds: intent.linkedIds ?? [] });
       }
       if (!applied.has(intent.grantId) && !grants.some(grant => grant.grantId===intent.grantId)) grants.push(intent);
     }
@@ -709,8 +765,11 @@ async function purchaseStarterPackUnlocked(): Promise<StarterPackPurchaseResult>
 }
 
 /**
- * Restore previously-purchased products. The store's reported set becomes the
- * authoritative local entitlement state.
+ * Restore previously-purchased products. Active keys the store reports are
+ * granted; a locally held key is removed only when the store explicitly marks
+ * it inactive (the same rule the customer-info listener applies). Restoring
+ * while signed in to a different store account therefore never strips a
+ * permanent purchase this device already owns.
  */
 export async function restorePurchases(): Promise<{ entitlements: EntitlementKey[]; error?: string }> {
   if (checkoutDone) return { entitlements: await getGrantedEntitlements(), error: 'purchase_in_progress' };
@@ -719,13 +778,17 @@ export async function restorePurchases(): Promise<{ entitlements: EntitlementKey
     if (!provider.isReady()) {
       return { entitlements: await getGrantedEntitlements(), error: 'billing_unavailable' };
     }
-    const { entitlements, error } = await provider.restorePurchases();
+    const { entitlements: active, inactive = [], error } = await provider.restorePurchases();
     if (error) return { entitlements: await getGrantedEntitlements(), error };
+    let entitlements: EntitlementKey[] = active;
     try {
       await saveWithPlayerRetry(async () => {
         try {
           await runStorageTransaction('restore_entitlements', async () => {
             invalidateEntitlementsCache();
+            const kept = (await getGrantedEntitlements())
+              .filter(key => active.includes(key) || !inactive.includes(key));
+            entitlements = [...new Set([...kept, ...active])];
             await setEntitlements(entitlements);
           });
         } catch (error) { invalidateEntitlementsCache(); throw error; }
