@@ -234,7 +234,7 @@ export const COSMETICS: CosmeticItem[] = [
   {
     id: 'confetti_supporter',
     category: 'confetti',
-    name: 'Keeper’s Thanks',
+    name: "Keeper's Thanks",
     description: 'Warm gold and patron violet, for the ones who keep the fire lit.',
     acquisition: { kind: 'entitlement', entitlement: ENTITLEMENTS.SUPPORTER },
   },
