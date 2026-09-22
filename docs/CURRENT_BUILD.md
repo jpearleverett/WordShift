@@ -1,5 +1,9 @@
 # Current build and documentation
 
+## September 22 launch-readiness follow-up (1.4.5 / 110)
+
+Branch `claude/wonderful-wright-wg49h9` carries the [2026-09-22 launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-22.md) and its fixes. App version **1.4.5**, Android code **110**; the build needs a new native binary because it adds the `android:appCategory="game"` manifest flag, the Sentry Android Gradle plugin (R8 mapping upload) and Metro debug IDs, so its OTA runtime is `1.4.5-<channel>`. The owner's device pass on the 1.4.4 internal build (2026-09-22) found purchases, onboarding, cloud backup and restore after Reset All, ads and notifications working. What remains before promotion is listed in the review's Resolution section and in the [launch checklist](LAUNCH_CHECKLIST.md); the Supabase files 9-11 are written and rehearsed offline but not applied.
+
 ## September 20 manual phase transitions and resident responses
 
 `feature/manual-phase-transitions`, based on main `4682c4c`, makes every ceremony passage wait for Continue and adds Back navigation. Android Back returns to the previous passage, with skip confirmation on the first. Revisiting a passage does not repeat its one-shot audio or haptics.
@@ -36,16 +40,16 @@ Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main`
 
 ## Build identity
 
-Current source builds on main `45973ae`, including the September 19 fixes and the owner's subsequent version bump. App version is **1.3.9** and Android version code **104**. The September 20 follow-up does not change either value. The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source is app **1.4.5**, Android version code **110** (see the September 22 section above; 1.3.9 / 104 was the September 19-20 identity). The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
-| App version | `1.3.9` | `mobile/app.json` |
-| Android package / version code | `com.wordshift.app` / `104` | `mobile/app.json` |
+| App version | `1.4.5` | `mobile/app.json` |
+| Android package / version code | `com.wordshift.app` / `110` | `mobile/app.json` |
 | iOS bundle / build number | `com.wordshift.app` / `3` | `mobile/app.json` |
 | Expo / React Native | SDK 57; lockfile resolves Expo `57.0.20`, RN `0.86.3` | `mobile/package-lock.json` |
 | Version management | Local; increase Android version code for each new Play upload | `mobile/eas.json` |
-| Resolved OTA runtime | `1.3.9-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
+| Resolved OTA runtime | `1.4.5-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
 | Android release optimization | R8 minification, resource shrinking, optimized ProGuard defaults and optimized resource shrinking enabled; PNG crunch disabled | `mobile/app.json`, `mobile/plugins/withAndroidOptimization.js` |
 
 `mobile/package.json` still has npm package version `1.3.1`; that field is tooling metadata, not the Expo app version or Android version code. Do not infer the installed app version from it. The current React Native Gradle plugin resolves AGP 8.12.0; the optimization configuration does not require an AGP 9 migration.
