@@ -787,8 +787,16 @@ const OUT_OF_HINTS_MESSAGES: Record<DialoguePhase, string> = {
   5: 'No hints remain. More are available in the shop.',
 };
 
-export function getOutOfHintsMessage(phase: DialoguePhase): string {
-  return OUT_OF_HINTS_MESSAGES[phase];
+/**
+ * Out-of-hints copy. Without `canWatch`: the board message usePuzzleGame
+ * shows as the HINT button refuses. With it: the body of App's out-of-hints
+ * alert, where `canWatch` says a rewarded clip is on offer.
+ */
+export function getOutOfHintsMessage(phase: number, canWatch?: boolean): string {
+  if (canWatch === undefined) {
+    return OUT_OF_HINTS_MESSAGES[Math.min(5, Math.max(0, Math.floor(phase))) as DialoguePhase];
+  }
+  return getOutOfHintsAlertBody(phase, canWatch);
 }
 
 // ============================================================================
@@ -1759,8 +1767,8 @@ export function getOutOfHintsTitle(phase: number): string {
   return 'Out of hints';
 }
 
-/** Body of the out-of-hints alert. `canWatch`: a rewarded clip is on offer. */
-export function getOutOfHintsMessage(phase: number, canWatch: boolean): string {
+/** Body of the out-of-hints alert (see getOutOfHintsMessage). */
+function getOutOfHintsAlertBody(phase: number, canWatch: boolean): string {
   if (phase >= 5) {
     return canWatch
       ? 'One short clip buys one more hint. The store keeps the rest. The board will wait for you.'

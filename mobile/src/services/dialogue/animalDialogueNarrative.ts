@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AnimalType, DialoguePhase } from '../../types/homeWorld';
+import { WORD_THRESHOLD_DIALOGUES } from './animalDialogueReactions';
 
 // =============================================================================
 // CROSS-ANIMAL REFERENCES
@@ -863,6 +864,12 @@ interface NarrativeDeliveryState {
   callbacksShown: Record<string, number[]>;
   /** animalType -> Phase-2 exhaustion-pool lines delivered (cycles past pool length) */
   phase2PoolCursor: Record<string, number>;
+  /** animalType -> word thresholds whose line this resident has spoken.
+   *  Optional: older saves simply lack it (read as empty). */
+  thresholdsHeard?: Record<string, number[]>;
+  /** animalType -> words formed when the resident was first met on a regular
+   *  visit (-1: met before this was recorded; nothing is caught up). */
+  thresholdBaseline?: Record<string, number>;
 }
 
 let deliveryCache: NarrativeDeliveryState | null = null;
@@ -1023,4 +1030,68 @@ export async function clearNarrativeDeliveryState(): Promise<void> {
   try {
     await AsyncStorage.removeItem(DELIVERY_STORAGE_KEY);
   } catch {}
+}
+
+// ============================================================================
+// WORD THRESHOLD LINES — delivered once, including to late residents
+// ============================================================================
+
+/**
+ * Regular lines a resident may have read and still count as newly met when
+ * their threshold baseline is first recorded. A resident is first evaluated on
+ * their first regular visit (0 lines read); a legacy save's long-standing
+ * resident has read far more, and is treated as having been present for every
+ * threshold already crossed.
+ */
+const THRESHOLD_NEW_RESIDENT_MAX_READ = 3;
+
+/**
+ * The next word-threshold line for this resident, or null. Two routes, one
+ * line per visit, each threshold spoken at most once per resident:
+ *  - the crossing: the count passed a threshold since the last few words
+ *    (`previousWords`), as before;
+ *  - the catch-up: a threshold crossed BEFORE the resident was met. Vesper,
+ *    Tock and Moss join after 100 (and often 250) words, and Fennick after
+ *    100; their lines are written for arriving late ("I wasn't watching every
+ *    single one") and used to be unreachable. Delivered in ascending order.
+ * The baseline is recorded on the first call for a resident (a peek, not a
+ * delivery), so this must be called on every regular visit, whether or not a
+ * page is wanted; `commit` marks the line heard when it reaches the screen.
+ */
+export async function peekWordThresholdPage(
+  animalType: AnimalType,
+  totalWords: number,
+  previousWords: number,
+  currentPhase: number,
+  residentLinesRead: number
+): Promise<NarrativeDeliveryPage | null> {
+  const state = await loadDeliveryState();
+  let baseline = state.thresholdBaseline?.[animalType];
+  if (baseline === undefined) {
+    baseline = residentLinesRead <= THRESHOLD_NEW_RESIDENT_MAX_READ ? totalWords : -1;
+    state.thresholdBaseline = { ...(state.thresholdBaseline ?? {}), [animalType]: baseline };
+    await saveDeliveryState(state);
+  }
+  const heard = state.thresholdsHeard?.[animalType] ?? [];
+  const eligible = WORD_THRESHOLD_DIALOGUES.filter(entry =>
+    currentPhase >= entry.phase &&
+    totalWords >= entry.threshold &&
+    !!entry.lines[animalType] &&
+    !heard.includes(entry.threshold)
+  );
+  const crossing = eligible.find(entry => previousWords < entry.threshold);
+  const catchUp = eligible.find(entry => entry.threshold <= (baseline as number));
+  const entry = crossing ?? catchUp;
+  if (!entry) return null;
+  const threshold = entry.threshold;
+  return {
+    text: entry.lines[animalType],
+    commit: async () => {
+      const fresh = await loadDeliveryState();
+      const already = fresh.thresholdsHeard?.[animalType] ?? [];
+      if (already.includes(threshold)) return;
+      fresh.thresholdsHeard = { ...(fresh.thresholdsHeard ?? {}), [animalType]: [...already, threshold] };
+      await saveDeliveryState(fresh);
+    },
+  };
 }

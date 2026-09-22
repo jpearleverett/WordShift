@@ -15,7 +15,7 @@ import {
   getVariantTutorialDialogue,
   TUTORIAL_CALLBACK_DIALOGUES,
   getCoordinatedEventLine,
-  getWordThresholdDialogue,
+  peekWordThresholdPage,
   getTotalDialogueCount,
   getSacrificeReaction,
   getPhase2ExtraDialogues,
@@ -1183,17 +1183,26 @@ export function useDialogueFlow({
       }
     }
 
-    // 6. Word count threshold dialogue — low priority
-    if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.totalWordsFormed) {
-      const approxPrevious = Math.max(0, (progress.totalWordsFormed || 0) - 5);
-      const thresholdLine = getWordThresholdDialogue(
-        animal.type,
-        progress.totalWordsFormed,
-        approxPrevious,
-        progress.currentPhase
-      );
-      if (thresholdLine) {
-        pages.push({ text: thresholdLine });
+    // 6. Word count threshold dialogue — low priority. Peeked on every
+    // regular visit (it records when a resident was met, so a late resident
+    // catches up on thresholds crossed before they joined), shown only when
+    // nothing else leads the visit, and marked heard when it is shown.
+    if (progress && progress.totalWordsFormed) {
+      try {
+        const approxPrevious = Math.max(0, (progress.totalWordsFormed || 0) - 5);
+        const thresholdPage = await peekWordThresholdPage(
+          animal.type,
+          progress.totalWordsFormed,
+          approxPrevious,
+          progress.currentPhase,
+          progress.conversationReadIds?.[animal.id]?.length ?? 0
+        );
+        if (!ownsVisit()) return;
+        if (thresholdPage && !hasCoordinatedEvent && pages.length === 0) {
+          pages.push(thresholdPage);
+        }
+      } catch {
+        // Threshold lines are non-critical
       }
     }
 

@@ -81,6 +81,7 @@ jest.mock('../services/animalDialogue', () => ({
   TUTORIAL_CALLBACK_DIALOGUES: ['tutorial callback line'],
   getCoordinatedEventLine: jest.fn(() => null),
   getWordThresholdDialogue: jest.fn(() => null),
+  peekWordThresholdPage: jest.fn(async () => null),
   getTotalDialogueCount: jest.fn(() => 24),
   getSacrificeReaction: jest.fn(() => null),
   getPhase2ExtraDialogues: jest.fn(() => []),

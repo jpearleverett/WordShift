@@ -2583,6 +2583,8 @@ describe('launch-readiness copy surfaces', () => {
       }
     }
     expect(getOutOfHintsMessage(0, true)).not.toBe(getOutOfHintsMessage(0, false));
+    // Without canWatch it is still usePuzzleGame's board message.
+    expect(getOutOfHintsMessage(0)).toBe("You're out of hints! Watch a quick clip or grab more to keep going.");
     expect(getOutOfHintsMessage(4, true)).not.toBe(getOutOfHintsMessage(0, true));
     expect(getSpeedRescueResumeMessage(0)).not.toBe(getSpeedRescueResumeMessage(3));
   });

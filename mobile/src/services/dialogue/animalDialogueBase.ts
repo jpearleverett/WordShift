@@ -2140,6 +2140,17 @@ export const PHASE2_EXTRA_DIALOGUES: Record<AnimalType, string[]> = {
     "Tonight I knocked on a beam, and the answer came back before my knock was done. So I've stopped tapping for a while, to hear what the wood does on its own.",
     "There's a small hollow behind the pantry, and it chimes when I tap it. One steady note is just a cavity. If the note starts changing, I'll call it a voice.",
   ],
+  // Reachability (dialogue review 2026-09-22, open item 5): Moss is served
+  // this pool only while his awareness phase is 2, which for a lagging
+  // resident means world phase 3, and only after he has read all 74 of his
+  // phase 0-2 base lines. He joins at 92 solves, at world phase 3, reading
+  // from his first line; even with backlog pacing (ten lines a visit, a
+  // two-win rest) that takes about eight visits, and the reveal usually
+  // lands first, after which his awareness is 4 and the pool is closed.
+  // A slow descent that holds world phase 3 for twenty-odd wins after he
+  // arrives does reach it. Serving it at awareness 3+ would put phase-2
+  // register lines between his phase-3 and phase-4 chapters, so it is left
+  // as a rarely heard pool rather than moved.
   kakapo: [
     "The dew on one leaf crawled from underneath up onto the top. Water doesn't do that. I watched a second leaf for a while before I wrote anything down.",
     "My walk around the garden is three paces shorter than it used to be. I left my measuring string by the path, so I can measure it properly tomorrow.",
