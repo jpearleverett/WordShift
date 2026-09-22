@@ -140,16 +140,9 @@ fs.mkdirSync(ENV, { recursive: true });
   savePNG(path.join(ENV, 'shadow_figure.png'), W, H, down2(cv, W, H));
 }
 
-// === 2. clouds (512x256, two variants) =======================================
-for (const [name, puffs] of [
-  ['cloud_1.png', [[0.32, 0.62, 0.20], [0.5, 0.48, 0.26], [0.68, 0.60, 0.21], [0.82, 0.68, 0.13], [0.18, 0.70, 0.13]]],
-  ['cloud_2.png', [[0.25, 0.60, 0.16], [0.42, 0.50, 0.22], [0.62, 0.55, 0.24], [0.80, 0.62, 0.15]]],
-]) {
-  const W = 512, H = 256, cv = C(W * 2, H * 2);
-  for (const [fx, fy, fr] of puffs) gauss(cv, W * 2 * fx, H * 2 * fy + 18, W * 2 * fr, W * 2 * fr * 0.62, '#E8E4F2', 0.5); // soft lavender under-shadow
-  for (const [fx, fy, fr] of puffs) gauss(cv, W * 2 * fx, H * 2 * fy, W * 2 * fr, W * 2 * fr * 0.66, '#FFFFFF', 0.92);
-  savePNG(path.join(ENV, name), W, H, down2(cv, W, H));
-}
+// Block 2 (cloud_1.png / cloud_2.png) is deleted: the clouds are drawn in
+// code and nothing requires either file, so regenerating them only shipped
+// dead weight inside the bundled assets/environment directory.
 
 // Blocks 3-6 (ground.png, roof.png, foundation.png, tree.png) are DELETED, not
 // disabled. They were destructive: `npm run generate:assets` overwrote the
@@ -157,8 +150,7 @@ for (const [name, puffs] of [
 // with a 1024x420 procedural candy roof, and re-created ground/tree/foundation,
 // three files deleted for bundle hygiene, inside the bundled assets/environment
 // directory. The house art has not come from this script for a long time: see
-// processRawWorldArt.mjs (roof, per-phase foundations, wall, pit entrance) and
-// generatePixelWorld.mjs (clouds). Only shadow_figure.png below is still this
+// processRawWorldArt.mjs (roof, per-phase foundations, wall, pit entrance). Only shadow_figure.png below is still this
 // script's own shipped output.
 
 // === 7. star icons (256x256) =================================================

@@ -126,7 +126,7 @@ await fs.writeFile(path.join(ROOT,'variants/01-one-letter-before-after.png'),(aw
 // Re-compose feature artwork exclusively from the game's actual den, window
 // mask, fox portrait and logo; the existing generated-art alternative remains
 // in its earlier campaign, unmodified.
-const room=await image('assets/rooms/cozy_den.png',1024,500,'cover','lanczos3');
+const room=await image('assets/rooms/cozy_den.webp',1024,500,'cover','lanczos3');
 const window=await sharp(asset('assets/rooms/windows/cozy_den.png')).resize(1024,500,{fit:'cover'}).ensureAlpha().linear([0,0,0,.88],[27,42,76,0]).png().toBuffer();
 const feature=await sharp(room).composite([
   {input:window},

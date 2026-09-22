@@ -14,6 +14,8 @@ for (const name of ['kept-table', 'private-room', 'outward-road', 'outward-road-
   // Heroes retain enough samples for a 430dp phone at 3x. Headers do not
   // decode a full cinematic plate just to show a shallow journal illustration.
   for (const [kind, width] of [['hero', 1290], ['header', 780]]) {
+    // The night road is only ever a full-screen hero; no journal header uses it.
+    if (name === 'outward-road-night' && kind === 'header') continue;
     const target = path.join(output, `${name}-${kind}.webp`);
     await sharp(source).resize({ width, withoutEnlargement: true }).webp({ quality: 92, effort: 6 }).toFile(target);
     outputBytes += (await stat(target)).size;
