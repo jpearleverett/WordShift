@@ -3,7 +3,7 @@ import { loadProgress, purchaseUnlockWithAmber, canAfford, reserveUnlock, getRes
 import { phase2PoolHasNew } from './dialogue/animalDialogueBase';
 import { getPhase2PoolCursors } from './dialogue/animalDialogueNarrative';
 import { getTotalDialogueCount } from './animalDialogue';
-import { isOnCooldown } from './dialogueSession';
+import { isOnCooldown, updateConversationBacklog, updateSessionPhase } from './dialogueSession';
 import { logEvent } from './eventLogger';
 import { loadTendingState, hasNewPhase5Line } from './tending';
 import { loadChoiceState, hasPendingDialogueChoice } from './dialogueChoices';
@@ -1486,11 +1486,15 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
     : {};
   // Locked-resident references wait unread until that friend joins the house.
   const unlockedTypes = new Set(progress.unlockedAnimals as AnimalType[]);
+  // Cooldowns below are phase- and backlog-aware; keep the session layer's
+  // mirrors current before consulting them.
+  updateSessionPhase(progress.currentPhase);
 
   return ANIMALS.map(animal => {
     const unlocked = progress.unlockedAnimals.includes(animal.id);
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
     const next = getNextAnimalConversation(progress, animal.type, animalPhase, unlockedTypes);
+    updateConversationBacklog(animal.id, next?.dialogue.phase);
     const total = getTotalDialogueCount(animal.type, Math.min(animalPhase, 4) as DialoguePhase);
     const dialogueIndex = next?.index ?? (animalPhase === 5
       ? Math.max(total, progress.lastDialogueRead[animal.id] ?? 0) : total);

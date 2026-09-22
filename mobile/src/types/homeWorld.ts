@@ -46,6 +46,12 @@ export const DIALOGUE_SESSION_CONFIG = {
   CATCH_UP_BONUS_DIALOGUES: 2,
   // Historical minimum for compatibility callers of the retired helper.
   CATCH_UP_MIN_GLOBAL_PHASE: 3,
+  // Live backlog policy (getConversationBacklogPlan): a resident whose next
+  // unread line was written for a phase at least this many phases behind the
+  // house talks longer and rests shorter until they catch up.
+  BACKLOG_PHASE_GAP: 2,
+  BACKLOG_BONUS_DIALOGUES: 5,
+  BACKLOG_MAX_PUZZLES_BETWEEN_SESSIONS: 2,
 };
 
 // Home World Types - Animal house with existential journey
@@ -173,8 +179,9 @@ export const LATE_PHASE_RECRUITS: ReadonlySet<AnimalType> = new Set<AnimalType>(
 
 /**
  * Retained compatibility helper for the former catch-up-session policy.
- * Live useDialogueFlow visits no longer call this helper: ordinary phase-aware
- * session limits apply, and unread regular lines survive Arrival. Its original
+ * Live visits use getConversationBacklogPlan instead, which keys on how far
+ * the resident's reading is behind the house rather than on who they are;
+ * unread regular lines survive Arrival. Its original
  * calculation remains available to compatibility callers/tests: one shared,
  * non-stacking bonus for late recruits at Phase 3+ or lagging residents at the
  * Phase-4 reveal, only while an indexed regular backlog remains.
@@ -191,6 +198,37 @@ export function getCatchUpSessionBonus(
   const laggingRevealWindow = isLaggingTier && globalPhase === 4;
   if (!lateRecruitWindow && !laggingRevealWindow) return 0;
   return DIALOGUE_SESSION_CONFIG.CATCH_UP_BONUS_DIALOGUES;
+}
+
+/**
+ * Visit pacing for a resident whose reading has fallen well behind the house.
+ *
+ * Every resident reads their whole conversation in order, so a late recruit
+ * (Vesper at 84, Tock at 88, Moss at 92) meets the player at world phase 3
+ * holding a phase-0 introduction and some 130 lines, with the finale about
+ * twenty-five solves away. At ordinary pacing they reach perhaps a third of it
+ * before the Arrival. While the next unread line belongs to a phase
+ * `BACKLOG_PHASE_GAP` or more behind the house, the visit runs longer and the
+ * rest between visits is capped short. The plan relaxes by itself as the
+ * reader catches up, so nothing is skipped and nothing is hurried past the
+ * point where the resident's conversation meets the house.
+ *
+ * `nextLinePhase` is the phase of the resident's next unread regular line
+ * (null when there is none).
+ */
+export function getConversationBacklogPlan(
+  worldPhase: DialoguePhase,
+  nextLinePhase: number | null | undefined
+): { catchingUp: boolean; sessionBonus: number; maxPuzzlesBetweenSessions: number | null } {
+  const catchingUp = typeof nextLinePhase === 'number' &&
+    nextLinePhase <= worldPhase - DIALOGUE_SESSION_CONFIG.BACKLOG_PHASE_GAP;
+  return catchingUp
+    ? {
+        catchingUp,
+        sessionBonus: DIALOGUE_SESSION_CONFIG.BACKLOG_BONUS_DIALOGUES,
+        maxPuzzlesBetweenSessions: DIALOGUE_SESSION_CONFIG.BACKLOG_MAX_PUZZLES_BETWEEN_SESSIONS,
+      }
+    : { catchingUp, sessionBonus: 0, maxPuzzlesBetweenSessions: null };
 }
 
 /**

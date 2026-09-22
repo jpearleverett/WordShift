@@ -231,12 +231,26 @@ describe('dialogueChoices', () => {
       }
     });
 
-    it('returns null before the animal is a couple of lines into its Phase-3 block', async () => {
+    it('waits two lines into the Phase-3 block before asking a reader who is there', async () => {
       const start = getPhaseStartIndex('fox', 3);
-      for (let i = start - 3; i < start + 2; i++) {
+      for (let i = start; i < start + 2; i++) {
         const result = await getChoiceForAnimal('fox', 3, i);
         expect(result).toBeNull();
       }
+    });
+
+    it('follows the house for a reader still in earlier chapters, once they know the player', async () => {
+      // A late recruit met at Phase 3 starts at line 0 of ~134; the choice
+      // must not wait for their reading to reach the block, or the Arrival
+      // closes it first.
+      for (let i = 0; i < 9; i++) {
+        expect(await getChoiceForAnimal('aye_aye', 3, i)).toBeNull();
+      }
+      expect(await getChoiceForAnimal('aye_aye', 3, 9)).toBe(ANIMAL_CHOICES.aye_aye);
+      expect(await getChoiceForAnimal('kakapo', 4, 20)).toBe(ANIMAL_CHOICES.kakapo);
+      expect(await getChoiceForAnimal('fox', 3, getPhaseStartIndex('fox', 3) - 1)).toBe(ANIMAL_CHOICES.fox);
+      // Awareness still gates it: a resident below Phase 3 is never asked.
+      expect(await getChoiceForAnimal('kakapo', 2, 20)).toBeNull();
     });
 
     it('stays available across the whole Phase-3 block (a 5-line session steps in fives)', async () => {

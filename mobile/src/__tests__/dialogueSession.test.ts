@@ -10,8 +10,10 @@ import {
   clearAllSessions,
   loadDialogueSessions,
   startCooldown,
+  updateConversationBacklog,
+  isCatchingUp,
 } from '../services/dialogueSession';
-import { DIALOGUE_SESSION_CONFIG, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
+import { DIALOGUE_SESSION_CONFIG, getDialoguesPerSession, getPuzzlesBetweenSessions, getConversationBacklogPlan } from '../types/homeWorld';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // At phase 0, getDialoguesPerSession returns 4 (not the raw DIALOGUES_PER_SESSION of 5)
@@ -376,4 +378,55 @@ test('an established cold-start session becomes badge-available when its persist
   updatePuzzleCount(89);
   updateSessionPhase(2);
   expect(isOnCooldown('fox')).toBe(false);
+});
+
+describe('catch-up pacing for a resident whose reading is behind the house', () => {
+  const BONUS = DIALOGUE_SESSION_CONFIG.BACKLOG_BONUS_DIALOGUES;
+  const REST = DIALOGUE_SESSION_CONFIG.BACKLOG_MAX_PUZZLES_BETWEEN_SESSIONS;
+
+  test('the plan keys on how far the next unread line is behind the house', () => {
+    expect(getConversationBacklogPlan(3, 0).catchingUp).toBe(true);
+    expect(getConversationBacklogPlan(3, 1).catchingUp).toBe(true);
+    expect(getConversationBacklogPlan(3, 2).catchingUp).toBe(false);
+    expect(getConversationBacklogPlan(4, 2).catchingUp).toBe(true);
+    expect(getConversationBacklogPlan(4, null).catchingUp).toBe(false);
+    expect(getConversationBacklogPlan(1, 0).catchingUp).toBe(false);
+  });
+
+  test('a late recruit reading phase-0 lines at world phase 3 gets longer visits', async () => {
+    updateSessionPhase(3);
+    updateConversationBacklog('kakapo', 0);
+    expect(isCatchingUp('kakapo')).toBe(true);
+    for (let i = 0; i < getDialoguesPerSession(3) + BONUS - 1; i++) await recordDialogue('kakapo');
+    expect((await checkDialogueAvailability('kakapo')).available).toBe(true);
+    await recordDialogue('kakapo');
+    expect((await checkDialogueAvailability('kakapo')).available).toBe(false);
+  });
+
+  test('and a short rest, capped below the phase rest', async () => {
+    updateSessionPhase(3);
+    updateConversationBacklog('kakapo', 1);
+    updatePuzzleCount(100);
+    // Burn the grace sessions so the rest actually applies.
+    for (let i = 0; i < GRACE_SESSIONS + 1; i++) await startCooldown('kakapo');
+    expect(isOnCooldown('kakapo')).toBe(true);
+    updatePuzzleCount(100 + REST);
+    expect(isOnCooldown('kakapo')).toBe(false);
+    expect(REST).toBeLessThan(getPuzzlesBetweenSessions(3));
+  });
+
+  test('pacing returns to normal once the reader catches up', async () => {
+    updateSessionPhase(3);
+    updateConversationBacklog('fox', 0);
+    updateConversationBacklog('fox', 2);
+    expect(isCatchingUp('fox')).toBe(false);
+    for (let i = 0; i < getDialoguesPerSession(3); i++) await recordDialogue('fox');
+    expect((await checkDialogueAvailability('fox')).available).toBe(false);
+  });
+
+  test('an unreported resident keeps ordinary pacing', async () => {
+    updateSessionPhase(4);
+    expect(isCatchingUp('owl')).toBe(false);
+    expect(getSessionStatus('owl').status).toBe('available');
+  });
 });

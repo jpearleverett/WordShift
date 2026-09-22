@@ -260,13 +260,23 @@ export async function loadChoiceState(): Promise<ChoiceState> {
 
 /** Let two regular lines establish a character's question before offering it. */
 const CHOICE_MIN_PHASE3_OFFSET = 2;
+/**
+ * A reader who has not reached the Phase-3 block yet (a late recruit, or a
+ * friend the player has rarely visited) is offered the choice once they know
+ * the player a little: after their first three short visits' worth of lines.
+ */
+const CHOICE_MIN_LINES_WHEN_BEHIND = 9;
 
 /**
- * The choice follows the material the player has reached. It remains available
- * through the reveal for a slow reader or a late recruit whose catch-up intro
- * skipped the Phase-3 block. The recorded branch, rather than a narrow index
- * window, makes the conversation once-only. Arrival ends this opportunity;
- * later callbacks must never manufacture a choice the player did not make.
+ * The choice follows the HOUSE, not the reading position. It opens once the
+ * resident's own awareness reaches Phase 3 (or the reveal), whether their
+ * conversation is inside the Phase-3 block, still in earlier chapters (a late
+ * recruit met at Phase 3 has some 130 lines ahead of them and would otherwise
+ * reach the question only after the Arrival had closed it), or already in the
+ * reveal. At phase 3 a reader who has passed the block has had their chance.
+ * The recorded branch makes the conversation once-only. Arrival ends this
+ * opportunity; later callbacks must never manufacture a choice the player did
+ * not make.
  */
 export function hasPendingDialogueChoice(
   animalType: string,
@@ -280,9 +290,13 @@ export function hasPendingDialogueChoice(
   const type = animalType as AnimalType;
   const start = getPhaseStartIndex(type, 3);
   const revealStart = getPhaseStartIndex(type, 4);
-  if (dialogueIndex < start + CHOICE_MIN_PHASE3_OFFSET) return false;
-  // At phase 3 the reader must still be in that phase's block. At phase 4,
-  // recruits such as Vesper begin at revealStart and need the choice here.
+  if (dialogueIndex < start) {
+    if (dialogueIndex < CHOICE_MIN_LINES_WHEN_BEHIND) return false;
+  } else if (dialogueIndex < start + CHOICE_MIN_PHASE3_OFFSET) {
+    return false;
+  }
+  // At phase 3 the reader must not have passed that phase's block. At phase
+  // 4, recruits such as Vesper begin at revealStart and need the choice here.
   if (animalPhase === 3 && dialogueIndex >= revealStart) return false;
 
   return !answeredAnimals.includes(animalType);

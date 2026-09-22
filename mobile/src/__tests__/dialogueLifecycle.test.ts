@@ -114,6 +114,7 @@ jest.mock('../services/dialogueSession', () => ({
   getSessionStatus: jest.fn(() => ({ status: 'in_session', dialoguesRemaining: 5 })),
   isOnCooldown: jest.fn(() => false),
   updateSessionPhase: jest.fn(),
+  updateConversationBacklog: jest.fn(),
 }));
 
 jest.mock('../services/amberCurrency', () => ({

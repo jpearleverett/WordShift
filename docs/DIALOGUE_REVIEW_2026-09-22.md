@@ -120,13 +120,20 @@ samples kept), so frozen transcripts still resolve their illustrations.
 
 ## Open items for the owner (not changed; they need code or a design call)
 
-1. **Late recruits read most of their story after the Arrival.** Vesper
-   (84), Tock (88) and Moss (92) are met at world phase 3; at 5-6 lines per
-   visit the player reaches only ~35 of their 134 lines before the finale.
-   Their personal phase-3 choice needs the reading cursor inside phase 3
-   before the Arrival, so it is almost never offered. Options: offer the
-   choice at phase 4 regardless of position, or give late recruits a larger
-   session budget until they reach phase 4.
+1. **Fixed (follow-up): late recruits read most of their story after the
+   Arrival.** Vesper (84), Tock (88) and Moss (92) were met at world phase 3
+   and reached only ~35 of their 134 lines before the finale; their personal
+   choice needed the reading cursor inside phase 3 and was almost never
+   offered, and their narrative seeds only planted while the house was at
+   phase 0-1. Now: a resident whose next line is two or more phases behind
+   the house gets longer visits and a short rest until they catch up
+   (`getConversationBacklogPlan`); the personal choice follows the house
+   phase, offered after nine lines read to a reader still in earlier
+   chapters; seeds plant on the resident's own 2nd and 5th visits while
+   they are reading their bright chapters, and the reveal callbacks wait
+   until that material is behind them. The finale still never waits on
+   reading: the Arrival, and whatever a player has not heard, stay the
+   player's own pace.
 2. **Fixed (follow-up): the first board after the Arrival** used to play
    entirely in the phase-4 register (dread theme, music, move messages)
    because the durable phase stays 4 until that win plays After. The session
