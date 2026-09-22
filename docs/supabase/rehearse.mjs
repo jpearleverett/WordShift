@@ -154,5 +154,130 @@ try {
   check((await db.query('select public.prune_expired_events(10000) as n')).rows[0].n, 0);
   check((await db.query("select count(*)::int as n from public.events where event_id='fresh'")).rows[0].n, 1);
   check((await db.query("select count(*)::int as n from public.events where event_id='other'")).rows[0].n, 1);
+  // ---- 2026-09-22 migrations: save-creation budgets, known Daily entrants, the
+  // raised floor, rollout analytics views and 180-day retention with rollups.
+  // Applied twice: every file must be rerunnable without new overloads.
+  for (let pass = 0; pass < 2; pass++) {
+    for (const file of ['save_and_board_limits_v1.sql', 'analytics_views_v1.sql', 'event_retention_v2.sql']) {
+      await db.exec(await readFile(new URL(file, import.meta.url), 'utf8'));
+    }
+  }
+  check((await db.query(`select proname, count(*)::int as n from pg_proc where pronamespace = 'public'::regnamespace
+    and proname in ('upsert_save_v2','daily_owner_has_activity','daily_time_floor_ms','prune_expired_events','bump_words_offered','rollup_event_days')
+    group by proname order by proname`)).rows.map(r => `${r.proname}:${r.n}`),
+    ['bump_words_offered:1', 'daily_owner_has_activity:1', 'daily_time_floor_ms:1', 'prune_expired_events:1', 'rollup_event_days:1', 'upsert_save_v2:1']);
+  check((await db.query(`select has_function_privilege('anon','public.upsert_save_v2(text,integer,bigint,text,text,bigint,boolean,text,text)','EXECUTE') as ok`)).rows[0].ok, true);
+  // Floor: 2,000 ms per row, at least 5,000 ms (Saturday five rows, Monday four).
+  check((await db.query(`select public.daily_time_floor_ms('2026-09-05') as f`)).rows[0].f, 10000);
+  check((await db.query(`select public.daily_time_floor_ms('2026-09-07') as f`)).rows[0].f, 8000);
+  const ownerThree = `ws2_${'e'.repeat(32)}`;
+  const ownerFour = `ws2_${'f'.repeat(32)}`;
+  const ownerFive = `ws2_${'9'.repeat(32)}`;
+  const save = async (id, expected, install, payload = '{}') =>
+    (await db.query(`select public.upsert_save_v2($1,1,100,'device',$5,$2,false,$3,$4) as value`,
+      [id, expected, support, install, payload])).rows[0].value;
+  await db.exec('set role anon');
+  // A telemetry row alone no longer makes an entrant; a linked backup does.
+  check((await ingest('inst2_events_only', 'z1')).rows[0].ok, true);
+  check((await score('inst2_events_only', 'vocabulary_2026_09_v1', 10000)).rows.length, 0);
+  check(await save(ownerThree, null, 'inst2_linked_player'), { status: 'saved', revision: 1 });
+  check((await score('inst2_linked_player', 'vocabulary_2026_09_v1', 9999)).rows.length, 0); // under the new floor
+  check((await score('inst2_linked_player', 'vocabulary_2026_09_v1', 10000)).rows.length, 1);
+  // A conflicting second device is linked too, so it can still be ranked.
+  check(await save(ownerThree, 7, 'inst2_conflict_device'), { status: 'conflict', revision: 1 });
+  check((await score('inst2_conflict_device', 'vocabulary_2026_09_v1', 10000)).rows.length, 1);
+  await db.exec('reset role');
+  // Creation budgets: refused creates return unavailable; updates are never charged.
+  await fillBucket('save_create_shared', 'shared', 5000);
+  await db.exec('set role anon');
+  check(await save(ownerFour, null, 'inst2_minter'), { status: 'unavailable' });
+  check(await save(ownerThree, 1, 'inst2_linked_player'), { status: 'saved', revision: 2 });
+  await db.exec('reset role');
+  await clearBucket('save_create_shared', 'shared');
+  await fillBucket('save_create_install', 'inst2_minter', 20);
+  await db.exec('set role anon');
+  check(await save(ownerFour, null, 'inst2_minter'), { status: 'unavailable' });
+  check(await save(ownerFour, null, 'inst2_other_minter'), { status: 'saved', revision: 1 });
+  await db.exec(`set request.headers = '{"x-forwarded-for":"203.0.113.9, 10.0.0.1"}'`);
+  await db.exec('reset role');
+  await fillBucket('save_create_kb', 'ip:203.0.113.9', 119999);
+  await db.exec('set role anon');
+  const twoKb = JSON.stringify({ blob: 'x'.repeat(2000) });
+  check(await save(ownerFive, null, 'inst2_address_one', twoKb), { status: 'unavailable' });
+  await db.exec('reset role');
+  await fillBucket('save_create_kb', 'ip:203.0.113.9', 119999); // a refused call still spends, like every budget
+  await db.exec('set role anon');
+  check(await save(ownerFive, null, 'inst2_address_one'), { status: 'saved', revision: 1 }); // 1 KB still fits
+  await db.exec('reset role');
+  await fillBucket('save_create_addr', 'ip:203.0.113.9', 300);
+  await db.exec('set role anon');
+  check(await save(`ws2_${'8'.repeat(32)}`, null, 'inst2_address_two'), { status: 'unavailable' });
+  check(await save(ownerFive, 1, 'inst2_address_one', twoKb), { status: 'saved', revision: 2 });
+  await db.exec(`set request.headers = ''`);
+  await db.exec('reset role');
+  // Analytics views: cohorts, retention, FTUE, phase and purchase funnels.
+  const addEvent = (install, id, type, data, daysAgo, version = '1.4.5') => db.query(
+    `insert into public.events(install_id,event_id,platform,app_version,type,data,created_at,received_at)
+     values($1,$2,'android',$3,$4,$5::jsonb,now(),
+       ((now() at time zone 'UTC')::date - $6::int)::timestamp at time zone 'UTC' + interval '1 hour')`,
+    [install, id, version, type, JSON.stringify(data), daysAgo]);
+  await addEvent('cohort_new', 'n1', 'app_open', {}, 20);
+  await addEvent('cohort_new', 'n2', 'onboarding_step', { step: 'cold_open_puzzle' }, 20);
+  await addEvent('cohort_new', 'n3', 'puzzle_completed', { puzzlesSolved: 1 }, 20);
+  await addEvent('cohort_new', 'n4', 'onboarding_complete', {}, 20);
+  await addEvent('cohort_new', 'n5', 'app_open', {}, 19);
+  await addEvent('cohort_new', 'n6', 'app_open', {}, 13);
+  await addEvent('cohort_new', 'n7', 'phase_reached', { phase: 4, puzzlesSolved: 100, installAgeDays: 12 }, 13);
+  await addEvent('cohort_new', 'n8', 'phase_reached', { phase: 4, puzzlesSolved: 300, installAgeDays: 19 }, 1); // New Cycle repeat
+  await addEvent('cohort_upgraded', 'u1', 'app_open', {}, 20, '1.4.4');
+  await addEvent('cohort_upgraded', 'u2', 'phase_reached', { phase: 4, puzzlesSolved: 120, installAgeDays: -1 }, 20, '1.4.4');
+  await addEvent('cohort_upgraded', 'u3', 'store_opened', { surface: 'store_modal' }, 20, '1.4.4');
+  await addEvent('cohort_upgraded', 'u4', 'purchase_initiated', { productId: 'com.wordshift.amber_small', kind: 'amber' }, 20, '1.4.4');
+  await addEvent('cohort_upgraded', 'u5', 'iap_purchase', { productId: 'com.wordshift.amber_small', kind: 'amber' }, 20, '1.4.4');
+  await addEvent('cohort_upgraded', 'u6', 'iap_purchase', { productId: 'season_premium_amber', kind: 'season', amber: 2500 }, 20, '1.4.4');
+  await addEvent('cohort_upgraded', 'u7', 'season_premium_unlocked', { productId: 'season_premium_amber', kind: 'season', amber: 2500 }, 20, '1.4.4');
+  const cohortDay = `(now() at time zone 'UTC')::date - 20`;
+  check((await db.query(`select install_kind, installs::int, d1_retained::int, d1_rate::text, d7_retained::int, d7_rate::text, d14_rate::text
+    from public.analytics_retention_cohorts where cohort_day = ${cohortDay} order by install_kind`)).rows,
+    [{ install_kind: 'existing', installs: 1, d1_retained: 0, d1_rate: '0.000', d7_retained: 0, d7_rate: '0.000', d14_rate: '0.000' },
+     { install_kind: 'new', installs: 1, d1_retained: 1, d1_rate: '1.000', d7_retained: 1, d7_rate: '1.000', d14_rate: '0.000' }]);
+  check((await db.query(`select app_open::int, cold_open_puzzle::int, onboarding_complete::int, first_puzzle_completed::int,
+    second_puzzle_completed::int, onboarding_completion_rate::text from public.analytics_ftue_funnel
+    where cohort_day = ${cohortDay} and install_kind = 'new'`)).rows,
+    [{ app_open: 1, cold_open_puzzle: 1, onboarding_complete: 1, first_puzzle_completed: 1, second_puzzle_completed: 0, onboarding_completion_rate: '1.000' }]);
+  check((await db.query(`select installs::int, median_puzzles_solved, median_install_age_days
+    from public.analytics_phase_reached where phase = 4 and app_version = 'all'`)).rows,
+    [{ installs: 2, median_puzzles_solved: 110, median_install_age_days: 12 }]);
+  check((await db.query(`select product_id, kind, store_openers::int, initiations::int, purchases::int
+    from public.analytics_purchase_funnel where observed_day = ${cohortDay} order by product_id`)).rows,
+    [{ product_id: '(store)', kind: '(store)', store_openers: 1, initiations: 0, purchases: 0 },
+     { product_id: 'com.wordshift.amber_small', kind: 'amber', store_openers: 0, initiations: 1, purchases: 1 }]);
+  await db.exec('set role anon');
+  for (const relation of ['analytics_install_cohorts', 'analytics_retention_cohorts', 'analytics_ftue_funnel',
+    'analytics_phase_reached', 'analytics_purchase_funnel', 'analytics_install_first_seen',
+    'analytics_daily_event_rollup', 'analytics_rollup_state']) {
+    await assert.rejects(db.query(`select * from public.${relation}`)); checks++;
+  }
+  await assert.rejects(db.query('select public.rollup_event_days(1)')); checks++;
+  await assert.rejects(db.query('select public.prune_expired_events(1)')); checks++;
+  await db.exec('reset role');
+  // Retention v2: 180 days, never pruning a day before it is rolled up, and the
+  // pruned install keeps its first-seen cohort.
+  await addEvent('prune-oldest', 'p1', 'app_open', {}, 300, '1.3.0');
+  await addEvent('prune-oldest', 'p2', 'puzzle_completed', {}, 300, '1.3.0');
+  await addEvent('prune-later', 'p3', 'app_open', {}, 200, '1.3.0');
+  await addEvent('keep-me', 'k1', 'app_open', {}, 100, '1.3.0');
+  check((await db.query('select public.prune_expired_events(10000) as n')).rows[0].n, 2);
+  check((await db.query(`select count(*)::int as n from public.events where install_id = 'prune-later'`)).rows[0].n, 1); // its day is not rolled up yet
+  check((await db.query(`select type, events::int, installs::int from public.analytics_daily_event_rollup
+    where day = (now() at time zone 'UTC')::date - 300 order by type`)).rows,
+    [{ type: '__any__', events: 2, installs: 1 }, { type: 'app_open', events: 1, installs: 1 }, { type: 'puzzle_completed', events: 1, installs: 1 }]);
+  check((await db.query(`select cohort_day = (now() at time zone 'UTC')::date - 300 as ok, app_version
+    from public.analytics_install_cohorts where install_id = 'prune-oldest'`)).rows, [{ ok: true, app_version: '1.3.0' }]);
+  for (let run = 0; run < 12; run++) await db.query('select public.prune_expired_events(10000)');
+  check((await db.query(`select count(*)::int as n from public.events where install_id = 'prune-later'`)).rows[0].n, 0);
+  check((await db.query(`select count(*)::int as n from public.events where install_id = 'keep-me'`)).rows[0].n, 1);
+  check((await db.query(`select last_rolled_day = (now() at time zone 'UTC')::date - 1 as ok from public.analytics_rollup_state`)).rows[0].ok, true);
+  check((await db.query(`select count(*)::int as n from public.analytics_daily_event_rollup where day = (now() at time zone 'UTC')::date - 200`)).rows[0].n, 2);
   console.log(JSON.stringify({ checks, result: 'passed', engine: 'PGlite PostgreSQL', remoteWrites: 0 }));
 } finally { await db.close(); }
