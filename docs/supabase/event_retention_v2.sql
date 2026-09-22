@@ -15,7 +15,12 @@
 --      start over a long backlog rolls up first and prunes afterwards;
 --   3. before deleting, records each pruned install's first-seen moment in
 --      analytics_install_first_seen, so analytics_install_cohorts keeps
---      long-lived installs in their true cohort.
+--      long-lived installs in their true cohort; that row is removed as soon
+--      as the install has no events left (pruned, or a verified support
+--      deletion) and never outlives 24 months, so no install id is kept past
+--      the published analytics ceiling.
+-- The rollup table holds counts only (no install ids) and is kept
+-- indefinitely; it is the long-term trend record once raw rows are gone.
 -- Days are UTC days of server receipt time (received_at). received_at is
 -- server-owned (event_retention.sql), so a completed day never gains rows
 -- later and each day is rolled up once. Support deletions after a rollup do not
@@ -139,6 +144,17 @@ begin
     returning 1
   ) delete from public.events e using expired where e.id = expired.id;
   get diagnostics removed = row_count;
+  -- A first-seen row exists only to keep a still-active install in its true
+  -- cohort. Once none of its events remain (pruned, or removed by a verified
+  -- support deletion) it goes too, and it never outlives the published
+  -- 24-month analytics ceiling.
+  delete from public.analytics_install_first_seen f
+  where f.install_id in (
+    select s.install_id from public.analytics_install_first_seen s
+    where s.first_seen_at < now() - interval '24 months'
+       or not exists (select 1 from public.events e where e.install_id = s.install_id)
+    limit p_batch_size
+  );
   return removed;
 end;
 $$;

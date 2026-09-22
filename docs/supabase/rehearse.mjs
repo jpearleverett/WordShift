@@ -266,12 +266,16 @@ try {
   await addEvent('prune-oldest', 'p1', 'app_open', {}, 300, '1.3.0');
   await addEvent('prune-oldest', 'p2', 'puzzle_completed', {}, 300, '1.3.0');
   await addEvent('prune-later', 'p3', 'app_open', {}, 200, '1.3.0');
+  await addEvent('prune-oldest', 'p4', 'app_open', {}, 50, '1.3.0'); // still active: keeps its cohort
+  await addEvent('prune-gone', 'g1', 'app_open', {}, 300, '1.3.0'); // no recent activity: no row survives
   await addEvent('keep-me', 'k1', 'app_open', {}, 100, '1.3.0');
-  check((await db.query('select public.prune_expired_events(10000) as n')).rows[0].n, 2);
+  check((await db.query('select public.prune_expired_events(10000) as n')).rows[0].n, 3);
+  check((await db.query(`select install_id from public.analytics_install_first_seen order by install_id`)).rows,
+    [{ install_id: 'prune-oldest' }]);
   check((await db.query(`select count(*)::int as n from public.events where install_id = 'prune-later'`)).rows[0].n, 1); // its day is not rolled up yet
   check((await db.query(`select type, events::int, installs::int from public.analytics_daily_event_rollup
     where day = (now() at time zone 'UTC')::date - 300 order by type`)).rows,
-    [{ type: '__any__', events: 2, installs: 1 }, { type: 'app_open', events: 1, installs: 1 }, { type: 'puzzle_completed', events: 1, installs: 1 }]);
+    [{ type: '__any__', events: 3, installs: 2 }, { type: 'app_open', events: 2, installs: 2 }, { type: 'puzzle_completed', events: 1, installs: 1 }]);
   check((await db.query(`select cohort_day = (now() at time zone 'UTC')::date - 300 as ok, app_version
     from public.analytics_install_cohorts where install_id = 'prune-oldest'`)).rows, [{ ok: true, app_version: '1.3.0' }]);
   for (let run = 0; run < 12; run++) await db.query('select public.prune_expired_events(10000)');
@@ -279,5 +283,11 @@ try {
   check((await db.query(`select count(*)::int as n from public.events where install_id = 'keep-me'`)).rows[0].n, 1);
   check((await db.query(`select last_rolled_day = (now() at time zone 'UTC')::date - 1 as ok from public.analytics_rollup_state`)).rows[0].ok, true);
   check((await db.query(`select count(*)::int as n from public.analytics_daily_event_rollup where day = (now() at time zone 'UTC')::date - 200`)).rows[0].n, 2);
+  // A first-seen row never outlives its install's events or the 24-month ceiling.
+  await db.query(`insert into public.analytics_install_first_seen(install_id, first_seen_at) values ('keep-me', now() - interval '25 months')`);
+  await db.query(`delete from public.events where install_id = 'prune-oldest'`); // as a verified support deletion would
+  await db.query('select public.prune_expired_events(10000)');
+  check((await db.query('select count(*)::int as n from public.analytics_install_first_seen')).rows[0].n, 0);
+  check((await db.query(`select count(*)::int as n from public.events where install_id = 'keep-me'`)).rows[0].n, 1);
   console.log(JSON.stringify({ checks, result: 'passed', engine: 'PGlite PostgreSQL', remoteWrites: 0 }));
 } finally { await db.close(); }
