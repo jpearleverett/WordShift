@@ -144,17 +144,16 @@ samples kept), so frozen transcripts still resolve their illustrations.
    phase.** `getCoordinatedEventLine` skips an event written for an earlier
    phase, so a fast player never hears phase-2/3 testimony ("almost time",
    the first naming of the arrangement) after the reveal.
-4. **Phase-5 ritual micro-events reuse the phase-4 pool.** The one false line
-   was rewritten to work at both phases; a dedicated phase-5 pool is better.
-5. **Unreachable lines:** Vesper's, Tock's and Moss's 100/250-word threshold
-   lines and Fennick's 100-word line fire before those residents join; Moss's
-   phase-2 extra pool is effectively unreachable.
-6. **Phase-5 system copy** (move messages, pit "Loom/Weave" labels, rules
-   text, hint receipts, difficulty suggestions) keeps the older serene
-   "weave" register. Resident dialogue is aligned; a system-copy pass would
-   finish the job.
-7. **`arrived` adaptations of phase 0-3 lines keep their contractions.**
-   This matches the one-time "I will tell it the way I saw it then" lead-in,
-   but the owner may prefer them uncontracted.
-8. The spine's `seeds` scene and Thyme's personal phase-3 choice both ask
-   "keep this between us"; consider differentiating one.
+4. **Fixed (launch follow-up): phase-5 ritual micro-events** have their own
+   post-Arrival pool.
+5. **Fixed (launch follow-up): threshold lines are reachable.** A resident met
+   after a word threshold was crossed hears that threshold line once, on a
+   later visit. Moss's phase-2 extra pool stays rarely reachable by design:
+   making it reachable would put phase-2-voice lines between his phase-3 and
+   phase-4 chapters (documented in `animalDialogueBase.ts`).
+6. **Fixed (launch follow-up): phase-5 system copy** no longer uses the serene
+   "weave" register (the Unbroken Weave's own name and ranks keep it).
+7. **Kept by owner preference: `arrived` adaptations of phase 0-3 lines keep
+   their contractions.**
+8. **Fixed (launch follow-up):** Thyme's personal choice no longer echoes the
+   spine's "keep this between us".

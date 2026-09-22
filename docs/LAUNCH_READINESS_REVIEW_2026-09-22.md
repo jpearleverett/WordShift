@@ -8,6 +8,73 @@ Reviewed source: branch `claude/wonderful-wright-wg49h9` at `bef7213` (origin/ma
 
 The single most important thing to check on the device: **buy one amber pack and confirm it is credited exactly once**, including after force-stop and Restore (MON-1 below).
 
+## Resolution (2026-09-22, same branch)
+
+The owner reported a device pass on the 1.4.4 internal build: the game works, purchases credit correctly, onboarding runs, cloud backup and restore after Reset All work, ads show and notifications fire and route into the game. The owner decided to **keep the full-house reveal hold** (bought amber may bring the reveal earlier; recorded as an exception in CLAUDE.md's never-list) and to keep **no gap** between the first ceremony and the rules-change card (CLAUDE.md corrected). Everything else that lives in the repository was fixed on this branch; app version **1.4.5**, Android code **110**.
+
+| Finding | Resolution |
+|---|---|
+| RC-1 | Owner task: build the production profile at 110 and run the remaining production-profile checks (LAUNCH_CHECKLIST). |
+| RC-2 | Runbooks name 1.4.5 / 110 and tell the reader to derive the runtime from app.json. |
+| RC-3 | Version raised to 1.4.5 / 110. |
+| RC-4 | Metro uses `getSentryExpoConfig` (debug IDs); the OTA runbook uploads source maps. |
+| RC-5 | Sentry Android Gradle plugin enabled (`experimental_android`), R8 mappings upload. |
+| RC-6 | Sentry `environment` is the release channel. |
+| RC-7 | Decided: `allowBackup` stays true. Auto Backup is what carries the cloud-owner key across a reinstall, so the fresh-install cloud restore works without a recovery code. |
+| RC-8 | No change (iOS out of scope). |
+| P1 | Unreadable pending victories are quarantined; the failed-boot card can send the save to support (recovery credentials excluded); migrations treat "null" as absent. |
+| P2 | Choices and narrative delivery fail on read errors instead of caching defaults; a veteran with an unreadable onboarding step skips the cold open. |
+| P3 | Not changed. The shared staging map has no known trigger; changing the journal without a reproduction risks more than it fixes. Documented here. |
+| P4 | Daily-amber receipts are pruned to the last two local days. |
+| P5 / N4 | The recollection flag is cleared by Reset All and New Cycle. |
+| P6 | A board won between the Arrival and After keeps the phase-5 presentation. |
+| P7 | A stale daily autosave is dropped. |
+| MON-1 | Receipt linking falls back to the single new receipt for the product within 2 minutes; checkout receipts are always stored; regressions at 3 s, 45 s, missing date and two purchases 10 s apart. Still verify one real purchase on the production build. |
+| MON-2 / BO-6 / N1 | Hold kept by owner decision. Lagging residents now read their reveal chapters at catch-up pace once the house is at phase 4; late micro-beats wait for the reveal. |
+| MON-3 | Owner device pass reported purchases correct; the production-profile single-credit check remains. |
+| MON-4 / SPL-2 | Ad requests set `maxAdContentRating` T (not child-directed). Set the AdMob console ceiling too as a backstop. |
+| MON-5 | Owner task (RTDN). |
+| MON-6 | Restore merges entitlements and drops a key only when explicitly inactive. |
+| MON-7 | The victory double excludes windfalls, and the victory screen shows the same amount. |
+| MON-8 | Malformed checkout receipts are quarantined. |
+| SPL-1 | Internal docs excluded by exact name, superseded docs deleted, and `docsSitePublication.test.ts` fails CI for any unlisted docs file. |
+| SPL-3 | Placeholder removed from the live terms source; the draft clause is in LAUNCH_CHECKLIST for the owner to complete. |
+| SPL-4 | Owner decision pending: which Play campaign is live (launch-2026-09, launch-2026-09-v2 or assembled-listing-2026-09). |
+| SPL-5 | SLAVE, SLAVES and SLAVERY blocked and purged (four Double Shift boards). DRUGS and BEER kept. |
+| SPL-6 | Privacy policy describes network addresses, the RevenueCat identifier and anonymous daily totals; "Support ID" aligned; effective date 2026-09-22. |
+| SPL-7 | The copied-code note tells the player to clear the clipboard. |
+| SPL-8 | Reminders use a named Android channel. |
+| FTUE-A | Kept (owner); CLAUDE.md corrected. |
+| FTUE-B | The review ask skips wins with a pending ceremony, the forced harvest or an unlock card. |
+| FTUE-C | Micro-beat 25 moved to 27. |
+| FTUE-D | EXPERT has a one-time unlock card; its locked hint moved to phaseNarrative. |
+| FTUE-E | Out-of-hints, rewarded-hint and speed-rescue copy is phase-aware in phaseNarrative. |
+| GP-A | Unplayed boards are served at their own length before any extendable board is replayed. |
+| GP-B | Dailies walk a date-seeded permutation of their bank (no repeat within a pass). |
+| GP-C | Hint spends are serialized through the storage queue. |
+| GP-D | The first three dailies are eased and unranked. |
+| N2 | Reveal-bound micro-beats are held until phase 4, never consumed early. |
+| N3 | Interjections name only residents with news, with canon pronouns. |
+| N5 | Whispers follow the resident's awareness tier. |
+| N6 | Both curly apostrophes straightened; the baseline is empty. |
+| N7 | Session-end, cooldown and micro-beat copy no longer say "puzzles". |
+| N8 | Dialogue review items 4, 5, 6 and 8 fixed; 7 kept by preference. |
+| PS-1 | `android:appCategory="game"` via `plugins/withGameCategory.js`. |
+| PS-2 | Rooms ship as near-lossless WebP (12.0 MB to 6.4 MB); story masters no longer bundled (8.6 MB). |
+| PS-3 | Owner device task (memory, cold start, frame pacing on the production build). |
+| PS-4 / PS-5 | Not changed without device numbers. |
+| A11Y-1 | Store, Patron and Season Pass sheets are bounded by the system-bar insets. |
+| A11Y-2 | No change (0.87 scale floor holds). |
+| A11Y-3 | Unreferenced shipped files deleted; bundle patterns narrowed; generators no longer recreate them. |
+| BO-1 | `analytics_views_v1.sql` (retention, FTUE funnel, phase reached, purchase funnel), service-role only. Owner applies. |
+| BO-2 | Sentry fixes above; alert rules are an owner console task. |
+| BO-3 / BO-7 | `save_and_board_limits_v1.sql` limits save creation and requires a linked backup for Daily entrants. Owner applies. |
+| BO-4 | `event_retention_v2.sql` keeps raw events 180 days with daily rollups. Owner applies. |
+| BO-5 | Six season palettes rotate monthly; an owned palette pays amber instead. |
+| BO-8 | The amber unlock logs `season_premium_unlocked`. |
+| BO-9 | The word counter sends the install id. |
+| BO-10 | Support runbook updated. |
+
 ## Framework
 
 Eight dimensions, each audited independently against the code on this commit (the code is the truth, every finding cites a file and line that was read), with suspected defects traced or tested before being reported. Earlier findings were re-checked for regression across the 113 commits since `687a08d`. Scores: **5** ship it, **4** ship with minor follow-ups, **3** ship with known caveats, **2** fix first, **1** do not ship.
