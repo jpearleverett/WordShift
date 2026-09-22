@@ -22,8 +22,9 @@ are dated history; they do not validate the latest optimized Android binary.
 >   RevenueCat, and the **`supporter` entitlement** (the 5th, identifier
 >   EXACTLY `supporter`) created and attached. Still recommended: one real
 >   license-tester subscription purchase end-to-end (the 2026-07-13 SKU
->   verification predates the subscription-category code), and Google RTDN →
->   RevenueCat Pub/Sub wiring for prompt cancel/lapse sync (owner-deferred).
+>   verification predates the subscription-category code). Google RTDN →
+>   RevenueCat Pub/Sub wiring ✅ DONE (2026-09-22): Play's test notification
+>   was received by RevenueCat, so cancels, refunds and lapses sync promptly.
 > - **Banner ad unit** — ✅ DONE for Android (2026-07-16): Android Banner unit
 >   created and `admobBannerIdAndroid` set in `extra`
 >   (`ca-app-pub-6575205005908086/7787305884`). Serves TEST banners while

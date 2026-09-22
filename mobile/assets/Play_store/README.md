@@ -1,17 +1,19 @@
 # WordShift Play Store assets
 
-The retained September 7 English campaign is [launch-2026-09](launch-2026-09/README.md).
-Its artwork is a dated asset, not a fresh capture of every subsequent
-build. See [current build status](../../../docs/CURRENT_BUILD.md).
+The live Play listing is the September 7 English campaign,
+[launch-2026-09](launch-2026-09/README.md) (owner-confirmed 2026-09-22; the
+other campaigns were deleted that day). Its artwork is a dated asset, not a
+fresh capture of every subsequent build. See
+[current build status](../../../docs/CURRENT_BUILD.md).
 
 - [See all artwork at once](launch-2026-09/contact-sheet.png)
 - [Open the interactive preview](launch-2026-09/preview.html)
 - [Paste-ready listing copy](launch-2026-09/copy/README.md)
 
-Before upload, compare the ten PNGs in `launch-2026-09/upload/` with the latest
-signed Android build, especially the changed choice screens and room details.
-After that review, use the eight phone screenshots in numeric order.
-The September 13 documentation review did not regenerate these images.
+The ten PNGs in `launch-2026-09/upload/` were reviewed against the build and
+uploaded by the owner on 2026-09-15. Before any re-upload, compare them with the
+latest signed Android build again, and use the eight phone screenshots in
+numeric order.
 
 `WordShift-Play-Store-Launch.zip` (17 MB) was deleted on 2026-09-15 once the
 listing had been uploaded. It was a stale archive of this same directory:

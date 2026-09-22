@@ -77,8 +77,8 @@ checkout; reconcile monetary totals with Play/RevenueCat reports.
 Added 2026-09-22 for the staged Play rollout ([launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-22.md),
 BO-1). The daily counts above cannot answer the rollout's two stop rules, so
 [`supabase/analytics_views_v1.sql`](supabase/analytics_views_v1.sql) adds
-install-based views. **Status: written and rehearsed offline (PGlite), pending
-owner application.** They need no client change; the current build is app
+install-based views. **Status: applied by the owner on 2026-09-22 and verified
+with the read-only probes in backend setup.** They need no client change; the current build is app
 1.4.5 / versionCode 110.
 
 ### Applying
@@ -176,8 +176,8 @@ slow, snapshot it into a table rather than widening the retention window.
 
 ### Long-term trends
 
-Once [`event_retention_v2.sql`](supabase/event_retention_v2.sql) is applied, raw
-events are kept 180 days. Before a day's rows are pruned, the hourly job rolls
+Since [`event_retention_v2.sql`](supabase/event_retention_v2.sql) was applied
+(2026-09-22), raw events are kept 180 days. Before a day's rows are pruned, the hourly job rolls
 them into `analytics_daily_event_rollup` (UTC day, build, event type, event
 count, distinct installs, and one `__any__` row per day and build with the day's
 active installs). That table holds counts only and is kept indefinitely, so

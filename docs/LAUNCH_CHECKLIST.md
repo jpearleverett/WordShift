@@ -28,9 +28,14 @@ verify the latest binary, backend deployment or public release.
   recorded CI evidence; green JavaScript CI does not establish native release QA.
 - [x] **Play Console declarations.** Data safety, content rating (IARC), target
   audience and the listing website field were all declared by the owner on
-  2026-09-15. Guidance they were answered against is in
-  [the launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-14.md). RTDN to
-  RevenueCat is an integration rather than a declaration and is still open below.
+  2026-09-15.
+- [x] **Google Play RTDN to RevenueCat (2026-09-22).** Connected by the owner
+  across RevenueCat, Google Cloud Pub/Sub and Play Console; Play's test
+  notification was received by RevenueCat. Refunds, revocations and Supporter
+  renewals/expiries now reach RevenueCat in real time.
+- [x] **AdMob maximum ad content rating (2026-09-22).** Set by the owner in the
+  AdMob console blocking controls, the server-side backstop to the SDK's
+  `maxAdContentRating: T` request configuration.
 - [ ] **Build the optimized signed AAB and test through Play internal testing.**
   PARTIAL, 2026-09-15: the owner built the `expo-device` native binary (code 101)
   and confirmed it installs and runs. That clears "does a minified binary start",
@@ -73,6 +78,14 @@ verify the latest binary, backend deployment or public release.
   notification cold-start routing, challenge deep links and PNG sharing. Include
   a longer session on low/mid/high-end Android where available; record device,
   thermal/frame/memory observations rather than extrapolating from a July build.
+- [ ] **Accessibility and presentation pass on the device.** TalkBack, enlarged
+  OS text and reduced motion across puzzles, choices, introductions, story
+  scenes, store controls and ceremonies; room upgrades in Phases 2, 4 and 5
+  (full attunement included) and every walking resident in both directions at
+  device scale. Browser screenshots and atlas checks do not establish either.
+- [ ] **Story pilot (recommended).** Run the unfamiliar-reader
+  [story playtest protocol](STORY_PLAYTEST_PROTOCOL.md), including a Phase-3
+  late recruit; no completed report exists yet.
 - [ ] **Ad and consent matrix.** Keep `adsUseTestIds: true` through internal and
   closed testing: with the channel-derived flag that means running this matrix
   on an `internal-testing`-profile build (its channel keeps Google test units,
@@ -110,25 +123,25 @@ verify the latest binary, backend deployment or public release.
   oldest-row query is what proves the window actually prunes, and that only
   becomes meaningful once real event volume arrives, so re-check it after the
   first days of live traffic rather than treating it as closed forever.
-- [ ] **Governing-law clause for the terms (owner).** The draft moved out of
-  `docs/terms.md` on 2026-09-22, because its bracketed placeholders were
-  visible in the live page source. Fill in your home jurisdiction and courts,
-  add it to the terms as "## 10. Governing law", renumber "Changes" to 11,
-  update the effective date and mention it in the release notes. Draft:
-
-  > ", renumber
-     "Changes" to 11, and mention the addition in the revision note above and
-     in the app's release notes.
-
-## 10. Governing law
-
-These terms are governed by the laws of [GOVERNING JURISDICTION], without regard to its conflict-of-law rules. Any dispute arising from these terms or your use of the app that cannot be resolved informally will be brought in the courts of [VENUE], except where the consumer-protection law of the country in which you live gives you the right to bring a claim in your local courts or grants you protections that cannot be waived, in which case those rights and protections apply.
+- [x] **Supabase files 9-11 applied (2026-09-22).** The owner applied
+  `save_and_board_limits_v1.sql`, `analytics_views_v1.sql` and
+  `event_retention_v2.sql` in that order and confirmed the read-only probes in
+  [backend setup](BACKEND_SETUP.md#verifying-files-9-to-11-read-only) pass.
+  Standing rule: never re-run `rate_limits_v1.sql` or `event_retention.sql` on
+  their own afterwards without re-running 9-11, since they replace the same
+  functions.
+- [x] **Governing-law clause published (2026-09-22).** `docs/terms.md` section 10:
+  the laws of the State of New York, with disputes in the state or federal courts
+  in New York County, New York, keeping the consumer-protection carve-out for
+  players elsewhere. "Changes" is now section 11 and the terms are effective
+  September 22, 2026.
 - [ ] **Remaining backend evidence.** From an operator connection: actual event
   rows from the signed build, a **Daily rank posted end to end by a signed
   build** (the one part of the rate-limit migration a key-only probe cannot
   prove), two-device conflict handling, verified support recovery/deletion, the
   project plan tier plus disk/usage alerts (the events table shares the disk
-  with saves), Sentry alert rules and a symbolicated event from the exact signed
+  with saves), **Sentry alert rules** (new issue, crash-free sessions under 99%,
+  error spike; still to confirm) and a symbolicated event from the exact signed
   release. Follow [backend setup](BACKEND_SETUP.md).
 - [x] **Review the current store package.** Done by the owner on 2026-09-15.
   Use the reviewed launch package in
@@ -171,20 +184,16 @@ These terms are governed by the laws of [GOVERNING JURISDICTION], without regard
   [OTA instructions](OTA_UPDATES.md) for compatible updates.
   The Play release notes for this build must carry the legal line: "Privacy
   Policy updated (effective September 22, 2026) and Terms updated (effective
-  September 14, 2026): clarified purchase restore and Reset All behavior, added
-  data retention periods, and described network addresses, the purchase
-  identifier and anonymous daily totals." Append "and a governing-law clause" only once the clause
-  below is actually published.
+  September 22, 2026): clarified purchase restore and Reset All behavior, added
+  data retention periods, described network addresses, the purchase identifier
+  and anonymous daily totals, and added a governing-law clause."
 - [ ] **Publish the documentation clarification with release notes.** The
   September 13 privacy/terms revision clarifies existing purchase delivery,
   restore and reset behavior; the September 14 revision adds retention periods
-  to the privacy policy. A governing-law clause for the terms is DRAFTED (see the governing-law item below; it moved out of the terms page on 2026-09-22) and was previously inside
-  an HTML comment in `docs/terms.md` (so the live page never shows bracketed
-  placeholders; the Pages workflow refuses a placeholder outside its comment):
-  fill in the jurisdiction and venue, move the section out of the comment,
-  renumber "Changes", then mention the clause in the revision note and the
-  release notes. Both documents promise a release-notes mention, so the line
-  above is not optional. Verify the deployed policy links.
+  to the privacy policy; the September 22 revisions add the governing-law clause
+  to the terms and the network-address/purchase-identifier detail to the policy.
+  Both documents promise a release-notes mention, so the line above is not
+  optional. After the merge to `main`, verify the deployed policy links.
 - [ ] **Submit and promote deliberately.** Both configured Android submit
   profiles target Play's **internal** track. Validate the production-configured
   artifact there, then promote it in Play Console with a staged rollout while
@@ -217,14 +226,14 @@ history, and repeat changed flows in the current release matrix above.
 - [x] **2026-08-31:** Supporter subscription/base plan and entitlement confirmed
   console-side; repriced Remove Ads ($5.99), Patron ($8.99), Supporter ($3.99/month)
   tiers confirmed. Device verification of Supporter remains above. RTDN wiring
-  was owner-deferred; revisit with the RevenueCat subscription operations setup.
+  was owner-deferred then; connected 2026-09-22 (see above).
 - [x] **2026-09-05:** Expo SDK 57 / RN 0.86.3 dependency update, Doctor 21/21 and
   zero known npm vulnerabilities recorded at that time. Re-run current checks;
   these dated results are not current measurements.
 - [x] **2026-09-14:** hosted Supabase v2 migrations verified by read-only probe
   (see the backend gates above); `rate_limits_v1.sql` written and rehearsed
-  offline, not applied. Launch readiness review recorded in
-  [`LAUNCH_READINESS_REVIEW_2026-09-14.md`](LAUNCH_READINESS_REVIEW_2026-09-14.md).
+  offline (applied 2026-09-15). A launch readiness review was recorded that day
+  and superseded by [the 2026-09-22 review](LAUNCH_READINESS_REVIEW_2026-09-22.md).
 
 ## iOS: separate release track
 

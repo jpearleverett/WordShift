@@ -2,7 +2,7 @@
 
 ## September 22 launch-readiness follow-up (1.4.5 / 110)
 
-Branch `claude/wonderful-wright-wg49h9` carries the [2026-09-22 launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-22.md) and its fixes. App version **1.4.5**, Android code **110**; the build needs a new native binary because it adds the `android:appCategory="game"` manifest flag, the Sentry Android Gradle plugin (R8 mapping upload) and Metro debug IDs, so its OTA runtime is `1.4.5-<channel>`. The owner's device pass on the 1.4.4 internal build (2026-09-22) found purchases, onboarding, cloud backup and restore after Reset All, ads and notifications working. What remains before promotion is listed in the review's Resolution section and in the [launch checklist](LAUNCH_CHECKLIST.md); the Supabase files 9-11 are written and rehearsed offline but not applied.
+Branch `claude/wonderful-wright-wg49h9` carries the [2026-09-22 launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-22.md) and its fixes. App version **1.4.5**, Android code **110**; the build needs a new native binary because it adds the `android:appCategory="game"` manifest flag, the Sentry Android Gradle plugin (R8 mapping upload) and Metro debug IDs, so its OTA runtime is `1.4.5-<channel>`. The owner's device pass on the 1.4.4 internal build (2026-09-22) found purchases, onboarding, cloud backup and restore after Reset All, ads and notifications working. What remains before promotion is listed in the review's Resolution section and in the [launch checklist](LAUNCH_CHECKLIST.md); the Supabase files 9-11, the AdMob content-rating ceiling, Google Play RTDN to RevenueCat and the terms' governing-law clause (New York) were all completed on 2026-09-22. Still open: Sentry alert rules and the production-profile device checks.
 
 ## September 20 manual phase transitions and resident responses
 
@@ -34,7 +34,7 @@ The September 19 `assembled-listing-2026-09` store campaign was deleted on 2026-
 
 ## September 17 assessment fixes
 
-The follow-up to `main` at `c9f5835` addresses the September 16 audit. See the [complete resolution map and validation](ASSESSMENT_RESOLUTION_2026-09-17.md). Earlier dated test totals below retain their original scope. At that assessment-fix snapshot, source version was 1.3.6 / Android 101; the later version bump is recorded below. The assessment fixes did not themselves constitute a Play upload.
+The follow-up to `main` at `c9f5835` addresses the September 16 audit. Its resolution map was folded into CLAUDE.md's September 17 section and deleted on 2026-09-22. Earlier dated test totals below retain their original scope. At that assessment-fix snapshot, source version was 1.3.6 / Android 101; the later version bump is recorded below. The assessment fixes did not themselves constitute a Play upload.
 
 Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main` at `687a08d` (the launch-readiness merge, PR 439). The earlier CI audit remains tied to [`6f96ebb583f591f46c9c023be6462d99d816a8e7`](https://github.com/jpearleverett/WordShift/commit/6f96ebb583f591f46c9c023be6462d99d816a8e7). This page distinguishes current implementation from recorded validation; it does not certify an uploaded AAB, a Play rollout, or hosted service configuration.
 
@@ -174,9 +174,10 @@ any coloured environment. The count is now printed as a string and
 
 ## Launch readiness review (2026-09-14)
 
-[`LAUNCH_READINESS_REVIEW_2026-09-14.md`](LAUNCH_READINESS_REVIEW_2026-09-14.md)
-answers "is the game ready to publish" with a twelve-dimension review of `main`
-at `8233184` (app 1.3.5 / code 99). Its verdict is **conditionally ready: publish
+The 2026-09-14 review (deleted on 2026-09-22 once the
+[2026-09-22 review](LAUNCH_READINESS_REVIEW_2026-09-22.md) superseded it; git
+history holds it) answered "is the game ready to publish" with a twelve-dimension review of `main`
+at `8233184` (app 1.3.5 / code 99). Its verdict was **conditionally ready: publish
 the next artifact, not the current one**, on three blockers:
 
 1. **Consumable purchases credit twice** (fixed on 2026-09-14): checkout
@@ -227,11 +228,11 @@ Android test ad IDs remain deliberately enabled in the checked-in configuration.
 |---|---|
 | Development, architecture and safety constraints | [README](../README.md), [AGENTS](../AGENTS.md), [CLAUDE](../CLAUDE.md) |
 | EAS archive size, builds and native optimization | [Build and upload](BUILD_AND_UPLOAD.md) |
-| Release acceptance and operational work | [Launch checklist](LAUNCH_CHECKLIST.md), [completion checklist](COMPLETION_CHECKLIST.md), [support runbook](SUPPORT_AND_RETENTION_RUNBOOK.md) |
+| Release acceptance and operational work | [Launch checklist](LAUNCH_CHECKLIST.md), [support runbook](SUPPORT_AND_RETENTION_RUNBOOK.md) |
 | Billing, ads, backend, analytics and updates | [Monetization](MONETIZATION_SETUP.md), [backend](BACKEND_SETUP.md), [analytics](ANALYTICS_DELIVERY.md), [save integrity](SAVE_INTEGRITY_UPGRADE.md), [OTA](OTA_UPDATES.md) |
 | Story, choices, ceremonies and visuals | [Story implementation](STORY_AND_VISUAL_IMPLEMENTATION.md), [story playtest](STORY_PLAYTEST_PROTOCOL.md), [presentation policy](../mobile/docs/STORY_PRESENTATION_POLICY.md), [typography ownership](../mobile/docs/TYPOGRAPHY_AND_ANIMATION_OWNERSHIP.md) |
 | Public copy and release art | [Store listing](STORE_LISTING.md), [press kit](PRESS_KIT.md), [launch asset package](../mobile/assets/Play_store/launch-2026-09/README.md) |
 
-The surviving September reports (`reports/`, and the bank proof files kept in `review-2026-09-06/` because the [bank top-up](PUZZLE_BANK_TOP_UP_2026-09-06.md) links them) are **historical evidence**. Their original counts, screenshots, access checks and completion statements apply to the recorded snapshot. Current references above take precedence for build commands and behavior. The July design audit and ledger, the September 5 review set, `RELEASE_VALIDATION_1_3_0.md` and the dated September status/handoff docs were deleted on 2026-09-15 once their findings had been folded into CLAUDE.md and the docs above; git history holds them. On 2026-09-22 the September 16 assessment (superseded by its [resolution](ASSESSMENT_RESOLUTION_2026-09-17.md)), the dated screenshot, UI and walk follow-up reports, the `visual-review/` walking strips and the unlinked screenshots and logs in `review-2026-09-06/` were deleted the same way. The marketing renders were compared against the current candidate and uploaded by the owner on 2026-09-15; editing their README does not regenerate the images, and the two Graphics assets are manual Play Console uploads, so changing them in Git never updates the live listing.
+The surviving September reports (`reports/`, and the bank proof files kept in `review-2026-09-06/` because the [bank top-up](PUZZLE_BANK_TOP_UP_2026-09-06.md) links them) are **historical evidence**. Their original counts, screenshots, access checks and completion statements apply to the recorded snapshot. Current references above take precedence for build commands and behavior. The July design audit and ledger, the September 5 review set, `RELEASE_VALIDATION_1_3_0.md` and the dated September status/handoff docs were deleted on 2026-09-15 once their findings had been folded into CLAUDE.md and the docs above; git history holds them. On 2026-09-22 the September 16 assessment, the dated screenshot, UI and walk follow-up reports, the `visual-review/` walking strips and the unlinked screenshots and logs in `review-2026-09-06/` were deleted the same way. The marketing renders were compared against the current candidate and uploaded by the owner on 2026-09-15; editing their README does not regenerate the images, and the two Graphics assets are manual Play Console uploads, so changing them in Git never updates the live listing. Later on 2026-09-22 the 2026-09-14 launch readiness review, the September 17 assessment resolution and the September 13 completion checklist were deleted too: the 2026-09-22 review supersedes the first, CLAUDE.md carries the second's rules, and the third's open device items moved into the launch checklist.
 
 Keep this page's audit date, commit, configuration and CI link together when updating it. Do not relabel historical evidence as a new device pass or mark an external deployment complete from source inspection alone.

@@ -15,7 +15,7 @@ no retention job or provider dashboard was executed here.
 > (request budgets, daily score plausibility, cohort purge) was applied by the
 > owner on 2026-09-15 (see section 1).
 >
-> **Pending owner application (added 2026-09-22, rehearsed locally only):**
+> **Applied by the owner on 2026-09-22 (read-only probes below reported passing):**
 > [`save_and_board_limits_v1.sql`](supabase/save_and_board_limits_v1.sql),
 > [`analytics_views_v1.sql`](supabase/analytics_views_v1.sql) and
 > [`event_retention_v2.sql`](supabase/event_retention_v2.sql), files 9 to 11
@@ -91,7 +91,8 @@ For the existing WordShift project, skip the base schema and run
 `psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f docs/supabase/apply_upgrade.sql`,
 or run files 2–11 above in the dashboard SQL editor, in order (every file is
 transactional and rerunnable, so re-running the already-applied 2 to 8 is
-harmless; only files 9 to 11 change anything on the hosted project today).
+harmless; files 9 to 11 were applied on 2026-09-22, so on the hosted project
+the whole run is now a no-op).
 **Order matters on any partial re-run:** files 9 and 11 replace functions that
 files 8 and 7 define, so re-running `rate_limits_v1.sql` or
 `event_retention.sql` on its own reverts them; re-run 9 to 11 afterwards. The
@@ -102,7 +103,8 @@ retention cron job was scheduled on 2026-09-15 and calls
 
 ### Verifying files 9 to 11 (read-only)
 
-Run as `postgres` in the SQL editor after applying. Nothing below writes:
+Run as `postgres` in the SQL editor after applying. Nothing below writes. The
+owner ran these on 2026-09-22 and reported every check passing:
 
 ```sql
 -- Exactly one overload of each replaced function (an extra one makes
@@ -264,7 +266,7 @@ A read-only probe with the publishable key from `mobile/app.json` (no
 
 Not verifiable with the publishable key, still open on the checklist: actual
 event rows arriving from the signed build, the Sentry alert rules and the
-project plan tier. The `wordshift-event-retention` cron job was created by the
+project plan tier. (Files 9 to 11 were applied and probed on 2026-09-22.) The `wordshift-event-retention` cron job was created by the
 owner on 2026-09-15 (`schedule_event_retention.sql` as postgres, with Supabase
 Cron enabled) and has since completed a successful run, so event retention is
 deployed and executing. Keep that job/run row with the release record; its
