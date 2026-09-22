@@ -80,6 +80,12 @@ import {
   getHouseAskLine,
   getHouseAskFulfilledMessage,
   getHintGrantMessage,
+  getPitButtonLabel,
+  getPitOfferAllLabel,
+  getPitEmptyMessage,
+  getPitHomeBadgeLabel,
+  getPitHarvestLabel,
+  getPitDevourVerb,
   getPreviewGraduationMessage,
   getSwiftVictoryHintMessage,
   getFinalBoardStartMessage,
@@ -844,7 +850,7 @@ describe('getComboMoveMessage', () => {
   test('signature lines survive as pool members', () => {
     expect(COMBO_MOVE_POOLS[4][2]).toContain('A flawless verse. It hears.');
     expect(COMBO_MOVE_POOLS[0][2]).toContain('On fire! Nothing is stopping you now!');
-    expect(COMBO_MOVE_POOLS[5][2]).toContain('The weave sings, unbroken.');
+    expect(COMBO_MOVE_POOLS[5][2]).toContain('Unbroken. The hum under the floor deepens.');
   });
 
   test('saturates at the top tier for very long streaks', () => {
@@ -1654,22 +1660,24 @@ describe('getNextStreakMilestoneText', () => {
   });
 });
 
-describe('Phase 5 victory register (serene, distinct from Phase 4 offering)', () => {
+describe('Phase 5 victory register (kept by the house, distinct from Phase 4 offering)', () => {
   it('getRitualEchoHeader gives Phase 5 its own settled header', () => {
     expect(getRitualEchoHeader(4)).toBe('The Offering:');
     expect(getRitualEchoHeader(5)).toBe('The Pattern:');
     expect(getRitualEchoHeader(5)).not.toBe(getRitualEchoHeader(4));
   });
 
-  it('getRitualEchoFooter weaves rather than offers at Phase 5', () => {
+  // The old serene "weave" register was retired (dialogue review 2026-09-22,
+  // item 6): after the Arrival the presence keeps what it is given.
+  it('getRitualEchoFooter keeps rather than offers at Phase 5', () => {
     expect(getRitualEchoFooter(4, 3)).toContain('offered');
-    expect(getRitualEchoFooter(5, 3)).toContain('woven');
+    expect(getRitualEchoFooter(5, 3)).toContain('kept');
     expect(getRitualEchoFooter(5, 3)).not.toBe(getRitualEchoFooter(4, 3));
   });
 
-  it('getWordsOfferedText shifts to the Phase 5 weave register', () => {
+  it('getWordsOfferedText shifts to the Phase 5 register', () => {
     expect(getWordsOfferedText(7, 4)).toContain('arrangement');
-    expect(getWordsOfferedText(7, 5)).toContain('woven');
+    expect(getWordsOfferedText(7, 5)).toContain('kept');
     expect(getWordsOfferedText(7, 5)).not.toBe(getWordsOfferedText(7, 4));
   });
 
@@ -2642,5 +2650,32 @@ describe('dialogue rest copy', () => {
   test('resting and not-resting say different things', () => {
     expect(getDialogueSessionEndMessage(3, 'Chill', 'capybara', true))
       .not.toBe(getDialogueSessionEndMessage(3, 'Chill', 'capybara', false));
+  });
+});
+
+// ============================================================================
+// Phase-5 system copy follows the current canon (dialogue review item 6):
+// the presence lives in the house and prefers sameness, the player's line
+// holds. The old serene weave/loom register is gone from system copy (the
+// Unbroken Weave keeps its name: it is a mode, not a register).
+// ============================================================================
+describe('phase-5 system copy leaves the serene weave register', () => {
+  test('no weave, loom or woven in the phase-5 system surfaces', () => {
+    const lines: string[] = [
+      ...Array.from({ length: 40 }, () => getMoveMessage(5)),
+      getHintFallback(5), getLoadingMessage(5), getStartMessage(5),
+      getNoValidMovesMessage(5), getDragMissMessage(5), getSpeedTimeUpMessage(5),
+      getPitButtonLabel(5), getPitOfferAllLabel(5), getPitEmptyMessage(5),
+      getPitHomeBadgeLabel(5), getPitHarvestLabel(5), getPitDevourVerb(5),
+      getRitualEchoFooter(5, 3), getWordsOfferedText(3, 5), getHintGrantMessage(5),
+      ...getRulesText(5).steps.flatMap(st => [st.heading, st.desc]), getRulesText(5).title,
+      ...PIT_OFFER_RESULT_MESSAGES[5],
+      ...COMBO_MOVE_POOLS[5].flat(),
+    ];
+    for (const line of lines) {
+      expect(line).not.toMatch(/weave|loom|woven|\bthreads?\b|at peace|serene/i);
+      expect(line).not.toMatch(/[–—]/);
+    }
+    expect(getPhaseIndicator(5).label).not.toMatch(/peace/i);
   });
 });

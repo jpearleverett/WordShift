@@ -75,7 +75,7 @@ const VICTORY_TITLES: Record<DialoguePhase, { three: string; two: string; one: s
   2: { three: 'FLAWLESS...', two: 'ADEQUATE.', one: 'IT\'S DONE.' },
   3: { three: 'IMPRESSIVE...', two: 'SUFFICIENT.', one: 'YOU PERSIST.' },
   4: { three: 'WHY DOES\nIT MATTER?', two: 'AND YET...', one: '...AGAIN.' },
-  5: { three: 'The pattern continues.', two: 'Another thread in the weave.', one: 'The arrangement hums.' },
+  5: { three: 'The pattern continues.', two: 'The house keeps it.', one: 'It stays where you put it.' },
 };
 
 export function getVictoryTitle(stars: number, phase: DialoguePhase): string {
@@ -201,21 +201,21 @@ export const VICTORY_FEEDBACK_POOLS: Record<
   5: {
     three: [
       'Flawless. Every word was heard, and each one stays exactly where you put it.',
-      'Every thread true. The pattern barely rippled as you passed.',
+      'Every word true. Something in the walls noticed, and said nothing.',
       'Flawless. Nobody asked it of you. You did it anyway.',
       'Perfect work, done for its own sake. Nobody here is keeping score.',
     ],
     two: [
-      'Another thread pulled tight. The fabric holds.',
-      'Woven, with a small unevenness here and there. Cloth is like that.',
-      'Done. A slip or two stays in the weave, and nobody smooths them out.',
-      'Done, gently. The weave has room for every kind of hand.',
+      'Done, with a slip or two. The house would tidy them away if you let it.',
+      'Finished, a little uneven. Leave it uneven. That is still allowed.',
+      'Done. A slip or two stays in the record, and nobody smooths them out.',
+      'Done. The house has room for every kind of hand, even the ones it cannot correct.',
     ],
     one: [
       'Slow, and finished. The stumbles stay in the record. They are yours.',
-      'A slow thread, worked all the way through. The weave is patient. So are you, now.',
+      'Slow, and worked all the way through. The house watched every stumble and kept its opinions to itself.',
       'Finished. The rough parts stay rough. The house is learning to leave them.',
-      'It took what it took. The pattern has all the time there is.',
+      'It took what it took. Something here would like every day to go the same. This one did not.',
     ],
   },
 };
@@ -449,15 +449,15 @@ export const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
     'Received. The gratitude below is patient and vast.',
   ],
   5: [
-    'The weave tightens.', 'Another thread.', 'The pattern knows.',
-    'It remembers.', 'Accepted.', 'Woven.', 'The hum continues.',
-    'Settled.', 'The thread holds.', 'Part of the whole.',
-    'Placed, like a stitch in old cloth.',
+    'Noted, quietly.', 'The house keeps it.', 'The pattern knows.',
+    'It remembers.', 'Accepted.', 'Settled.', 'The hum continues.',
+    'Your line still holds.', 'The quiet takes it in.', 'Nothing corrects it.',
+    'Placed. The house would leave it there forever.',
     'The pattern makes room without being asked.',
-    'A soft click, somewhere far away and content.',
-    'The thread finds its row.',
-    'A place remains between the threads.',
-    'The weave breathes in.',
+    'A soft click, somewhere far away.',
+    'It is watching. It is always watching now.',
+    'A place remains between the words.',
+    'The house breathes in, and lets it be.',
   ],
 };
 
@@ -615,14 +615,14 @@ export const COMBO_MOVE_POOLS: Record<DialoguePhase, [string[], string[], string
     ],
   ],
   5: [
-    ['Two threads, true.', 'Two stitches, even and sure.', 'Twice woven, no snag.'],
-    ['Three, woven without a snag.', 'Three threads pulled smooth in a row.', 'Three true stitches. The cloth is pleased, in its way.'],
+    ['Two, true.', 'Two in a row. The house notices.', 'Twice, and nothing to correct.'],
+    ['Three without a slip.', 'Three clean. The quiet leans in.', 'Three true. Something below keeps count.'],
     [
-      'The weave sings, unbroken.',
-      'Thread after thread, all true. The loom is content.',
-      'A long, even run. The pattern wears it well.',
-      'Unbroken weaving. The hum deepens.',
-      'Your hands and the weave, one motion now.',
+      'An unbroken run. The house watches it go by.',
+      'Move after move, all true. Nothing needs correcting, and that unsettles it.',
+      'A long, even run. The house would have you do it the same way forever.',
+      'Unbroken. The hum under the floor deepens.',
+      'Your hands, sure and steady. It is still watching them.',
     ],
   ],
 };
@@ -672,7 +672,7 @@ const HINT_FALLBACK: Record<DialoguePhase, string> = {
   2: 'You\'ve wandered off course. Undo.',
   3: 'Wrong path. Is there a right one?',
   4: 'Lost. But the arrangement knows exactly where you are.',
-  5: 'The threads tangle. Undo and try again.',
+  5: 'This path goes nowhere. Undo and try again.',
 };
 
 export function getHintFallback(phase: DialoguePhase): string {
@@ -725,7 +725,7 @@ const HINT_NO_SAFE_ROUTE_UNDO: Record<DialoguePhase, string> = {
   2: 'The pattern sees no sure way on from here. Undo a move. No hint was spent.',
   3: 'No sure route remains from here. Take a move back. No hint was spent.',
   4: 'The arrangement finds no way on from here. Undo. No hint was spent.',
-  5: 'The threads lead nowhere sure from here. Unwind a move. No hint was spent.',
+  5: 'Nothing sure leads on from here. Undo a move. No hint was spent.',
 };
 
 const HINT_NO_SAFE_ROUTE_FRESH: Record<DialoguePhase, string> = {
@@ -734,7 +734,7 @@ const HINT_NO_SAFE_ROUTE_FRESH: Record<DialoguePhase, string> = {
   2: 'The pattern has not found a sure way in yet. Begin, then ask. No hint was spent.',
   3: 'No sure route shows from the start. Begin, then ask again. No hint was spent.',
   4: 'The arrangement offers no opening yet. Begin. No hint was spent.',
-  5: 'The threads have not settled yet. Begin, then ask again. No hint was spent.',
+  5: 'Nothing is placed yet. Begin, then ask again. No hint was spent.',
 };
 
 export function getHintNoSafeRouteMessage(phase: DialoguePhase, canUndo: boolean): string {
@@ -809,7 +809,7 @@ const INVALID_WORD_MESSAGES: Record<DialoguePhase, (word: string) => string> = {
   2: (word) => `The pattern doesn't accept "${word}".`,
   3: (word) => `The arrangement rejects "${word}".`,
   4: (word) => `"${word}" dissolves into nothing.`,
-  5: (word: string) => `"${word}" unravels. The weave rejects it.`,
+  5: (word: string) => `"${word}" is not a word. Not even here.`,
 };
 
 export function getInvalidWordMessage(word: string, phase: DialoguePhase): string {
@@ -822,7 +822,7 @@ const BLOCKED_WORD_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The pattern refuses that placement.',
   3: 'The arrangement refuses that placement.',
   4: 'That placement is not accepted.',
-  5: 'The weave refuses that placement.',
+  5: 'That placement will not hold.',
 };
 
 /** Reject a blocked intermediate without repeating the hidden term. */
@@ -860,7 +860,7 @@ const LOCKED_LETTER_MESSAGES: Record<DialoguePhase, string> = {
   2: 'That letter won\'t move.',
   3: 'That letter has been claimed.',
   4: 'It belongs to the arrangement now.',
-  5: 'Woven into the pattern. It cannot move.',
+  5: 'Set in place. It will not move now.',
 };
 
 export function getLockedLetterMessage(phase: DialoguePhase): string {
@@ -924,7 +924,7 @@ const NO_VALID_MOVES_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The letters refuse every path from here. Even they seem to know this arrangement was wrong. Undo, or clear the board and begin anew.',
   3: 'No word can form from this arrangement. Unmake a move, or clear it all away.',
   4: 'The arrangement admits no further words. Unmake your moves, or begin again.',
-  5: 'The weave has closed around this path. Undo a thread, or clear it and start once more.',
+  5: 'No word fits from here. Undo a move, or clear it and start once more.',
 };
 
 export function getNoValidMovesMessage(phase: DialoguePhase): string {
@@ -938,7 +938,7 @@ const STUCK_PANEL_TITLES: Record<DialoguePhase, string> = {
   2: 'This path has closed.',
   3: 'The way is shut.',
   4: 'No path remains.',
-  5: 'The thread frays.',
+  5: 'The way closes.',
 };
 
 export function getStuckPanelTitle(phase: DialoguePhase): string {
@@ -957,7 +957,7 @@ const DRAG_MISS_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The letter found no row. Bring it down onto one.',
   3: 'It slipped free. Settle the letter onto a row.',
   4: 'The letter would not settle. Lay it upon a row.',
-  5: 'The thread drifted loose. Rest it upon a row.',
+  5: 'The letter drifted loose. Set it down on a row.',
 };
 
 export function getDragMissMessage(phase: DialoguePhase): string {
@@ -974,7 +974,7 @@ const LOADING_MESSAGES: Record<DialoguePhase, string> = {
   2: 'Seeking patterns...',
   3: 'Words emerging from darkness...',
   4: 'The void speaks...',
-  5: 'The pattern weaves...',
+  5: 'The house is listening...',
 };
 
 export function getLoadingMessage(phase: DialoguePhase): string {
@@ -991,7 +991,7 @@ const START_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The letters await.',
   3: 'Begin... if you must.',
   4: 'The words are waiting. They always are.',
-  5: 'The threads await your hand.',
+  5: 'The letters wait. So does the house.',
 };
 
 export function getStartMessage(phase: DialoguePhase): string {
@@ -1008,7 +1008,7 @@ const SPEED_TIME_UP_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The clock ran dry. The letters scattered before you finished.',
   3: 'Time collapsed. The arrangement closed this path.',
   4: 'The hour was consumed. The arrangement does not wait. Offer again.',
-  5: 'Time settled where it fell. The threads rest. Begin again, gently.',
+  5: 'Time ran out. The house did not mind. Begin again when you like.',
 };
 
 export function getSpeedTimeUpMessage(phase: DialoguePhase): string {
@@ -1025,7 +1025,7 @@ const REWARDED_DOUBLE_LABELS: Record<DialoguePhase, string> = {
   2: 'Linger a moment... double the offering',
   3: 'Stay a while... double the offering',
   4: 'Give it your attention... double the offering',
-  5: 'Tend it longer... double the offering',
+  5: 'Stay a little longer... double the offering',
 };
 
 const REWARDED_DOUBLE_CONFIRM: Record<DialoguePhase, string> = {
@@ -1246,12 +1246,12 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
     dismissLabel: '...',
   },
   5: {
-    title: 'THE WEAVE',
+    title: 'THE PATTERN',
     steps: [
-      { heading: 'Choose a Thread', desc: 'Pull gently. The fabric remembers.' },
-      { heading: 'Place it in the Pattern', desc: 'It knows where it belongs.' },
+      { heading: 'Choose a Letter', desc: 'Take it from the word. The house will notice.' },
+      { heading: 'Place it Where You Choose', desc: 'It would rather everything stayed put. Move it anyway.' },
       { heading: 'The Words Are Real', desc: 'As real as the silence between them.' },
-      { heading: 'Continue the Pattern', desc: 'Row by row. The weave holds.' },
+      { heading: 'Continue the Pattern', desc: 'Row by row. Your line still holds.' },
     ],
     dismissLabel: 'Continue',
   },
@@ -1272,7 +1272,7 @@ export function getPhaseIndicator(phase: DialoguePhase): { icon: string; label: 
     case 2: return { icon: '🌙', label: 'Questioning' };
     case 3: return { icon: '👁️', label: 'Shadows' };
     case 4: return { icon: '🌑', label: 'The Horizon' };
-    case 5: return { icon: '🕊️', label: 'Peace' };
+    case 5: return { icon: '🕊️', label: 'After' };
     default: return { icon: '☀️', label: '' };
   }
 }
@@ -1291,7 +1291,7 @@ export function getRitualEchoHeader(phase: number): string {
   if (phase === 2) return 'Words Transformed:';
   if (phase === 3) return 'The Incantation:';
   if (phase === 4) return 'The Offering:';
-  return 'The Pattern:'; // Phase 5 — serene, settled
+  return 'The Pattern:'; // Phase 5: the house keeps it
 }
 
 /**
@@ -1303,7 +1303,7 @@ export function getRitualEchoFooter(phase: number, wordCount: number): string {
   if (phase === 2) return 'The pattern takes shape...';
   if (phase === 3) return 'The arrangement accepts.';
   if (phase === 4) return `${wordCount} words offered to the pattern.`;
-  return `${wordCount} words woven into the pattern.`; // Phase 5 — the pattern continues
+  return `${wordCount} words kept by the house.`; // Phase 5: the house keeps everything
 }
 
 // ============================================================================
@@ -1358,10 +1358,10 @@ export function getIncantationName(words: string[], phase: number): string | nul
     `The ${lastWord} Opens`,
   ];
 
-  // Phase 5 templates - serene, settled; the pattern simply continues
+  // Phase 5 templates: the presence keeps what it is given; quiet, watchful
   const phase5Templates = [
     `${firstWord} settles into ${lastWord}`,
-    `The Weave of ${lastWord}`,
+    `The Keeping of ${lastWord}`,
     `${firstWord} Becomes ${lastWord}`,
     `The ${lastWord} Abides`,
     `${firstWord} Returns as ${lastWord}`,
@@ -1386,7 +1386,7 @@ export function getWordsOfferedText(totalWords: number, phase: number): string {
   if (phase === 2) return `Words transformed: ${totalWords}`;
   if (phase === 3) return `Words offered: ${totalWords}`;
   if (phase === 4) return `${totalWords} words offered to the arrangement`;
-  return `${totalWords} words woven into the pattern`; // Phase 5 — serene
+  return `${totalWords} words kept by the house`; // Phase 5: kept, not consumed
 }
 
 /**
@@ -3266,7 +3266,7 @@ export function getHouseAskFulfilledMessage(phase: number): string {
 // ============================================================================
 
 export function getHintGrantMessage(phase: number): string {
-  if (phase >= 5) return 'A hint is set aside for you, though little here still needs solving. Take it as fondness.';
+  if (phase >= 5) return 'A hint is set aside for you. The house is fond of you. That has not changed, and neither has your line.';
   if (phase >= 4) return 'A small kindness is set aside for you. One hint, kept where the cold cannot reach it.';
   if (phase >= 3) return 'The house slips a hint into your keeping. The doors ahead are heavier.';
   if (phase >= 2) return 'The house tucks a spare hint into your pocket. For the harder doors ahead.';
@@ -3333,9 +3333,9 @@ export function resolveImperfectStarCause(
 export function getFirstImperfectStarsMessage(phase: number, cause: ImperfectStarCause, stars = 2): string {
   const opener = stars <= 1 ? 'One star.' : 'Two stars!';
   if (phase >= 5) {
-    if (cause === 'both') return 'A hint and a few slips cost a star. The weave keeps the whole solve anyway.';
-    if (cause === 'hint') return 'The hint cost a star. Three come from solving unaided. The weave holds either way.';
-    return 'A few slipped drops cost a star. One slip is forgiven; more are not. The weave holds either way.';
+    if (cause === 'both') return 'A hint and a few slips cost a star. The house keeps the whole solve anyway.';
+    if (cause === 'hint') return 'The hint cost a star. Three come from solving unaided. The house keeps it either way.';
+    return 'A few slipped drops cost a star. One slip is forgiven; more are not. The house keeps it either way.';
   }
   if (phase >= 4) {
     if (cause === 'both') return 'Guidance and faltering hands cost a star. The arrangement counts both.';
@@ -3866,7 +3866,7 @@ export function getNewCyclePointerLine(phase: DialoguePhase): string | null {
 
 export function getDreadOfferingLine(word: string, phase: DialoguePhase): string {
   const w = word.toUpperCase();
-  if (phase >= 5) return `${w}. It is part of the weave now. Woven by your hand.`;
+  if (phase >= 5) return `${w}. The house keeps it now. It keeps everything you give it.`;
   if (phase >= 4) return `You brought ${w}. The house is still learning what it means.`;
   if (phase >= 3) return `${w} slips into the dark. The pit remembers it.`;
   return `Something in ${w} sinks deeper than the rest.`;
@@ -3958,11 +3958,11 @@ const HOME_AMBIENT_LINES: Record<DialoguePhase, string[]> = {
     'Something vast and tender watches from above.',
   ],
   5: [
-    'The house is at peace.',
-    'The pattern holds. Everything is quiet.',
-    'A gentle warmth permeates every room.',
+    'The house is quiet. Something in it is listening.',
+    'The pattern holds. So does your line.',
+    'A steady warmth reaches every room. It would like everything to stay just so.',
     'The keepers sleep. Or something like sleep.',
-    'The weave continues. Thread by thread.',
+    'Every room is exactly as it was yesterday. The house prefers it that way.',
     'Nothing moves. Nothing needs to.',
     'The light is neither bright nor dark. It simply is.',
     'There is a place for you here. The door opens both ways.',
@@ -4000,7 +4000,7 @@ const DAILY_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   2: ['The daily arrangement awaits.', 'Today\'s challenge waits in silence.'],
   3: ['The daily incantation is prepared.', 'Today\'s words are chosen.'],
   4: ['The daily offering is ready.', 'The arrangement requires today\'s words.'],
-  5: ['The daily thread awaits weaving.', 'Today\'s pattern is ready.'],
+  5: ['Today\'s board is waiting.', 'Today\'s pattern is ready.'],
 };
 
 const DIFFICULTY_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
@@ -4033,8 +4033,8 @@ const DIFFICULTY_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
     HARD: 'Hard is open. Deeper boards, and something beneath them, listening.',
   },
   5: {
-    MEDIUM: 'Medium suits a quiet evening. Every thread finds the weave.',
-    MEDIUM_PLUS: 'Medium+ is there when you want more length in the thread. The weave takes it gladly.',
+    MEDIUM: 'Medium suits a quiet evening. The house will keep whatever you make.',
+    MEDIUM_PLUS: 'Medium+ is there when you want longer words. The house would rather you did not change a thing. Try it anyway.',
     HARD: 'Hard remains, for the joy of it. Not everything in this house has to be easy.',
   },
 };
@@ -4069,9 +4069,9 @@ const VARIANT_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
     speed: 'Speed Shift is open, if you want the clock. Hurry is yours. The void has never needed it.',
   },
   5: {
-    reverse: 'Reverse Shift is still here. Threads run both ways through the cloth.',
-    double_shift: 'Double Shift. Two threads at once.',
-    speed: 'Speed Shift. Time flows differently here.',
+    reverse: 'Reverse Shift is still here. Down, and back up. The house prefers one direction.',
+    double_shift: 'Double Shift. Two letters at once. More change than the house would choose.',
+    speed: 'Speed Shift. The house has all the time there is. You do not have to.',
   },
 };
 
@@ -4081,7 +4081,7 @@ const QUEST_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   2: ['The weekly tasks remember your progress.', 'Quests carry weight this week.'],
   3: ['This week\'s quests are unfinished. The house keeps a list.', 'Your quests await fulfillment.'],
   4: ['The week\'s work is not yet done. The arrangement notices unfinished things.', 'Your weekly quests remain open. What is begun here prefers to be finished.'],
-  5: ['The week\'s quests remain, unhurried.', 'The week\'s tasks are open still. The weave will take them when they come.'],
+  5: ['The week\'s quests remain, unhurried.', 'The week\'s tasks are open still. The house will wait for them.'],
 };
 
 const QUEST_CLAIM_SUGGESTIONS: Record<DialoguePhase, string[]> = {
@@ -4090,7 +4090,7 @@ const QUEST_CLAIM_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   2: ['The week has already yielded amber.', 'Claim what the week has offered.'],
   3: ['The week has prepared its reward.', 'Claim the amber the rituals produced.'],
   4: ['The arrangement has set aside amber for you.', 'Your weekly rewards are ready to be taken.'],
-  5: ['The week has left amber in the weave.', 'Claim the threads already completed.'],
+  5: ['The week has left amber for you.', 'Claim what the week already finished.'],
 };
 
 const PIT_SUGGESTIONS: Record<DialoguePhase, string[]> = {
@@ -4099,7 +4099,7 @@ const PIT_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   2: ['The pit is full of waiting arrangements.', 'Pending words linger below.'],
   3: ['The pit waits for what you have gathered.', 'Your latest offerings have not yet been fed.'],
   4: ['The pit is waiting. Feed it what remains.', 'The arrangement has not forgotten your stored words.'],
-  5: ['Waiting threads still drift in the pit.', 'The pit still holds what you gathered.'],
+  5: ['Words still wait by the still water.', 'The pit still holds what you gathered.'],
 };
 
 /**
@@ -4297,7 +4297,7 @@ const PIT_BUTTON_LABELS: Record<DialoguePhase, string> = {
   2: 'Release',
   3: 'Surrender',
   4: 'Feed',
-  5: 'Weave',
+  5: 'Give',
 };
 
 export function getPitButtonLabel(phase: DialoguePhase): string {
@@ -4310,7 +4310,7 @@ const PIT_OFFER_ALL_LABELS: Record<DialoguePhase, string> = {
   2: 'Release All',
   3: 'Surrender Everything',
   4: 'Feed It All',
-  5: 'Weave All',
+  5: 'Give All',
 };
 
 export function getPitOfferAllLabel(phase: DialoguePhase): string {
@@ -4323,7 +4323,7 @@ const PIT_EMPTY_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The pit is empty. It waits for you to bring more.',
   3: 'Nothing left to give. The dark is patient.',
   4: 'Empty. But the hunger remains.',
-  5: 'Nothing to weave. The loom rests.',
+  5: 'Nothing to give. The water is still.',
 };
 
 export function getPitEmptyMessage(phase: DialoguePhase): string {
@@ -4370,11 +4370,11 @@ export const PIT_OFFER_RESULT_MESSAGES: Record<DialoguePhase, string[]> = {
     '{words} words gone below, by your hand. {amber} amber. You will bring more.',
   ],
   5: [
-    '{words} words woven into the pattern. {amber} amber surfaced gently.',
-    'The weave accepted {words} threads. {amber} amber drifted back to you.',
+    '{words} words went into the still water. {amber} amber came back up.',
+    'The house kept {words} words. {amber} amber drifted back to you.',
     '{words} words taken in like breath. {amber} amber given back the same way.',
     'The still water closed over {words} words. {amber} amber floated up, unhurried.',
-    '{words} threads joined the cloth. {amber} amber fell softly from the loom.',
+    '{words} words given, and kept. {amber} amber, returned the same as always.',
   ],
 };
 
@@ -4396,7 +4396,7 @@ const PIT_HOME_BADGE_LABELS: Record<DialoguePhase, string> = {
   2: 'The Below',
   3: 'The Dark',
   4: 'The Pit',
-  5: 'The Loom',
+  5: 'The Still Water',
 };
 
 export function getPitHomeBadgeLabel(phase: DialoguePhase): string {
@@ -4409,7 +4409,7 @@ const PIT_HARVEST_LABELS: Record<DialoguePhase, string> = {
   2: 'gathered',
   3: 'taken',
   4: 'claimed',
-  5: 'woven',
+  5: 'kept',
 };
 
 export function getPitHarvestLabel(phase: DialoguePhase): string {
@@ -4437,7 +4437,7 @@ const PIT_DEVOUR_VERBS: Record<DialoguePhase, string> = {
   2: 'released',
   3: 'surrendered',
   4: 'devoured',
-  5: 'woven',
+  5: 'kept',
 };
 
 export function getPitDevourVerb(phase: DialoguePhase): string {
@@ -4445,7 +4445,7 @@ export function getPitDevourVerb(phase: DialoguePhase): string {
 }
 
 export function getPitOverflowText(phase: DialoguePhase, extraCount: number): string {
-  if (phase >= 5) return `+${extraCount} more threads for the loom`;
+  if (phase >= 5) return `+${extraCount} more for the still water`;
   if (phase >= 4) return `+${extraCount} more hunger for their turn`;
   if (phase >= 3) return `+${extraCount} more await their turn`;
   if (phase >= 2) return `+${extraCount} more words waiting`;
