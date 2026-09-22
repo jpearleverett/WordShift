@@ -60,6 +60,7 @@ const FIRST_WIN_GLITCH_KEY = 'wordshift_first_win_glitch';
 const MODIFIER_STACKING_INTRO_SEEN_KEY = 'wordshift_modifier_stacking_intro_seen';
 // Lexicon's own unlock beat. Every other mode has had one; Lexicon changes
 // nothing the player can see on the board, so it needed one most of all.
+const BLIND_INTRO_SEEN_KEY = 'wordshift_blind_intro_seen';
 const LEXICON_INTRO_SEEN_KEY = 'wordshift_lexicon_intro_seen';
 const GATED_UNLOCK_INTRO_SEEN_KEY = 'wordshift_gated_unlock_intro_seen';
 const HARVEST_HOME_INTRO_SEEN_KEY = 'wordshift_harvest_home_intro_seen';
@@ -1526,6 +1527,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(DAILY_CHALLENGE_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(CHALLENGE_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(MODIFIER_STACKING_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(BLIND_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(LEXICON_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(FOX_PLAY_NUDGE_SEEN_KEY);
     await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
@@ -2320,6 +2322,20 @@ export async function hasSeenModifierStackingIntro(): Promise<boolean> {
 export async function markModifierStackingIntroSeen(): Promise<void> {
   try {
     await AsyncStorage.setItem(MODIFIER_STACKING_INTRO_SEEN_KEY, 'true');
+  } catch {}
+}
+
+export async function hasSeenBlindIntro(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(BLIND_INTRO_SEEN_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markBlindIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(BLIND_INTRO_SEEN_KEY, 'true');
   } catch {}
 }
 

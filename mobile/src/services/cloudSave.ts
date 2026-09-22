@@ -161,6 +161,7 @@ export const SYNC_KEYS = [
   'wordshift_notification_prompted',
   'wordshift_challenge_intro_seen',
   'wordshift_modifier_stacking_intro_seen',
+  'wordshift_blind_intro_seen',
   'wordshift_lexicon_intro_seen',
   'wordshift_daily_challenge_intro_seen',
   'wordshift_journal_intro_seen',

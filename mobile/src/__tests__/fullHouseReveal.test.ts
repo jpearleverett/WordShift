@@ -77,9 +77,18 @@ describe("Ember's full-house beat", () => {
   });
 
   test('mentions the unfinished conversations only when there are some', () => {
-    expect(getFullHouseIntroLines(0).join(' ')).not.toContain('have not told you');
-    expect(getFullHouseIntroLines(1).join(' ')).toContain('One of them still has something they have not told you');
-    expect(getFullHouseIntroLines(4).join(' ')).toContain('Four of them still have something they have not told you');
+    // The sentence is asserted without its auxiliary, so a register pass can
+    // repair "have not" to "haven't" without the pin reading as a behaviour
+    // change. What is load-bearing is the CONDITION and the count agreeing
+    // with the home badges, not the contraction.
+    expect(getFullHouseIntroLines(0).join(' ')).not.toContain('told you');
+    expect(getFullHouseIntroLines(1).join(' ')).toMatch(/One of them still has something they (?:have not|haven't) told you/);
+    expect(getFullHouseIntroLines(4).join(' ')).toMatch(/Four of them still have something they (?:have not|haven't) told you/);
+    // Both branches must speak the SAME way: one player reading "haven't" and
+    // another "have not" in the same sentence is the card contradicting itself.
+    const one = /haven't told you/.test(getFullHouseIntroLines(1).join(' '));
+    const many = /haven't told you/.test(getFullHouseIntroLines(4).join(' '));
+    expect(one).toBe(many);
     // An invitation, never an instruction.
     expect(getFullHouseIntroLines(4).join(' ')).toContain('if you like');
   });

@@ -298,9 +298,9 @@ export function getUnbrokenWeaveIntroLines(phase: DialoguePhase): string[] {
   }
   if (phase >= 3) {
     return [
-      "A new thread has appeared beneath the others, and it is a stricter one.",
-      "It is called the Unbroken Weave. Each letter may cross the chain only once.",
-      "It is waiting for you in the arrangement setup.",
+      "A new thread has appeared beneath the others, and it's a stricter one.",
+      "It's called the Unbroken Weave. Each letter may cross the chain only once.",
+      "It's waiting for you in the arrangement setup.",
     ];
   }
   return [
@@ -1415,7 +1415,7 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
   }
   if (phase >= 3) {
     return [
-      "There's a new puzzle path now. One special arrangement, once a day.",
+      "There's a new path now. One special arrangement, once a day.",
       "It's called the Daily Challenge. Everyone gets the same words, and it asks a little more of you.",
       "Try it up top when you want to test yourself. The house pays attention to the daily ones.",
     ];
@@ -1429,7 +1429,7 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
   }
   return [
     "Something new showed up this morning, friend. Come see.",
-    "There's a Daily Challenge now. One special puzzle each day, and everyone gets the same one. It's a little harder than usual.",
+    "There's a Daily Challenge now. One special puzzle each day, and everyone gets the same words. It's a little harder than usual.",
     "You'll find it up top. Try it when you're feeling brave. The amber is worth it.",
   ];
 }
@@ -1735,8 +1735,8 @@ export function getFoxSetupSelectorIntroLines(phase: number): string[] {
 export function getFoxStarterIntroLines(phase: number): string[] {
   if (phase >= 2) {
     return [
-      "There is an optional pack in the shop, amber and a few hints, if that would be useful to you.",
-      "It is a purchase, so the price is shown before you decide anything.",
+      "There's an optional pack in the shop, amber and a few hints, if that would be useful to you.",
+      "It's a purchase, so the price is shown before you decide anything.",
       "Your place by the fire is yours either way.",
     ];
   }
@@ -4121,17 +4121,17 @@ export function getPitHouseIncompleteHint(residentsAway: number): string | null 
 export function getFullHouseIntroLines(residentsWaiting: number): string[] {
   const lines = [
     'Everyone is in. Every room has someone in it, and the whole house is awake at once.',
-    'The circle will turn when it is ready now. It is not waiting on the house any more.',
+    'The circle will turn when it\'s ready now. It\'s not waiting on the house any more.',
   ];
   // "Something they have not told you", never "partway through": the count is
   // the same signal that lights the home badges, and the newest resident has a
   // whole introduction waiting rather than a half-finished sentence.
   if (residentsWaiting === 1) {
-    lines.push('One of them still has something they have not told you. There is no hurry. Go up and listen, if you like.');
+    lines.push('One of them still has something they haven\'t told you. There\'s no hurry. Go up and listen, if you like.');
   } else if (residentsWaiting > 1) {
-    lines.push(`${spellCountCapitalized(residentsWaiting)} of them still have something they have not told you. There is no hurry. Go up and listen, if you like.`);
+    lines.push(`${spellCountCapitalized(residentsWaiting)} of them still have something they haven't told you. There's no hurry. Go up and listen, if you like.`);
   }
-  lines.push('None of it goes away either way. They will simply say the rest of it differently, after.');
+  lines.push('None of it goes away either way. They\'ll simply say the rest of it differently, after.');
   return lines;
 }
 
@@ -4215,7 +4215,7 @@ const FOX_PIT_NUDGE_LINES: Record<number, string[]> = {
   ],
   4: [
     "The final circle is trembling. Go to the pit.",
-    "Everything we have done has led to this. The pit is waiting for you.",
+    "Everything we've done has led to this. The pit is waiting for you.",
   ],
 };
 
@@ -4235,9 +4235,9 @@ export function getFoxPitNudgeLines(targetPhase: DialoguePhase): string[] {
 export function getGatedRoomIntroLines(phase: number, roomName: string): string[] {
   if (phase >= 2) {
     return [
-      `The house has grown quickly with you, friend. But the ${roomName} is not ready to rise yet.`,
+      `The house has grown quickly with you, friend. But the ${roomName} isn't ready to rise yet.`,
       "Some rooms ask for more than amber. They ask for time, and for words. More of your words must be offered to the pit before the ground will hold the walls.",
-      "If you have the amber, you do not have to wait. There are two ways. Set the amber aside now, and the room will rise on its own when the time comes. Or pay a good deal more and bring the room to completion now.",
+      "If you have the amber, you don't have to wait. There are two ways. Set it aside now, and the room will rise on its own when the time comes. Or pay a good deal more and bring the room to completion now.",
     ];
   }
   return [
@@ -4284,7 +4284,7 @@ export function getChallengeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 3) {
     return [
       "The patterns grow more complex. There are harder paths, if you want them.",
-      "Challenge Mode strips away your safety. No previews of what a move will make, no hints, and only a few undos. But there is more amber for it.",
+      "Challenge Mode strips away your safety. No previews of what a move will make, no hints, and only a few undos. But there's more amber for it.",
       "Look for it in the puzzle setup. The arrangement gives you more when you commit to it.",
     ];
   }
@@ -5211,6 +5211,47 @@ export function getModifierStackingIntroLines(phase: DialoguePhase): string[] {
     "Ooh, a new one! Speed Shift. It's just a clock, but a clock does concentrate the mind.",
     "Here's the lovely part. It doesn't replace your style, it goes ON TOP of it. Reverse AND timed, if you're feeling brave.",
     "That's true of all the little toggles, you know. Stack as many as you can stand. I'll be watching.",
+  ];
+}
+
+/**
+ * One-time Fox beat when the Blind Offering unlocks (80 solves).
+ *
+ * It was the only modifier with no unlock beat at all. Challenge has one at 15,
+ * Speed announces itself and the stacking rule at 55, Lexicon has its own at
+ * 100, and Blind, which arrives between them, said nothing. That is backwards:
+ * Blind is the one whose RULES actually change. Its previews do not just dim,
+ * they vanish; every structurally legal move commits with no dictionary check
+ * at all; the whole chain is judged once, when the final letter lands. A player
+ * meeting that cold makes an unchecked move, watches a non-word sit on the
+ * board, and reads it as the game breaking. So this card has four beats rather
+ * than the usual three: the guidance is gone, anything that fits goes in,
+ * judgment comes at the end, and undo is free without limit because walking the
+ * chain back IS the mode's repair loop. The rate named is blind-alone (+100%);
+ * the menu row owns the stacked figure.
+ */
+export function getBlindIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 4) {
+    return [
+      "The last of the guidance goes now, friend. No ghosts beneath the letters. Nothing to tell you what a move would make.",
+      "It is called the Blind Offering. Every move your hands can make will be accepted. Nothing is weighed until the final letter lands, and then the whole chain is weighed at once.",
+      "So take it back as often as you need. Undo costs nothing here, and there is no limit on it. Walk the chain backward until you find where it stopped being true.",
+      "The arrangement pays double for an offering made in the dark. Of course it does.",
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      "This one takes the guidance away entirely. No ghost words under the letters at all.",
+      "It's the Blind Offering. Anything that fits, goes in. Nothing's checked as you go, and then the whole chain is judged the moment the last letter lands.",
+      "That's why undo is free here, as many times as you like. When the chain doesn't hold, walk it back until you find where it stopped being a word.",
+      "And it pays double, friend. I'd want double too, for working in the dark.",
+    ];
+  }
+  return [
+    "Something new, and it's the hardest one yet. The little ghost words go away completely.",
+    "It's called Blind Mode! Anything that fits will go straight in. Nothing gets checked as you go, and then the whole chain is judged the moment your last letter lands.",
+    "Don't panic if it doesn't hold. Undo is free here, as often as you like. Just walk it back to where it stopped being a word.",
+    "And it pays double. You've earned a look at it.",
   ];
 }
 
