@@ -70,6 +70,32 @@ describe('socialProof', () => {
       expect(typeof sent.p_date).toBe('string');
     });
 
+    test('recordPuzzleContribution sends the install id so the server budgets per install', async () => {
+      const { getInstallId } = jest.requireActual('../services/installIdentity') as typeof import('../services/installIdentity');
+      const installId = await getInstallId();
+      expect(installId.length).toBeGreaterThanOrEqual(8); // the server's per-install floor
+      (global.fetch as jest.Mock).mockResolvedValue(okJson(10));
+      await recordPuzzleContribution(4);
+      const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+      const sent = JSON.parse(init.body);
+      expect(sent.p_install_id).toBe(installId);
+      expect(Object.keys(sent).sort()).toEqual(['p_count', 'p_date', 'p_install_id']);
+    });
+
+    test('recordPuzzleContribution still bumps when the install id cannot be read', async () => {
+      const identity = jest.requireActual('../services/supabaseClient') as typeof import('../services/supabaseClient');
+      const spy = jest.spyOn(identity, 'getBackendIdentity').mockRejectedValue(new Error('storage down'));
+      try {
+        (global.fetch as jest.Mock).mockResolvedValue(okJson(11));
+        expect(await recordPuzzleContribution(2)).toBe(11);
+        const sent = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+        expect(sent).not.toHaveProperty('p_install_id');
+        expect(sent.p_count).toBe(2);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
     test('recordPuzzleContribution accepts an object {words_offered} result', async () => {
       (global.fetch as jest.Mock).mockResolvedValue(okJson({ words_offered: 99 }));
       expect(await recordPuzzleContribution(3)).toBe(99);
