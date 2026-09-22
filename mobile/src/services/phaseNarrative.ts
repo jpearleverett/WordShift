@@ -2255,13 +2255,22 @@ export interface NarrativeMicroBeat {
   glitchTitle?: string;
   /** Duration of the effect in ms */
   durationMs: number;
+  /**
+   * Lowest world phase at which this beat may be SHOWN. A beat whose copy
+   * presumes the reveal carries 4: reached below it (a reveal held by the
+   * full house, or a slow unaccelerated descent), the beat is DEFERRED, never
+   * consumed, and delivered once the world reaches phase 4, earliest key
+   * first, one per victory (see checkDeferredMicroBeat). Such a beat belongs
+   * to the approach and is never delivered after the Arrival (phase 5).
+   */
+  minPhase?: number;
 }
 
 /**
  * Micro-beats keyed by exact puzzle count. Each fires exactly once.
  * These are subtle moments of wrongness seeded throughout the experience:
  *
- * Early game (puzzles 5-25): Warm but slightly "too aware" observations.
+ * Early game (puzzles 5-27): Warm but slightly "too aware" observations.
  *   Innocent on first read, resonant in retrospect. Create early "wait,
  *   what?" hooks before the Phase 1 transition.
  *
@@ -2305,14 +2314,16 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The animals talk about you when you\'re away. All good things. Probably.',
     durationMs: 3500,
   },
-  25: {
+  // 27, not 25: win 25 already carries the Double Shift unlock card and the
+  // 25-solve milestone, and three voices on one victory buried all of them.
+  27: {
     type: 'ambient_whisper',
-    text: 'Each puzzle builds something. The house counts them like bricks.',
+    text: 'Every word you settle builds something. The house counts them like bricks.',
     durationMs: 3000,
   },
   30: {
     type: 'ambient_whisper',
-    text: 'The house feels fuller with each puzzle. Or maybe it just wants to.',
+    text: 'The house feels fuller with every word you give it. Or maybe it just wants to.',
     durationMs: 3000,
   },
   31: {
@@ -2435,12 +2446,19 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     durationMs: 4000,
   },
   // Reveal-adjacent (92): lands just after the turn, when the robes are new.
+  // minPhase 4 on this and every later whisper: each presumes the reveal, so
+  // a player whose reveal is still held hears it once the turn arrives.
   92: {
     type: 'ambient_whisper',
     text: 'The words are part of an invitation. Your friends are still arguing about what a guest may ask of a home.',
     durationMs: 4500,
+    minPhase: 4,
   },
   104: {
+    // Deliberately NOT phase-gated: App suppresses the chime by the exact
+    // completed count (isSilentVictoryBeat), so a deferred silent victory
+    // would print its line over a victory that played its fanfare. Its line
+    // presumes nothing about the reveal.
     // Scripted anticlimax: the fanfare simply does not play. The rendered text
     // is stark; App suppresses the victory chime on this one board so the
     // silence is felt, not described. The most complicit moment is a quiet one.
@@ -2452,6 +2470,7 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: 'A flower at the edge of the house keeps trying to turn toward the morning. Each night, the warmth turns it back.',
     durationMs: 4000,
+    minPhase: 4,
   },
   // Dwell-window beats (109/112): the house is whole (~96-100) but not yet
   // ready to receive. Held breath, never a countdown.
@@ -2459,17 +2478,20 @@ export const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: 'The warmth reaches every occupied room. At one doorway, a draft still gets through.',
     durationMs: 4500,
+    minPhase: 4,
   },
   112: {
     type: 'ambient_whisper',
     text: 'The house settles around the work you have done. Underneath, something waits for the next word.',
     durationMs: 4500,
+    minPhase: 4,
   },
   // Final pre-finale beat (115, the arming floor): the last word before the last arrangement.
   115: {
     type: 'ambient_whisper',
     text: 'Each arrangement settles a little deeper than the last. The space between the words is no longer empty.',
     durationMs: 4000,
+    minPhase: 4,
   },
 };
 
@@ -2609,11 +2631,25 @@ async function resolveMicroBeatText(beat: NarrativeMicroBeat): Promise<Narrative
   return { ...beat, text: finalText };
 }
 
+/**
+ * Whether a beat may be shown at this world phase. `phase` undefined means
+ * the caller does not gate (legacy callers and the key-table tests).
+ */
+function isMicroBeatPhaseOpen(beat: NarrativeMicroBeat, phase: number | undefined): boolean {
+  if (phase === undefined || beat.minPhase === undefined) return true;
+  return phase >= beat.minPhase && phase < 5;
+}
+
 export async function checkNarrativeMicroBeat(
   puzzlesSolved: number,
+  phase?: number,
 ): Promise<NarrativeMicroBeat | null> {
   const beat = MICRO_BEATS[puzzlesSolved];
   if (!beat) return null;
+  // A phase-gated beat is never consumed by its exact key when the caller
+  // knows the phase: checkDeferredMicroBeat owns it, in key order, so a beat
+  // reached before the reveal waits for it instead of speaking too early.
+  if (phase !== undefined && beat.minPhase !== undefined) return null;
 
   const record = await loadMicroBeatsRecord();
   if (record.seen.includes(puzzlesSolved)) return null;
@@ -2630,6 +2666,62 @@ export async function checkNarrativeMicroBeat(
   // again, but the resolved line survives a cancelled reveal (see the
   // deferred-delivery note above) until it is actually shown.
   await markMicroBeatSeen(puzzlesSolved, resolved);
+  return resolved;
+}
+
+/**
+ * The earliest phase-gated beat whose key has been passed but that has not
+ * been delivered, on the track `seen` belongs to. Keys are scanned in order,
+ * so deferred beats arrive in the order they were written. Pure.
+ */
+function findDeferredMicroBeatKey(
+  count: number,
+  phase: number,
+  seen: number[],
+  beatAt: (key: number) => NarrativeMicroBeat | null,
+  keys: number[],
+): number | null {
+  for (const key of keys) {
+    if (key > count) break;
+    const beat = beatAt(key);
+    if (!beat || beat.minPhase === undefined) continue;
+    if (!isMicroBeatPhaseOpen(beat, phase)) continue;
+    if (seen.includes(key)) continue;
+    return key;
+  }
+  return null;
+}
+
+function sortedBeatKeys(...tables: Record<number, NarrativeMicroBeat>[]): number[] {
+  const keys = new Set<number>();
+  for (const table of tables) for (const k of Object.keys(table)) keys.add(Number(k));
+  return [...keys].sort((a, b) => a - b);
+}
+
+/**
+ * Deliver the earliest phase-gated beat (minPhase) whose key the player has
+ * already passed, once the world has reached that phase: the late beats
+ * (92, 106, 109, 112, 115) presume the reveal, and a reveal held by the full
+ * house, or a slow descent, reaches their counts first. One beat per call,
+ * in key order; consumed and queued exactly like an exact-key beat. Returns
+ * null at phase 5: those beats belong to the approach, not the aftermath.
+ */
+export async function checkDeferredMicroBeat(
+  puzzlesSolved: number,
+  phase: number,
+): Promise<NarrativeMicroBeat | null> {
+  const record = await loadMicroBeatsRecord();
+  const key = findDeferredMicroBeatKey(
+    puzzlesSolved,
+    phase,
+    record.seen,
+    k => MICRO_BEATS[k] ?? null,
+    sortedBeatKeys(MICRO_BEATS),
+  );
+  if (key === null) return null;
+  const resolved = await resolveMicroBeatText(MICRO_BEATS[key]);
+  if (!resolved) return null;
+  await markMicroBeatSeen(key, resolved);
   return resolved;
 }
 
@@ -3157,16 +3249,19 @@ export const CYCLE_MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: 'One flower turns away from the center. The warmth starts to turn it back, then stops, as though it remembers a correction.',
     durationMs: 4500,
+    minPhase: 4,
   },
   112: {
     type: 'ambient_whisper',
     text: 'The house is quiet. It is not yet ready. The held breath feels rehearsed, like a song the walls already know the end of.',
     durationMs: 4500,
+    minPhase: 4,
   },
   115: {
     type: 'ambient_whisper',
     text: 'The space between the words is no longer empty. It arrives with the cadence of something recited, not spoken.',
     durationMs: 4000,
+    minPhase: 4,
   },
 };
 
@@ -3286,15 +3381,22 @@ export async function ackVictoryMicroBeat(cycleCount: number): Promise<void> {
  * MICRO_BEATS re-fire (except the forever-once silent_victory). One-time per
  * cycle via the cycle-scoped seen set.
  */
+function getCycleTrackBeat(cycleRelativeCount: number): NarrativeMicroBeat | null {
+  const regular = MICRO_BEATS[cycleRelativeCount];
+  return CYCLE_MICRO_BEATS[cycleRelativeCount]
+    ?? (regular && regular.type !== 'silent_victory' ? regular : null);
+}
+
 export async function checkCycleNarrativeMicroBeat(
   cycleRelativeCount: number,
   cycleCount: number,
+  phase?: number,
 ): Promise<NarrativeMicroBeat | null> {
   if (cycleCount <= 0 || cycleRelativeCount <= 0) return null;
-  const regular = MICRO_BEATS[cycleRelativeCount];
-  const beat = CYCLE_MICRO_BEATS[cycleRelativeCount]
-    ?? (regular && regular.type !== 'silent_victory' ? regular : null);
+  const beat = getCycleTrackBeat(cycleRelativeCount);
   if (!beat) return null;
+  // Phase-gated beats go through the deferred scan (see checkNarrativeMicroBeat).
+  if (phase !== undefined && beat.minPhase !== undefined) return null;
 
   const record = await loadCycleBeatsRecord(cycleCount);
   if (record.seen.includes(cycleRelativeCount)) return null;
@@ -3309,27 +3411,77 @@ export async function checkCycleNarrativeMicroBeat(
   return resolved;
 }
 
+/** New-Cycle analogue of checkDeferredMicroBeat, on the cycle-scoped record. */
+export async function checkDeferredCycleMicroBeat(
+  cycleRelativeCount: number,
+  cycleCount: number,
+  phase: number,
+): Promise<NarrativeMicroBeat | null> {
+  if (cycleCount <= 0 || cycleRelativeCount <= 0) return null;
+  const record = await loadCycleBeatsRecord(cycleCount);
+  const key = findDeferredMicroBeatKey(
+    cycleRelativeCount,
+    phase,
+    record.seen,
+    getCycleTrackBeat,
+    sortedBeatKeys(MICRO_BEATS, CYCLE_MICRO_BEATS),
+  );
+  if (key === null) return null;
+  const beat = getCycleTrackBeat(key);
+  if (!beat) return null;
+  const resolved = await resolveMicroBeatText(beat);
+  if (!resolved) return null;
+  await markCycleBeatSeen(cycleCount, key, resolved);
+  return resolved;
+}
+
+export interface ResolveVictoryMicroBeatOptions {
+  /** The world phase this victory is played at. When given, phase-gated
+   *  beats (minPhase) are deferred until the phase opens; omitted, every
+   *  beat fires on its exact key (legacy behaviour). */
+  phase?: number;
+  /** The bespoke final board: no deferred beat is delivered on it (the
+   *  finale carries one voice, the silence). */
+  isFinalBoard?: boolean;
+}
+
 /**
  * Single victory-time entry point for micro-beats: the first playthrough
  * consumes the absolute-count MICRO_BEATS; a New Cycle (cycleCount > 0)
  * consumes the cycle-relative track instead (legacy cycled saves without a
  * cycleStartPuzzles anchor pass 0 and simply outrun every key — the same
  * silence they had before this wiring, never a double-fire).
+ *
+ * With `options.phase`, a beat that presumes the reveal (minPhase 4) is held
+ * until the world reaches phase 4 and then delivered, earliest key first, on
+ * a victory that has no other beat to show: one voice per victory.
  */
 export async function resolveVictoryMicroBeat(
   totalPuzzlesCompleted: number,
   cycleCount: number,
   cycleStartPuzzles: number,
+  options: ResolveVictoryMicroBeatOptions = {},
 ): Promise<NarrativeMicroBeat | null> {
+  const { phase, isFinalBoard } = options;
   // A beat held from an earlier win (resolved, never actually shown) is
   // delivered FIRST. This win's own beat is still rolled and reserved behind
   // it in the queue rather than skipped — the keys are exact-count, so a beat
   // we decline to roll here would be lost for good.
   const held = await peekPendingMicroBeat(cycleCount);
+  const relativeCount = totalPuzzlesCompleted - cycleStartPuzzles;
   const fresh = cycleCount > 0
-    ? await checkCycleNarrativeMicroBeat(totalPuzzlesCompleted - cycleStartPuzzles, cycleCount)
-    : await checkNarrativeMicroBeat(totalPuzzlesCompleted);
-  return held ?? fresh;
+    ? await checkCycleNarrativeMicroBeat(relativeCount, cycleCount, phase)
+    : await checkNarrativeMicroBeat(totalPuzzlesCompleted, phase);
+  if (held || fresh) return held ?? fresh;
+  // Deferred beats are scanned by key, never lost, so they only claim a
+  // victory nothing else speaks on. A legacy cycled save with no anchor
+  // (cycleStartPuzzles 0) would scan every key at once; it stays silent.
+  if (phase === undefined || isFinalBoard) return null;
+  if (cycleCount > 0) {
+    if (cycleStartPuzzles <= 0) return null;
+    return checkDeferredCycleMicroBeat(relativeCount, cycleCount, phase);
+  }
+  return checkDeferredMicroBeat(totalPuzzlesCompleted, phase);
 }
 
 /**

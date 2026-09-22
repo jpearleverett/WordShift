@@ -25,6 +25,8 @@ import {
   getWhisperGalleryEmptyText,
   getNextStreakMilestoneText,
   checkNarrativeMicroBeat,
+  checkDeferredMicroBeat,
+  checkDeferredCycleMicroBeat,
   resetMicroBeats,
   getHomescreenNudge,
   getHarvestOverflowMessage,
@@ -1008,7 +1010,7 @@ describe('checkNarrativeMicroBeat', () => {
     }
   });
 
-  test('returns early micro-beats in puzzles 5-25', async () => {
+  test('returns early micro-beats in puzzles 5-27', async () => {
     const beat5 = await checkNarrativeMicroBeat(5);
     expect(beat5).not.toBeNull();
     expect(beat5!.type).toBe('ambient_whisper');
@@ -1034,9 +1036,11 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat20).not.toBeNull();
     expect(beat20!.type).toBe('ambient_whisper');
 
-    const beat25 = await checkNarrativeMicroBeat(25);
-    expect(beat25).not.toBeNull();
-    expect(beat25!.type).toBe('ambient_whisper');
+    const beat27 = await checkNarrativeMicroBeat(27);
+    expect(beat27).not.toBeNull();
+    expect(beat27!.type).toBe('ambient_whisper');
+    // Win 25 already carries the Double Shift card and a milestone.
+    expect(await checkNarrativeMicroBeat(25)).toBeNull();
   });
 
   test('returns a beat at puzzle 35', async () => {
@@ -1159,7 +1163,7 @@ describe('checkNarrativeMicroBeat', () => {
 
   test('all 28 micro-beat thresholds fire independently', async () => {
     const thresholds = [
-      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
+      5, 8, 12, 16, 20, 27, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
       75, 82, 88, 92, 104, 106, 109, 112, 115,
     ];
     for (const t of thresholds) {
@@ -1184,7 +1188,7 @@ describe('MICRO_BEATS geography', () => {
 
   test('keys match the new geography exactly', () => {
     expect(keys).toEqual([
-      5, 8, 12, 16, 20, 25, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
+      5, 8, 12, 16, 20, 27, 30, 31, 33, 35, 38, 42, 45, 50, 54, 58, 61, 64, 70,
       72, 75, 78, 82, 86, 88, 92, 104, 106, 109, 112, 115,
     ]);
   });
@@ -1260,6 +1264,30 @@ describe('MICRO_BEATS geography', () => {
 
   test('the pre-completion builder beat sits before the house is whole', () => {
     expect(MICRO_BEATS[88].text).toContain('The house keeps making room');
+  });
+
+  test('win 25 carries no beat: the Double Shift card and a milestone already speak there', () => {
+    expect(MICRO_BEATS[25]).toBeUndefined();
+    expect(CYCLE_MICRO_BEATS[25]).toBeUndefined();
+    expect(CYCLE_MICRO_BEATS[27]).toBeUndefined();
+  });
+
+  test('system beats never say "puzzle" (the house counts words, not puzzles)', () => {
+    for (const k of keys) {
+      expect(MICRO_BEATS[k].text ?? '').not.toMatch(/puzzle/i);
+    }
+  });
+
+  test('every beat that presumes the reveal is gated to phase 4, and only those', () => {
+    const gated = keys.filter(k => MICRO_BEATS[k].minPhase !== undefined);
+    expect(gated).toEqual([92, 106, 109, 112, 115]);
+    for (const k of gated) expect(MICRO_BEATS[k].minPhase).toBe(4);
+    // The silent victory is keyed to its exact board by App (the chime is
+    // suppressed by count), so it can never be deferred.
+    expect(MICRO_BEATS[104].minPhase).toBeUndefined();
+    const cycleGated = Object.keys(CYCLE_MICRO_BEATS).map(Number)
+      .filter(k => CYCLE_MICRO_BEATS[k].minPhase !== undefined);
+    expect(cycleGated).toEqual([106, 112, 115]);
   });
 
   test('no beat says Phase or carries a dash', () => {
@@ -2296,5 +2324,101 @@ describe('getDialogueCaughtUpLine (an exhausted animal never replays its last li
     const distinct = new Set([0, 2, 4, 5].map(getDialogueCaughtUpLine));
     expect(distinct.size).toBe(4);
     expect(getDialogueCaughtUpLine(4)).toMatch(/arrangement/);
+  });
+});
+
+// ============================================================================
+// Reveal-gated micro-beats (N2): the late beats presume the reveal. A reveal
+// held by the full house reaches their counts at phase 3, so they wait and
+// then arrive one per victory, earliest key first, once phase 4 opens.
+// ============================================================================
+describe('reveal-gated micro-beats are deferred, never consumed early', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await resetMicroBeats();
+  });
+
+  test('a gated beat reached at phase 3 is not shown and not consumed', async () => {
+    expect(await resolveVictoryMicroBeat(92, 0, 0, { phase: 3 })).toBeNull();
+    // Not in the seen set: the exact key still resolves for an ungated caller.
+    expect(await checkNarrativeMicroBeat(92)).toEqual(MICRO_BEATS[92]);
+  });
+
+  test('ungated late beats keep their exact keys at phase 3', async () => {
+    expect(await resolveVictoryMicroBeat(88, 0, 0, { phase: 3 })).toEqual(MICRO_BEATS[88]);
+    await ackVictoryMicroBeat(0);
+    expect(await resolveVictoryMicroBeat(104, 0, 0, { phase: 3 })).toEqual(MICRO_BEATS[104]);
+  });
+
+  test('once phase 4 opens, deferred beats arrive in key order, one per victory', async () => {
+    for (const count of [92, 100, 106, 109]) {
+      expect(await resolveVictoryMicroBeat(count, 0, 0, { phase: 3 })).toBeNull();
+    }
+    const delivered: (string | undefined)[] = [];
+    for (const count of [110, 111, 112, 113, 114, 115, 116]) {
+      const beat = await resolveVictoryMicroBeat(count, 0, 0, { phase: 4 });
+      delivered.push(beat?.text);
+      if (beat) await ackVictoryMicroBeat(0);
+    }
+    expect(delivered).toEqual([
+      MICRO_BEATS[92].text,
+      MICRO_BEATS[106].text,
+      MICRO_BEATS[109].text,
+      MICRO_BEATS[112].text,
+      undefined, // 114: every passed key is delivered; 115 is not yet reached
+      MICRO_BEATS[115].text,
+      undefined,
+    ]);
+  });
+
+  test('an older deferred beat speaks before the one keyed to this very victory', async () => {
+    await resolveVictoryMicroBeat(92, 0, 0, { phase: 4 });
+    await ackVictoryMicroBeat(0);
+    await resolveVictoryMicroBeat(106, 0, 0, { phase: 3 });
+    expect((await resolveVictoryMicroBeat(109, 0, 0, { phase: 4 }))?.text).toBe(MICRO_BEATS[106].text);
+    await ackVictoryMicroBeat(0);
+    expect((await resolveVictoryMicroBeat(110, 0, 0, { phase: 4 }))?.text).toBe(MICRO_BEATS[109].text);
+  });
+
+  test('an unaffected player at phase 4 hears 92 on its own key', async () => {
+    expect(await resolveVictoryMicroBeat(92, 0, 0, { phase: 4 })).toEqual(MICRO_BEATS[92]);
+  });
+
+  test('the silent victory keeps its exact board and a deferred beat waits behind it', async () => {
+    await resolveVictoryMicroBeat(92, 0, 0, { phase: 3 });
+    expect(await resolveVictoryMicroBeat(104, 0, 0, { phase: 4 })).toEqual(MICRO_BEATS[104]);
+    await ackVictoryMicroBeat(0);
+    expect((await resolveVictoryMicroBeat(105, 0, 0, { phase: 4 }))?.text).toBe(MICRO_BEATS[92].text);
+  });
+
+  test('a held (unshown) beat is delivered before any deferred beat is rolled', async () => {
+    expect(await resolveVictoryMicroBeat(88, 0, 0, { phase: 3 })).toEqual(MICRO_BEATS[88]);
+    await resolveVictoryMicroBeat(92, 0, 0, { phase: 3 });
+    // The reveal of 88 was cancelled: it is delivered again, and 92 waits.
+    expect(await resolveVictoryMicroBeat(95, 0, 0, { phase: 4 })).toEqual(MICRO_BEATS[88]);
+    await ackVictoryMicroBeat(0);
+    expect((await resolveVictoryMicroBeat(96, 0, 0, { phase: 4 }))?.text).toBe(MICRO_BEATS[92].text);
+  });
+
+  test('no deferred beat is delivered on the final board or after the Arrival', async () => {
+    await resolveVictoryMicroBeat(112, 0, 0, { phase: 3 });
+    expect(await resolveVictoryMicroBeat(116, 0, 0, { phase: 4, isFinalBoard: true })).toBeNull();
+    expect(await resolveVictoryMicroBeat(117, 0, 0, { phase: 5 })).toBeNull();
+    expect(await checkDeferredMicroBeat(117, 5)).toBeNull();
+  });
+
+  test('the New Cycle track defers its gated beats the same way, in key order', async () => {
+    const start = 300;
+    expect(await resolveVictoryMicroBeat(start + 92, 1, start, { phase: 3 })).toBeNull();
+    expect(await resolveVictoryMicroBeat(start + 106, 1, start, { phase: 3 })).toBeNull();
+    expect((await resolveVictoryMicroBeat(start + 107, 1, start, { phase: 4 }))?.text)
+      .toBe(MICRO_BEATS[92].text);
+    await ackVictoryMicroBeat(1);
+    // At 106 the half-memory wins its key, as on the exact-key path.
+    expect(await checkDeferredCycleMicroBeat(108, 1, 4)).toEqual(CYCLE_MICRO_BEATS[106]);
+  });
+
+  test('a legacy cycled save with no anchor never scans the whole table at once', async () => {
+    expect(await resolveVictoryMicroBeat(300, 1, 0, { phase: 4 })).toBeNull();
   });
 });

@@ -451,10 +451,14 @@ export function useVictoryOrchestration(): [
         const fullProgress = await getFullProgress();
         if (gen !== generationRef.current) return;
         beatCycleCount = fullProgress?.cycleCount ?? 0;
+        // The phase lets a beat that presumes the reveal wait for it (a
+        // reveal held by the full house reaches 92-115 first); deferred beats
+        // are delivered one per victory from phase 4, never on the finale.
         beat = await resolveVictoryMicroBeat(
           totalPuzzlesCompleted,
           beatCycleCount,
           fullProgress?.cycleStartPuzzles ?? 0,
+          { phase, isFinalBoard: suppressCeremonyCues },
         );
         beatIsKeyed = !!beat;
       } catch {
