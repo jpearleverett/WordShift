@@ -36,6 +36,7 @@ jest.mock('react-native-google-mobile-ads', () => {
     initializeError: false,
     showBehavior: 'auto' as 'auto' | 'manual' | 'reject' | 'throw',
     ads: [] as any[],
+    requestConfiguration: null as any,
   };
   const consentInfo = () => ({
     status: 'OBTAINED',
@@ -70,12 +71,17 @@ jest.mock('react-native-google-mobile-ads', () => {
   return {
     __state: state,
     default: () => ({
+      setRequestConfiguration: async (config: any) => {
+        state.calls.push('sdk.setRequestConfiguration');
+        state.requestConfiguration = config;
+      },
       initialize: async () => {
         state.calls.push('sdk.initialize');
         await state.initializeWait;
         if (state.initializeError) throw new Error('SDK initialization unavailable');
       },
     }),
+    MaxAdContentRating: { G: 'G', PG: 'PG', T: 'T', MA: 'MA' },
     AdEventType: { LOADED: 'loaded', OPENED: 'opened', CLOSED: 'closed', ERROR: 'error' },
     RewardedAdEventType: { LOADED: 'rewarded_loaded', EARNED_REWARD: 'earned' },
     InterstitialAd: {
@@ -176,6 +182,24 @@ describe('AdMob adapter — UMP consent ordering', () => {
     expect(calls.indexOf('consent.gather')).toBeLessThan(calls.indexOf('sdk.initialize'));
     expect(calls.indexOf('sdk.initialize')).toBeLessThan(calls.indexOf('interstitial.load'));
     expect(calls.indexOf('sdk.initialize')).toBeLessThan(calls.indexOf('rewarded.load'));
+    expect(a.isReady()).toBe(true);
+  });
+
+  it('caps ad content at T (not child-directed) after consent and before the SDK initializes', async () => {
+    admob.__state.requestConfiguration = null;
+    const a = createAdMobAdProvider({ interstitialId: 'ca-x/1', rewardedId: 'ca-x/2' });
+    await a.initialize();
+    await flushBackgroundChain();
+    const calls: string[] = admob.__state.calls;
+    expect(calls.indexOf('consent.gather')).toBeLessThan(calls.indexOf('sdk.setRequestConfiguration'));
+    expect(calls.indexOf('sdk.setRequestConfiguration')).toBeLessThan(calls.indexOf('sdk.initialize'));
+    expect(calls.indexOf('sdk.setRequestConfiguration')).toBeLessThan(calls.indexOf('interstitial.load'));
+    expect(admob.__state.requestConfiguration).toEqual({
+      maxAdContentRating: 'T',
+      tagForChildDirectedTreatment: false,
+      tagForUnderAgeOfConsent: false,
+    });
+    // Ready (and so the banner) only after the ceiling is in place.
     expect(a.isReady()).toBe(true);
   });
 

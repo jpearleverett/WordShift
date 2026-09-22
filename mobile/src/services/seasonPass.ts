@@ -38,8 +38,50 @@ import {
 
 const STORAGE_KEY = 'wordshift_season_pass';
 
-/** Cosmetic granted at the final PREMIUM tier of every season (premium-exclusive). */
+/** The first season's premium cosmetic (kept for callers that name the line). */
 export const SEASON_PREMIUM_COSMETIC_ID = 'confetti_season';
+
+/**
+ * The premium final-tier cosmetic ROTATES by month through this pool, so the
+ * premium track brings a new palette every season until the player owns them
+ * all (it used to repeat confetti_season, which made every month after the
+ * first a net loss). A season whose palette is already owned grants
+ * SEASON_PREMIUM_COSMETIC_AMBER_EQUIVALENT amber in its place.
+ */
+export const SEASON_PREMIUM_COSMETIC_POOL: readonly string[] = [
+  'confetti_season',
+  'confetti_season_2',
+  'confetti_season_3',
+  'confetti_season_4',
+  'confetti_season_5',
+  'confetti_season_6',
+];
+
+/** The season that serves pool entry 0 (the launch month). */
+const SEASON_ROTATION_ANCHOR = '2026-09';
+
+/**
+ * Amber granted instead of the month's cosmetic when it is already owned (a
+ * mid-shop confetti price). Reward balance only, never phase progress.
+ */
+export const SEASON_PREMIUM_COSMETIC_AMBER_EQUIVALENT = 400;
+
+function monthIndex(seasonId: string): number | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(seasonId);
+  if (!match) return null;
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return null;
+  return Number(match[1]) * 12 + (month - 1);
+}
+
+/** The premium cosmetic for a season (local YYYY-MM), rotating monthly. */
+export function getSeasonPremiumCosmeticId(seasonId: string): string {
+  const index = monthIndex(seasonId);
+  const anchor = monthIndex(SEASON_ROTATION_ANCHOR)!;
+  if (index === null) return SEASON_PREMIUM_COSMETIC_POOL[0];
+  const size = SEASON_PREMIUM_COSMETIC_POOL.length;
+  return SEASON_PREMIUM_COSMETIC_POOL[(((index - anchor) % size) + size) % size];
+}
 
 interface SeasonPassState {
   /** The season (local YYYY-MM) this state is tracking. */
@@ -87,8 +129,12 @@ export interface SeasonPassView {
   premiumViaSupporter: boolean;
   /** Amber cost to unlock premium as a non-subscriber. */
   premiumAmberCost: number;
-  /** The existing terminal cosmetic is a collection reward, not a new monthly item. */
+  /** This season's premium final-tier cosmetic (rotates monthly). */
+  premiumCosmeticId: string;
+  /** This season's cosmetic is already owned; its tier grants amber instead. */
   premiumCosmeticOwned: boolean;
+  /** Amber granted in place of an already-owned season cosmetic. */
+  premiumCosmeticAmberEquivalent: number;
   /** Existing unlocks and Supporter benefits remain valid; do not sell the same collection twice. */
   canUnlockPremiumWithAmber: boolean;
   tiers: SeasonTierView[];
@@ -211,7 +257,8 @@ export async function getSeasonPassView(puzzlesSolved: number): Promise<SeasonPa
   const tiersUnlocked = tiersUnlockedFor(state, puzzlesSolved);
   const inSeason = Math.max(0, puzzlesSolved - state.startPuzzles);
   const premiumUnlocked = premiumAvailable(state);
-  const premiumCosmeticOwned = await ownsCosmetic(SEASON_PREMIUM_COSMETIC_ID);
+  const premiumCosmeticId = getSeasonPremiumCosmeticId(state.seasonId);
+  const premiumCosmeticOwned = await ownsCosmetic(premiumCosmeticId);
 
   const tiers: SeasonTierView[] = [];
   let claimableCount = 0;
@@ -248,7 +295,9 @@ export async function getSeasonPassView(puzzlesSolved: number): Promise<SeasonPa
     premiumUnlocked,
     premiumViaSupporter: isSupporterSync(),
     premiumAmberCost: SEASON_PASS_PREMIUM_AMBER_COST,
+    premiumCosmeticId,
     premiumCosmeticOwned,
+    premiumCosmeticAmberEquivalent: SEASON_PREMIUM_COSMETIC_AMBER_EQUIVALENT,
     canUnlockPremiumWithAmber: !premiumUnlocked && !premiumCosmeticOwned,
     tiers,
     claimableCount,
@@ -264,6 +313,10 @@ export interface SeasonClaimResult {
   granted: boolean;
   amber: number;
   cosmeticGranted: boolean;
+  /** The cosmetic this claim concerned (final premium tier only). */
+  cosmeticId?: string;
+  /** Amber granted in place of an already-owned season cosmetic (included in `amber`). */
+  cosmeticAmber?: number;
   newBalance?: number;
   reason?: 'not_unlocked' | 'already_claimed' | 'premium_locked' | 'invalid_tier';
 }
@@ -309,17 +362,30 @@ async function claimSeasonTierInTransaction(
     return { granted: false, amber: 0, cosmeticGranted: false, reason: 'already_claimed' };
   }
 
-  const amber = track === 'free' ? SEASON_PASS_FREE_AMBER_PER_TIER : SEASON_PASS_PREMIUM_AMBER_PER_TIER;
-  const newBalance = await awardBonusAmberInTransaction(amber, `season_${track}`);
+  let amber = track === 'free' ? SEASON_PASS_FREE_AMBER_PER_TIER : SEASON_PASS_PREMIUM_AMBER_PER_TIER;
+  let newBalance = await awardBonusAmberInTransaction(amber, `season_${track}`);
 
   let cosmeticGranted = false;
+  let cosmeticId: string | undefined;
+  let cosmeticAmber = 0;
   if (track === 'premium' && tier === SEASON_PASS_TIERS) {
-    cosmeticGranted = await grantCosmetic(SEASON_PREMIUM_COSMETIC_ID);
+    cosmeticId = getSeasonPremiumCosmeticId(state.seasonId);
+    cosmeticGranted = await grantCosmetic(cosmeticId);
+    if (!cosmeticGranted) {
+      // Already owned: the season still pays out, in amber (reward-only).
+      cosmeticAmber = SEASON_PREMIUM_COSMETIC_AMBER_EQUIVALENT;
+      newBalance = await awardBonusAmberInTransaction(cosmeticAmber, 'season_premium_cosmetic_owned');
+      amber += cosmeticAmber;
+    }
   }
 
   claimedList.push(tier);
   await persist(state);
-  return { granted: true, amber, cosmeticGranted, newBalance };
+  return {
+    granted: true, amber, cosmeticGranted, newBalance,
+    ...(cosmeticId !== undefined ? { cosmeticId } : {}),
+    ...(cosmeticAmber > 0 ? { cosmeticAmber } : {}),
+  };
 }
 
 /** Amber cost to unlock the premium track for the current season (non-subscribers). */
@@ -337,7 +403,8 @@ export function getSeasonPremiumAmberCost(): number {
  */
 export async function markSeasonPremiumUnlocked(puzzlesSolved: number): Promise<boolean> {
   const state = await loadState(puzzlesSolved);
-  if (isSupporterSync() || state.premiumUnlockedByAmber || await ownsCosmetic(SEASON_PREMIUM_COSMETIC_ID)) return false;
+  if (isSupporterSync() || state.premiumUnlockedByAmber ||
+      await ownsCosmetic(getSeasonPremiumCosmeticId(state.seasonId))) return false;
   state.premiumUnlockedByAmber = true;
   await persist(state);
   return true;
@@ -352,7 +419,7 @@ export async function purchaseSeasonPremiumWithAmber(puzzlesSolved: number): Pro
   try {
     return await runStorageTransaction('season_premium_unlock', async () => {
       const state = await loadState(puzzlesSolved);
-      if (premiumAvailable(state) || await ownsCosmetic(SEASON_PREMIUM_COSMETIC_ID)) {
+      if (premiumAvailable(state) || await ownsCosmetic(getSeasonPremiumCosmeticId(state.seasonId))) {
         return { success: false, error: 'This collection is already available to you.' };
       }
       const spend = await spendAmber(SEASON_PASS_PREMIUM_AMBER_COST, 'season_pass');

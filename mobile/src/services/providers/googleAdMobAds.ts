@@ -95,6 +95,24 @@ function loadAdsModule(): any | null {
   }
 }
 
+/**
+ * The request configuration applied before initialization (see
+ * applyRequestConfiguration). Exported for tests; reads MaxAdContentRating off
+ * the loaded module with a literal fallback for partial mocks (the native layer
+ * compares the rating by its string value, 'T').
+ */
+export function adRequestConfiguration(mod: any): {
+  maxAdContentRating: string;
+  tagForChildDirectedTreatment: boolean;
+  tagForUnderAgeOfConsent: boolean;
+} {
+  return {
+    maxAdContentRating: mod?.MaxAdContentRating?.T ?? 'T',
+    tagForChildDirectedTreatment: false,
+    tagForUnderAgeOfConsent: false,
+  };
+}
+
 function loadATTModule(): any | null {
   if (Platform.OS === 'web') return null;
   try {
@@ -222,6 +240,25 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
     });
   }
 
+  /**
+   * Global ad-request ceiling, set after consent and before the SDK initializes,
+   * so it governs every request this process makes: interstitial, rewarded and
+   * the menu banner (BannerAd mounts only once ads are ready, i.e. after this).
+   * A cosy animal game with a 13+ audience caps content at T; it is not
+   * child-directed and does not tag users as under the age of consent. Guarded:
+   * an SDK without the API (or a failing call) never blocks ads; the AdMob
+   * console's blocking controls are the second, server-side ceiling.
+   */
+  async function applyRequestConfiguration(mobileAds: any): Promise<void> {
+    try {
+      const instance = typeof mobileAds === 'function' ? mobileAds() : null;
+      if (!instance || typeof instance.setRequestConfiguration !== 'function') return;
+      await instance.setRequestConfiguration(adRequestConfiguration(mod));
+    } catch (error) {
+      console.warn('[Ads] AdMob request configuration failed:', error);
+    }
+  }
+
   /** SDK initialization is shared, but only the current consent generation may serve ads. */
   async function startAds(generation: number): Promise<void> {
     if (!consentAllowsAds || generation !== consentGeneration || !mod) return;
@@ -229,6 +266,7 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
       sdkInitialization = (async () => {
         try {
           const mobileAds = mod.default ?? mod;
+          await applyRequestConfiguration(mobileAds);
           await mobileAds().initialize();
           sdkInitialized = true;
           return true;

@@ -1,6 +1,6 @@
 import NativeStorage from '@react-native-async-storage/async-storage';
 import { getFullProgress, invalidateProgressCache } from '../services/amberCurrency';
-import { claimVictoryDouble } from '../services/victoryDouble';
+import { claimVictoryDouble, getVictoryDoubleAmount } from '../services/victoryDouble';
 import { recoverPendingStorageTransaction, STORAGE_COMMIT_KEY } from '../services/persistenceStorage';
 
 jest.mock('@react-native-async-storage/async-storage', () => require('./helpers/mockAsyncStorage').createMockAsyncStorage());
@@ -74,4 +74,28 @@ test('a failed receipt read cannot be mistaken for an unclaimed reward', async (
   (NativeStorage.getItem as jest.Mock).mockImplementation(originalRead);
   expect((await getFullProgress()).amber).toBe(100);
   expect(await NativeStorage.getItem(ledgerKey)).toBeNull();
+});
+
+test('the 2x doubles the per-puzzle share only, never the one-time windfalls (MON-7)', async () => {
+  await NativeStorage.setItem(receiptKey, JSON.stringify({
+    id: 'win-2', result: {
+      harvestBatchId: 'win-2', amberEarned: 30 + 150 + 50 + 30,
+      milestoneBonus: 150, firstCompletionBonus: 50, streakMilestoneBonus: 30,
+    },
+  }));
+  expect(await claimVictoryDouble('win-2')).toEqual({ status: 'claimed', amount: 30, newBalance: 130 });
+  // Idempotent: a replay credits nothing more.
+  expect(await claimVictoryDouble('win-2')).toMatchObject({ status: 'already_claimed', amount: 0 });
+  invalidateProgressCache();
+  expect((await getFullProgress()).amber).toBe(130);
+});
+
+test('an older receipt without the windfall fields still doubles the whole amount', async () => {
+  expect(await claimVictoryDouble('win-1')).toEqual({ status: 'claimed', amount: 30, newBalance: 130 });
+});
+
+test('getVictoryDoubleAmount ignores malformed windfall fields and never goes negative', () => {
+  expect(getVictoryDoubleAmount({ amberEarned: 40, milestoneBonus: -5, firstCompletionBonus: NaN })).toBe(40);
+  expect(getVictoryDoubleAmount({ amberEarned: 40, milestoneBonus: 100 })).toBe(0);
+  expect(getVictoryDoubleAmount(null)).toBe(0);
 });

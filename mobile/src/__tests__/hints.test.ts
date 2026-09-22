@@ -9,6 +9,7 @@ import {
   grantBonusHint,
   BONUS_HINT_SOFT_CAP,
   clearHints,
+  flushHintSpendWrites,
 } from '../services/hints';
 import { STARTING_FREE_HINTS, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 
@@ -128,5 +129,63 @@ describe('hints economy', () => {
       expect(await getHintBalance()).toBe(1);
       expect(hasHintSync()).toBe(true);
     });
+  });
+});
+
+describe('hint debit and grant ordering (GP-C)', () => {
+  const tick = () => new Promise<void>(resolve => setImmediate(resolve));
+
+  it('a spend during an in-flight paid grant is never overwritten by the grant write', async () => {
+    await initHints();
+    const start = await getHintBalance();
+    const original = (AsyncStorage.setItem as jest.Mock).getMockImplementation()!;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let held = false;
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(async (key: string, value: string) => {
+      // Hold the grant's durable hints write while the player spends a hint.
+      if (key === 'wordshift_hints' && !held) { held = true; await gate; }
+      return original(key, value);
+    });
+    try {
+      const grant = addHints(5, 'iap_test');
+      await tick(); await tick();
+      expect(held).toBe(true);
+      expect(consumeHintSync()).toBe(true);
+      release();
+      await grant;
+      await flushHintSpendWrites();
+    } finally {
+      (AsyncStorage.setItem as jest.Mock).mockImplementation(original);
+    }
+    expect(getHintBalanceSync()).toBe(start + 5 - 1);
+    expect(JSON.parse((await AsyncStorage.getItem('wordshift_hints'))!).balance).toBe(start + 5 - 1);
+  });
+
+  it('a spend queued before a grant lands first, and both survive on disk', async () => {
+    await initHints();
+    const start = await getHintBalance();
+    expect(consumeHintSync()).toBe(true);
+    await addHints(3, 'rewarded');
+    await flushHintSpendWrites();
+    expect(JSON.parse((await AsyncStorage.getItem('wordshift_hints'))!).balance).toBe(start - 1 + 3);
+  });
+
+  it('a failed debit write rolls the optimistic spend back', async () => {
+    await initHints();
+    const start = await getHintBalance();
+    const original = (AsyncStorage.setItem as jest.Mock).getMockImplementation()!;
+    (AsyncStorage.setItem as jest.Mock).mockImplementation(async (key: string, value: string) => {
+      if (key === 'wordshift_storage_commit') throw new Error('disk full');
+      return original(key, value);
+    });
+    try {
+      expect(consumeHintSync()).toBe(true);
+      await flushHintSpendWrites();
+    } finally {
+      (AsyncStorage.setItem as jest.Mock).mockImplementation(original);
+    }
+    expect(getHintBalanceSync()).toBe(start);
+    expect(JSON.parse((await AsyncStorage.getItem('wordshift_hints'))!).balance).toBe(start);
   });
 });

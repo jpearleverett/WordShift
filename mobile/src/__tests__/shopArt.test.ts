@@ -4,10 +4,13 @@ import {
   SHOP_ART,
   PENDING_SHOP_ART,
   SHOP_ART_PLACEHOLDER_KEY,
+  SHOP_ART_ALIASES,
   getShopArt,
   hasShopArt,
 } from '../components/shop/shopArt';
 import { COSMETICS } from '../services/cosmetics';
+import { SEASON_PREMIUM_COSMETIC_POOL } from '../services/seasonPass';
+import { CONFETTI_THEMES } from '../theme/colors';
 import { ROOM_UPGRADES, ROOM_DEEPENINGS, MAX_ATTUNEMENT_LEVEL } from '../services/roomUpgrades';
 
 const ART_DIR = path.resolve(__dirname, '../../assets/ui/shop');
@@ -70,5 +73,27 @@ describe('shopArt registry', () => {
 
   it('ships one art file per registry entry (58 as generated)', () => {
     expect(Object.keys(SHOP_ART).length).toBe(58);
+  });
+});
+
+describe('season rotation cosmetics', () => {
+  it('every alias points at a real registry key with a file on disk', () => {
+    for (const [key, target] of Object.entries(SHOP_ART_ALIASES)) {
+      expect(key in SHOP_ART).toBe(false);
+      expect(target in SHOP_ART).toBe(true);
+      expect(target).not.toBe(SHOP_ART_PLACEHOLDER_KEY);
+      expect(getShopArt(key)).toBe(SHOP_ART[target]);
+    }
+  });
+
+  it('every season pool cosmetic is a non-shop reward with a palette and art', () => {
+    for (const id of SEASON_PREMIUM_COSMETIC_POOL) {
+      const item = COSMETICS.find(c => c.id === id);
+      expect(item).toBeDefined();
+      expect(item!.category).toBe('confetti');
+      expect(item!.acquisition.kind).toBe('reward');
+      expect(CONFETTI_THEMES[id]).toHaveLength(6);
+      expect(hasShopArt(id)).toBe(true);
+    }
   });
 });

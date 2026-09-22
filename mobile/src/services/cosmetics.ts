@@ -234,7 +234,7 @@ export const COSMETICS: CosmeticItem[] = [
   {
     id: 'confetti_supporter',
     category: 'confetti',
-    name: 'Keeper’s Thanks',
+    name: "Keeper's Thanks",
     description: 'Warm gold and patron violet, for the ones who keep the fire lit.',
     acquisition: { kind: 'entitlement', entitlement: ENTITLEMENTS.SUPPORTER },
   },
@@ -245,6 +245,44 @@ export const COSMETICS: CosmeticItem[] = [
     category: 'confetti',
     name: 'The Season Turns',
     description: 'Teal, old gold, and a rose ember. Earned at the top of a season.',
+    acquisition: { kind: 'reward' },
+  },
+  // The rest of the season rotation (seasonPass.SEASON_PREMIUM_COSMETIC_POOL):
+  // each month's premium final tier grants the next palette in turn, so the
+  // premium track brings a new cosmetic every month until the pool is complete.
+  {
+    id: 'confetti_season_2',
+    category: 'confetti',
+    name: 'First Frost',
+    description: 'Pale blue, lilac, and the white of a window at dawn. Earned at the top of a season.',
+    acquisition: { kind: 'reward' },
+  },
+  {
+    id: 'confetti_season_3',
+    category: 'confetti',
+    name: 'Harvest Gold',
+    description: 'Wheat, rust, and the last of the apples. Earned at the top of a season.',
+    acquisition: { kind: 'reward' },
+  },
+  {
+    id: 'confetti_season_4',
+    category: 'confetti',
+    name: 'First Bloom',
+    description: 'Blossom pink, new leaf, and a little buttercup. Earned at the top of a season.',
+    acquisition: { kind: 'reward' },
+  },
+  {
+    id: 'confetti_season_5',
+    category: 'confetti',
+    name: 'Storm Light',
+    description: 'Slate and rain blue, with one bright seam of gold. Earned at the top of a season.',
+    acquisition: { kind: 'reward' },
+  },
+  {
+    id: 'confetti_season_6',
+    category: 'confetti',
+    name: 'Deep Moss',
+    description: 'Moss, bark, and lichen on an old stone. Earned at the top of a season.',
     acquisition: { kind: 'reward' },
   },
 ];
