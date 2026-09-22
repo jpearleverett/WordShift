@@ -3,7 +3,7 @@ import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import { getCumulativeStats, CumulativeStats } from '../services/starRating';
 import { getAmberBalance, getCurrentPhase, getPhaseProgressFraction,
-  getPendingPhaseTransition, isPostRevelation } from '../services/amberCurrency';
+  getPendingPhaseTransition, hasArrivalBeenPresented, isPostRevelation } from '../services/amberCurrency';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
 import { logEvent } from '../services/eventLogger';
 import { PuzzleVariant } from '../services/puzzleVariety';
@@ -152,6 +152,8 @@ export interface PersistenceState {
   currentPhase: DialoguePhase;
   phaseProgressFraction: number;
   pendingPhaseTransition: DialoguePhase | null;
+  /** The durable post-revelation flag. `currentPhase` reads 5 one board earlier (after the Arrival), so phase-5 features gate on this. */
+  postRevelation: boolean;
 }
 
 export interface PersistenceActions {
@@ -184,6 +186,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
   const [phaseProgressFraction, setPhaseProgressFraction] = useState(0);
   const [pendingPhaseTransition, setPendingPhaseTransition] = useState<DialoguePhase | null>(null);
+  const [postRevelation, setPostRevelation] = useState(false);
   const recordInProgress = useRef(false);
   const pendingCompletionId = useRef<string | null>(null);
 
@@ -195,11 +198,13 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       getCurrentPhase(),
       getPhaseProgressFraction(),
       getPendingPhaseTransition(),
+      hasArrivalBeenPresented(),
       isPostRevelation(),
-    ]).then(([stats, balance, phase, fraction, pending, postRev]) => {
+    ]).then(([stats, balance, phase, fraction, pending, arrived, postRev]) => {
       setCumulativeStats(stats);
       setAmberBalance(Math.max(0, balance));
-      setCurrentPhase(postRev ? 5 as DialoguePhase : phase);
+      setCurrentPhase(arrived ? 5 as DialoguePhase : phase);
+    setPostRevelation(postRev);
       setPhaseProgressFraction(fraction);
       setPendingPhaseTransition(pending);
     }).catch(err => {
@@ -208,17 +213,19 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   }, []);
 
   const refreshStats = useCallback(async () => {
-    const [stats, balance, phase, fraction, pending, postRev] = await Promise.all([
+    const [stats, balance, phase, fraction, pending, arrived, postRev] = await Promise.all([
       getCumulativeStats(),
       getAmberBalance(),
       getCurrentPhase(),
       getPhaseProgressFraction(),
       getPendingPhaseTransition(),
+      hasArrivalBeenPresented(),
       isPostRevelation(),
     ]);
     setCumulativeStats(stats);
     setAmberBalance(Math.max(0, balance));
-    setCurrentPhase(postRev ? 5 as DialoguePhase : phase);
+    setCurrentPhase(arrived ? 5 as DialoguePhase : phase);
+    setPostRevelation(postRev);
     setPhaseProgressFraction(fraction);
     setPendingPhaseTransition(pending);
   }, []);
@@ -306,6 +313,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       if (!result.phaseTransitionPending) {
         updateSessionPhase(result.newPhase);
         setCurrentPhase(result.newPhase);
+        if (result.endgame?.kind === 'post_arrival') setPostRevelation(true);
       } else {
         setPendingPhaseTransition(result.newPhase);
       }
@@ -328,7 +336,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     currentPhase,
     phaseProgressFraction,
     pendingPhaseTransition,
-  }), [cumulativeStats, amberBalance, currentPhase, phaseProgressFraction, pendingPhaseTransition]);
+    postRevelation,
+  }), [cumulativeStats, amberBalance, currentPhase, phaseProgressFraction, pendingPhaseTransition, postRevelation]);
 
   const actions = useMemo<PersistenceActions>(() => ({
     recordVictory,

@@ -208,19 +208,32 @@ describe('coordinated events keyed on weighted progress', () => {
     return delivered;
   }
 
-  it('an accelerated player (weighted progress past every threshold) receives ALL events, in threshold order', () => {
+  it('an accelerated player receives every event of the CURRENT phase, in threshold order', () => {
     // Engaged player near the finale: phaseProgress ~230 from ~116 real puzzles.
     const delivered = drain(230, 4);
-    expect(delivered).toEqual(themesInOrder);
+    expect(delivered).toEqual(COORDINATED_EVENTS.filter(e => e.phase === 4).map(e => e.theme));
   });
 
-  it('skipped-past thresholds deliver one per visit rather than being lost', () => {
+  it('never delivers an event written for an earlier phase (stale testimony after the reveal)', () => {
+    for (const phase of [3, 4]) {
+      const delivered = drain(230, phase);
+      const stale = COORDINATED_EVENTS.filter(e => e.phase < phase).map(e => e.theme);
+      expect(delivered.filter(theme => stale.includes(theme))).toEqual([]);
+    }
+    // A player who stays in a phase long enough hears every event written for it.
+    for (const phase of [2, 3, 4]) {
+      expect(drain(230, phase)).toEqual(COORDINATED_EVENTS.filter(e => e.phase === phase).map(e => e.theme));
+    }
+  });
+
+  it('skipped-past thresholds within a phase deliver one per visit rather than being lost', () => {
+    const phaseTwo = COORDINATED_EVENTS.filter(e => e.phase === 2).map(e => e.theme);
     const consumed: string[] = [];
-    const first = getCoordinatedEventLine('fox', 230, 4, consumed, ALL_ANIMALS);
-    expect(first?.theme).toBe(themesInOrder[0]);
+    const first = getCoordinatedEventLine('fox', 230, 2, consumed, ALL_ANIMALS);
+    expect(first?.theme).toBe(phaseTwo[0]);
     consumed.push(first!.deliveryKey);
-    const second = getCoordinatedEventLine('fox', 230, 4, consumed, ALL_ANIMALS);
-    expect(second?.theme).toBe(themesInOrder[1]);
+    const second = getCoordinatedEventLine('fox', 230, 2, consumed, ALL_ANIMALS);
+    expect(second?.theme).toBe(phaseTwo[1]);
   });
 
   it('makes every event available before arrival without assuming the player heard it', () => {
@@ -242,8 +255,9 @@ describe('coordinated events keyed on weighted progress', () => {
       expect(event.puzzleThreshold).toBeLessThanOrEqual(arrivalBound);
     }
 
-    // At the bound a player can hear every theme; actual visits remain optional.
-    expect(drain(arrivalBound, 4)).toEqual(themesInOrder);
+    // At the bound a phase-4 player can hear every phase-4 theme; the earlier
+    // ones belonged to visits in their own phases.
+    expect(drain(arrivalBound, 4)).toEqual(COORDINATED_EVENTS.filter(e => e.phase === 4).map(e => e.theme));
   });
 
   it('each event sits inside the weighted window of the phase it is written for', () => {
@@ -268,6 +282,7 @@ describe('coordinated events keyed on weighted progress', () => {
   it('already-consumed bookkeeping still suppresses delivered events', () => {
     const all = drain(230, 4);
     expect(getCoordinatedEventLine('fox', 230, 4, all, ALL_ANIMALS)).toBeNull();
+    expect(themesInOrder.length).toBe(COORDINATED_EVENTS.length);
   });
 });
 

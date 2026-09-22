@@ -2084,6 +2084,21 @@ export async function isPostRevelation(): Promise<boolean> {
   return progress.postRevelation === true;
 }
 
+/**
+ * The puzzle board's presentation phase after the Arrival. The durable phase
+ * stays 4 until the next win pins 5 (markPostRevelation plays After), but the
+ * board in between is played after the ending, not before it: presenting it in
+ * the reveal's register ("WHY DOES IT MATTER?", dread music, crimson) was
+ * whiplash straight out of the Arrival. Same rule as
+ * hasAnimalConversationArrivalOccurred: the Arrival ceremony must have been
+ * acknowledged, so the board that plays it is untouched.
+ */
+export async function hasArrivalBeenPresented(): Promise<boolean> {
+  const progress = await loadProgress();
+  return progress.postRevelation === true || (progress.finalPuzzleCompleted === true &&
+    !(progress.pendingCeremonies ?? []).some(entry => entry.kind === 'arrival'));
+}
+
 // ============================================================================
 // NEW CYCLE (NG+)
 // ============================================================================

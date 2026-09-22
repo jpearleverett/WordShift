@@ -127,13 +127,16 @@ samples kept), so frozen transcripts still resolve their illustrations.
    before the Arrival, so it is almost never offered. Options: offer the
    choice at phase 4 regardless of position, or give late recruits a larger
    session budget until they reach phase 4.
-2. **The first board after the Arrival** still shows the pre-arrival
-   phase-4 victory text ("WHY DOES IT MATTER?") because `currentPhase` stays
-   4 until that win. Keying the victory register off `finalPuzzleCompleted`
-   would remove the whiplash.
-3. **Phase 2-3 coordinated events can fire at phase 4** for fast players who
-   rarely visit home. A guard in `getCoordinatedEventLine` (skip events more
-   than one phase behind) would fix it.
+2. **Fixed (follow-up): the first board after the Arrival** used to play
+   entirely in the phase-4 register (dread theme, music, move messages)
+   because the durable phase stays 4 until that win plays After. The session
+   now presents phase 5 once the Arrival ceremony is acknowledged
+   (`hasArrivalBeenPresented`); phase-5 features such as the Unbroken Weave
+   still gate on the durable `postRevelation` flag.
+3. **Fixed (follow-up): house-wide events are delivered only in their own
+   phase.** `getCoordinatedEventLine` skips an event written for an earlier
+   phase, so a fast player never hears phase-2/3 testimony ("almost time",
+   the first naming of the arrangement) after the reveal.
 4. **Phase-5 ritual micro-events reuse the phase-4 pool.** The one false line
    was rewritten to work at both phases; a dedicated phase-5 pool is better.
 5. **Unreachable lines:** Vesper's, Tock's and Moss's 100/250-word threshold

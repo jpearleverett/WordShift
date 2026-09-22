@@ -634,6 +634,13 @@ export function getCoordinatedEventLine(
   // call, so a player whose effective progress leapt past several thresholds
   // still receives the skipped events in order (one per visit) — never lost.
   for (const event of COORDINATED_EVENTS) {
+    // An event is testimony from its own phase. A player who reaches a later
+    // phase without visiting home in time has moved past it: a phase-3
+    // "almost time" or first naming of the arrangement, heard after the
+    // reveal, contradicts what the house has already shown (and speaks in the
+    // contracted register the residents dropped at the reveal). The residents'
+    // regular conversations still carry every chapter in order.
+    if (event.phase < currentPhase) continue;
     if (effectiveProgress >= event.puzzleThreshold &&
         currentPhase >= event.phase &&
         !consumedEvents.includes(event.theme)) {

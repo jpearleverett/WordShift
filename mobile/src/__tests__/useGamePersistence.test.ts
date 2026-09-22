@@ -173,6 +173,7 @@ jest.mock('../services/amberCurrency', () => ({
   getPhaseProgressFraction: jest.fn(async () => 0),
   getPendingPhaseTransition: jest.fn(async () => null),
   isPostRevelation: jest.fn(async () => false),
+  hasArrivalBeenPresented: jest.fn(async () => false),
   recordRitualWords: (...args: any[]) => mockRecordRitualWords(args[0], args[1], args[2]),
   recordVariantEncounter: (...args: any[]) => mockRecordVariantEncounter(args[0]),
   applyVariantAmberBonus: (...args: any[]) => mockApplyVariantAmberBonus(args[0], args[1], args[2], args[3]),

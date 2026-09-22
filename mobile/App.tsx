@@ -4868,7 +4868,7 @@ function MainApp() {
   }, [puzzleActions, keepSetupMenuOpen, puzzle.difficulty, puzzle.selectedVariant, puzzle.speedMode, puzzlesSolvedForVariantUnlocks, orchestrationActions, resetSpeedRun]);
 
   const handleToggleUnbrokenWeave = useCallback(() => {
-    if (persistence.currentPhase !== 5) return;
+    if (persistence.currentPhase !== 5 || !persistence.postRevelation) return;
     hapticMedium();
     soundSelection();
     orchestrationActions.setCompletionCoda(null);
@@ -4885,6 +4885,7 @@ function MainApp() {
   }, [
     keepSetupMenuOpen,
     persistence.currentPhase,
+    persistence.postRevelation,
     puzzleActions,
     puzzle.difficulty,
     puzzle.unbrokenWeaveMode,
@@ -4956,6 +4957,10 @@ function MainApp() {
     ? phaseTransitionEvent : null;
   const completePresentedCeremony = async () => {
     const completed = await ceremonyPlayback.complete(cinematicEvent);
+    // The board after the Arrival is played after the ending: its session
+    // phase follows hasArrivalBeenPresented, which only turns true once this
+    // acknowledgement is saved.
+    if (completed?.kind === 'arrival') await persistenceActions.refreshStats();
     if (completed?.kind === 'new_cycle' && pendingCycleRebuildRef.current) {
       pendingCycleRebuildRef.current = false;
       await rebuildSessionFromStorage({ restartOnboarding: false });
@@ -5643,7 +5648,7 @@ function MainApp() {
             showLexiconToggle={puzzlesSolvedForVariantUnlocks >= BLIND_TOGGLE_UNLOCK_PUZZLES}
             lexiconLocked={puzzlesSolvedForVariantUnlocks < LEXICON_UNLOCK_PUZZLES}
             lexiconUnlockHint={getLexiconUnlockHint(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)}
-            showUnbrokenWeave={persistence.currentPhase === 5}
+            showUnbrokenWeave={persistence.currentPhase === 5 && persistence.postRevelation}
             unbrokenWeaveActive={puzzle.unbrokenWeaveMode}
             onToggleUnbrokenWeave={handleToggleUnbrokenWeave}
             unbrokenWeaveMastery={unbrokenWeaveMastery}
