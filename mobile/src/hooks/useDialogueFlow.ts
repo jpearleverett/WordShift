@@ -72,6 +72,8 @@ import {
   getDialogueCaughtUpLine,
   getDialogueRevealSkipHint,
   getArrivalResumeFramingLine,
+  getDialogueSessionEndMessage,
+  getDialogueCooldownMessage,
 } from '../services/phaseNarrative';
 import { recordAnimalVisit, Quest } from '../services/weeklyQuests';
 import { hapticLight, hapticSelection } from '../services/haptics';
@@ -376,10 +378,9 @@ export function resolveVisiblePage(
  * come back later there is just wrong. Caller passes `onCooldown` read AFTER the
  * session has ended (so grace state is settled).
  */
-function sessionEndMessage(name: string, onCooldown: boolean): string {
-  return onCooldown
-    ? `${name} wants to rest now. Come back after solving a few puzzles.`
-    : `${name} still has more to say. Tap them again to keep talking.`;
+function sessionEndMessage(name: string, animalType: string, onCooldown: boolean, phase: number): string {
+  // Copy lives in phaseNarrative (house register, canon pronouns, no "puzzles").
+  return getDialogueSessionEndMessage(phase, name, animalType, onCooldown);
 }
 
 interface SessionInfo {
@@ -974,20 +975,7 @@ export function useDialogueFlow({
 
     if (!availability.available) {
       // Phase-aware cooldown messages
-      const phase = progress?.currentPhase ?? 0;
-      const cooldownMessages = phase >= 3
-        ? [
-            `${animal.name} is preparing. Return after more offerings.`,
-            `The ritual requires patience. ${animal.name} will speak again soon.`,
-          ]
-        : phase >= 2
-          ? [
-              `${animal.name} is lost in thought. Come back after solving some puzzles.`,
-            ]
-          : [
-              `${animal.name} needs some quiet time. Play more puzzles and come back!`,
-            ];
-      setCooldownMessage(cooldownMessages[Math.floor(Math.random() * cooldownMessages.length)]);
+      setCooldownMessage(getDialogueCooldownMessage(progress?.currentPhase ?? 0, animal.name, animal.type));
       return;
     }
 
@@ -1575,8 +1563,9 @@ export function useDialogueFlow({
     if (!availability.available) {
       const animalId = selectedAnimal.id;
       const animalName = selectedAnimal.name;
+      const animalType = selectedAnimal.type;
       await closeDialogue(true);
-      setCooldownMessage(sessionEndMessage(animalName, isOnCooldown(animalId)));
+      setCooldownMessage(sessionEndMessage(animalName, animalType, isOnCooldown(animalId), progress?.currentPhase ?? 0));
       return;
     }
 
@@ -1622,7 +1611,7 @@ export function useDialogueFlow({
           const resting = isOnCooldown(updated.id);
           setAnimals(prev => prev.map(animal => animal.id === updated.id
             ? { ...animal, hasNewDialogue: !resting && hasNews } : animal));
-          setCooldownMessage(sessionEndMessage(updated.name, resting));
+          setCooldownMessage(sessionEndMessage(updated.name, updated.type, resting, progress?.currentPhase ?? 0));
         }
       } catch (error) {
         if (generation === visitGenerationRef.current) {
@@ -1789,7 +1778,7 @@ export function useDialogueFlow({
               : a
           )
         );
-        setCooldownMessage(sessionEndMessage(animalName, restingNow));
+        setCooldownMessage(sessionEndMessage(animalName, animalId, restingNow, progress?.currentPhase ?? 0));
         return;
       }
     } else {

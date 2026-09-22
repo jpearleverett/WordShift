@@ -1870,6 +1870,66 @@ export function getExpertLockedHint(solved: number, gate: number): string {
 }
 
 // ============================================================================
+// DIALOGUE REST COPY — shown when a resident's visit ends or they are resting.
+// System voice in the house register: never "puzzles", never a count, and
+// the resident's canon pronoun. Rest ends after a few more words are given to
+// the house, so the copy points there.
+// ============================================================================
+
+/**
+ * Line after a visit ends. `onCooldown`: the resident is genuinely resting
+ * (outside the new-resident grace period, re-tapping would show nothing).
+ */
+export function getDialogueSessionEndMessage(
+  phase: number,
+  animalName: string,
+  animalType: string,
+  onCooldown: boolean,
+): string {
+  const fill = (t: string) => fillInterjectionTemplate(t, animalType, animalName);
+  if (!onCooldown) {
+    if (phase >= 4) return fill('{name} is not finished. Go back to {them} when you are ready.');
+    return fill('{name} still has more to say. Tap {them} again to keep talking.');
+  }
+  if (phase >= 5) return fill('{name} would like a little quiet now. Come back after a few more words.');
+  if (phase >= 4) return fill('{name} has said enough for now. Come back after a few more words.');
+  if (phase >= 2) return fill('{name} wants to rest now. Come back after a few more words.');
+  return fill('{name} wants to rest now. Come back after you\'ve arranged a few more words!');
+}
+
+/**
+ * Line when a resident is tapped while resting. Several per phase, picked at
+ * random (`rng` is injectable for tests).
+ */
+export function getDialogueCooldownMessage(
+  phase: number,
+  animalName: string,
+  animalType: string,
+  rng: () => number = Math.random,
+): string {
+  const pools: string[][] = [
+    ['{name} needs some quiet time. Arrange a few more words and come back!'],
+    ['{name} is off daydreaming. Come back after a few more words!'],
+    ['{name} is lost in thought. Come back after a few more words.'],
+    [
+      '{name} is preparing. Return after more offerings.',
+      'The house wants patience. {name} will speak again soon.',
+    ],
+    [
+      '{name} is preparing. Return after more offerings.',
+      'The arrangement asks for patience. {name} will speak again soon.',
+    ],
+    [
+      '{name} is keeping to {their} own room for a while. Come back after a few more words.',
+      'The house is quiet around {name}. {They} will talk again soon.',
+    ],
+  ];
+  const pool = pools[Math.min(5, Math.max(0, Math.floor(phase)))];
+  const template = pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
+  return fillInterjectionTemplate(template, animalType, animalName);
+}
+
+// ============================================================================
 // HOUSE UPGRADE GIFT — the prompt before a bought improvement is handed over.
 // Narration: never contracts. Pronouns follow the resident's canon.
 // ============================================================================

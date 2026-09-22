@@ -67,6 +67,8 @@ import {
   getExpertUnlockIntroLines,
   getExpertLockedHint,
   getHouseUpgradeGiftPrompt,
+  getDialogueSessionEndMessage,
+  getDialogueCooldownMessage,
   getAnimalInterjection,
   getRitualMicroEvent,
   fillInterjectionTemplate,
@@ -2609,5 +2611,34 @@ describe('launch-readiness copy surfaces', () => {
     expect(getHouseUpgradeGiftPrompt('a rug', 'Ember', 'fox')).toBe('You brought a rug for Ember. Give it to her when you are ready.');
     expect(getHouseUpgradeGiftPrompt('a lamp', 'Tock', 'aye_aye')).toContain('Give it to him');
     expect(getHouseUpgradeGiftPrompt('a lamp', 'Bamboo', 'red_panda')).toContain('Give it to them');
+  });
+});
+
+// ============================================================================
+// Dialogue rest copy (N7): house register, canon pronouns, never "puzzles"
+// ============================================================================
+describe('dialogue rest copy', () => {
+  test('never says puzzle, a phase or a dash; pronouns follow canon', () => {
+    for (const p of [0, 1, 2, 3, 4, 5]) {
+      const lines = [
+        getDialogueSessionEndMessage(p, 'Ember', 'fox', true),
+        getDialogueSessionEndMessage(p, 'Ember', 'fox', false),
+        getDialogueCooldownMessage(p, 'Ember', 'fox', () => 0),
+        getDialogueCooldownMessage(p, 'Ember', 'fox', () => 0.99),
+      ];
+      for (const line of lines) {
+        expect(line).toContain('Ember');
+        expect(line).not.toMatch(/puzzle|\bPhase\b|[–—‘’“”{}]/i);
+        expect(line).not.toMatch(/\b(they|them|They)\b/);
+        if (p >= 2) expect(line).not.toContain('!');
+      }
+    }
+    expect(getDialogueSessionEndMessage(0, 'Bamboo', 'red_panda', false)).toContain('Tap them again');
+    expect(getDialogueSessionEndMessage(0, 'Tock', 'aye_aye', false)).toContain('Tap him again');
+  });
+
+  test('resting and not-resting say different things', () => {
+    expect(getDialogueSessionEndMessage(3, 'Chill', 'capybara', true))
+      .not.toBe(getDialogueSessionEndMessage(3, 'Chill', 'capybara', false));
   });
 });

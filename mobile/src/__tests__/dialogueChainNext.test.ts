@@ -156,6 +156,9 @@ jest.mock('../services/phaseNarrative', () => ({
   getDialogueCaughtUpLine: jest.fn((phase: number) => `caught up (phase ${phase})`),
   getDialogueRevealSkipHint: jest.fn(() => 'Tap the words to skip ahead.'),
   getArrivalResumeFramingLine: jest.fn((name: string) => `${name} settles in (resume framing).`),
+  getDialogueSessionEndMessage: jest.fn((_p: number, name: string, _t: string, resting: boolean) =>
+    resting ? `${name} wants to rest now.` : `${name} still has more to say.`),
+  getDialogueCooldownMessage: jest.fn((_p: number, name: string) => `${name} is resting.`),
 }));
 
 jest.mock('../services/weeklyQuests', () => ({
