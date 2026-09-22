@@ -55,6 +55,18 @@ import {
   getPitOfferResultMessage,
   INTERJECTION_MESSAGES,
   INTERJECTION_NOBODY_MESSAGES,
+  getOutOfHintsTitle,
+  getOutOfHintsMessage,
+  getOutOfHintsWatchLabel,
+  getOutOfHintsStoreLabel,
+  getOutOfHintsDismissLabel,
+  getRewardedHintLimitMessage,
+  getRewardedHintGrantedMessage,
+  getRewardedHintUnavailableMessage,
+  getSpeedRescueResumeMessage,
+  getExpertUnlockIntroLines,
+  getExpertLockedHint,
+  getHouseUpgradeGiftPrompt,
   getAnimalInterjection,
   getRitualMicroEvent,
   fillInterjectionTemplate,
@@ -2535,5 +2547,67 @@ describe('getRitualMicroEvent phase-5 pool', () => {
       expect(line).not.toMatch(/\b\w+'(s|re|ve|ll|d|t)\b/i);
       expect(line).not.toMatch(/[–—]/);
     }
+  });
+});
+
+// ============================================================================
+// Hint economy, speed rescue, Expert unlock and gift copy (FTUE-D/E, N6)
+// ============================================================================
+describe('launch-readiness copy surfaces', () => {
+  const PHASES = [0, 1, 2, 3, 4, 5];
+  const CONTRACTION = /\b\w+'(s|re|ve|ll|d|t|m)\b/i;
+
+  test('out-of-hints and rewarded-hint copy is phase-aware, never names money', () => {
+    for (const p of PHASES) {
+      const lines = [
+        getOutOfHintsTitle(p),
+        getOutOfHintsMessage(p, true),
+        getOutOfHintsMessage(p, false),
+        getOutOfHintsWatchLabel(p),
+        getOutOfHintsStoreLabel(p),
+        getOutOfHintsDismissLabel(p),
+        getRewardedHintLimitMessage(p),
+        getRewardedHintGrantedMessage(p),
+        getRewardedHintUnavailableMessage(p),
+        getSpeedRescueResumeMessage(p),
+      ];
+      for (const line of lines) {
+        expect(line.length).toBeGreaterThan(0);
+        expect(line).not.toMatch(/[$€£]|\bprice\b|\bbuy\b|\bmoney\b|\bpay\b/i);
+        expect(line).not.toMatch(/[–—‘’“”]/);
+        expect(line).not.toMatch(/\bPhase\b/);
+        // Exclamations are the bright days' voice only.
+        if (p >= 2) expect(line).not.toContain('!');
+      }
+    }
+    expect(getOutOfHintsMessage(0, true)).not.toBe(getOutOfHintsMessage(0, false));
+    expect(getOutOfHintsMessage(4, true)).not.toBe(getOutOfHintsMessage(0, true));
+    expect(getSpeedRescueResumeMessage(0)).not.toBe(getSpeedRescueResumeMessage(3));
+  });
+
+  test('the Expert card is Ember-voiced, three lines, register-correct', () => {
+    for (const p of PHASES) {
+      const lines = getExpertUnlockIntroLines(p);
+      expect(lines.length).toBeGreaterThanOrEqual(2);
+      expect(lines.length).toBeLessThanOrEqual(3);
+      const text = lines.join(' ');
+      expect(text).toMatch(/Expert/);
+      expect(text).toMatch(/[Ss]ix-letter/);
+      expect(text).not.toMatch(/puzzle|\bPhase\b|[–—‘’“”]/i);
+      // Residents drop contractions at the reveal.
+      if (p >= 4) expect(text).not.toMatch(CONTRACTION);
+    }
+  });
+
+  test('the Expert locked hint counts toward the gate', () => {
+    expect(getExpertLockedHint(20, 35)).toContain('35');
+    expect(getExpertLockedHint(20, 35)).toContain('20');
+    expect(getExpertLockedHint(35, 35)).toBe('Unlocked.');
+  });
+
+  test('the gift prompt uses the resident\'s pronoun and straight narration', () => {
+    expect(getHouseUpgradeGiftPrompt('a rug', 'Ember', 'fox')).toBe('You brought a rug for Ember. Give it to her when you are ready.');
+    expect(getHouseUpgradeGiftPrompt('a lamp', 'Tock', 'aye_aye')).toContain('Give it to him');
+    expect(getHouseUpgradeGiftPrompt('a lamp', 'Bamboo', 'red_panda')).toContain('Give it to them');
   });
 });

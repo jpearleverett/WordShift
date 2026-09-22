@@ -5,6 +5,7 @@ import type { Animal, DialoguePhase } from '../../types/homeWorld';
 import type { HouseUpgradeGift } from '../../services/roomUpgrades';
 import { getHouseUpgradeGiftDialogue, getHouseUpgradeGiftName } from '../../services/dialogue/houseUpgradeDialogue';
 import { announceForA11y } from '../../services/a11yAnnounce';
+import { getHouseUpgradeGiftPrompt } from '../../services/phaseNarrative';
 import { getSettingsSync } from '../../services/settings';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { AppText } from '../ui/AppText';
@@ -128,7 +129,7 @@ export function HouseUpgradeGiftModal({
             {portrait && <Image source={portrait} resizeMode="contain" style={styles.portrait} accessible={false} />}
             <AppText textRole="label" style={[styles.speaker, { color: theme.title }]}>{animal.name}</AppText>
             <AppText textRole="reading" style={[styles.body, { color: theme.body }]}>
-              {delivered ? line : `You brought ${giftName} for ${animal.name}. Give it to them when you’re ready.`}
+              {delivered ? line : getHouseUpgradeGiftPrompt(giftName, animal.name, animal.type)}
             </AppText>
             <View style={styles.actions}>
               {delivered && pages.length > 1 && (

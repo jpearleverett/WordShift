@@ -1748,6 +1748,143 @@ export function getFoxStarterIntroLines(phase: number): string[] {
 }
 
 // ============================================================================
+// HINT ECONOMY COPY — the out-of-hints alert and the rewarded-hint receipts.
+// System voice (it may say "hint" and "store"), never names money, cheerful
+// only through phase 1 and drier as the house darkens. Wired by App.
+// ============================================================================
+
+/** Title of the out-of-hints alert. */
+export function getOutOfHintsTitle(phase: number): string {
+  if (phase >= 2) return 'No hints left';
+  return 'Out of hints';
+}
+
+/** Body of the out-of-hints alert. `canWatch`: a rewarded clip is on offer. */
+export function getOutOfHintsMessage(phase: number, canWatch: boolean): string {
+  if (phase >= 5) {
+    return canWatch
+      ? 'One short clip buys one more hint. The store keeps the rest. The board will wait for you.'
+      : 'The store keeps the hints now. The board will wait for you.';
+  }
+  if (phase >= 4) {
+    return canWatch
+      ? 'One short clip buys one more hint. The store keeps the rest.'
+      : 'The store keeps the hints now.';
+  }
+  if (phase >= 2) {
+    return canWatch
+      ? 'Watch a short clip for one more hint, or find a hint pack in the store.'
+      : 'Hint packs are in the store.';
+  }
+  return canWatch
+    ? 'Watch a short clip for a free hint, or grab a hint pack in the store!'
+    : 'Hint packs are waiting in the store!';
+}
+
+/** Button: watch a rewarded clip for one hint. */
+export function getOutOfHintsWatchLabel(phase: number): string {
+  if (phase >= 4) return 'One clip (+1)';
+  return 'Watch a clip (+1)';
+}
+
+/** Button: open the store. */
+export function getOutOfHintsStoreLabel(phase: number): string {
+  if (phase >= 2) return 'The store';
+  return 'Get hints';
+}
+
+/** Button: dismiss the alert. */
+export function getOutOfHintsDismissLabel(phase: number): string {
+  if (phase >= 4) return 'Leave it';
+  return 'Not now';
+}
+
+/** Toast: the daily rewarded-clip cap is spent. */
+export function getRewardedHintLimitMessage(phase: number): string {
+  if (phase >= 4) return 'No more clips today. The store keeps the rest.';
+  if (phase >= 2) return 'No more clips today. The store has hints.';
+  return 'That\'s all the clips for today. Try the store!';
+}
+
+/** Toast: the rewarded clip completed and one hint was granted. */
+export function getRewardedHintGrantedMessage(phase: number): string {
+  if (phase >= 4) return 'One more hint.';
+  if (phase >= 2) return '+1 hint.';
+  return '+1 hint!';
+}
+
+/** Toast: the clip did not complete (or failed), so no hint was granted. */
+export function getRewardedHintUnavailableMessage(phase: number): string {
+  if (phase >= 4) return 'No hint this time. The store keeps the rest.';
+  if (phase >= 2) return 'No hint this time. Hint packs are in the store.';
+  return 'No hint this time. Hint packs live in the store.';
+}
+
+/** Board message when a rewarded rescue puts time back on a Speed Shift clock. */
+export function getSpeedRescueResumeMessage(phase: number): string {
+  if (phase >= 5) return 'The clock gives a little back.';
+  if (phase >= 3) return 'The clock relents. Briefly.';
+  if (phase >= 2) return 'Extra time on the clock. Use it well.';
+  return 'Back in it! Extra time on the clock!';
+}
+
+// ============================================================================
+// EXPERT UNLOCK — a one-time Ember card when six-letter boards open (35).
+// Resident voice: contractions through phase 3, none from the reveal on; no
+// "puzzle", no numbers of solves.
+// ============================================================================
+
+export function getExpertUnlockIntroLines(phase: number): string[] {
+  if (phase >= 5) {
+    return [
+      'There is a new rung in the setup. Expert. Six-letter words, and chains as long as the house can hold.',
+      'It is the hardest arrangement there is. The house would rather you kept to the easy ones.',
+      'That is as good a reason to try it as any.',
+    ];
+  }
+  if (phase >= 4) {
+    return [
+      'There is a new rung in the setup. Expert. Six-letter words, and chains as long as the house can hold.',
+      'It is the hardest arrangement there is. Fewer moves fit, and every word must be reached for.',
+      'Take it when you are ready. It will wait.',
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      'There\'s a new rung in the setup. Expert. Six-letter words, the longest chains the house can hold.',
+      'It\'s the hardest of them. Fewer moves fit, and the words are the kind you have to reach for.',
+      'Try it when you want to. It won\'t go anywhere.',
+    ];
+  }
+  return [
+    'Oh, look at you! There\'s a new rung in the setup now: Expert. Six-letter words, and the longest chains I know.',
+    'It\'s the hardest arrangement there is. The words get rarer, the moves get fewer, and every one of them counts.',
+    'No rush at all. It\'ll be there whenever you fancy a real stretch.',
+  ];
+}
+
+/** Locked Expert row hint in the setup menu (current count against the gate). */
+export function getExpertLockedHint(solved: number, gate: number): string {
+  if (solved >= gate) return 'Unlocked.';
+  return `Six-letter words, the hardest boards. Opens at ${gate} (you're at ${solved})`;
+}
+
+// ============================================================================
+// HOUSE UPGRADE GIFT — the prompt before a bought improvement is handed over.
+// Narration: never contracts. Pronouns follow the resident's canon.
+// ============================================================================
+
+/** Body line of the gift card before the player hands the gift over. */
+export function getHouseUpgradeGiftPrompt(
+  giftName: string,
+  animalName: string,
+  animalType: string,
+): string {
+  const them = fillInterjectionTemplate('{them}', animalType, animalName);
+  return `You brought ${giftName} for ${animalName}. Give it to ${them} when you are ready.`;
+}
+
+// ============================================================================
 // HOUSE COMPLETION — All rooms built, all animals unlocked
 // ============================================================================
 
