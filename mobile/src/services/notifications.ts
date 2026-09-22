@@ -6,6 +6,25 @@ import { getWinBackMessage, getNotificationTitle } from './phaseNarrative';
 type NotificationsModule = typeof import('expo-notifications');
 
 /**
+ * Android groups every WordShift ping under one named channel, so the
+ * system settings read "Reminders" instead of the default "Miscellaneous" and
+ * a player can mute them without turning off everything else.
+ */
+export const REMINDER_CHANNEL_ID = 'reminders';
+
+async function ensureReminderChannel(mod: NotificationsModule): Promise<void> {
+  if (typeof mod.setNotificationChannelAsync !== 'function') return;
+  try {
+    await mod.setNotificationChannelAsync(REMINDER_CHANNEL_ID, {
+      name: 'Reminders',
+      importance: mod.AndroidImportance?.DEFAULT ?? 3,
+    });
+  } catch {
+    // iOS and web have no channels; a failure only leaves the default channel.
+  }
+}
+
+/**
  * Push notification scheduling service for WordShift.
  *
  * Schedules local notifications for:
@@ -333,6 +352,7 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
 
   const mod = await getNotificationsModule();
   if (!mod) return;
+  await ensureReminderChannel(mod);
 
   // Cancel existing scheduled notifications
   try {
@@ -592,6 +612,7 @@ async function scheduleDailyReminder(
         },
         trigger: {
           type: mod.SchedulableTriggerInputTypes.DATE,
+          channelId: REMINDER_CHANNEL_ID,
           date: triggerDate,
         },
       });
@@ -643,6 +664,7 @@ async function scheduleWinBackLadder(
         },
         trigger: {
           type: mod.SchedulableTriggerInputTypes.DATE,
+          channelId: REMINDER_CHANNEL_ID,
           date: triggerDate,
         },
       });
@@ -800,6 +822,7 @@ async function scheduleQuestExpiry(
       },
       trigger: {
         type: mod.SchedulableTriggerInputTypes.DATE,
+          channelId: REMINDER_CHANNEL_ID,
         date: triggerDate,
       },
     });
@@ -847,6 +870,7 @@ async function scheduleStreakRisk(
       },
       trigger: {
         type: mod.SchedulableTriggerInputTypes.DATE,
+          channelId: REMINDER_CHANNEL_ID,
         date: triggerDate,
       },
     });

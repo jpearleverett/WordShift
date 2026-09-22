@@ -2,7 +2,7 @@ import AsyncStorage, { isStorageTransactionActive, runStorageTransaction } from 
 import { DAILY_BOARD_VERSION } from './dailyBoardVersion';
 import { Difficulty, PuzzleSolutionStep } from '../types';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
-import { selectDailyBankPuzzle } from './puzzleBank';
+import { selectDailyBankPuzzle, selectDailyBankPuzzleForDate } from './puzzleBank';
 import { getLocalDateString, daysAgoLocal, parseLocalDate } from './dateUtils';
 import { addHintsInTransaction, invalidateHintsCache, getHintBalance } from './hints';
 
@@ -253,8 +253,15 @@ export function getDailyRamp(dateStr?: string, isFirstDaily = false): {
  * the leaderboard submission; generateDailyPuzzle also flags the board via
  * DailyPuzzleData.eased.
  */
+/** How many of a player's first dailies take the gentle MEDIUM 4/4 shape. */
+export const EASED_DAILY_COUNT = 3;
+
 export function isFirstDailyEasing(progress: DailyChallengeProgress): boolean {
-  return progress.totalCompleted === 0;
+  // Not only the first: the second daily used to be able to land on a
+  // Thursday-to-Sunday 5 or 6-letter HARD board around the solve where the
+  // word marks stop, a sharp wall for a new player. Eased boards stay off the
+  // shared leaderboard exactly as the first one always did.
+  return progress.totalCompleted < EASED_DAILY_COUNT;
 }
 
 // Deterministic daily host order — the animal "preparing today's offering".
@@ -426,13 +433,14 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
     const eased = isFirstDailyEasing(progress);
     const ramp = getDailyRamp(today, eased);
     const difficulty = ramp.difficulty;
-    // One draw off the date-seeded stream. Math.random is never touched.
+    // One draw off the date-seeded stream, kept only for the fallback shape.
+    // Math.random is never touched.
     const rng = seededRandom(`wordshift-daily-${today}`);
     const roll = rng();
 
     try {
       const board =
-        selectDailyBankPuzzle(bankForDailyShape(ramp.wordLength, ramp.targetRows), roll) ??
+        selectDailyBankPuzzleForDate(bankForDailyShape(ramp.wordLength, ramp.targetRows), today) ??
         // Shipped banks are never empty, so this is belt and braces only: fall
         // back to the gentlest shape rather than leaving the player with no
         // daily at all.

@@ -263,3 +263,31 @@ describe('trap steering (secondary planning-depth preference)', () => {
     expect(plainMulti.has(selected!.words.join(','))).toBe(true);
   });
 });
+
+describe('late-game supply past the extension unlock', () => {
+  it('serves unplayed boards at their own length before replaying an extendable board', async () => {
+    jest.resetModules();
+    const extension = require('../services/puzzleExtension');
+    const extendable = new Set<string>();
+    (extension.extendStandardPuzzle as jest.Mock).mockImplementation((config: { words: string[] }) => {
+      const key = config.words.join(',');
+      if (extendable.size < 2) extendable.add(key);
+      return extendable.has(key) ? { ...config, words: [...config.words, 'DEPTH'] } : config;
+    });
+    const bank = require('../services/puzzleBank') as typeof import('../services/puzzleBank');
+    await bank.clearPlayedPuzzles();
+
+    const served: string[][] = [];
+    for (let i = 0; i < 3; i++) {
+      const board = await bank.selectPreGeneratedPuzzle('HARD', 3, new Map(), 'standard', 100);
+      expect(board).not.toBeNull();
+      served.push(board!.words);
+    }
+    expect(served[0].at(-1)).toBe('DEPTH');
+    expect(served[1].at(-1)).toBe('DEPTH');
+    // Both extendable boards are spent: the next board is new, at its own length.
+    expect(served[2].at(-1)).not.toBe('DEPTH');
+    const bases = served.map(words => (words.at(-1) === 'DEPTH' ? words.slice(0, -1) : words).join(','));
+    expect(new Set(bases).size).toBe(3);
+  });
+});

@@ -80,6 +80,9 @@ export interface ReviewPromptContext {
   /** Onboarding / daily / other contexts where a prompt would be inappropriate. */
   isOnboarding?: boolean;
   isDaily?: boolean;
+  /** The win already carries its own beat (a pending ceremony, the forced
+   * first harvest, an unlock card): the one-time ask waits for a quiet win. */
+  isBusyMoment?: boolean;
 }
 
 /**
@@ -89,7 +92,7 @@ export interface ReviewPromptContext {
  */
 export function shouldPromptReview(ctx: ReviewPromptContext): boolean {
   if (ctx.alreadyPrompted) return false;
-  if (ctx.isOnboarding || ctx.isDaily) return false;
+  if (ctx.isOnboarding || ctx.isDaily || ctx.isBusyMoment) return false;
   if (ctx.phase >= REVIEW_MAX_PHASE) return false; // hard suppress from the reveal on
   if (ctx.puzzlesSolved < REVIEW_MIN_PUZZLES) return false;
   // The delight peak: a perfect (3-star) solve. Genre leaders prompt on a win.

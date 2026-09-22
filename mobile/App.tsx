@@ -11,6 +11,7 @@ import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 import { getSupportIdentifier } from './src/services/supportIdentity';
 import { getSupportMailto } from './src/constants/links';
+import { buildSupportExport } from './src/services/supportExport';
 import { useGlobalOverlays } from './src/hooks/useGlobalOverlays';
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useSyncExternalStore } from 'react';
 import {
@@ -29,6 +30,7 @@ import {
   Modal,
   Image,
   Linking,
+  Share,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -351,6 +353,8 @@ if (sentryDsn) {
     dsn: sentryDsn,
     // Crash + error capture only; no performance tracing by default.
     tracesSampleRate: 0,
+    // Keep internal-testing noise out of the production dashboards and alerts.
+    environment: String(Constants.expoConfig?.extra?.releaseChannel ?? 'internal-testing'),
   });
   setErrorForwarder((error, context) => {
     const err = error instanceof Error ? error : new Error(String(error));
@@ -2383,6 +2387,9 @@ function MainApp() {
           houseAskRestoreSuppressRef.current = true;
           return;
         }
+        // An unfinished daily from an earlier day can never be resumed; drop it
+        // rather than leave it waiting in the slot until the next daily saves.
+        if (saved?.isPlayingDaily) await clearPuzzleState('daily').catch(() => {});
         const daily = await generateDailyPuzzle();
         if (!isCurrent()) return;
         puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength, daily.solution);
@@ -3256,6 +3263,12 @@ function MainApp() {
             puzzlesSolved: completedTotal,
             isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
             isDaily: isPlayingDaily,
+            // Never stack the OS sheet on a win that already carries a beat of
+            // its own: a ceremony waiting at the pit, the forced first harvest,
+            // or an unlock card queued for this exit.
+            isBusyMoment: finalVictory.phaseTransitionPending === true ||
+              finalVictory.mandatoryHarvest === true ||
+              immediateIntros.length > 0,
           }).then(prompted => {
             // The OS review sheet fired mid-victory, outside the exit-nudge
             // chain — flag it so THIS win's exit runs no nudges on top
@@ -6462,6 +6475,11 @@ function BootHold({
   const openSupportMail = useCallback(() => {
     Linking.openURL(getSupportMailto(BOOT_APP_VERSION, supportIdentifier ?? undefined)).catch(() => {});
   }, [supportIdentifier]);
+  const shareSaveWithSupport = useCallback(() => {
+    buildSupportExport(BOOT_APP_VERSION)
+      .then(message => Share.share({ title: 'WordShift save', message }))
+      .catch(() => {});
+  }, []);
   const copy = getBootFailureCopy(onContinueWithoutCloud ? 'cloud' : failureKind);
   if (failed) {
     // A flowing, group-centred column: the card must be allowed to push the
@@ -6496,6 +6514,11 @@ function BootHold({
           <TouchableOpacity onPress={openSupportMail} accessibilityRole="link" accessibilityLabel={copy.contactSupport} style={bootStyles.failedLink}>
             <Text style={bootStyles.failedLinkText}>{copy.contactSupport}</Text>
           </TouchableOpacity>
+          {!onContinueWithoutCloud ? (
+            <TouchableOpacity onPress={shareSaveWithSupport} accessibilityRole="button" accessibilityLabel={copy.shareSave} style={bootStyles.failedLink}>
+              <Text style={bootStyles.failedLinkText}>{copy.shareSave}</Text>
+            </TouchableOpacity>
+          ) : null}
           {supportIdentifier ? (
             <Text selectable style={bootStyles.failedSupportId}>Support ID: {supportIdentifier}</Text>
           ) : null}

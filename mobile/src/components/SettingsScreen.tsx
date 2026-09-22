@@ -1047,7 +1047,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
               <View style={[styles.recoveryCodeBox, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
                 <Text selectable style={[styles.recoveryCodeText, { color: t.title }]} accessibilityLabel={`Recovery code ${recoveryCode}`}>{recoveryCode}</Text>
                 <CandyButton label={codeCopied ? 'Copied!' : 'Copy code'} onPress={handleCopyRecoveryCode} phase={phase} variant="quiet" accessibilityLabel={codeCopied ? 'Recovery code copied' : 'Copy recovery code'} />
-                <Text style={[styles.recoveryCodeHint, { color: t.muted }]} accessibilityLiveRegion="polite">{codeCopied ? 'Code copied. Keep it somewhere private.' : 'Backup saved. This code stays the same as your game progresses; it restores your latest saved backup, including after a reset. Keep it private: anyone with it can restore your game.'}</Text>
+                <Text style={[styles.recoveryCodeHint, { color: t.muted }]} accessibilityLiveRegion="polite">{codeCopied ? 'Code copied. Paste it somewhere private, then copy something else so it does not stay on your clipboard.' : 'Backup saved. This code stays the same as your game progresses; it restores your latest saved backup, including after a reset. Keep it private: anyone with it can restore your game.'}</Text>
               </View>
             )}
             <TouchableOpacity style={[styles.aboutRow, rowTint]} onPress={() => { hapticLight(); setRestoreVisible(true); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore with a recovery code">

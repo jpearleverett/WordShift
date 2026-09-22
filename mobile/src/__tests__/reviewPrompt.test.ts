@@ -41,6 +41,10 @@ const base = {
 };
 
 describe('shouldPromptReview', () => {
+  test('waits for a quiet win when this one already carries its own beat', () => {
+    expect(shouldPromptReview({ ...base, phase: 0, isBusyMoment: true })).toBe(false);
+  });
+
   test('prompts on a Phase 0-1 perfect win past the settle-in threshold', () => {
     expect(shouldPromptReview({ ...base, phase: 0 })).toBe(true);
     expect(shouldPromptReview({ ...base, phase: 1 })).toBe(true);

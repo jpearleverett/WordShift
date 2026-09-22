@@ -4,6 +4,7 @@ import {
   getDailyDifficulty,
   getDailyRamp,
   isFirstDailyEasing,
+  EASED_DAILY_COUNT,
   isDailyChallengeUnlocked,
   getDailyChallengeUnlockProgress,
   isDailyCompleted,
@@ -23,7 +24,7 @@ import {
 } from '../services/dailyChallenge';
 import { DAILY_BOARD_VERSION } from '../services/dailyBoardVersion';
 import { getHintBalance, clearHints } from '../services/hints';
-import { selectDailyBankPuzzle } from '../services/puzzleBank';
+import { selectDailyBankPuzzle, selectDailyBankPuzzleForDate } from '../services/puzzleBank';
 import { FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 
@@ -58,6 +59,7 @@ jest.mock('../services/puzzleBank', () => {
   return {
     ...actual,
     selectDailyBankPuzzle: jest.fn(actual.selectDailyBankPuzzle),
+    selectDailyBankPuzzleForDate: jest.fn(actual.selectDailyBankPuzzleForDate),
   };
 });
 
@@ -138,13 +140,11 @@ describe('dailyChallenge', () => {
       expect(getDailyRamp('2026-02-13')).toEqual(getDailyRamp('2026-02-13')); // stable per date
     });
 
-    test('isFirstDailyEasing is true only before the first daily completion', async () => {
+    test('isFirstDailyEasing is true only for the first EASED_DAILY_COUNT dailies', async () => {
       const fresh = await loadDailyProgress();
       expect(isFirstDailyEasing(fresh)).toBe(true);
-
-      await recordDailyCompletion(3, 0, 0);
-      const after = await loadDailyProgress();
-      expect(isFirstDailyEasing(after)).toBe(false);
+      expect(isFirstDailyEasing({ ...fresh, totalCompleted: EASED_DAILY_COUNT - 1 })).toBe(true);
+      expect(isFirstDailyEasing({ ...fresh, totalCompleted: EASED_DAILY_COUNT })).toBe(false);
     });
 
     test('generateDailyPuzzle flags the first daily as eased (not leaderboard-eligible)', async () => {
@@ -154,7 +154,7 @@ describe('dailyChallenge', () => {
 
     test('generateDailyPuzzle does NOT ease once the player has completed a daily', async () => {
       const p = await loadDailyProgress();
-      p.totalCompleted = 1; // returning player
+      p.totalCompleted = EASED_DAILY_COUNT; // returning player past the eased dailies
       const daily = await generateDailyPuzzle();
       expect(daily.eased).toBe(false);
     });
@@ -437,7 +437,7 @@ describe('first-daily hint mercy', () => {
 });
 
 describe('generateDailyPuzzle caching / prewarm', () => {
-  const bankPick = selectDailyBankPuzzle as jest.Mock;
+  const bankPick = selectDailyBankPuzzleForDate as jest.Mock;
 
   beforeEach(async () => {
     (AsyncStorage.clear as jest.Mock)();
@@ -577,5 +577,27 @@ describe('dailyStreakMilestones', () => {
     const result = checkDailyStreakMilestone(30, 29, 0);
     expect(result).not.toBeNull();
     expect(result!.amber).toBe(100);
+  });
+});
+
+describe('daily board rotation', () => {
+  const actual = jest.requireActual('../services/puzzleBank');
+
+  test('is a pure function of (difficulty, date)', () => {
+    expect(actual.selectDailyBankPuzzleForDate('HARD', '2026-10-04'))
+      .toEqual(actual.selectDailyBankPuzzleForDate('HARD', '2026-10-04'));
+  });
+
+  test('never repeats a board within one pass of the bank', () => {
+    const seen = new Set<string>();
+    const start = Date.UTC(2026, 9, 1);
+    for (let day = 0; day < 60; day++) {
+      const date = new Date(start + day * 86400000).toISOString().slice(0, 10);
+      const board = actual.selectDailyBankPuzzleForDate('EXPERT', date);
+      expect(board).not.toBeNull();
+      const key = board.words.join('-');
+      expect(seen.has(key)).toBe(false);
+      seen.add(key);
+    }
   });
 });

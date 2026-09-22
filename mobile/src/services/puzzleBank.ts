@@ -662,6 +662,58 @@ export function selectDailyBankPuzzle(
   return toPuzzleConfig(bank[index]);
 }
 
+/** Whole days since the Unix epoch for a local YYYY-MM-DD string (no timezone math). */
+function dailyOrdinal(dateStr: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match) return null;
+  return Math.floor(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / 86400000);
+}
+
+function dailyPermutation(seed: string, size: number): number[] {
+  let hash = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  let state = hash >>> 0;
+  const next = () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const order = Array.from({ length: size }, (_, i) => i);
+  for (let i = size - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+
+/**
+ * The daily board for a date: a date-seeded PERMUTATION of the shape's bank,
+ * walked one position per calendar day, so the same bank never repeats a board
+ * until every board in it has been a daily. The old independent roll per day
+ * could serve the same Sunday board twice within weeks. Pure and identical on
+ * every device with the same bank, like selectDailyBankPuzzle.
+ */
+export function selectDailyBankPuzzleForDate(
+  difficulty: Difficulty,
+  dateStr: string,
+): PuzzleConfig | null {
+  const bankKey = getBankKey(difficulty, 'standard');
+  if (!BANK_REGISTRY[bankKey]) return null;
+  const bank = getBank(bankKey);
+  if (bank.length === 0) return null;
+  const ordinal = dailyOrdinal(dateStr);
+  if (ordinal === null) return null;
+  const cycle = Math.floor(ordinal / bank.length);
+  const position = ordinal - cycle * bank.length;
+  const order = dailyPermutation(`wordshift-daily-${bankKey}-${bank.length}-${cycle}`, bank.length);
+  return toPuzzleConfig(bank[order[position]]);
+}
+
 /**
  * Select a puzzle from the pre-generated bank.
  *
@@ -718,6 +770,22 @@ export async function selectPreGeneratedPuzzle(
 
   // Filter out already-played puzzles
   let available = selectableBank.filter(p => !usedSet.has(p.id));
+
+  // Past the extension unlock only some boards can take the extra row (about
+  // 31 HARD and 39 EXPERT), so a late player used to see exact replays every
+  // few dozen boards through the climax while the rest of the bank sat unused.
+  // Once every extendable board has been played, a board the player has never
+  // seen, served at its own length, beats a replay with an extra row: spend
+  // the unplayed remainder first, and recycle extended boards only after it.
+  let serveExtended = extensionRequired;
+  if (extensionRequired && available.length === 0) {
+    const unplayedRemainder = bank.filter(p => !usedSet.has(p.id));
+    if (unplayedRemainder.length > 0) {
+      serveExtended = false;
+      selectableBank = bank;
+      available = unplayedRemainder;
+    }
+  }
 
   // Phase 4+ dread steering: the climax must serve dread vocabulary, but a
   // played board must NEVER be re-served while ANY unplayed board remains
@@ -807,7 +875,7 @@ export async function selectPreGeneratedPuzzle(
   // primary filters and synchronous work stays capped (see the constant docs).
   if (variant === 'standard' && puzzlesSolved >= BRANCHING_UNLOCK_PUZZLES) {
     const candidateCount = Math.min(BRANCHING_CONTEXT_CANDIDATES, scored.length);
-    const metricSource = extensionRequired ? 'extended' : 'source';
+    const metricSource = serveExtended ? 'extended' : 'source';
     const contextCandidates = scored.slice(0, candidateCount);
     // Same as the former .map(), but as an awaitable loop so the cold-cache
     // batch of analyzeStandardBranching traversals can yield the JS thread every
@@ -827,7 +895,7 @@ export async function selectPreGeneratedPuzzle(
       const metricsCacheKey = `${bankKey}:${candidate.puzzle.id}:${metricSource}`;
       let metrics = branchingMetricsCache.get(metricsCacheKey);
       if (!metrics) {
-        const branchingWords = extensionRequired
+        const branchingWords = serveExtended
           ? getCachedStandardExtension(bankKey, candidate.puzzle)!.words
           : candidate.puzzle.words;
         metrics = analyzeStandardBranching(
@@ -873,7 +941,7 @@ export async function selectPreGeneratedPuzzle(
   // Mark as played
   await markPuzzlePlayed(selected.puzzle.id, bankKey);
 
-  if (extensionRequired) {
+  if (serveExtended) {
     // `selectableBank` contains only cache hits, so this cannot fail without a
     // mutation of generated bank data during the process.
     return getCachedStandardExtension(bankKey, selected.puzzle);

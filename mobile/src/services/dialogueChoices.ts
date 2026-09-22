@@ -245,15 +245,15 @@ function getDefaultState(): ChoiceState {
 export async function loadChoiceState(): Promise<ChoiceState> {
   if (choiceCache) return choiceCache;
   const generation = choiceGeneration;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (generation !== choiceGeneration) return loadChoiceState();
-    if (stored) {
-      choiceCache = choiceCache ?? JSON.parse(stored);
-      return choiceCache!;
-    }
-  } catch {}
+  // A read or parse failure is a failure, not an empty state: caching the
+  // default here would let the next recordChoice write it back over every
+  // earlier answer. Callers that treat choices as optional catch it.
+  const stored = await AsyncStorage.getItem(STORAGE_KEY);
   if (generation !== choiceGeneration) return loadChoiceState();
+  if (stored) {
+    choiceCache = choiceCache ?? JSON.parse(stored);
+    return choiceCache!;
+  }
   choiceCache = choiceCache ?? getDefaultState();
   return choiceCache;
 }

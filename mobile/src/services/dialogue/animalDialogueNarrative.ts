@@ -879,14 +879,14 @@ function getDefaultDeliveryState(): NarrativeDeliveryState {
 
 async function loadDeliveryState(): Promise<NarrativeDeliveryState> {
   if (deliveryCache) return deliveryCache;
-  try {
-    const stored = await AsyncStorage.getItem(DELIVERY_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      deliveryCache = { ...getDefaultDeliveryState(), ...parsed };
-      return deliveryCache!;
-    }
-  } catch {}
+  // Fail on a read or parse error rather than caching an empty state that the
+  // next delivery would write back over every seed and callback already heard.
+  const stored = await AsyncStorage.getItem(DELIVERY_STORAGE_KEY);
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    deliveryCache = { ...getDefaultDeliveryState(), ...parsed };
+    return deliveryCache!;
+  }
   deliveryCache = getDefaultDeliveryState();
   return deliveryCache;
 }

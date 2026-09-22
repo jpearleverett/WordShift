@@ -19,7 +19,9 @@ import {
   Animated,
   Easing,
   Image,
+  useWindowDimensions,
 } from 'react-native';
+import { useScreenInsets } from '../hooks/useScreenInsets';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getSurfaceTheme, SURFACE, getModalInSpring } from '../theme/surfaces';
 import { CONFETTI_THEMES } from '../theme/colors';
@@ -68,6 +70,11 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
   onAmberChange,
   onSubscribe,
 }) => {
+  // Bound the sheet by the system bars: under Android 15 edge-to-edge with
+  // three-button navigation a percentage height let its foot sit under the bar.
+  const insets = useScreenInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetMaxHeight = Math.max(240, windowHeight - insets.top - insets.bottom - 24);
   const t = getSurfaceTheme(phase);
   const copy = getSeasonPassCopy(phase as DialoguePhase);
   const [view, setView] = useState<SeasonPassView | null>(null);
@@ -331,7 +338,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
           style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay, opacity: backdropOpacity }]}
         />
         <Animated.View
-          style={[styles.cardWrap, { transform: [{ scale: cardScale }], opacity: cardOpacity }]}
+          style={[styles.cardWrap, { maxHeight: Math.min(sheetMaxHeight, windowHeight * 0.9), transform: [{ scale: cardScale }], opacity: cardOpacity }]}
         >
         <PanelCard phase={phase} kind="panel" style={styles.card}>
           {/* One-time full-card confetti burst (the season's own granted

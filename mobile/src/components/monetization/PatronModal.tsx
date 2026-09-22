@@ -7,7 +7,9 @@ import {
   Animated,
   ActivityIndicator,
   Image,
+  useWindowDimensions,
 } from 'react-native';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme, getModalInSpring } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
@@ -117,6 +119,11 @@ export const PatronModal: React.FC<PatronModalProps> = ({
   onClose,
   onPatronChange,
 }) => {
+  // Bound the sheet by the system bars: under Android 15 edge-to-edge with
+  // three-button navigation a percentage height let its foot sit under the bar.
+  const insets = useScreenInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetMaxHeight = Math.max(240, windowHeight - insets.top - insets.bottom - 24);
   const reducedMotion = getSettingsSync().reducedMotion;
 
   const [isPatron, setIsPatron] = useState<boolean>(isPatronSync());
@@ -399,6 +406,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           style={[
             styles.card,
             {
+              maxHeight: sheetMaxHeight,
               opacity: cardOpacity,
               transform: [{ scale: cardScale }],
             },

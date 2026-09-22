@@ -30,6 +30,7 @@ import { SYNC_KEYS, SYNC_KEY_PREFIXES } from '../services/cloudSave';
 const DOCUMENTED_EXCLUSIONS: Record<string, string> = {
   wordshift_storage_commit: 'Local write-ahead transaction journal; replay before any gameplay reads.',
   wordshift_pending_victory: 'Local unfinished completion intent; restored saves discard it, Reset clears it.',
+  wordshift_pending_victory_quarantine: 'Local copy of an unreadable completion intent set aside so boot can open; support evidence only, cleared by Reset.',
   wordshift_victory_receipt: 'Local idempotency receipt for the most recent completion, not transferable progress.',
   wordshift_cloud_legacy_owner: 'Private legacy recovery reference retained for reviewed support; never synced or merged.',
   wordshift_support_id: 'Non-secret per-install support lookup, not a recovery credential; survives Reset.',

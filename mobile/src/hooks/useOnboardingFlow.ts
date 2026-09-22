@@ -6,7 +6,7 @@ import {
   ONBOARDING_FOX_LINES,
 } from '../services/onboarding';
 import { hasTutorialCompleted, markTutorialCompleted } from '../components/Tutorial';
-import { markTutorialSeedsPlanted } from '../services/amberCurrency';
+import { markTutorialSeedsPlanted, getFullProgress } from '../services/amberCurrency';
 import { clearPuzzleState } from '../services/puzzleSaveState';
 import { hapticLight } from '../services/haptics';
 import { ONBOARDING_TRANSITION_DELAY_MS } from '../constants/timing';
@@ -157,9 +157,15 @@ export function useOnboardingFlow(
     (async () => {
       const tutorialDone = await hasTutorialCompleted();
       const step = await getOnboardingStep();
+      // A player who has already solved puzzles is never a fresh install: an
+      // unreadable or missing step must not send a veteran back through the
+      // cold open. Progress is read strictly, so a failure here stays a failure.
+      const veteran = step === 'not_started'
+        ? ((await getFullProgress().catch(() => null))?.puzzlesSolved ?? 0) > 0
+        : false;
       if (!mountedRef.current) return;
 
-      if (tutorialDone && step === 'not_started') {
+      if ((tutorialDone || veteran) && step === 'not_started') {
         // Existing player who completed old tutorial — skip onboarding
         await setOnboardingStep('complete');
         if (!mountedRef.current) return;

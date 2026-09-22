@@ -2,7 +2,8 @@ import { clearEvents } from '../services/eventLogger';
 import NativeStorage from '@react-native-async-storage/async-storage';
 import { collectLocalSaveData, invalidateRestoredServiceCaches, restoreFromCloudData } from '../services/cloudSave';
 import { recoverPendingStorageTransaction, STORAGE_COMMIT_KEY } from '../services/persistenceStorage';
-import { recordDurableVictory, recoverPendingVictory, createVictoryInput, PENDING_VICTORY_KEY } from '../services/victoryPersistence';
+import { recordDurableVictory, recoverPendingVictory, createVictoryInput, PENDING_VICTORY_KEY, PENDING_VICTORY_QUARANTINE_KEY } from '../services/victoryPersistence';
+import { buildSupportExport } from '../services/supportExport';
 import { loadProgress, invalidateProgressCache } from '../services/amberCurrency';
 import { HomeWorldProgress } from '../types/homeWorld';
 import { getCumulativeStats } from '../services/starRating';
@@ -337,3 +338,36 @@ test.each(['before_commit', 'after_progress_write'])('New Cycle preserves its ar
 
 // The service owns a debounced telemetry timer; do not let it outlive its test environment.
 afterAll(() => clearEvents());
+
+test('an unreadable pending victory is set aside so the save still opens', async () => {
+  await NativeStorage.setItem(PENDING_VICTORY_KEY, '{"truncated":');
+  expect(await recoverPendingVictory()).toBeNull();
+  expect(await NativeStorage.getItem(PENDING_VICTORY_KEY)).toBeNull();
+  expect(await NativeStorage.getItem(PENDING_VICTORY_QUARANTINE_KEY)).toBe('{"truncated":');
+  // The next board records normally instead of being refused.
+  const result = await recordDurableVictory(input('board-after'));
+  expect(result.puzzlesSolved).toBe(1);
+});
+
+test('a pending victory of an older shape does not block the next completion', async () => {
+  await NativeStorage.setItem(PENDING_VICTORY_KEY, JSON.stringify({ completionId: 'old', shape: 'retired' }));
+  const result = await recordDurableVictory(input('board-new'));
+  expect(result.puzzlesSolved).toBe(1);
+  expect(await NativeStorage.getItem(PENDING_VICTORY_QUARANTINE_KEY)).not.toBeNull();
+});
+
+test('migrations treat a stored "null" progress record as absent', async () => {
+  await NativeStorage.setItem('wordshift_home_progress', 'null');
+  await NativeStorage.setItem('wordshift_schema_version', '0');
+  await expect(runMigrations()).resolves.not.toThrow();
+});
+
+test('the support export leaves recovery credentials out', async () => {
+  await NativeStorage.setItem('wordshift_cloud_owner', 'ws2_secret');
+  await NativeStorage.setItem('wordshift_cloud_legacy_owner', 'legacy-secret');
+  await NativeStorage.setItem('wordshift_home_progress', progressRecord(12));
+  const text = await buildSupportExport('1.4.5');
+  expect(text).not.toContain('ws2_secret');
+  expect(text).not.toContain('legacy-secret');
+  expect(JSON.parse(text).data.wordshift_home_progress).toBe(progressRecord(12));
+});

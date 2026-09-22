@@ -651,3 +651,20 @@ describe('getPhase5ChoiceCallback', () => {
   });
 });
 
+
+describe('read failures never become an empty choice record', () => {
+  beforeEach(async () => {
+    await clearChoiceState();
+    invalidateChoiceCache();
+  });
+
+  it('rejects instead of caching defaults, so earlier answers survive the next save', async () => {
+    await recordChoice('fox', 'ask');
+    invalidateChoiceCache();
+    (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error('read failed'));
+    await expect(loadChoiceState()).rejects.toThrow('read failed');
+    await recordChoice('owl', 'refuse');
+    expect(await getPlayerChoice('fox')).toBe('ask');
+    expect(await getPlayerChoice('owl')).toBe('refuse');
+  });
+});

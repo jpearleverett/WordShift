@@ -19,6 +19,7 @@ import {
  isHouseCompleted, isFinalPuzzleCompleted, isFinaleArmed, markFinalPuzzleCompleted,
   markPostRevelation, getPhase4DwellCount, recordPhase4Dwell, armFinale , canArmFinale , awardBonusAmberInTransaction } from './amberCurrency';
 import { recordFormedWords } from './wordHistory';
+import { reportError } from './errorReporting';
 import { calculateRitualEnergy, extractTriggerWords } from './localGenerator';
 import { updateQuestProgress, WeeklyQuestGenerationContext } from './weeklyQuests';
 import { recordOfferingFulfillment } from './offeringRequests';
@@ -65,6 +66,29 @@ export interface VictoryInput {
   unbrokenWeave?: boolean;
 }
 export const PENDING_VICTORY_KEY = 'wordshift_pending_victory';
+/**
+ * Where an unreadable completion intent is set aside. A pending victory that no
+ * longer parses or validates (a truncated write, or an intent from a build
+ * whose shape changed) used to throw on every boot, holding the player on the
+ * failed-boot card for ever. It cannot be replayed safely, so it is kept here
+ * for support and the save opens; that one board's reward is the only loss.
+ */
+export const PENDING_VICTORY_QUARANTINE_KEY = 'wordshift_pending_victory_quarantine';
+
+function parsePendingVictory(raw: string): VictoryInput | null {
+  try {
+    const input: unknown = JSON.parse(raw);
+    return validateInput(input) ? input : null;
+  } catch {
+    return null;
+  }
+}
+
+async function quarantinePendingVictory(raw: string, storage: { setItem(k: string, v: string): Promise<void>; removeItem(k: string): Promise<void> }): Promise<void> {
+  await storage.setItem(PENDING_VICTORY_QUARANTINE_KEY, raw);
+  await storage.removeItem(PENDING_VICTORY_KEY);
+  reportError(new Error('Unreadable pending victory set aside'), { source: 'victory_quarantine' });
+}
 export const VICTORY_RECEIPT_KEY = 'wordshift_victory_receipt';
 
 async function computeVictory(input: VictoryInput): Promise<VictoryData> {
@@ -458,10 +482,14 @@ async function prepareVictory(input: VictoryInput): Promise<VictoryData> {
   if (!validateInput(input)) throw new Error('Invalid puzzle completion');
   // Intent must be outside the staged operation. If storage is full before this
   // write, the caller keeps the completed board and offers Retry.
-  const pending = await NativeStorage.getItem(PENDING_VICTORY_KEY);
+  let pending = await NativeStorage.getItem(PENDING_VICTORY_KEY);
+  if (pending && parsePendingVictory(pending) === null) {
+    await quarantinePendingVictory(pending, NativeStorage);
+    pending = null;
+  }
   if (pending) {
-    const old = JSON.parse(pending) as VictoryInput;
-    if (!validateInput(old) || old.completionId !== input.completionId) {
+    const old = parsePendingVictory(pending) as VictoryInput;
+    if (old.completionId !== input.completionId) {
       throw new Error('Finish recovering the previous puzzle before continuing');
     }
   } else {
@@ -474,8 +502,12 @@ async function prepareVictory(input: VictoryInput): Promise<VictoryData> {
 export async function recoverPendingVictory(): Promise<VictoryData | null> {
   const raw = await AsyncStorage.getItem(PENDING_VICTORY_KEY);
   if (!raw) { await recoverPendingHarvestCredits(); return null; }
-  const input: unknown = JSON.parse(raw);
-  if (!validateInput(input)) throw new Error('Your unfinished completion needs recovery');
+  const input = parsePendingVictory(raw);
+  if (input === null) {
+    await quarantinePendingVictory(raw, AsyncStorage);
+    await recoverPendingHarvestCredits();
+    return null;
+  }
   const result = await persistVictory(input);
   await recoverPendingHarvestCredits();
   return result;
@@ -484,6 +516,7 @@ export async function recoverPendingVictory(): Promise<VictoryData | null> {
 /** Reset All only; paid purchase intents are intentionally a different ledger. */
 export async function clearPendingVictory(): Promise<void> {
   await AsyncStorage.removeItem(PENDING_VICTORY_KEY);
+  await AsyncStorage.removeItem(PENDING_VICTORY_QUARANTINE_KEY);
   await AsyncStorage.removeItem(VICTORY_RECEIPT_KEY);
 }
 

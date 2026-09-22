@@ -5438,23 +5438,27 @@ export function getBootFailureCopy(kind: BootFailureKind): {
   retry: string;
   continueWithoutCloud: string;
   contactSupport: string;
+  shareSave: string;
 } {
   const retry = 'Try again';
   const continueWithoutCloud = 'Continue without the cloud backup';
   const contactSupport = 'Contact support';
+  const shareSave = 'Send your save to support';
   if (kind === 'cloud') {
     return {
       message: 'Your cloud backup could not be checked. Try again, or continue without it for now. The progress saved on this device is safe.',
       retry,
       continueWithoutCloud,
       contactSupport,
+      shareSave,
     };
   }
   return {
-    message: 'Your save could not be opened safely. Free some device storage if it is full, then try again. If it keeps failing, contact support and your support ID will be attached.',
+    message: 'Your save could not be opened safely. Free some device storage if it is full, then try again. If it keeps failing, send your save to support so it can be repaired.',
     retry,
     continueWithoutCloud,
     contactSupport,
+    shareSave,
   };
 }
 

@@ -1478,11 +1478,12 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
   // phase 2 (the first vanguard opportunity). Loaded once, not per animal.
   const nearEndgame = progress.currentPhase >= 5;
   const tendingState = nearEndgame ? await loadTendingState() : null;
-  const choiceState = progress.currentPhase >= 2 ? await loadChoiceState() : null;
+  // Badges are optional here: an unreadable record must not stop the house loading.
+  const choiceState = progress.currentPhase >= 2 ? await loadChoiceState().catch(() => null) : null;
   // Phase-2 exhaustion pool: badge honesty for animals whose base block is
   // done but who still have undelivered pool lines. Loaded once, not per animal.
   const phase2Cursors = progress.currentPhase >= 1 && progress.currentPhase <= 3
-    ? await getPhase2PoolCursors()
+    ? await getPhase2PoolCursors().catch(() => ({} as Record<string, number>))
     : {};
   // Locked-resident references wait unread until that friend joins the house.
   const unlockedTypes = new Set(progress.unlockedAnimals as AnimalType[]);

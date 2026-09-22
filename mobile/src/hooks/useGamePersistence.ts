@@ -311,8 +311,15 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       // explanation until the next relaunch.
       setPhaseProgressFraction(result.phaseProgressFraction);
       if (!result.phaseTransitionPending) {
-        updateSessionPhase(result.newPhase);
-        setCurrentPhase(result.newPhase);
+        // Between the Arrival and the board that plays After, durable phase is
+        // still 4 while the session presents 5 (hasArrivalBeenPresented). A
+        // board that does not pin post-revelation (a daily, a shared link)
+        // must not drop the presentation back into the phase-4 register.
+        setCurrentPhase(prev => {
+          const next = prev === 5 && result.newPhase === 4 ? 5 as DialoguePhase : result.newPhase;
+          updateSessionPhase(next);
+          return next;
+        });
         if (result.endgame?.kind === 'post_arrival') setPostRevelation(true);
       } else {
         setPendingPhaseTransition(result.newPhase);
