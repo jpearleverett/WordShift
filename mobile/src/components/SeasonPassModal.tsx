@@ -322,7 +322,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
       // store -> purchase funnel (docs/supabase/analytics_views_v1.sql).
       // The cast stands until eventLogger's EventType union lists the name.
       logEvent({
-        type: 'season_premium_unlocked' as Parameters<typeof logEvent>[0]['type'],
+        type: 'season_premium_unlocked',
         data: { productId: 'season_premium_amber', kind: 'season', amber: cost },
       });
       await refresh();
