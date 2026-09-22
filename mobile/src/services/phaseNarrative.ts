@@ -200,21 +200,21 @@ export const VICTORY_FEEDBACK_POOLS: Record<
   },
   5: {
     three: [
-      'The weave accepts perfection. And imperfection. They are the same.',
+      'Flawless. Every word was heard, and each one stays exactly where you put it.',
       'Every thread true. The pattern barely rippled as you passed.',
-      'Flawless, and it changes nothing. It was beautiful anyway.',
-      'Perfect work, done for its own sake. That is the peace.',
+      'Flawless. Nobody asked it of you. You did it anyway.',
+      'Perfect work, done for its own sake. Nobody here is keeping score.',
     ],
     two: [
       'Another thread pulled tight. The fabric holds.',
       'Woven, with a small unevenness here and there. Cloth is like that.',
-      'Settled. The pattern takes your work the way water takes rain.',
+      'Done. A slip or two stays in the weave, and nobody smooths them out.',
       'Done, gently. The weave has room for every kind of hand.',
     ],
     one: [
-      'You continue. The pattern continues. Neither can stop.',
+      'Slow, and finished. The stumbles stay in the record. They are yours.',
       'A slow thread, worked all the way through. The weave is patient. So are you, now.',
-      'Finished. Nothing is measured here anymore. Everything is kept.',
+      'Finished. The rough parts stay rough. The house is learning to leave them.',
       'It took what it took. The pattern has all the time there is.',
     ],
   },
@@ -291,9 +291,9 @@ export function getUnbrokenWeaveRankUpLine(
 export function getUnbrokenWeaveIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 5) {
     return [
-      "The house is quiet now. But there is still one thread left to follow, if you want it.",
+      "There is one thread in this house nobody has pulled yet. It is yours, if you want it.",
       "It is called the Unbroken Weave. Each letter may cross the chain only once. Finish a chain that way, and the house keeps a mark of it.",
-      "You will find it in the arrangement setup, before your next offering. The weave remembers how far you carry it.",
+      "It waits in the setup, where you pick your board. The weave remembers how far you carry it.",
     ];
   }
   if (phase >= 3) {
@@ -376,7 +376,7 @@ export function getKeeperRecordLines(data: KeeperRecordData): string[] {
 export function getVariantNudgeMessage(phase: DialoguePhase, variantTitle: string): string {
   if (phase >= 4) return `The pattern wonders what ${variantTitle} would offer...`;
   if (phase >= 2) return `Have you tried ${variantTitle}? The words move differently there.`;
-  return `Fox wonders what happens if you try ${variantTitle}!`;
+  return `Ember wonders what happens if you try ${variantTitle}!`;
 }
 
 // ============================================================================
@@ -1050,7 +1050,7 @@ const WHISPER_GALLERY_EMPTY_TEXT: Record<DialoguePhase, string> = {
   2: 'Nothing collected yet. The house is listening for your words.',
   3: 'The walls are quiet... for now.',
   4: 'The walls are quiet... for now.',
-  5: 'The walls are quiet now. Every voice rests in its place.',
+  5: 'The walls are quiet now. The voices are still here, if you listen.',
 };
 
 export function getWhisperGalleryEmptyText(phase: DialoguePhase): string {
@@ -1127,13 +1127,13 @@ export function getPhaseChangeNarrative(newPhase: DialoguePhase): PhaseChangeNar
       return {
         emoji: '🌑',
         title: 'Something has changed...',
-        body: 'Your friends seem... different. Visit them at home.',
+        body: 'Your friends seem... different. The pit is waiting for you first.',
       };
     case 5:
       return {
         emoji: '🕊️',
-        title: 'A terrible peace...',
-        body: 'The pattern has settled. Everything is quiet now.',
+        title: 'It stayed...',
+        body: 'The house is quiet now. Not everyone in it is.',
       };
     default:
       return {
@@ -1423,13 +1423,13 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
   if (phase >= 2) {
     return [
       "You've grown stronger with these words, so I want to show you something new.",
-      "The Daily Challenge comes once a day. It's one shared puzzle, a little tougher than usual.",
+      "The Daily Challenge comes once a day. It's one shared board, a little tougher than usual.",
       "You'll find it up top. Everyone gets the same arrangement, every day. I keep thinking about that.",
     ];
   }
   return [
     "Something new showed up this morning, friend. Come see.",
-    "There's a Daily Challenge now. One special puzzle each day, and everyone gets the same words. It's a little harder than usual.",
+    "There's a Daily Challenge now. One special board each day, and everyone gets the same words. It's a little harder than usual.",
     "You'll find it up top. Try it when you're feeling brave. The amber is worth it.",
   ];
 }
@@ -1447,7 +1447,7 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
 export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 4) {
     return [
-      "The arrangement leaves a record. Open the Journal, then Things We Kept, for the conversations you've had and the choices you've made.",
+      "The arrangement leaves a record. Open the Journal, then Things We Kept, for the conversations you have had and the choices you have made.",
       "Word Ledger is a separate entry in the Journal. Look for the quill to revisit the recent words you have formed.",
       "The Whisper Gallery keeps the whispers, replies, and keepsakes you have collected. Some echoes linger longer than others.",
       "Quests holds your daily and weekly tasks. Complete them and more amber follows. The Season Pass keeps its rewards nearby.",
@@ -1457,7 +1457,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 3) {
     return [
       "The Journal keeps a record. Things We Kept holds the conversations you've had and the choices you've made. Some sound different now.",
-      "Word Ledger is another entry in the Journal menu. The quill marks your recent puzzle words. Some stay with me longer than others.",
+      "Word Ledger is another entry in the Journal menu. The quill marks the recent words you've made. Some stay with me longer than others.",
       "The Whisper Gallery keeps the whispers, replies, and keepsakes you've collected. The echoes that refused to fade.",
       "Quests holds daily and weekly goals, with amber waiting when you finish. The Season Pass has its own rewards beside it.",
       "The book icon up top opens the Journal menu. I think the house wants you to read what's been written.",
@@ -1466,7 +1466,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 2) {
     return [
       "I've been keeping a journal for this house. Things We Kept holds the conversations you've had and the choices you've made.",
-      "Back in the Journal menu, the quill opens Word Ledger. It keeps your recent puzzle words. Some look different on a second reading.",
+      "Back in the Journal menu, the quill opens Word Ledger. It keeps the recent words you've made. Some look different on a second reading.",
       "The Whisper Gallery saves the whispers, replies, and keepsakes you've collected. You can return to those quiet moments here.",
       "Quests holds daily and weekly goals, with amber when you finish. You'll find Season Pass rewards in the Journal menu too.",
       "Tap the book icon up top to open the Journal menu. Choose a place to look back, friend.",
@@ -1475,7 +1475,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 1) {
     return [
       "I started a journal for you. Things We Kept saves the conversations you've had and the choices you've made along the way.",
-      "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse your recent puzzle words.",
+      "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse the recent words you've made.",
       "The Whisper Gallery keeps the whispers, replies, and keepsakes you've collected. Little moments to read again when you like.",
       "Quests has daily and weekly goals, and amber when you finish. You'll find the Season Pass and its rewards in this menu too.",
       "The book icon up top brings you back to the Journal menu. Take a peek when you have a quiet moment.",
@@ -1483,10 +1483,10 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
   }
   return [
     "I've made you a journal! Things We Kept saves the conversations you've had and the choices you've made. A little scrapbook of us.",
-    "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse your recent puzzle words.",
+    "Word Ledger is a separate entry in the Journal menu. Look for the quill to browse the recent words you've made.",
     "The Whisper Gallery keeps the whispers, replies, and keepsakes you've collected. Little moments you can read again whenever you like.",
     "Quests has daily and weekly goals that earn extra amber. You'll find Season Pass rewards in the Journal menu too.",
-    "Tap the book icon up top to open the Journal menu, then choose what you'd like to revisit. It's yours, friend.",
+    "The book up top opens the Journal menu. Choose whatever you'd like to revisit. It's yours, friend.",
   ];
 }
 
@@ -1695,35 +1695,35 @@ export function getJournalSpotlightSteps(
  */
 export function getFoxPostTutorialPlayPrompt(phase: number): string {
   if (phase >= 4) {
-    return "Keep playing, friend. Every word and every piece of amber you bring back builds this house a little further. There are others still waiting to come in.";
+    return "Go on back to the words, friend. Every one you make is heard in this house now. I would rather you knew that.";
   }
   if (phase >= 3) {
-    return "Play a few more puzzles for me. More amber means more rooms, more friends, and a stronger pattern in the house.";
+    return "Bring me a few more words. More amber means more rooms, more friends, and a stronger pattern in the house.";
   }
   if (phase >= 2) {
-    return "Head back to the puzzles when you're ready. More amber lets us open new rooms and welcome the others in.";
+    return "Head back to the words when you're ready. More amber lets us open new rooms and welcome the others in.";
   }
-  return "Play more puzzles and gather amber, okay? I want to invite more friends. The house will feel so much fuller with everyone here.";
+  return "Go find a few more words and gather amber, okay? I want to invite more friends. The house will feel so much fuller with everyone here.";
 }
 
 export function getFoxSetupSelectorIntroLines(phase: number): string[] {
   if (phase >= 4) {
     return [
-      "Before you begin, touch the setup mark below the board. There you choose how hard the next arrangement will be.",
+      "Before you begin, touch the seal above the board. There you choose how hard the next arrangement will be.",
       "Some paths are short. Some go deeper. Stranger ways to play will open there in time.",
       "Choose how deep this next offering goes, then begin.",
     ];
   }
   if (phase >= 3) {
     return [
-      'Before you start, tap the setup button for me. It lets you choose how hard the next puzzle should feel.',
+      "Before you start, touch the glowing seal above the board for me. It lets you choose how hard the next board should feel.",
       "There are short paths and deeper ones, and later a few stranger arrangements as well.",
       "Pick a path that feels right, then we'll keep building.",
     ];
   }
   return [
-    'Before you jump in, tap the setup button. It lets you choose how gentle or tricky the next puzzle will be.',
-    "Right now it only changes how deep the path goes. Later, a few new puzzle styles will show up there too.",
+    "Before you jump in, see the little seal glowing above the board? That's the setup. It lets you choose how gentle or tricky the next board will be.",
+    "Right now it only changes how deep the path goes. Later, a few new ways to move the words will show up there too.",
     "Pick what sounds fun, then let's play.",
   ];
 }
@@ -1796,8 +1796,8 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     fox: ["Ember noticed which words you used.", 'Ember stared into the fire after that one.', "Ember says the flames flickered when you finished.", 'Ember wonders where the warmth really comes from.', "Ember says the fire remembers more than we do."],
     owl: ["Archimedes found a passage about that word.", "Archimedes is checking one book against another.", 'Archimedes wrote something down.', 'Archimedes keeps finding the same symbol.', "Archimedes wonders who writes the notes in his margins."],
     pangolin: ["Panko says the recipe changed overnight.", "Panko tasted something in the soup she can't name.", "Panko is putting the spice jars back in order.", "Panko swears she never bought that spice.", "Panko can't remember who taught her this recipe."],
-    axolotl: ['Axel felt a ripple.', "Axel says the water shifted, and he didn't move it.", "Axel is staring at something in the water.", 'Axel wonders what is on the other side of the glass.', 'Axel says the water hums when you win.'],
-    capybara: ["Chill noticed. He stayed chill.", 'Chill filed that away.', 'Chill is thinking.', "Chill wonders who arranged all this calm.", "Chill watched the pattern line up. He stayed chill."],
+    axolotl: ['Axel felt a ripple.', "Axel says the water shifted, and he didn't move it.", "Axel is staring at something in the water.", 'Axel wonders what is on the other side of the glass.', 'Axel says the water hums when your words go down.'],
+    capybara: ["Chill noticed. He stayed chill.", 'Chill filed that away.', 'Chill is thinking.', "Chill wonders who arranged all this calm.", "Chill initialed the page and added the time."],
     fennec_fox: ["Fennick heard something else inside those words.", 'Fennick is alert.', "Fennick tilted his head to hear you better.", "Fennick wonders what keeps calling at night.", "Fennick says the quiet has a shape now. He'd like to know what made it."],
     sloth: ["Sloane felt something arrive. It's in no hurry, and neither is she.", 'Sloane is thinking. She started well before you got here.', "Sloane paused today. From someone this slow, that means something.", "Sloane wonders if you feel the change too, or if she's just early again.", "Sloane has been counting something. She won't say what."],
     wombat: ["Warren says the ground trembled under the burrow floor.", "Warren heard something below the burrow floor.", "Warren is checking his burrow walls again.", "Warren wonders how deep his burrow really goes.", "Warren found a tunnel he never dug himself."],
@@ -1809,7 +1809,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
   },
   2: {
     fox: ["The fire noticed the word you just made.", "Ember says the flames spelled something she won't repeat.", 'Ember is watching the embers closely.', "Ember says the fire prefers your colder words.", 'The flames leaned toward your last word.'],
-    owl: ["Archimedes says that word is already in the old book.", "Archimedes underlined a sentence.", 'The book opened on its own.', 'Archimedes says the book was waiting for that word.', 'A page wrote itself while you played.'],
+    owl: ["Archimedes says that word is already in the old book.", "Archimedes underlined a sentence.", 'The book opened on its own.', 'Archimedes says the book was waiting for that word.', 'A page wrote itself while you worked.'],
     pangolin: ["Panko says her ingredients were not where she left them.", "The kitchen smells of a supper nobody made.", "Panko is stirring a pot of something dark.", "Panko says the pantry rearranged itself overnight.", "The kitchen has gone cold in the spot where you stood."],
     axolotl: ["The water remembered your word.", 'Axel sank a little deeper.', 'Something moved beneath Axel.', "Axel says something in the glass is looking back at him.", 'The water dimmed when you finished.'],
     capybara: ['Chill catalogued the arrangement.', "Chill added your word to the list.", "Chill is still calm. It is starting to feel wrong.", 'Chill says the schedule has your name in it.', 'Chill underlined your word. Twice.'],
@@ -1833,7 +1833,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     wombat: ["Warren hears a low knock coming through the foundation stone.", "One footing stays warm long after the soil around it cools.", "One of Warren's tunnels curves toward a chamber he never dug.", "Pale dust keeps rising from a seam in the sealed floor.", "Warren is bracing a beam that was not sagging yesterday."],
     rabbit: ["Thyme chalks an arrow on the garden path. By dusk it points back at the house.", "A trail beyond the gate bends gently back toward the rosemary beds.", "Thyme moves the teapot away from the window. Its steam drifts back toward the glass.", "Fresh tracks circle the hedge, then stop beside her chair.", "The garden gate opens outward. The wind keeps swinging it back in."],
     red_panda: ["The incense smoke drew a circle and left it open.", "Bamboo is counting the quiet gaps between breaths.", "One line of the pattern is still unfinished.", 'A reed in Bamboo\'s mat stays loose. They do not tie it.', "Bamboo says the gap in the middle of the pattern still has a shape."],
-    tarsier: ["Vesper has watched the same road for three dawns now.", "A faint line crosses the dark below the stars. She has marked it.", 'Vesper moves the lantern to the far side of the rail.', 'She watches one bend in the road until morning.', "Her counting song is one number shorter tonight. The tune is the same."],
+    tarsier: ["Vesper has watched the same patch of sky for three dawns now.", "A faint line crosses the dark below the stars. She has marked it.", 'Vesper moves the lantern to the far side of the rail.', 'She watches one bend in the road until morning.', "Her counting song is one number shorter tonight. The tune is the same."],
     aye_aye: ["The bell hums on one syllable. Tock will not say it out loud.", "Tock taps the beam. The answer is in the bronze before he can reach her.", 'The bell rope twists once in the still air.', "Tock writes one word on his slate, then sands it clean.", "At dusk he listens under the bell and nods at her silence."],
     kakapo: ["A ridge rises in the soil and travels from root to root.", "Moss says the whole valley is fruiting at once, months early.", 'Every seedling turned the same way during the night.', "Moss rests one foot on the soil to feel the low note pass below.", "The fruit trees flower out of season, then shut again before dawn."],
   },
@@ -1842,15 +1842,15 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     owl: ['Archimedes closes the book. It opens again to a warm blank page.', "Ink gathers in the margins while Archimedes watches.", "Archimedes reaches for the last page. It turns before he touches it."],
     pangolin: ["Panko lays one more place at the table.", "The empty pot is steaming. Panko turns the flame down.", "Panko tastes the air. She decides the salt is enough."],
     axolotl: ['The water is warm now. It should not be.', "Axel is happy today. The water seems happy too.", 'Something brushes the glass from the other side. Axel does not turn.'],
-    capybara: ["Chill closes the last folder and straightens its corners.", 'Every clock in the office ticks at once. Chill keeps breathing.', 'Chill says: relax. Nothing else needs moving.'],
+    capybara: ["Chill closes the last folder and straightens its corners.", 'Every clock in the office ticks at once. Chill keeps breathing.', 'Chill writes the date twice, once for the ledger and once for himself.'],
     fennec_fox: ["Fennick is silent now. He is only listening.", 'Both ears turn toward the ceiling. The room stays still.', 'Fennick whispers: closer. Then the echo whispers it too.'],
     sloth: ['Sloane opens both eyes. She has been saving them for this.', 'The branch does not move beneath her. Nothing here moves without meaning now.', "Time used to pass through Sloane. Now it goes around her."],
     wombat: ["Warren presses a paw flat to the foundation. Something answers.", "The tunnels carry a low note up through the burrow floor.", "Warren says the deepest wall in the burrow is warm now."],
-    rabbit: ["Thyme sits with her back to the garden gate. She has never done that before.", 'The tea has gone cold. Thyme keeps both paws around the cup.', 'Thyme counts the exits once, then stops.'],
+    rabbit: ["Thyme sits facing the garden gate, the seed tin in her lap.", 'The tea has gone cold. Thyme keeps both paws around the cup.', 'Thyme counts the ways out twice. The second count is for her.'],
     red_panda: ["Bamboo breathes out. The whole attic seems to breathe in.", 'The incense smoke gathers into one unbroken thread.', "Bamboo opens both eyes. Nothing in the room moves."],
-    tarsier: ['Vesper says: look up. Do not blink.', "The lantern gutters. Vesper's eyes catch a second light.", 'The dark looks back now. Vesper does not look away.'],
+    tarsier: ['Vesper keeps her eyes on the seam. Every hour, on purpose, she blinks.', "The lantern gutters. Vesper's eyes catch a second light.", 'The dark looks back now. Vesper does not look away.'],
     aye_aye: ["Tock rests one hand on the bell rope.", 'The knocking has stopped. Tock presses his ear to the latch.', 'The bell hums all day now. Tock hums with her.'],
-    kakapo: ['Moss draws one long breath. The garden leans toward him.', 'The garden blooms all at once. Moss closes his eyes.', 'The stars seem farther apart above the sky garden.'],
+    kakapo: ['Moss draws one long breath. The garden leans toward him.', 'The garden blooms all at once. Moss closes his eyes.', 'Moss sits at the rim of his bowl, chest full, not calling yet.'],
   },
   5: {
     "fox": [
@@ -1899,7 +1899,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
         "Sloane changes her mind about which branch to sit on.",
         "Sloane is watching the afternoon take its time.",
         "Sloane breathes out. A moment later, the leaves catch up.",
-        "Two of her three moths say hello. Both are named Gerald.",
+        "Two moths say hello. Both are named Gerald.",
         "Sloane hears a word she has not heard before, and lifts her head."
     ],
     "wombat": [
@@ -1933,7 +1933,7 @@ export const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     "aye_aye": [
         "Tock knocks, then waits through the whole silence after it.",
         "Tock polishes one side of the bronze and forgets the other.",
-        "Tock sleeps under the bell now, right side up.",
+        "Tock naps under the bell, one ear against the bronze.",
         "A grub interrupts Tock's count. He starts again.",
         "Tock lays the rope out in the open, where any paw can leave it alone."
     ],
@@ -2028,7 +2028,7 @@ export function getPersonalizedPhase5Whisper(
 
   const templates: Record<string, string[]> = {
     fox: [
-      `${name} whispers: "The fire still remembers ${word}."`,
+      `${name} hears the fire say ${word}. She answers it with a word of her own.`,
       `${name} traces ${word} in the ashes. It glows briefly.`,
     ],
     owl: [
@@ -2040,7 +2040,7 @@ export function getPersonalizedPhase5Whisper(
       `${name} stirs the pot. ${word} rises in the steam.`,
     ],
     axolotl: [
-      `${name} sees ${word} written on the surface of the water.`,
+      `${name} writes ${word} on the glass with one finger. The water leaves it alone. He checks twice.`,
       `${name} says the bubbles still spell ${word}.`,
     ],
     capybara: [
@@ -2064,7 +2064,7 @@ export function getPersonalizedPhase5Whisper(
       `${name} finds yesterday's label: ${word}. A new shoot leans across it.`,
     ],
     red_panda: [
-      `${name} breathes in ${word}. Breathes out silence.`,
+      `${name} says ${word} out loud, plainly, and does not explain it.`,
       `${word} is written twice in the smoke. ${name} watches the second shape change.`,
     ],
     tarsier: [
@@ -2139,17 +2139,17 @@ export const INTERJECTION_MESSAGES: Record<number, string[]> = {
     '{name} keeps rehearsing something quietly. It has your name in it.',
   ],
   4: [
-    "{name} is ready. They have been ready for a long time.",
+    "{name} has been up all night. They want to talk before anything else changes.",
     '{name} says the arrangement is almost complete.',
-    "Visit {name}. The keepers want to speak with you.",
+    "Visit {name}. There is something they should have told you sooner.",
     "{name} set a place for you in the pattern. It is exactly your shape.",
-    '{name} is not waiting anymore. They are certain.',
+    '{name} has stopped agreeing with the others. They want to tell you why.',
     "{name} says there is little left to say. They would like to say it to you.",
   ],
   5: [
-    '{name} is at peace. You could be too.',
-    "{name} says the weave holds. Visit whenever you like.",
-    "The pattern hums. {name} hums along with it.",
+    '{name} is still working out how they feel about all of it. They would like company while they do.',
+    "{name} says what you chose that night is still holding. Visit whenever you like.",
+    "The pattern hums. {name} is humming a different tune, on purpose.",
     "{name} set a memory aside for you. There is no hurry at all.",
     '{name} sits with the quiet. There is room beside them.',
     "{name} would like to see you. Wanting company is one of the things that stayed.",
@@ -2186,13 +2186,13 @@ export function getRitualMicroEvent(
       `The walls remember ${word}.`,
     ],
     3: [
-      `The house trembled when you formed ${word}. The animals felt it.`,
+      `The house trembled when you formed ${word}. Every room felt it.`,
       `${word} echoes through every room. They all heard it.`,
       `The foundation cracked when ${word} was spoken aloud.`,
     ],
     4: [
       `${word} was the word it was waiting for. The arrangement trembles with recognition.`,
-      `The keepers felt ${word} in their bones. It feels closer now.`,
+      `Everyone in the house felt ${word} in their bones. Something underneath felt it too.`,
       `${word} completes another verse. The silence between the words thickens.`,
     ],
   };
@@ -2657,7 +2657,7 @@ export function isSilentVictoryBeat(completedTotal: number): boolean {
 // original lines anchor positions 1, 3, and 7.
 const DWELL_LINES: string[] = [
   'The house is whole. It is quiet in a new way, like a table set before the guests arrive.',
-  'Nothing is being built anymore. The keepers have folded their hands, and the rooms have begun to listen.',
+  'Nothing is being built anymore. Some of your friends have folded their hands. Others keep checking the doors.',
   'The rooms are ready. The keepers are ready. What is coming is almost ready too.',
   'The walls have stopped their settling. Even the dust waits to fall until you have passed.',
   'Your words land more softly now, the way footsteps soften outside a door that is about to open.',
@@ -2675,7 +2675,7 @@ const DWELL_LINES_SERENE: string[] = [
   'The dust settles where it likes now. The house does not mind being lived in.',
   'Your words arrive like letters from an old friend. The house reads them slowly.',
   'The quiet is not waiting for anything. It is simply staying.',
-  'The house holds its shape, contented. It kept still for this once.',
+  'The house holds its shape. Inside, someone moves a chair, and it stays moved.',
   'The house breathes out. Somewhere a cup cools, and nobody rushes to warm it.',
 ];
 
@@ -2684,7 +2684,7 @@ const DWELL_LINES_SERENE: string[] = [
 // eighth-dwell sentence on every intervening victory.
 const POST_CAP_DWELL_LINES: string[] = [
   'The house is listening past the sound of its own walls.',
-  'No one asks whether it is ready now. They have begun to wait with it.',
+  'Nobody agrees on whether it is ready. They wait with it anyway.',
   'A stillness gathers in the rooms and does not ask to be named.',
   'The keepers move carefully, as if the air has become a sleeping thing.',
   'Your words settle. The house keeps the silence around them.',
@@ -2697,10 +2697,10 @@ const POST_CAP_DWELL_LINES_SERENE: string[] = [
   'The quiet has room for every word that arrives.',
   'The keepers wait together without needing to speak.',
   'The rooms keep their gentle attention on the spaces between things.',
-  'The house rests in its own patient shape.',
+  'The house rests. A new scuff on the floor is allowed to stay.',
   'Your words settle among the others and are not lost.',
   'The familiar rooms hold their peace without effort.',
-  'Nothing hurries. Everything is where it belongs.',
+  'Nothing hurries. A few things are no longer where they used to be.',
   'The breath leaves slowly, and the house lets it go.',
 ];
 
@@ -2779,7 +2779,7 @@ export function getNextFriendPrompt(_phase: number, name: string): string {
 
 export function getDialogueCaughtUpLine(phase: number): string {
   if (phase >= 5) return 'There is nothing new to tell tonight. Sit with me a while, or go on. Both are fine.';
-  if (phase >= 4) return 'I have said what I am able to say, for now. The arrangement will give me more when it is ready.';
+  if (phase >= 4) return 'That is everything I have for now. Bring the house another arrangement or two, and I will have more to tell you.';
   if (phase >= 2) return "I've said what I can for now. Bring a few more words to the house and I'll have more for you.";
   return "That's everything I've got for now. Go find a few more words and come back. I'll have more to say by then.";
 }
@@ -3025,7 +3025,7 @@ export function getDialogueRevealSkipHint(phase: number): string {
 // ============================================================================
 
 export function getArrivalResumeFramingLine(animalName: string): string {
-  return `${animalName} settles in. "There is more I meant to tell you before that night. Let me say it the way I had it then."`;
+  return `${animalName} settles in. "I never finished telling you some of this before that night. I will tell it the way I saw it then."`;
 }
 
 // ============================================================================
@@ -3091,7 +3091,7 @@ const FINAL_BOARD_MOVE_MESSAGES = [
   'Placed. Kept.',
   'It hears this one.',
   'The word settles where you placed it.',
-  'One more, and the house leans closer.',
+  'One more, and the house goes still to listen.',
   'Set down gently. Held completely.',
   'The letters hold the places you gave them.',
 ];
@@ -3355,7 +3355,7 @@ export function getEchoPuzzleMessage(phase: DialoguePhase): string {
  */
 export function getDailyHostLine(hostName: string, phase: DialoguePhase): string {
   if (phase >= 4) return `${hostName} laid out today's offering. It is ready for you.`;
-  if (phase >= 2) return `${hostName} prepared today's arrangement. They were waiting for you.`;
+  if (phase >= 2) return `${hostName} prepared today's arrangement, and has been waiting for you.`;
   return `${hostName} prepared today's puzzle just for you!`;
 }
 
@@ -3583,7 +3583,7 @@ const DIFFICULTY_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
   5: {
     MEDIUM: 'Medium suits a quiet evening. Every thread finds the weave.',
     MEDIUM_PLUS: 'Medium+ is there when you want more length in the thread. The weave takes it gladly.',
-    HARD: 'Hard remains, for the joy of it. The weave needs nothing. It welcomes everything.',
+    HARD: 'Hard remains, for the joy of it. Not everything in this house has to be easy.',
   },
 };
 
@@ -3757,17 +3757,17 @@ const HOME_NUDGE_MESSAGES: Record<number, string[]> = {
     '{name} has been listening at the floor. They would rather tell you than write it down.',
   ],
   4: [
-    'The keepers are calling for you. {name} says it is time.',
-    '{name} says: "We have waited long enough."',
+    '{name} says it is nearly time. They would rather not face it without you.',
+    '{name} has a question the others will not answer. Come home.',
     '{name} keeps your place at the pattern. Nobody else will sit there.',
     'The house holds its breath between your visits. {name} counts them.',
     '{name} has one more thing to tell you before the hour. Come home.',
   ],
   5: [
-    '{name} is humming softly. The house hums with them.',
-    'The weave holds. {name} wants you to know that.',
+    '{name} is humming something new. The house has not learned it yet.',
+    'What you chose still holds. {name} wants you to know that.',
     '{name} mended a cup this morning. They would like to show you.',
-    'The house rests. {name} is on the porch, saving the good chair.',
+    '{name} moved a chair across the room last night, just to see if it would stay moved. It did. Come and look.',
     '{name} has a story from the quiet days. No hurry. It keeps.',
   ],
 };
@@ -4155,7 +4155,7 @@ const PIT_TRANSITION_CEREMONY_TEXT: Record<number, string[]> = {
   4: [
     'The final mark blazes crimson.',
     'Every word you offered led here.',
-    'The arrangement is complete.',
+    'The arrangement is almost whole.',
   ],
 };
 
@@ -4243,7 +4243,7 @@ export function getGatedRoomIntroLines(phase: number, roomName: string): string[
   return [
     `The house has grown so quickly with you, friend. But the ${roomName} isn't ready to be built yet.`,
     "Some rooms need more than amber. They need a little time, and a few more of your words offered to the pit, before the ground will hold them.",
-    "If you'd rather not wait and you have the amber to spare, there are two ways. Set it aside now, and the room will build itself when the time comes. Or press it to completion now, though the house asks a good deal more for that.",
+    "If you'd rather not wait and you have the amber to spare, there are two ways. Set it aside now, and the room will build itself when the time comes. Or bring it to completion now, though the house asks a good deal more for that.",
   ];
 }
 
@@ -4277,28 +4277,28 @@ export function getChallengeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 5) {
     return [
       "There is always further down, friend. Some paths through the arrangement are harder than others.",
-      "Challenge Mode takes away your hints and leaves you only a few undos. You do not need more than that. The pattern has already shown you everything.",
-      "It waits in the puzzle setup. If you want to face what these words have made, face it without help.",
+      "Challenge Mode takes away your hints and leaves you an undo or two. Take it for yourself, not for the house.",
+      "It waits in the setup, where you pick your board. Some evenings I want a thing to be hard on purpose. Maybe you will too.",
     ];
   }
   if (phase >= 3) {
     return [
       "The patterns grow more complex. There are harder paths, if you want them.",
-      "Challenge Mode strips away your safety. No previews of what a move will make, no hints, and only a few undos. But there's more amber for it.",
-      "Look for it in the puzzle setup. The arrangement gives you more when you commit to it.",
+      "Challenge Mode takes away your hints and leaves you an undo or two. Every move has to be meant. The amber is richer for it.",
+      "Look for it in the setup, where you pick your board. The arrangement gives you more when you commit to it.",
     ];
   }
   if (phase >= 2) {
     return [
       "You've grown stronger with the letters, friend. Curious about a harder path?",
       "Challenge Mode takes away your hints and limits your undos. It's rougher going, but you earn more amber for it.",
-      'You\'ll find it in the puzzle setup. The words feel different when there\'s no safety net.',
+      "You'll find it in the setup, where you pick your board. The words feel different when there's no safety net.",
     ];
   }
   return [
     "I've been watching you work, friend. You've got a feel for this now.",
-    "There's something called Challenge Mode. No hints to lean on, and only a couple of undos. It's tougher, but you earn more amber for it.",
-    'It\'s tucked into the puzzle setup. Give it a try when you want the letters to push back a little.',
+    "There's something called Challenge Mode. No hints to lean on, and only an undo or two. It's tougher, but you earn more amber for it.",
+    "It's tucked into the setup, where you pick your board. Give it a try when you want the letters to push back a little.",
   ];
 }
 
@@ -4351,7 +4351,7 @@ export function getAutoCollectCaption(phase: DialoguePhase, isLastBeforeManual: 
 export function getMandatoryHarvestText(phase: DialoguePhase): string {
   if (phase >= 3) return 'The house will carry nothing more for you. Your words wait in the pit. Offer them yourself before you go on.';
   if (phase >= 2) return 'The house has stopped gathering for you, friend. Your words are waiting in the pit now. Offer them yourself before we play on.';
-  return 'That is the last the house will carry for you, friend. Your words are waiting in the pit now. Go and offer them yourself before we play on.';
+  return "The house has carried its last load for you, friend. Your words are waiting in the pit now. Go and offer them yourself, and then we'll play on.";
 }
 
 /** CTA button label for the one-time mandatory first-harvest gate. */
@@ -4431,7 +4431,7 @@ export function getHarvestHomeIntroLines(phase: DialoguePhase): string[] {
     ];
   }
   return [
-    'Oh! Friend, before you settle in... the house has stopped carrying your amber down for you.',
+    'Oh! Friend, before you settle in... the house has stopped carrying your words down for you.',
     "Everything you earn now waits in the pit, down past the bottom of the house. See the little glow below us?",
     "Go and tap the words floating there, and the pit will trade them for your amber. I promise it's the fun kind of chore.",
   ];
@@ -5202,7 +5202,7 @@ export function getModifierStackingIntroLines(phase: DialoguePhase): string[] {
   }
   if (phase >= 2) {
     return [
-      "Something new: Speed Shift. It's a clock, that's all. Whatever board you were going to play, now it's timed.",
+      "Something new in the setup: Speed Shift. It's a clock, that's all. Switch it on and whatever board you were going to play gets timed.",
       "It doesn't take the place of your style. It sits on top of it. Reverse and timed. Doubled and timed.",
       "That goes for all of them, actually. Challenge, the clock, and the ones still ahead of you. They all layer. You can wear as many as you like.",
     ];
@@ -5210,7 +5210,7 @@ export function getModifierStackingIntroLines(phase: DialoguePhase): string[] {
   return [
     "Ooh, a new one! Speed Shift. It's just a clock, but a clock does concentrate the mind.",
     "Here's the lovely part. It doesn't replace your style, it goes ON TOP of it. Reverse AND timed, if you're feeling brave.",
-    "That's true of all the little toggles, you know. Stack as many as you can stand. I'll be watching.",
+    "That's true of all of them, you know. Stack as many as you can stand. I'll be watching.",
   ];
 }
 
@@ -5242,7 +5242,7 @@ export function getBlindIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 2) {
     return [
       "This one takes the guidance away entirely. No ghost words under the letters at all.",
-      "It's the Blind Offering. Anything that fits, goes in. Nothing's checked as you go, and then the whole chain is judged the moment the last letter lands.",
+      "It's Blind Mode, though the house has started calling it the Blind Offering. Anything that fits goes in. Nothing's checked as you go, and the whole chain is judged the moment the last letter lands.",
       "That's why undo is free here, as many times as you like. When the chain doesn't hold, walk it back until you find where it stopped being a word.",
       "And it pays double, friend. I'd want double too, for working in the dark.",
     ];
@@ -5265,7 +5265,7 @@ export function getLexiconIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 4) {
     return [
       "There are older pages in this house. Words it has not needed in a long time.",
-      "Lexicon opens them. The rules do not change. Only the words do, and they get stranger the harder you set the difficulty.",
+      "Lexicon opens them. The rules do not change. Only the words do, and the harder the board, the stranger they get.",
       "It goes on top of anything else, like the rest of them. The arrangement pays more for the difficult words. Of course it would.",
     ];
   }
@@ -5373,17 +5373,17 @@ export function getShopMotionNoticeText(
   reason: unknown = 'reduced_motion',
 ): { body: string; button?: string } {
   if (reason === 'low_tier') {
-    if (phase >= 4) return { body: 'These move. On this device they keep to a smaller burst, so the colours you choose are what you will see.' };
-    return { body: 'These are motion effects. On this device they play as a smaller burst, so the colours you choose are what you will notice.' };
+    if (phase >= 4) return { body: 'These move. On this device they keep to a smaller burst, so the colors you choose are what you will see.' };
+    return { body: 'These are motion effects. On this device they play as a smaller burst, so the colors you choose are what you will notice.' };
   }
   if (phase >= 4) {
     return {
-      body: 'These move. With motion stilled, each holds one frame and lets it go. The colours you choose are still worn.',
+      body: 'These move. With motion stilled, each holds one frame and lets it go. The colors you choose are still worn.',
       button: 'Motion settings',
     };
   }
   return {
-    body: 'These are motion effects. Reduced Motion is on, so they show as a still moment instead of a burst. The colours you choose still show.',
+    body: 'These are motion effects. Reduced Motion is on, so they show as a still moment instead of a burst. The colors you choose still show.',
     button: 'Motion settings',
   };
 }

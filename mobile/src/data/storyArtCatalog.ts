@@ -105,7 +105,8 @@ export const STORY_ART_CATALOG = [
       "echo"
     ],
     "samples": [
-      "I could call this a coincidence, friend. I would like that word to be some help. It is not."
+      "I could call this a coincidence, friend. I would like that word to be some help. It is not.",
+      "I could call this a coincidence, friend. I'd like to. It doesn't explain a thing."
     ]
   },
   {
@@ -141,7 +142,8 @@ export const STORY_ART_CATALOG = [
       "witness"
     ],
     "samples": [
-      "But you were there too. Shall we tell the household what we saw, or keep the account between us while we look into it?"
+      "But you were there too. Shall we tell the household what we saw, or keep the account between us while we look into it?",
+      "But you were there too. Do we tell the household what we saw, or keep the account between us while we look into it?"
     ]
   },
   {
@@ -882,7 +884,8 @@ export const STORY_ART_CATALOG = [
       "promise"
     ],
     "samples": [
-      "You asked us to wait for permission. I should have understood that before we put up the sign."
+      "You asked us to wait for permission. I should have understood that before we put up the sign.",
+      "You asked us to wait until we were let in. I should have kept that rule long before anyone had to write it on a sign."
     ]
   },
   {
@@ -920,7 +923,8 @@ export const STORY_ART_CATALOG = [
       "returned"
     ],
     "samples": [
-      "PLUM died. I let him drift down to the bottom of the tank. I should have told someone before I did that."
+      "PLUM died. I let him drift down to the bottom of the tank. I should have told someone before I did that.",
+      "PLUM died. I laid him on the gravel and told nobody. I did not want anyone to say something kind yet. This morning the gravel was empty."
     ]
   },
   {
@@ -974,7 +978,8 @@ export const STORY_ART_CATALOG = [
       "returned"
     ],
     "samples": [
-      "The old cup by the hearth is whole again. Even the line where it was mended has disappeared."
+      "The old cup by the hearth is whole again. Even the line where it was mended has disappeared.",
+      "The old chipped cup sits by the hearth. This morning its handle is smooth and whole."
     ]
   },
   {
@@ -983,7 +988,8 @@ export const STORY_ART_CATALOG = [
       "returned"
     ],
     "samples": [
-      "This is the cup I wanted back, friend. And I cannot remember who was sitting with me when I broke it."
+      "This is the cup I wanted back, friend. And I cannot remember who was sitting with me when I broke it.",
+      "Something mended it in the night, friend. I never asked it to."
     ]
   },
   {
@@ -1001,7 +1007,8 @@ export const STORY_ART_CATALOG = [
       "returned"
     ],
     "samples": [
-      "The shape is perfect. The chip is gone, and so is the memory of breaking it."
+      "The shape is perfect. The chip is gone, and so is the memory of breaking it.",
+      "The shape is perfect. And I cannot remember who was sitting with me the day I dropped it. I used to."
     ]
   },
   {
@@ -1010,7 +1017,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "The work stops. The last arrangement has not been made yet."
+      "The work stops. The last arrangement has not been made yet.",
+      "The household gathers at the long table. One arrangement is left, and everyone knows it."
     ]
   },
   {
@@ -1028,7 +1036,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "It learned how to keep us exactly as we are, friend. It never learned where that has to stop."
+      "It learned how to keep us exactly as we are, friend. It never learned where that has to stop.",
+      "What lives under this house learned how to keep us exactly as we are, friend. Nobody ever taught it where to stop."
     ]
   },
   {
@@ -1037,7 +1046,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "I moved my cushion out of the middle of the mat. There are other places to sit. I should have moved it sooner."
+      "I moved my cushion out of the middle of the mat. There are other places to sit. I should have moved it sooner.",
+      "I sat at the center, where every stalk points, and called that understanding. I have moved my mat. I was far more certain than I had any right to be."
     ]
   },
   {
@@ -1064,7 +1074,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "Two words will fit at the end, friend. CLOSED keeps one room it cannot enter. A thought you have in there stays yours, uncorrected."
+      "Two words will fit at the end, friend. CLOSED keeps one room it cannot enter. A thought you have in there stays yours, uncorrected.",
+      "Two words will fit at the end, friend. Either one lets it in to live with us. CLOSED keeps one room it can never enter. A thought you have in there stays yours, uncorrected."
     ]
   },
   {
@@ -1073,7 +1084,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "CLOSER lets it come and live with us, and keeps a road that leads away. Anyone who stays must be able to leave."
+      "CLOSER lets it come and live with us, and keeps a road that leads away. Anyone who stays must be able to leave.",
+      "CLOSER keeps one road out that it can never close. Anyone who stays must be able to leave."
     ]
   },
   {
@@ -1100,7 +1112,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "We marked the road because you asked us to. CLOSER can keep that way out open. You may still choose CLOSED, friend; putting out a lamp did not choose your last word."
+      "We marked the road because you asked us to. CLOSER can keep that way out open. You may still choose CLOSED, friend; putting out a lamp did not choose your last word.",
+      "We marked the road because you asked. CLOSER would keep that road open for good. You can still choose CLOSED, friend. A lamp by the gate did not choose your last word for you."
     ]
   },
   {
@@ -1109,7 +1122,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "We fitted the latch because you asked us to. CLOSED can make that room private from the presence too. You may still choose CLOSER; fitting a latch did not choose your last word."
+      "We fitted the latch because you asked us to. CLOSED can make that room private from the presence too. You may still choose CLOSER; fitting a latch did not choose your last word.",
+      "We fitted the latch because you asked. CLOSED would shut that room to it as well as to us. You can still choose CLOSER, friend. A latch did not choose your last word for you."
     ]
   },
   {
@@ -1118,7 +1132,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "Both words work. Neither is the greater offering. The last letter you move sets the boundary."
+      "Both words work. Neither is the greater offering. The last letter you move sets the boundary.",
+      "The last arrangement ends at CLOSE. Give it the D, and it reads CLOSED. Give it the R, and it reads CLOSER. Neither is the greater offering."
     ]
   },
   {
@@ -1184,7 +1199,8 @@ export const STORY_ART_CATALOG = [
       "after"
     ],
     "samples": [
-      "The seam in the sky has closed. The presence stayed. Now comes the ordinary work of living together."
+      "The seam in the sky has closed. The presence stayed. Now comes the ordinary work of living together.",
+      "The seam in the sky has closed. The presence stayed. This morning, someone tests what your last word actually kept."
     ]
   },
   {
@@ -1248,7 +1264,8 @@ export const STORY_ART_CATALOG = [
       "after"
     ],
     "samples": [
-      "Someone sets a cup down where the pattern's lines do not run. The house used to put a stray cup back. This one has not moved for a long time."
+      "Someone sets a cup down where the pattern's lines do not run. The house used to put a stray cup back. This one has not moved for a long time.",
+      "Someone leaves a cup a little crooked at the edge of the table. The house used to straighten a stray cup by morning. This one is still crooked."
     ]
   },
   {
@@ -1275,7 +1292,8 @@ export const STORY_ART_CATALOG = [
       "after"
     ],
     "samples": [
-      "You do not owe this morning any particular feeling, friend."
+      "You do not owe this morning any particular feeling, friend.",
+      "Feel however you feel about this morning, friend. Nobody here gets to correct it."
     ]
   },
   {
@@ -1294,7 +1312,8 @@ export const STORY_ART_CATALOG = [
       "reply"
     ],
     "samples": [
-      "We have talked a great deal, friend. I would like to listen now."
+      "We have talked a great deal, friend. I would like to listen now.",
+      "I have done most of the talking, friend. It is your turn. I am listening."
     ]
   },
   {
@@ -1384,7 +1403,8 @@ export const STORY_ART_CATALOG = [
       "old_mark"
     ],
     "samples": [
-      "I don't remember writing that, friend. But I know what it took to leave it there and not fix it."
+      "I don't remember writing that, friend. But I know what it took to leave it there and not fix it.",
+      "I don't remember who wrote that, friend. But I know what it took to leave it there and not fix it."
     ]
   },
   {

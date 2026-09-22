@@ -73,7 +73,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       "refuse": "Leave my words out of the comparison."
     },
     "responses": {
-      "ask": "Here's the line. The old page says the guest will preserve us. Yesterday my notebook said protect. I've kept both versions. A correction that erases its earlier wording isn't evidence I trust.",
+      "ask": "Here's the line. The old page says the guest will preserve us. My notebook said protect. This morning my notebook said preserve too, in my handwriting, and I didn't write it. I've kept both versions. A correction that erases its earlier wording isn't evidence I trust.",
       "refuse": "Your words stay out of my notes, then. I can compare the two inks without turning you into a specimen."
     },
     "convergence": "Archimedes dates a fresh page and leaves the earlier one untouched."
@@ -110,9 +110,9 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
     },
     "responses": {
       "ask": "Done. Two copies, on separate shelves. My objection is simple: nobody authorized the word permanent. I'd rather not be the only one who remembers writing it.",
-      "refuse": "I will. The folder stays closed while you visit. Wanting it private is reason enough. I don't owe you a second reason under the first one."
+      "refuse": "I will. The folder stays closed while you visit. Wanting it private is reason enough. You don't owe me a second reason under the first one."
     },
-    "convergence": "Chill slides a clean sheet between the damp copies so the ink cannot smudge."
+    "convergence": "Chill blots the margin and lays his pen beside the ledger, uncapped."
   },
   "fennec_fox": {
     "prompt": "Fennick lifts one ear away from the low note. For a moment, all the ordinary sounds go missing.",
@@ -193,13 +193,13 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       "refuse": "Leave the bell quiet for now."
     },
     "responses": {
-      "ask": "Yes. A bell is heard by everyone, wanted or not. So I'll ask before the first pull, and wait for an answer. She's been silent sixty years, and that rule is what the silence was for.",
-      "refuse": "Quiet, then. I've kept her silent a long while already. Keeping her quiet isn't a favor, and nobody owes me anything for it."
+      "ask": "Yes. A bell is heard by everyone, wanted or not. So I'll ask before the first pull, and wait for an answer. Sixty years of silence can wait one more knock.",
+      "refuse": "Quiet, then. I've kept her silent a long while already. I can keep her quiet a while longer, and nobody owes me anything for it."
     },
     "convergence": "Tock lays the rope across the rail instead of winding it around his wrist."
   },
   "kakapo": {
-    "prompt": "Moss holds up a seedpod. It should have dried and opened by now, but it has stayed green long past its season.",
+    "prompt": "Moss holds up a seedpod. It should have dried and opened by now, but it has stayed green long past its season. He means to plant every seed in it and see what the warmth does with them.",
     "options": {
       "ask": "Leave one seed unplanted.",
       "refuse": "I'd rather not join the experiment."
@@ -381,7 +381,7 @@ export function getPhase4ChoiceCallback(
     "refuse": "You did not want to test the pear. So I kept it out of supper. I will not put something I cannot explain in a friend's bowl, just to satisfy my curiosity."
   },
   "axolotl": {
-    "ask": "You asked me to try a different shape. I drew a crooked one on paper, and I keep the paper outside the tank. The water still makes circles. The paper still holds the shape I asked for.",
+    "ask": "You asked me to try a different shape. I drew a crooked one on paper, and I keep the paper outside the tank. The water still makes circles. The paper still keeps the crooked one.",
     "refuse": "You wanted a quiet visit. I gave you one. Now I am learning the difference between letting the water be still and not being able to stir it."
   },
   "capybara": {
@@ -393,7 +393,7 @@ export function getPhase4ChoiceCallback(
     "refuse": "You asked me to stop listening. I did. For the first minute I was angry with you, and that frightened me. By the second minute I understood that I was only tired. I needed the rest."
   },
   "sloth": {
-    "ask": "You asked what I knew. I have been separating what I know from what I want. It is slow work, even for me. I still cannot tell you when it arrives.",
+    "ask": "You asked what I actually knew. I have been sorting it into two piles on the branch: what I know, and what I want. The want pile is taller. I still cannot tell you whether it will be kind.",
     "refuse": "You asked me not to promise kindness. I have kept the smaller promise instead. I am here. That much I can tell you without guessing at the future."
   },
   "wombat": {

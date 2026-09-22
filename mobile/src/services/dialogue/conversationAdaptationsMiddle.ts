@@ -11,7 +11,7 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     shadows: "GLOW and PLUM never agreed about anything, including me. I loved that about the tank. Two opinions, and somebody in the middle to hold the spoon.",
   },
   ax_0_18: {
-    shadows: "PLUM used to spend his days investigating the deep corner. I kept wishing he'd submit a report. I'd have accepted a very rude one.",
+    shadows: "PLUM used to spend his days investigating the deep corner. He only stopped when I laughed, and gave me his worried little face until I'd finished. I kept wishing he'd submit a report. I'd have accepted a very rude one.",
   },
   ax_1_20: {
     shadows: "When the fish first began pointing inward, I made a game of turning them around. I turned GLOW, then PLUM. GLOW was already back in line by the time I'd finished. I laughed and laughed. Then I laughed a little less.",
@@ -38,7 +38,7 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     arrived: "The water showed me the space above the house before the arrival. Its ceiling looked thin, with something pressing against the far side. I still look for that view sometimes. The seam has closed, but I remember where it was.",
   },
   ax_2_10: {
-    arrived: "The first time the water showed me the seam in the sky, it was faint as the join between two panes of glass. I woke before I saw it move. I watched that patch of sky for so long afterwards. I know what crossed it now, though not everything about what crossed.",
+    arrived: "The first time the water showed me the seam in the sky, it was faint as the join between two panes of glass. I woke before I saw it move. I watched that patch of sky for a long time afterward. I know what came through it now. Not everything about it, though.",
   },
   ax_2_21: {
     arrived: "Before the arrival, I thought the thing in the water would grow too big to float above, and I'd have to go down into it. I wanted you at the glass so I'd have someone familiar to turn toward. I still like knowing where the ordinary part of the room is.",
@@ -87,7 +87,7 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     arrived: "Come back tomorrow if you'd like to. I'll have thought a little further, and the tree may have found another way to lean. Neither of us has become quick since that night. At least now I can stop treating every movement as the last part of an approach.",
   },
   sl_2_1: {
-    arrived: "Before this arrival, I knew seasons, storms, and creatures that came out of the deep green and went away again. Each approach had a feel to it. I recognised that feeling in the house. I mistook recognition for a much larger understanding.",
+    arrived: "Before this arrival, I knew seasons, storms, and creatures that came out of the deep green and went away again. Each approach had a feel to it. I recognized that feeling in the house. I mistook recognition for a much larger understanding.",
   },
   sl_2_4: {
     arrived: "The house felt like the week before that flood. Ants walking in spirals, birds flying low, and me sitting very still. I used the old flood to explain the new feeling to myself. You can see why I reached for a story I had already survived.",
@@ -105,7 +105,7 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     arrived: "Sometimes I worry I'll outlast everyone I know. I used that worry as an excuse for wanting the arrival. If I would be alone anyway, I told myself, perhaps something could come and stay. The presence is here now. That doesn't make the excuse a sound one.",
   },
   sl_2_20: {
-    arrived: "Watching wore my fear smooth, the way a river wears a stone. I had half expected the presence since the first new beam went up. Half expecting a thing was a comfort of its own. I can recognise the comfort now without calling it knowledge.",
+    arrived: "Watching wore my fear smooth, the way a river wears a stone. I had half expected the presence since the first new beam went up. Half expecting a thing was a comfort of its own. I can recognize the comfort now without calling it knowledge.",
   },
   sl_2_21: {
     arrived: "I sat through the week before the flood alone. That was why I wanted company through the approach here. The arrival has happened, and I can still share the branch. You needn't bring words to justify a visit.",
@@ -120,7 +120,7 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     arrived: "Fennick startled at each creaking branch as the arrival drew close. I didn't. I'd expected the guest so long that the knock felt familiar. I keep remembering how differently we sat through the same nights. My calm didn't tell him whether he was safe.",
   },
   sl_3_12: {
-    arrived: "I described the flood as mostly waiting. I was wrong about using it to explain this, and I rarely admit that. The flood was water finding its level. The presence made choices as it came. I recognised its patience, and took that strange kinship much too far.",
+    arrived: "I described the flood as mostly waiting. I was wrong about using it to explain this, and I rarely admit that. The flood was water finding its level. The presence made choices as it came. I recognized its patience, and took that strange kinship much too far.",
   },
   sl_3_14: {
     arrived: "Before the arrival, the pit felt nearly full of your words, the way you feel a cup filling in your hand. There was that careful stillness before the last drop. I remember noticing it and remaining in the hammock. Noticing was the easier part.",
@@ -156,7 +156,7 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     arrived: "I hoped it would come and stay. It has done both. Ask what I understood about the consequences, and you'll get a much shorter answer. A fulfilled wish still isn't the same thing as a prediction I had evidence for.",
   },
   sl_4_1: {
-    arrived: "I wanted this arrival. I still have feelings invested in having wanted it. Be careful with anything I tell you about what it means now.",
+    arrived: "Now we know what drank from the cup. I told you plainly that something would. I left out that I had spent years setting the table for it.",
   },
   sl_4_3: {
     arrived: "All three Geralds slept through the arrival. They declined to attend what I had spent years treating as my one moment of significance. The household administration was remarkably unimpressed.",
@@ -299,10 +299,10 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     arrived: "I measured how little of the plan remained before the arrival. The last few folders in a drawer, no searching left to do. I knew that feeling from ordinary work. The resemblance made it far too easy to carry on filing.",
   },
   cp_3_18: {
-    arrived: "Your folder grew a final section before the arrival, exactly one page thick. I recognised the shape of a form with one empty field. The schedule already carried a date for filling it. I kept the tabbed page as evidence of what had been expected.",
+    arrived: "Your folder grew a final section before the arrival, exactly one page thick. I recognized the shape of a form with one empty field. The schedule already carried a date for filling it. I kept the tabbed page as evidence of what had been expected.",
   },
   cp_3_21: {
-    arrived: "I wanted to say I could move the deadline before the arrival. The date was pressed deep into the page in a hand I didn't recognise, and every other date deferred to it. I couldn't move that entry. I should have been plain about what my authority did and didn't cover.",
+    arrived: "I wanted to say I could move the deadline before the arrival. The date was pressed deep into the page in a hand I did not recognize, and every other date deferred to it. I could not move that entry. I should have been plain about what my authority covered and what it did not.",
   },
   cp_3_27: {
     arrived: "Every word was accounted for in the old ledger. I used that as reassurance until I heard how it sounded. The house stored what you gave it for the arrival. That date has passed. I still want to know what the records mean by keeping something.",
@@ -317,6 +317,6 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     arrived: "The coffee will be warm and the chair free when you come back. Before the arrival I kept promising to preserve one ordinary room to the end of the schedule. We have gone past that end. I can offer the chair now without turning it into a final safeguard.",
   },
   cp_4_5: {
-    arrived: "The old calendar stopped at the arrival. I put a blank sheet beside it, and we have needed those extra dates. I keep both pages. They make a useful pair.",
+    arrived: "The old calendar stopped at the arrival. On the blank sheet beside it I had written one entry: breakfast. We ate it. The sheet is full of our own dates now, and I keep both pages together.",
   },
 };

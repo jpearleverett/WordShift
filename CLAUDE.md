@@ -185,6 +185,10 @@ than it is."), quoted written text ("I am afraid", whose own sentence counts
 three words) and "this is" / "on it is", which have no spoken contraction.
 Stranded NEGATIVES are legal and are the preferred fix ("It isn't.").
 
+### Dialogue and Scene Review (2026-09-22)
+
+[The review](docs/DIALOGUE_REVIEW_2026-09-22.md) rewrote ~660 lines across the cast, the story spine and every cinematic, keeping ids, counts and the register device. Rules it established for future edits: phase-4 lines carry the reveal through concrete, room-specific signs of the presence correcting things, never a string of consent disclaimers ("You do not have to...", "Take as long as you need"), which had collapsed the climax; the council, `STORY_COPY.finalChoice` and the free hint describe CLOSED and CLOSER as parallel terms (either word lets it in); the aftermath gives each resident a distinct stance with the presence still living in the house, not permission lines or "terrible peace" serenity. A reworded story-spine line needs its new text appended to that artId's `samples` in both `scripts/story/story-art-prompts.json` and `src/data/storyArtCatalog.ts` (keep the old sample). Open design items (late recruits' unreachable choice, the first post-Arrival victory text, event phase guards) are listed at the end of the review.
+
 ## Tech Stack
 
 - **Framework**: React Native with Expo SDK 57

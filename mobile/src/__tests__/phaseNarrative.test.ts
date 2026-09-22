@@ -1441,7 +1441,8 @@ describe('getJournalIntroLines', () => {
     for (const phase of [0, 1, 2, 3, 4, 5] as const) {
       const [memories, ledger, gallery, quests, open] = getJournalIntroLines(phase);
       expect(memories).toContain('Things We Kept');
-      expect(memories).toContain("conversations you've had");
+      // Phases 4-5 drop contractions (the register device); the phrase survives either way.
+      expect(memories).toMatch(/conversations you(?:'ve| have) had/);
       expect(ledger).toContain('Word Ledger');
       expect(ledger).toContain('Journal');
       expect(ledger).toContain('quill');

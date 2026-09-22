@@ -3304,7 +3304,7 @@ function MainApp() {
             title: endgame.houseComplete ? 'THE HOUSE STANDS COMPLETE' : 'THE ARRANGEMENT IS COMPLETE',
             text: endgame.houseComplete
               ? 'The last word has settled. What happens next belongs to everyone who lives here.'
-              : 'There is still room to build. Tonight, the words have opened something beneath the unfinished house.',
+              : 'There is still room to build. Tonight, the words call something down to the unfinished house.',
           });
           queueEndgameCinematic();
         } else if (endgame?.kind === 'dwell') {
@@ -3313,8 +3313,8 @@ function MainApp() {
             : getDwellLine(Math.min(endgame.dwell ?? 0, FINALE_DWELL_PUZZLES), persistence.currentPhase, endgame.houseComplete);
         } else if (endgame?.kind === 'post_arrival') {
           orchestrationActions.setCompletionCoda({
-            title: 'THE PATTERN REMEMBERS YOU',
-            text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
+            title: 'THE MORNING AFTER',
+            text: 'It stayed. So did everyone who lives here. Your words are still in every wall.',
           });
           queueEndgameCinematic();
         }
