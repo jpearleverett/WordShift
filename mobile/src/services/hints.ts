@@ -13,7 +13,7 @@
  * `handleHint` callback can read and consume without awaiting storage.
  */
 
-import AsyncStorage, { runStorageTransaction } from './persistenceStorage';
+import AsyncStorage, { runStorageTransaction, StorageRecoveryRequiredError } from './persistenceStorage';
 import { STARTING_FREE_HINTS } from '../constants/gameBalance';
 
 const STORAGE_KEY = 'wordshift_hints';
@@ -113,10 +113,20 @@ export function hasHintSync(): boolean {
   return syncBalance > 0;
 }
 
+/** The latest queued debit write (tests await it; the UI never does). */
+let pendingSpendWrite: Promise<void> = Promise.resolve();
+
+/** Resolve once every queued hint debit has reached storage (or failed). */
+export function flushHintSpendWrites(): Promise<void> {
+  return pendingSpendWrite;
+}
+
 /**
  * Spend one hint. Synchronous so the (synchronous) `handleHint` callback can use
- * it; updates the in-memory cache + mirror immediately and persists in the
- * background. Returns false (and changes nothing) when the balance is empty.
+ * it; updates the in-memory cache + mirror immediately and queues the durable
+ * write behind any in-flight storage transaction (a paid hint grant, a restore),
+ * so a debit can never be overwritten by, or overwrite, a concurrent grant.
+ * Returns false (and changes nothing) when the balance is empty.
  */
 export function consumeHintSync(): boolean {
   const previous = cache;
@@ -124,16 +134,30 @@ export function consumeHintSync(): boolean {
   const spent = { ...previous, balance: previous.balance - 1 };
   cache = spent;
   mirror(spent);
-  // A failed debit must not erase every remaining paid hint. Roll back only
-  // this exact optimistic state; a later spend/grant/restore owns its mirror.
-  // Keep the snapshot immutable so a delayed write cannot serialize a newer grant.
-  void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(spent)).catch(() => {
+  pendingSpendWrite = persistSpend(previous, spent);
+  return true;
+}
+
+async function persistSpend(previous: HintState, spent: HintState): Promise<void> {
+  try {
+    await runStorageTransaction('hint_spend', async () => {
+      // Every writer keeps the cache current (debits synchronously, grants inside
+      // their own transaction), so the cache at this serialized point already
+      // holds this debit plus everything committed before it. A restore that
+      // dropped the cache owns the balance now; there is nothing to write.
+      if (!cache) return;
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+    });
+  } catch (error) {
+    // The journal is on disk: recovery will apply this debit, keep it.
+    if (error instanceof StorageRecoveryRequiredError) return;
+    // A failed debit must not erase every remaining paid hint. Roll back only
+    // this exact optimistic state; a later spend/grant/restore owns its mirror.
     if (cache === spent) {
       cache = previous;
       mirror(previous);
     }
-  });
-  return true;
+  }
 }
 
 /**
@@ -171,12 +195,16 @@ export const BONUS_HINT_SOFT_CAP = 10;
  * `source` is recorded only via the caller's own logging.
  */
 export async function grantBonusHint(_source: string): Promise<boolean> {
-  const state = await load();
-  if (state.balance >= BONUS_HINT_SOFT_CAP) return false;
-  cache = { ...state, balance: state.balance + 1 };
-  mirror(cache);
-  await save();
-  return true;
+  try {
+    return await runStorageTransaction('hint_bonus', async () => {
+      const state = await load();
+      if (state.balance >= BONUS_HINT_SOFT_CAP) return false;
+      cache = { ...state, balance: state.balance + 1 };
+      mirror(cache);
+      await save();
+      return true;
+    });
+  } catch (error) { invalidateHintsCache(); throw error; }
 }
 
 /** Clear all hint state (for Settings → Reset All). */
