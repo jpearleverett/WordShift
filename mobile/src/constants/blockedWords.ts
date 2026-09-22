@@ -21,7 +21,9 @@ export const BLOCKED_WORDS = [
   'THEE', 'THOU', 'HAST', 'HATH', 'SHALT', 'DOTH',
   'PENIS', 'PENISES', 'PUBIC', 'ANUS', 'ANUSES', 'ANAL', 'VULVA', 'VULVAS',
   'LABIA', 'VAGINA', 'VAGINAS', 'ORGASM', 'ORGASMS', 'ORGY', 'ORGIES',
-  'INCEST', 'HORNY', 'RANDY', 'EROTIC', 'EROTICA', 'SEXIER', 'SEXUAL',
+  'INCEST',
+  // Editorial: out of place in a cosy word game (2026-09-22 launch review).
+  'SLAVE', 'SLAVES', 'SLAVERY', 'HORNY', 'RANDY', 'EROTIC', 'EROTICA', 'SEXIER', 'SEXUAL',
   'CONDOM', 'CONDOMS', 'DOUCHE', 'DOUCHES', 'FANNY', 'FANNIES',
   'BUGGER', 'BUGGERS', 'BUGGERY', 'RAPING', 'RAPISTS',
   'HOOKER', 'HOOKERS', 'BROTHEL', 'BROTHELS', 'PIMP', 'PIMPS',
