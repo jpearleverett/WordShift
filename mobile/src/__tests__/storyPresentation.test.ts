@@ -156,6 +156,34 @@ test('narrator and player pages keep the latest animal, and going back restores 
   expect(saved.page).toBe(0);
 });
 
+test('an opening narration shows the resident it NAMES, not the scene\'s first speaker', () => {
+  // The supper scene opens on narration about Ember and only then hands the
+  // room to Panko. Walking backward for a speaker found none and fell through
+  // to "the first animal anywhere in this scene", so the player read
+  // "Ember sets your flower cup at your place." beside a pangolin.
+  const ctx = context();
+  const progress = state({ memories: { cup: memoryFor(buildStoryScene('cup', ctx, state()), { choice: 'flower', completed: true }) } });
+  const saved = memoryFor(buildStoryScene('supper', ctx, progress));
+  const pages = getStoryPages(saved);
+  expect(pages[0].speaker).toBe('narrator');
+  expect(pages[0].text).toContain('Ember');
+  expect(pages.find(page => page.speaker !== 'narrator' && page.speaker !== 'player')!.speaker).toBe('pangolin');
+  expect(getStoryPortraitSpeaker(saved, 0)).toBe('fox');
+  // ...and from Panko's line on, the room is hers: a named narration never
+  // overrides a resident already in view.
+  expect(getStoryPortraitSpeaker(saved, 1)).toBe('pangolin');
+  expect(getStoryPortraitSpeaker(saved, 2)).toBe('pangolin');
+});
+
+test('a name is matched whole, never inside another word', () => {
+  const saved = memoryFor({ id: 'old_mark', title: 'A quiet hour', memory: 'A mark', lines: [
+    { speaker: 'narrator', text: 'The mossy stones are chilly, and a stocking hangs by the hearth.' },
+    { speaker: 'owl', text: 'Nobody is here yet.' },
+  ] });
+  // Moss / Chill / Tock all sit inside those words; none of them is present.
+  expect(getStoryPortraitSpeaker(saved, 0)).toBe('owl');
+});
+
 test('a narrator-only historical transcript still has a resident portrait', () => {
   const saved = memoryFor({ id: 'old_mark', title: 'An earlier morning', memory: 'A mark',
     lines: [{ speaker: 'narrator', text: 'Two chairs sit beside the hearth.' }] });

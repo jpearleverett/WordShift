@@ -33,7 +33,7 @@ jest.mock('../components/ui/CandyButton', () => ({ CandyButton: 'CandyButton' })
 import { useWindowDimensions } from 'react-native';
 import { StorySceneModal } from '../components/StorySceneModal';
 import { StoryMemory } from '../services/storySpine';
-import { SURFACE } from '../theme/surfaces';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 
 type Element = ReactElement<Record<string, any>>;
 function flatten(node: React.ReactNode): Element[] {
@@ -73,23 +73,29 @@ it.each([[393, 873, 1], [320, 568, 2], [844, 390, 1]])(
   },
 );
 
-it('keeps the compact animal portrait while the narrator speaks, with no nameplate', () => {
+it('captions the resident drawn beside narration, and never attributes it', () => {
   const tree = render('narrator');
   const portrait = tree.find(item => item.type === 'StoryPortrait')!.props;
   expect(portrait.speaker).toBe('fox');
   expect(portrait.speaking).toBe(false);
   expect(portrait.size).toBeLessThanOrEqual(56);
-  // Narration used to be captioned "The house" beside Ember's portrait, which
-  // read as Ember speaking as the house. The narrator has no nameplate at all.
-  expect(tree.find(item => item.props.testID === 'story-scene-speaker')).toBeUndefined();
+  // Narration used to be captioned "The house", which read as Ember speaking
+  // AS the house; dropping it left a face the player had no name for. The
+  // label now names the SPRITE, in the muted ink, and the narration stays
+  // italic, so it reads as "who is on screen", not "who said this".
+  const plate = tree.find(item => item.props.testID === 'story-scene-speaker')!;
+  expect(plate.props.children).toBe('Ember');
+  expect(style(plate.props.style).color).toBe(getSurfaceTheme(0).muted);
   expect(tree.some(item => item.props.children === 'The house')).toBe(false);
   const text = tree.find(item => item.props.testID === 'story-scene-text')!.props;
   expect(style(text.style).fontFamily).toBe('italic');
 });
 
-it('names the resident on their own line', () => {
+it('names the resident on their own line, in the attribution ink', () => {
   const tree = render('fox');
-  expect(tree.find(item => item.props.testID === 'story-scene-speaker')!.props.children).toBe('Ember');
+  const plate = tree.find(item => item.props.testID === 'story-scene-speaker')!;
+  expect(plate.props.children).toBe('Ember');
+  expect(style(plate.props.style).color).toBe(getSurfaceTheme(0).title);
   expect(tree.find(item => item.type === 'StoryPortrait')!.props.speaking).toBe(true);
 });
 

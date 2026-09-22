@@ -1271,7 +1271,22 @@ export const Row: React.FC<RowProps> = memo(({
     <Animated.View
       // This wrapper owns the persistent target/completed/future-row fade;
       // the outer wrapper independently fades the initial board entrance.
-      needsOffscreenAlphaCompositing
+      //
+      // NOT on the DROP row. Offscreen alpha compositing is only meaningful
+      // while a row is dimmed enough for Android's per-child alpha to leave
+      // dark rectangular patches around transparent text/image bounds, which
+      // is the heavily faded completed (0.4) and future (0.25) rows. The drop
+      // row sits at 0.9, where that artifact is imperceptible -- and the layer
+      // is not free there: with opacity < 1 AND overlapping rendering, Android
+      // composites the subtree into an offscreen buffer sized to THIS view's
+      // bounds, so anything a child paints outside them is discarded. The drop
+      // slots' word previews hang ~11dp below the row and reach ~44dp past
+      // each end of it (slotPreviewContainer), so every preview on the row had
+      // its descender row sliced off and the first/last slot lost the start
+      // and end of its word -- the previews read as cut off by the row panel.
+      // `overflow: 'visible'` cannot help: the clip is the compositing layer,
+      // not the view's own child clipping.
+      needsOffscreenAlphaCompositing={!isTarget}
       style={[
         styles.rowWrapper,
         {
