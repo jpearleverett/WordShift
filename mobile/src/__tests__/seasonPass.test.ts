@@ -12,6 +12,7 @@ jest.mock('../services/dateUtils', () => ({
 
 let isSupporter = false;
 let cosmeticOwned = false;
+const ownedIds = new Set<string>();
 jest.mock('../services/entitlements', () => ({
   isSupporterSync: () => isSupporter,
 }));
@@ -28,7 +29,7 @@ jest.mock('../services/amberCurrency', () => ({
 const grantCosmetic = jest.fn(async (_id?: string) => true);
 jest.mock('../services/cosmetics', () => ({
   grantCosmetic: (id: string) => grantCosmetic(id),
-  ownsCosmetic: async () => cosmeticOwned,
+  ownsCosmetic: async (id: string) => cosmeticOwned || ownedIds.has(id),
   invalidateCosmeticsCache: jest.fn(),
 }));
 
@@ -41,6 +42,9 @@ import {
   clearSeasonPass,
   invalidateSeasonPassCache,
   SEASON_PREMIUM_COSMETIC_ID,
+  SEASON_PREMIUM_COSMETIC_POOL,
+  SEASON_PREMIUM_COSMETIC_AMBER_EQUIVALENT,
+  getSeasonPremiumCosmeticId,
   recordSeasonPuzzleCompletion,
   purchaseSeasonPremiumWithAmber,
 } from '../services/seasonPass';
@@ -58,6 +62,7 @@ beforeEach(async () => {
   mockDay = '2026-07-04';
   isSupporter = false;
   cosmeticOwned = false;
+  ownedIds.clear();
   awardBonusAmber.mockClear();
   grantCosmetic.mockClear();
   spendAmber.mockClear();
@@ -213,7 +218,53 @@ describe('seasonPass', () => {
     const r = await claimSeasonTier(SEASON_PASS_TIERS, 'premium', solved);
     expect(r.granted).toBe(true);
     expect(r.cosmeticGranted).toBe(true);
-    expect(grantCosmetic).toHaveBeenCalledWith(SEASON_PREMIUM_COSMETIC_ID);
+    expect(r.cosmeticId).toBe(getSeasonPremiumCosmeticId('2026-07'));
+    expect(grantCosmetic).toHaveBeenCalledWith(getSeasonPremiumCosmeticId('2026-07'));
+  });
+
+  test('the premium cosmetic rotates monthly through six distinct palettes (BO-5)', () => {
+    expect(SEASON_PREMIUM_COSMETIC_POOL).toHaveLength(6);
+    expect(new Set(SEASON_PREMIUM_COSMETIC_POOL).size).toBe(6);
+    expect(getSeasonPremiumCosmeticId('2026-09')).toBe(SEASON_PREMIUM_COSMETIC_ID);
+    const sixMonths = ['2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02']
+      .map(getSeasonPremiumCosmeticId);
+    expect(new Set(sixMonths).size).toBe(6);
+    expect(getSeasonPremiumCosmeticId('2027-03')).toBe(getSeasonPremiumCosmeticId('2026-09'));
+    expect(SEASON_PREMIUM_COSMETIC_POOL).toContain(getSeasonPremiumCosmeticId('2026-07'));
+    expect(getSeasonPremiumCosmeticId('garbage')).toBe(SEASON_PREMIUM_COSMETIC_ID);
+  });
+
+  test('a second month grants a NEW cosmetic, and the premium track stays sellable', async () => {
+    mockDay = '2026-09-03';
+    isSupporter = true;
+    await getSeasonPassView(START);
+    const first = await claimSeasonTier(SEASON_PASS_TIERS, 'premium', START + SEASON_PASS_PUZZLES_PER_TIER * SEASON_PASS_TIERS);
+    expect(first.cosmeticId).toBe('confetti_season');
+    ownedIds.add('confetti_season');
+    isSupporter = false;
+    mockDay = '2026-10-03';
+    invalidateSeasonPassCache();
+    const view = await getSeasonPassView(START + 100);
+    expect(view.premiumCosmeticId).toBe('confetti_season_2');
+    expect(view.premiumCosmeticOwned).toBe(false);
+    expect(view.canUnlockPremiumWithAmber).toBe(true);
+  });
+
+  test('an already-owned season cosmetic pays equivalent amber instead, once', async () => {
+    isSupporter = true;
+    ownedIds.add(getSeasonPremiumCosmeticId('2026-07'));
+    grantCosmetic.mockResolvedValueOnce(false);
+    await getSeasonPassView(START);
+    const solved = START + SEASON_PASS_PUZZLES_PER_TIER * SEASON_PASS_TIERS;
+    const r = await claimSeasonTier(SEASON_PASS_TIERS, 'premium', solved);
+    expect(r.granted).toBe(true);
+    expect(r.cosmeticGranted).toBe(false);
+    expect(r.cosmeticAmber).toBe(SEASON_PREMIUM_COSMETIC_AMBER_EQUIVALENT);
+    expect(r.amber).toBe(SEASON_PASS_PREMIUM_AMBER_PER_TIER + SEASON_PREMIUM_COSMETIC_AMBER_EQUIVALENT);
+    expect(awardBonusAmber).toHaveBeenCalledWith(SEASON_PREMIUM_COSMETIC_AMBER_EQUIVALENT, 'season_premium_cosmetic_owned');
+    const again = await claimSeasonTier(SEASON_PASS_TIERS, 'premium', solved);
+    expect(again.granted).toBe(false);
+    expect(awardBonusAmber).toHaveBeenCalledTimes(2);
   });
 
   test('a new local month rolls the season over and resets progress + claims', async () => {

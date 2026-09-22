@@ -87,7 +87,7 @@ test('fresh saved balance wins over a stale cached affordable amount', async () 
   expect(await ledger()).toEqual([]);
 });
 
-test.each(['unknown_item', 'theme_patron', 'theme_eclipse', 'confetti_season'])('%s cannot be bought for amber', async id => {
+test.each(['unknown_item', 'theme_patron', 'theme_eclipse', 'confetti_season', 'confetti_season_2', 'confetti_season_6'])('%s cannot be bought for amber', async id => {
   expect((await purchaseAmberCosmetic(id)).reason).toBe('unavailable');
   expect(await balance()).toBe(2000);
   expect(await ledger()).toEqual([]);

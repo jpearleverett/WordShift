@@ -285,6 +285,12 @@ export const CONFETTI_THEMES: Record<string, string[]> = {
   // Season pass premium reward (earned, not bought) — the "arrangement" hues:
   // teal, old gold, and a rose ember.
   confetti_season: ['#37A99E', '#0A8F82', '#E8A33D', '#C79A2E', '#D96A7E', '#EFE7D0'],
+  // The rest of the monthly season rotation (one premium palette per season).
+  confetti_season_2: ['#8FB8D9', '#5E8FB8', '#DCE8F2', '#B7A6DA', '#A7C4C0', '#F4F1EA'],
+  confetti_season_3: ['#D9893A', '#B5652A', '#E8C170', '#8A6B3E', '#C44F3A', '#F3E2BF'],
+  confetti_season_4: ['#E59AB4', '#C4718F', '#A6CF8A', '#F2D06B', '#9F86D1', '#FBEFF3'],
+  confetti_season_5: ['#4F6A8F', '#2F4868', '#9DB4CF', '#C9A227', '#6E7F99', '#E6EDF5'],
+  confetti_season_6: ['#6E8B4E', '#4E6B3A', '#B8C98A', '#8C6E4A', '#D9B26A', '#EEF0DC'],
 };
 
 // The equipped tile theme id is pushed in from cosmetics.ts (registration pattern
