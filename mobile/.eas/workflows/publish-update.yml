@@ -35,6 +35,9 @@ jobs:
     environment: production
     env:
       WORDSHIFT_RELEASE_CHANNEL: ${{ inputs.channel }}
+      # The uploaded archive carries no .git folder, and eas update otherwise
+      # stops to offer 'git init', which fails with no terminal attached.
+      EAS_NO_VCS: '1'
     params:
       channel: ${{ inputs.channel }}
       platform: android

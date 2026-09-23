@@ -15,6 +15,8 @@ describe('OTA publish workflow', () => {
   it('publishes to the channel it sets WORDSHIFT_RELEASE_CHANNEL from', () => {
     expect(wf).toContain('type: update');
     expect(wf).toContain('WORDSHIFT_RELEASE_CHANNEL: ${{ inputs.channel }}');
+    // Without this, eas update in the archive stops on a 'git init' prompt.
+    expect(wf).toContain("EAS_NO_VCS: '1'");
     expect(wf).toContain('channel: ${{ inputs.channel }}');
     expect(wf).toContain('platform: android');
   });
