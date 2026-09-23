@@ -463,3 +463,29 @@ describe('the held reveal explains itself at the pit', () => {
     pit.dispose();
   });
 });
+
+test('a confirmed ceremony holds a cover over the pit until the phase cinematic has played', async () => {
+  const cover = (tree: unknown) => find(tree, node => node.props?.testID === 'pit-handoff-cover');
+  const harness = mount(); await flush();
+  press(byLabel(harness.render(), 'Activate the ward marks'));
+  harness.render(); jest.advanceTimersByTime(20000); await flush();
+  expect(confirmPhaseTransition).toHaveBeenCalledTimes(1);
+  // The pit is redrawn in the new phase underneath, but never visible.
+  expect(cover(harness.render({ phase: 1, pendingPhaseTransition: null }))).toBeDefined();
+  expect(cover(harness.render({ cinematicActive: true }))).toBeDefined();
+  harness.render({ cinematicActive: false }); jest.advanceTimersByTime(400); await flush();
+  expect(cover(harness.render())).toBeUndefined();
+  harness.dispose();
+});
+
+test('the hand-off cover lifts on its own when no cinematic arrives', async () => {
+  const cover = (tree: unknown) => find(tree, node => node.props?.testID === 'pit-handoff-cover');
+  const harness = mount(); await flush();
+  press(byLabel(harness.render(), 'Activate the ward marks'));
+  harness.render(); jest.advanceTimersByTime(20000); await flush();
+  expect(cover(harness.render({ phase: 1, pendingPhaseTransition: null }))).toBeDefined();
+  jest.advanceTimersByTime(6000); await flush(); harness.render();
+  jest.advanceTimersByTime(400); await flush();
+  expect(cover(harness.render())).toBeUndefined();
+  harness.dispose();
+});
