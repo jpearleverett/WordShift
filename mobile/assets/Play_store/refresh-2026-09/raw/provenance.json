@@ -1,0 +1,1574 @@
+{
+  "campaign": "refresh-2026-09",
+  "renderer": "Actual Expo / React Native web build of WordShift at http://localhost:8081, rendered in headless Chromium through Playwright",
+  "note": "Genuine app UI renders, not Android device screenshots. Only local progression is seeded (localStorage states A to J from brief section 2, see scripts/store/refresh/states.mjs); every visible action is real UI input through Playwright. No DOM edits, hidden elements, restyling, re-layering, invented words or mocked UI. Full frames only: nothing here is cropped or resampled. The \"window\" of each capture is the crop rectangle the brief asks for, measured with locator.boundingBox() at capture time, given in CSS px and in device px of this file. All non-local network requests were aborted.",
+  "script": "mobile/scripts/store/captureRefresh.mjs",
+  "updatedAt": "2026-09-23T07:46:20.539Z",
+  "captures": [
+    {
+      "file": "s01-frame-a-letter-lifted.png",
+      "job": "s01",
+      "uses": [
+        "phone 01 (top)",
+        "FG-B hero tiles (puzzle-row-0 card)"
+      ],
+      "state": "A",
+      "stateSummary": "Phase 0, 6 solves, Ember only, 120 amber. EASY is already cleared (the six earlier wins were EASY boards, so no first-clear bonus is paid again). The autosaved opener board (PLAY / PANT / HEAR) is kept; the cup scene is due on Play.",
+      "viewport": {
+        "width": 390,
+        "height": 780
+      },
+      "deviceScaleFactor": 4,
+      "pixelSize": {
+        "width": 1560,
+        "height": 3120
+      },
+      "reducedMotion": true,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T06:46:20.183Z",
+      "sha256": "1f2b188cc675ba2431b5daf3b66ba70546860ea57218bd6986c7801fbc5cd476",
+      "description": "Real opener board after RESTART (onboarding done, cup scene read). The L was tapped in PLAY: it lifts and the DROP fan opens over PANT with the real previews.",
+      "visibleText": "Rows PLAY / PANT / HEAR; L selected; PANT previews: Drop zone 1 of 5, would form LPANT, not a valid move | Letter P | Drop zone 2 of 5, forms PLANT, valid word | Letter A | Drop zone 3 of 5, would form PALNT, not a valid move | Letter N | Drop zone 4 of 5, would form PANLT, not a valid move | Letter T | Drop zone 5 of 5, would form PANTL, not a valid move",
+      "boxesCss": {
+        "puzzle-row-0": {
+          "x": 8,
+          "y": 265,
+          "width": 374,
+          "height": 130
+        },
+        "puzzle-row-1": {
+          "x": 8,
+          "y": 395,
+          "width": 374,
+          "height": 130
+        },
+        "fgbRowCardPanel": {
+          "x": 12,
+          "y": 287,
+          "width": 366,
+          "height": 102
+        },
+        "fgbRowCardWithTagAndGlow": {
+          "x": 4,
+          "y": 271,
+          "width": 382,
+          "height": 126
+        },
+        "fgbTiles": {
+          "x": 79,
+          "y": 301.06,
+          "width": 232,
+          "height": 71.5
+        }
+      },
+      "window": {
+        "css": {
+          "x": 8,
+          "y": 257,
+          "width": 374,
+          "height": 278.96
+        },
+        "px": {
+          "left": 32,
+          "top": 1028,
+          "width": 1496,
+          "height": 1116
+        }
+      },
+      "checks": {
+        "rowExtentsCss": {
+          "row0": {
+            "top": 271,
+            "bottom": 397,
+            "cardTop": 275
+          },
+          "row1": {
+            "top": 402.17999267578125,
+            "bottom": 529.6366577148438,
+            "cardTop": 417.8599853515625
+          },
+          "row2": {
+            "top": 537.9600219726562,
+            "bottom": 640.0399780273438,
+            "cardTop": 552.0399780273438
+          }
+        },
+        "cropRule": "screen width less 8 CSS each side (the game's edge strip); 14 CSS above row 0 to 10 CSS below the DROP fan labels, stopping 6 CSS above the third row card",
+        "excludes": "the Tap a tile to begin! bubble sits above the window; the HEAR row is below it"
+      }
+    },
+    {
+      "file": "s01-frame-b-after-move.png",
+      "job": "s01",
+      "uses": [
+        "phone 01 (bottom)",
+        "FG-B hero tiles and YouTube thumbnail tiles (PLANT, puzzle-row-1 card)"
+      ],
+      "state": "A",
+      "stateSummary": "Phase 0, 6 solves, Ember only, 120 amber. EASY is already cleared (the six earlier wins were EASY boards, so no first-clear bonus is paid again). The autosaved opener board (PLAY / PANT / HEAR) is kept; the cup scene is due on Play.",
+      "viewport": {
+        "width": 390,
+        "height": 780
+      },
+      "deviceScaleFactor": 4,
+      "pixelSize": {
+        "width": 1560,
+        "height": 3120
+      },
+      "reducedMotion": true,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T06:46:23.083Z",
+      "sha256": "0fea66f26a4ab09a6377e89e691c372de1088b935afc72e77b9743a41f04e740",
+      "description": "The same board after the real move: the L dropped into PANT, giving PAY (checked) and PLANT, which is now the PICK row.",
+      "visibleText": "Rows PAY / PLANT / HEAR",
+      "boxesCss": {
+        "puzzle-row-0": {
+          "x": 8,
+          "y": 265,
+          "width": 374,
+          "height": 128
+        },
+        "puzzle-row-1": {
+          "x": 8,
+          "y": 393,
+          "width": 374,
+          "height": 130
+        },
+        "fgbRowCardPanel": {
+          "x": 12,
+          "y": 415,
+          "width": 366,
+          "height": 102
+        },
+        "fgbTiles": {
+          "x": 50,
+          "y": 431.8,
+          "width": 290,
+          "height": 66.2
+        }
+      },
+      "window": {
+        "css": {
+          "x": 8,
+          "y": 254.28,
+          "width": 374,
+          "height": 273.88
+        },
+        "px": {
+          "left": 32,
+          "top": 1017,
+          "width": 1496,
+          "height": 1096
+        }
+      },
+      "checks": {
+        "rowExtentsCss": {
+          "row0": {
+            "top": 268.2799987792969,
+            "bottom": 375,
+            "cardTop": 283
+          },
+          "row1": {
+            "top": 399,
+            "bottom": 525,
+            "cardTop": 403
+          },
+          "row2": {
+            "top": 530.1599731445312,
+            "bottom": 643.8399658203125,
+            "cardTop": 545.8400268554688
+          }
+        },
+        "cropRule": "screen width less 8 CSS each side; 14 CSS above row 0 to 10 CSS below row 1, stopping 6 CSS above the third row card"
+      }
+    },
+    {
+      "file": "s02-day-house.png",
+      "job": "s02",
+      "uses": [
+        "phone 02"
+      ],
+      "state": "B",
+      "stateSummary": "Phase 1, 42 solves, first 7 residents and rooms, 640 amber (2400 earned), story memories cup/plum/echo/witness, streak 4. Sessions and read ids leave only Axel with news.",
+      "viewport": {
+        "width": 432,
+        "height": 768
+      },
+      "deviceScaleFactor": 3,
+      "pixelSize": {
+        "width": 1296,
+        "height": 2304
+      },
+      "reducedMotion": true,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T03:05:51.766Z",
+      "sha256": "f1a17c6bfe4fc4faa23d48f31696f79e4524a99b30dc803d5ec56d43f13c79c7",
+      "description": "The day house at phase 1 with seven residents, panned so Chill Office, the highest built room, sits just under the Next: sign, above Desert Camp, Jungle Hammock and the Aquarium Room. Only Axel has news (his \"!\" badge); everyone else is between conversations.",
+      "visibleText": "Residents: Chill the capybara, resting, a little longer | Fennick the fennec fox, resting, a little longer | Sloane the sloth, resting, a little longer | Axel the axolotl | Archimedes the owl, resting, a little longer | Panko the pangolin, resting, a little longer | Ember the fox, resting, a little longer",
+      "boxesCss": {
+        "sign": {
+          "x": 16,
+          "y": 112,
+          "width": 400,
+          "height": 52
+        },
+        "play": {
+          "x": 16,
+          "y": 700,
+          "width": 400,
+          "height": 56
+        },
+        "room:Chill Office": {
+          "x": 91,
+          "y": 170.02,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Chill Office": {
+          "x": 151.69,
+          "y": 174.02,
+          "width": 128.63,
+          "height": 28.55
+        },
+        "namePlaque:CHILL": {
+          "x": 97,
+          "y": 273,
+          "width": 62.16,
+          "height": 18.47
+        },
+        "room:Desert Camp": {
+          "x": 91,
+          "y": 299.47,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Desert Camp": {
+          "x": 151.03,
+          "y": 303.47,
+          "width": 129.94,
+          "height": 28.55
+        },
+        "namePlaque:FENNICK": {
+          "x": 97,
+          "y": 402.45,
+          "width": 76.8,
+          "height": 18.47
+        },
+        "room:Jungle Hammock": {
+          "x": 91,
+          "y": 428.92,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Jungle Hammock": {
+          "x": 136.61,
+          "y": 432.92,
+          "width": 158.78,
+          "height": 28.55
+        },
+        "namePlaque:SLOANE": {
+          "x": 97,
+          "y": 531.91,
+          "width": 72.59,
+          "height": 18.47
+        },
+        "room:Aquarium Room": {
+          "x": 91,
+          "y": 558.38,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Aquarium Room": {
+          "x": 140.83,
+          "y": 562.38,
+          "width": 150.33,
+          "height": 28.55
+        },
+        "namePlaque:AXEL": {
+          "x": 97,
+          "y": 661.36,
+          "width": 58.39,
+          "height": 18.47
+        },
+        "room:Scholar's Study": {
+          "x": 91,
+          "y": 687.83,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Scholar's Study": {
+          "x": 137.98,
+          "y": 691.83,
+          "width": 156.03,
+          "height": 28.55
+        },
+        "namePlaque:ARCHIMEDES": {
+          "x": 97,
+          "y": 790.81,
+          "width": 97.17,
+          "height": 18.47
+        }
+      },
+      "window": {
+        "css": {
+          "x": 36,
+          "y": 168,
+          "width": 360,
+          "height": 520
+        },
+        "px": {
+          "left": 108,
+          "top": 504,
+          "width": 1080,
+          "height": 1560
+        }
+      },
+      "checks": {
+        "officeTopBelowSign": 6.02,
+        "windowBottomAbovePlay": 12,
+        "mustInclude": [
+          [
+            "room:Chill Office",
+            true
+          ],
+          [
+            "room:Desert Camp",
+            true
+          ],
+          [
+            "room:Jungle Hammock",
+            true
+          ],
+          [
+            "room:Aquarium Room",
+            true
+          ]
+        ],
+        "studyPlaqueWhole": true,
+        "cutPlaques": [],
+        "cloudsInWindow": 0
+      }
+    },
+    {
+      "file": "s03-dusk-house.png",
+      "job": "s03",
+      "uses": [
+        "phone 03"
+      ],
+      "state": "C",
+      "stateSummary": "Phase 2 (dusk), 60 solves, first 8 residents and rooms, 900 amber (3800 earned), story memories through supper/plan/shelter, streak 4. Sessions and read ids leave only Ember with news.",
+      "viewport": {
+        "width": 432,
+        "height": 768
+      },
+      "deviceScaleFactor": 3.3125,
+      "pixelSize": {
+        "width": 1431,
+        "height": 2544
+      },
+      "reducedMotion": false,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T06:04:02.894Z",
+      "sha256": "0a45ceb96bef28d5ef49bbd39308f5b6578993b8db0f8b5437795fc85533b1c6",
+      "description": "The same house at dusk (phase 2 sky), at the bottom clamp: Rustic Kitchen with Panko, Cozy Den with Ember and her \"!\" badge, the stone foundation, the dirt path and the glowing well in the sunset meadow. Rendered at DPR 3.3125 so the span from the study/kitchen floor beam to 10 CSS under the well is exactly 1080x1560. Motion on, the game clock fast-forwarded 73800 ms and paused so no drifting cloud is sliced by the frame or the house column.",
+      "visibleText": "Residents: Warren the wombat, resting, a little longer | Chill the capybara, resting, a little longer | Fennick the fennec fox, resting, a little longer | Sloane the sloth, resting, needs more puzzles | Axel the axolotl, resting, needs more puzzles | Archimedes the owl, resting, needs more puzzles | Panko the pangolin, resting, needs more puzzles | Ember the fox",
+      "boxesCss": {
+        "sign": {
+          "x": 16,
+          "y": 112,
+          "width": 400,
+          "height": 52
+        },
+        "play": {
+          "x": 15.92,
+          "y": 699.99,
+          "width": 400.16,
+          "height": 56.02
+        },
+        "well": {
+          "x": 151,
+          "y": 518,
+          "width": 130,
+          "height": 140
+        },
+        "room:Scholar's Study": {
+          "x": 91,
+          "y": 60.64,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Scholar's Study": {
+          "x": 137.98,
+          "y": 64.64,
+          "width": 156.03,
+          "height": 28.55
+        },
+        "namePlaque:ARCHIMEDES": {
+          "x": 97,
+          "y": 163.63,
+          "width": 97.17,
+          "height": 18.47
+        },
+        "room:Rustic Kitchen": {
+          "x": 91,
+          "y": 200.09,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Rustic Kitchen": {
+          "x": 142.91,
+          "y": 204.09,
+          "width": 146.19,
+          "height": 28.55
+        },
+        "namePlaque:PANKO": {
+          "x": 97,
+          "y": 303.08,
+          "width": 67.78,
+          "height": 18.47
+        },
+        "room:Cozy Den": {
+          "x": 91,
+          "y": 339.55,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Cozy Den": {
+          "x": 161.14,
+          "y": 343.55,
+          "width": 109.7,
+          "height": 28.55
+        },
+        "namePlaque:EMBER": {
+          "x": 97,
+          "y": 442.53,
+          "width": 65.78,
+          "height": 18.47
+        }
+      },
+      "window": {
+        "css": {
+          "x": 52.98,
+          "y": 197.09,
+          "width": 326.04,
+          "height": 470.94
+        },
+        "px": {
+          "left": 175,
+          "top": 653,
+          "width": 1080,
+          "height": 1560
+        }
+      },
+      "checks": {
+        "deviceScaleFactor": 3.3125,
+        "windowCss": {
+          "width": 326.04,
+          "height": 470.94
+        },
+        "windowTopAboveKitchenCss": 3,
+        "windowBottomBelowWellCss": 10.04,
+        "windowBottomAbovePlayCss": 31.95,
+        "mustInclude": [
+          [
+            "room:Rustic Kitchen",
+            true
+          ],
+          [
+            "room:Cozy Den",
+            true
+          ],
+          [
+            "well",
+            true
+          ]
+        ],
+        "studyOutside": true,
+        "cutPlaques": [],
+        "cloudsInWindow": [
+          {
+            "x": 98.51,
+            "y": 147.59,
+            "width": 149.59,
+            "height": 71.39
+          },
+          {
+            "x": 170.15,
+            "y": 206.39,
+            "width": 114.39,
+            "height": 54.59
+          },
+          {
+            "x": 88.2,
+            "y": 175.59,
+            "width": 105.59,
+            "height": 50.39
+          }
+        ],
+        "cloudsClear": true,
+        "clockFastForwardMs": 73800,
+        "roadSeamRows": [],
+        "retakes": []
+      }
+    },
+    {
+      "file": "s04-panko-dialogue.png",
+      "job": "s04",
+      "uses": [
+        "phone 04"
+      ],
+      "state": "D",
+      "stateSummary": "Phase 1, 24 solves, first 5 residents and rooms, 520 amber (1800 earned), story memories cup/plum. Panko has read her 24 phase-0 lines, so her next line is her first phase-1 line.",
+      "viewport": {
+        "width": 380,
+        "height": 817
+      },
+      "deviceScaleFactor": 2.8421051502227783,
+      "pixelSize": {
+        "width": 1080,
+        "height": 2322
+      },
+      "reducedMotion": false,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T06:06:09.518Z",
+      "sha256": "bdb216283720fb398e039f747497921d4721c0916ae4d9905c0f083072958c84",
+      "description": "Panko's real conversation, opened by tapping her in the kitchen: her first phase-1 line (pg_1_1), typewriter finished. The whole dialogue sheet (portrait, name, Next) fills the bottom of the window; above it the dimmed house shows the Scholar's Study, the room over the kitchen, with Archimedes. Motion on; the game clock was then fast-forwarded and paused on a moment with no drifting cloud beside the study.",
+      "visibleText": "Panko: Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.. House above the sheet: SCHOLAR'S STUDY, ARCHIMEDES",
+      "boxesCss": {
+        "sign": {
+          "x": 16,
+          "y": 112,
+          "width": 348,
+          "height": 52
+        },
+        "sheet": {
+          "x": 0,
+          "y": 398,
+          "width": 380,
+          "height": 419
+        },
+        "next": {
+          "x": 210,
+          "y": 738,
+          "width": 132,
+          "height": 45
+        },
+        "kitchen": {
+          "x": 65,
+          "y": 401.57,
+          "width": 250,
+          "height": 123.45
+        }
+      },
+      "window": {
+        "css": {
+          "x": 0,
+          "y": 268.11,
+          "width": 380,
+          "height": 548.89
+        },
+        "px": {
+          "left": 0,
+          "top": 762,
+          "width": 1080,
+          "height": 1560
+        }
+      },
+      "checks": {
+        "sheetInside": true,
+        "nextInside": true,
+        "signOutsideWindow": true,
+        "viewportHeight": 817,
+        "cloudsBesideStudy": [
+          {
+            "x": 76.48,
+            "y": 290.07,
+            "width": 149.59,
+            "height": 71.39
+          },
+          {
+            "x": 143.22,
+            "y": 348.87,
+            "width": 114.39,
+            "height": 54.59
+          },
+          {
+            "x": 69.46,
+            "y": 318.07,
+            "width": 105.59,
+            "height": 50.39
+          }
+        ],
+        "clockFastForwardMs": 59400,
+        "houseDraggedDownCss": 143.38,
+        "studyWholeAboveSheet": true,
+        "kitchenBehindSheet": true,
+        "textSlicedAtWindowTopOrSheet": [],
+        "pankoButtonBeforeTap": {
+          "x": 103.27,
+          "y": 425.05,
+          "width": 100,
+          "height": 100
+        }
+      }
+    },
+    {
+      "file": "s05-stacked-modes.png",
+      "job": "s05",
+      "uses": [
+        "phone 05"
+      ],
+      "state": "G",
+      "stateSummary": "Phase 2, 60 solves, first 8 residents and rooms, 900 amber (4000 earned), story memories through supper/plan/shelter. Double Shift, Challenge and Speed are all unlocked.",
+      "viewport": {
+        "width": 432,
+        "height": 844
+      },
+      "deviceScaleFactor": 2.5,
+      "pixelSize": {
+        "width": 1080,
+        "height": 2110
+      },
+      "reducedMotion": true,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T01:12:39.896Z",
+      "sha256": "fc5c1e775da844d93e7e2c79726afafa5cacf6cd10b0c42eada8d919875e6a88",
+      "description": "Double Shift chosen in the real setup menu with Challenge and Speed switched on, then the first stored-solution letter picked: the undo budget chip, the style and Speed chips, the countdown, the lifted letter and the DROP previews.",
+      "visibleText": "Rows STICK / NIGHT / SITED / WALTZ; chips CHALLENGE | Double Shift | Speed; clock 94s; DROP row: Drop zone 1 of 6, would form SNIGHT, not a valid move | Letter N | Drop zone 2 of 6, would form NSIGHT, not a valid move | Letter I | Drop zone 3 of 6, would form NISGHT, not a valid move | Letter G | Drop zone 4 of 6, would form NIGSHT, not a valid move | Letter H | Drop zone 5 of 6, would form NIGHST, not a valid move | Letter T | Drop zone 6 of 6, forms NIGHTS, valid word",
+      "boxesCss": {
+        "puzzle-row-0": {
+          "x": 8,
+          "y": 408,
+          "width": 416,
+          "height": 130
+        },
+        "puzzle-row-1": {
+          "x": 8,
+          "y": 538,
+          "width": 416,
+          "height": 130
+        },
+        "chip:challenge": {
+          "x": 30,
+          "y": 167,
+          "width": 61.86,
+          "height": 13
+        },
+        "chip:double": {
+          "x": 183.55,
+          "y": 167,
+          "width": 65.3,
+          "height": 13
+        },
+        "chip:speed": {
+          "x": 48,
+          "y": 200,
+          "width": 33.03,
+          "height": 13
+        }
+      },
+      "window": {
+        "css": {
+          "x": 0,
+          "y": 53,
+          "width": 432,
+          "height": 624
+        },
+        "px": {
+          "left": 0,
+          "top": 133,
+          "width": 1080,
+          "height": 1560
+        }
+      },
+      "checks": {
+        "take": 2,
+        "chips": {
+          "challenge": "CHALLENGE",
+          "double": "Double Shift",
+          "speed": "Speed"
+        },
+        "rowsInside": true,
+        "windowRule": "bottom edge in the gap between the DROP preview labels and the third row card; top edge above the in-game header (brief position 8 CSS above the chips would cut the third row)",
+        "dropLabelsBottomCss": 672.64,
+        "thirdRowCardTopCss": 695.04,
+        "headerTopCss": 60,
+        "chipRowTopCss": 167,
+        "msFromSelectToShot": 1417,
+        "clockAtShotSeconds": 94,
+        "confusingPreviews": [],
+        "chainWords": [
+          "STICK",
+          "NIGHT",
+          "SITED",
+          "WALTZ",
+          "TICK",
+          "SNIGHT",
+          "SNIHT",
+          "SIGTED",
+          "SIGTE",
+          "WALTZD"
+        ]
+      }
+    },
+    {
+      "file": "s06-pit.png",
+      "job": "s06",
+      "uses": [
+        "phone 06"
+      ],
+      "state": "F",
+      "stateSummary": "Phase 0, 10 solves, first 3 residents and rooms, 300 amber (700 earned), story memory cup, streak 3. Every earlier win was offered at the pit (32 words from 10 batches, 150 amber), so the pit shows a lifetime harvest; the win at 11 queues a new batch there.",
+      "viewport": {
+        "width": 432,
+        "height": 768
+      },
+      "deviceScaleFactor": 2.5,
+      "pixelSize": {
+        "width": 1080,
+        "height": 1920
+      },
+      "reducedMotion": false,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T03:07:23.979Z",
+      "sha256": "c24913687f6574b993f4c0b13d537b11db2cf6276f271a7a0bf5273b02f12243",
+      "description": "The Offering Pit at phase 0 right after a real win, reached through the victory card's Collect button: the solved chain's words float over the pit, the ward hint reads Something stirs below..., with the pending-amber card and the Offer All button.",
+      "visibleText": "Solved board HIPS / CRAM / HEAD / RELY; floating words HIS, CAMP, HERD, RELAY; hint \"Something stirs below...\"",
+      "boxesCss": {
+        "word:HIS": {
+          "x": 315.57,
+          "y": 318.28,
+          "width": 70.5,
+          "height": 28
+        },
+        "word:CAMP": {
+          "x": 298.94,
+          "y": 226.65,
+          "width": 94,
+          "height": 28
+        },
+        "word:HERD": {
+          "x": 295.72,
+          "y": 188.46,
+          "width": 94,
+          "height": 28
+        },
+        "word:RELAY": {
+          "x": 34.26,
+          "y": 208.57,
+          "width": 117.5,
+          "height": 28
+        },
+        "hint": {
+          "x": 127.48,
+          "y": 345.59,
+          "width": 177.03,
+          "height": 22
+        },
+        "offerAll": {
+          "x": 94,
+          "y": 692,
+          "width": 244,
+          "height": 60
+        },
+        "summary": {
+          "x": 87.5,
+          "y": 653,
+          "width": 76.23,
+          "height": 13
+        },
+        "headerMenu": {
+          "x": 343,
+          "y": 62,
+          "width": 34,
+          "height": 34
+        }
+      },
+      "window": {
+        "css": {
+          "x": 0,
+          "y": 140,
+          "width": 432,
+          "height": 624
+        },
+        "px": {
+          "left": 0,
+          "top": 350,
+          "width": 1080,
+          "height": 1560
+        }
+      },
+      "checks": {
+        "take": 0,
+        "pitVisit": 2,
+        "shot": 1,
+        "victoryFramesScreened": 8,
+        "wordsFullyVisible": 4,
+        "wordBoxesOverlap": false,
+        "grimWords": [],
+        "offerAllInside": true,
+        "note": "layout from a later visit to the pit (Return home, then the pit entrance)"
+      }
+    },
+    {
+      "file": "s07-cup-choice.png",
+      "job": "s07",
+      "uses": [
+        "phone 07"
+      ],
+      "state": "A",
+      "stateSummary": "Phase 0, 6 solves, Ember only, 120 amber. EASY is already cleared (the six earlier wins were EASY boards, so no first-clear bonus is paid again). The autosaved opener board (PLAY / PANT / HEAR) is kept; the cup scene is due on Play.",
+      "viewport": {
+        "width": 432,
+        "height": 768
+      },
+      "deviceScaleFactor": 2.5,
+      "pixelSize": {
+        "width": 1080,
+        "height": 1920
+      },
+      "reducedMotion": true,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": false,
+      "capturedAt": "2026-09-23T07:45:40.286Z",
+      "sha256": "8d7073fb17ca222dae81b84d8224878d6301f8514fb810374fd241986274f21b",
+      "description": "The first story scene, \"A place at the table\", on its choice page (3/3): cup-03 art, Ember asks for kindness and honesty, and both answers are offered.",
+      "visibleText": "A place at the table Ember That flower was meant to be a fox. You can be kind about it, but please don't lie. 3 / 3 The flower cup. Cocoa, please. The chipped cup. Tea, please. Previous page Come back to this",
+      "boxesCss": {
+        "storyCard": {
+          "x": 16,
+          "y": 48,
+          "width": 400,
+          "height": 672
+        },
+        "headerArt": {
+          "x": 95.11,
+          "y": 76,
+          "width": 241.77,
+          "height": 136
+        },
+        "storyScroll": {
+          "x": 16,
+          "y": 76,
+          "width": 400,
+          "height": 616
+        }
+      },
+      "window": {
+        "css": {
+          "x": 16,
+          "y": 48,
+          "width": 400,
+          "height": 672
+        },
+        "px": {
+          "left": 40,
+          "top": 120,
+          "width": 1000,
+          "height": 1680
+        }
+      },
+      "checks": {
+        "scrollOverflowCss": 0,
+        "note": "window = the whole framed story card (nearest ancestor of story-scene-scroll that contains the header art)"
+      }
+    },
+    {
+      "file": "s08-supper-02.png",
+      "job": "s08",
+      "uses": [
+        "phone 08"
+      ],
+      "state": "E",
+      "stateSummary": "Phase 2, 44 solves (46 weighted), first 7 residents and rooms, 700 amber (2600 earned), story memories cup/plum/echo/witness; the supper scene is due on Play.",
+      "viewport": {
+        "width": 432,
+        "height": 768
+      },
+      "deviceScaleFactor": 2.5,
+      "pixelSize": {
+        "width": 1080,
+        "height": 1920
+      },
+      "reducedMotion": true,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": false,
+      "capturedAt": "2026-09-23T07:45:49.670Z",
+      "sha256": "7a40b1db5bc77e5b516f82f17566822a94b5f2eebe6799caf2946a3b0429e267",
+      "description": "The supper scene, \"Before it goes cold\", after exactly one Continue: page 2 of 7 with the supper-02 art (a set table with an empty place) and Panko's line.",
+      "visibleText": "Before it goes cold Panko Supper. Now. The empty place at the table can wait. The rest of us have stomachs. 2 / 7 Continue Previous page Come back to this",
+      "boxesCss": {
+        "storyCard": {
+          "x": 16,
+          "y": 89.5,
+          "width": 400,
+          "height": 589
+        },
+        "headerArt": {
+          "x": 95.11,
+          "y": 117.5,
+          "width": 241.77,
+          "height": 136
+        },
+        "storyScroll": {
+          "x": 16,
+          "y": 117.5,
+          "width": 400,
+          "height": 533
+        }
+      },
+      "window": {
+        "css": {
+          "x": 16,
+          "y": 89.5,
+          "width": 400,
+          "height": 589
+        },
+        "px": {
+          "left": 40,
+          "top": 224,
+          "width": 1000,
+          "height": 1473
+        }
+      },
+      "checks": {
+        "scrollOverflowCss": 0,
+        "note": "window = the whole framed story card (nearest ancestor of story-scene-scroll that contains the header art)"
+      }
+    },
+    {
+      "file": "t1-house.png",
+      "job": "t1",
+      "uses": [
+        "tablet t2-house"
+      ],
+      "state": "B",
+      "stateSummary": "Phase 1, 42 solves, first 7 residents and rooms, 640 amber (2400 earned), story memories cup/plum/echo/witness, streak 4. Sessions and read ids leave only Axel with news.",
+      "viewport": {
+        "width": 720,
+        "height": 1280
+      },
+      "deviceScaleFactor": 2,
+      "pixelSize": {
+        "width": 1440,
+        "height": 2560
+      },
+      "reducedMotion": false,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T06:26:32.960Z",
+      "sha256": "37c3f87bd46f7f52f71051452a00a011b836b78a33c15faf05ce69715b41a49c",
+      "description": "Tablet frame of the day house at phase 1: the Next: sign sits directly above Chill Office, the highest built room, with the rooms stacked below it. Motion on (residents walk, clouds drift, the amber sparkle rises); the game clock was fast-forwarded and paused on a moment with no cloud sliced by the house column and no seam line across the dirt path.",
+      "visibleText": "Residents: Chill the capybara, resting, a little longer | Fennick the fennec fox, resting, a little longer | Sloane the sloth, resting, a little longer | Axel the axolotl | Archimedes the owl, resting, a little longer | Panko the pangolin, resting, a little longer | Ember the fox, resting, a little longer",
+      "boxesCss": {
+        "sign": {
+          "x": 16,
+          "y": 112,
+          "width": 688,
+          "height": 52
+        },
+        "room:Chill Office": {
+          "x": 235,
+          "y": 175.32,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Chill Office": {
+          "x": 295.69,
+          "y": 179.32,
+          "width": 128.63,
+          "height": 28.55
+        },
+        "namePlaque:CHILL": {
+          "x": 241,
+          "y": 278.3,
+          "width": 62.16,
+          "height": 18.47
+        },
+        "room:Desert Camp": {
+          "x": 235,
+          "y": 304.77,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Desert Camp": {
+          "x": 295.03,
+          "y": 308.77,
+          "width": 129.94,
+          "height": 28.55
+        },
+        "namePlaque:FENNICK": {
+          "x": 241,
+          "y": 407.75,
+          "width": 76.8,
+          "height": 18.47
+        },
+        "room:Jungle Hammock": {
+          "x": 235,
+          "y": 434.22,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Jungle Hammock": {
+          "x": 280.61,
+          "y": 438.22,
+          "width": 158.78,
+          "height": 28.55
+        },
+        "namePlaque:SLOANE": {
+          "x": 241,
+          "y": 537.21,
+          "width": 72.59,
+          "height": 18.47
+        },
+        "room:Aquarium Room": {
+          "x": 235,
+          "y": 563.68,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Aquarium Room": {
+          "x": 284.83,
+          "y": 567.68,
+          "width": 150.33,
+          "height": 28.55
+        },
+        "namePlaque:AXEL": {
+          "x": 241,
+          "y": 666.66,
+          "width": 58.39,
+          "height": 18.47
+        },
+        "room:Scholar's Study": {
+          "x": 235,
+          "y": 693.13,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Scholar's Study": {
+          "x": 281.98,
+          "y": 697.13,
+          "width": 156.03,
+          "height": 28.55
+        },
+        "namePlaque:ARCHIMEDES": {
+          "x": 241,
+          "y": 796.11,
+          "width": 97.17,
+          "height": 18.47
+        },
+        "room:Rustic Kitchen": {
+          "x": 235,
+          "y": 822.58,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Rustic Kitchen": {
+          "x": 286.91,
+          "y": 826.58,
+          "width": 146.19,
+          "height": 28.55
+        },
+        "namePlaque:PANKO": {
+          "x": 241,
+          "y": 925.57,
+          "width": 67.78,
+          "height": 18.47
+        },
+        "room:Cozy Den": {
+          "x": 235,
+          "y": 952.04,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Cozy Den": {
+          "x": 305.14,
+          "y": 956.04,
+          "width": 109.7,
+          "height": 28.55
+        },
+        "namePlaque:EMBER": {
+          "x": 241,
+          "y": 1055.02,
+          "width": 65.78,
+          "height": 18.47
+        }
+      },
+      "window": null,
+      "checks": {
+        "officeTopBelowSignCss": 11.32,
+        "tidyShiftCss": 5.63,
+        "slicedBeforeTidy": [
+          "Build",
+          "250"
+        ],
+        "clockFastForwardMs": 900,
+        "cloudsClearOfColumn": true,
+        "clouds": [
+          {
+            "x": -133.08,
+            "y": 248.08,
+            "width": 149.59,
+            "height": 71.39
+          },
+          {
+            "x": -89.47,
+            "y": 306.88,
+            "width": 114.39,
+            "height": 54.59
+          },
+          {
+            "x": -79.06,
+            "y": 276.08,
+            "width": 105.59,
+            "height": 50.39
+          }
+        ],
+        "emoteOverPlaque": [],
+        "sparkleOpacities": [
+          0,
+          0.82,
+          0,
+          1,
+          0
+        ],
+        "wellCss": {
+          "x": 295,
+          "y": 1130.49,
+          "width": 130,
+          "height": 140
+        },
+        "roadSeamRows": [],
+        "retakes": [
+          {
+            "seam": [
+              {
+                "y": 2260,
+                "luma": 108,
+                "base": 144
+              }
+            ],
+            "nudgeCss": 0.6
+          },
+          {
+            "seam": [
+              {
+                "y": 2260,
+                "luma": 102,
+                "base": 144
+              }
+            ],
+            "nudgeCss": -0.6
+          },
+          {
+            "seam": [
+              {
+                "y": 2260,
+                "luma": 92,
+                "base": 144
+              }
+            ],
+            "nudgeCss": 1.2
+          }
+        ]
+      }
+    },
+    {
+      "file": "t2-board.png",
+      "job": "t2wide",
+      "uses": [
+        "tablet t1"
+      ],
+      "state": "A",
+      "stateSummary": "Phase 0, 6 solves, Ember only, 120 amber. EASY is already cleared (the six earlier wins were EASY boards, so no first-clear bonus is paid again). The autosaved opener board (PLAY / PANT / HEAR) is kept; the cup scene is due on Play.",
+      "viewport": {
+        "width": 720,
+        "height": 1280
+      },
+      "deviceScaleFactor": 2,
+      "pixelSize": {
+        "width": 1440,
+        "height": 2560
+      },
+      "reducedMotion": true,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": false,
+      "capturedAt": "2026-09-23T07:46:20.432Z",
+      "sha256": "462b90cc56e6c6349df4ebcdc7575d3abfab84c1f4007d0a4933e0268d06e99f",
+      "description": "Tablet frame of the opener board at 720x1280, DPR 2: PLAY / PANT / HEAR with the L lifted from PLAY and the DROP fan open over PANT. The board is enlarged for the tablet and every row card stays on screen.",
+      "visibleText": "Rows PLAY / PANT / HEAR; L selected; Drop zone 1 of 5, would form LPANT, not a valid move | Drop zone 2 of 5, forms PLANT, valid word | Drop zone 3 of 5, would form PALNT, not a valid move | Drop zone 4 of 5, would form PANLT, not a valid move | Drop zone 5 of 5, would form PANTL, not a valid move",
+      "boxesCss": {},
+      "window": null,
+      "checks": {
+        "rowContentInsideScreen": true,
+        "rowExtentsCss": [
+          {
+            "left": 3.2062253952026367,
+            "right": 716.7937498092651
+          },
+          {
+            "left": 19.750099182128906,
+            "right": 700.2498550415039
+          },
+          {
+            "left": 54.469478607177734,
+            "right": 665.5305137634277
+          }
+        ]
+      }
+    },
+    {
+      "file": "t2-pit.png",
+      "job": "t2",
+      "uses": [
+        "tablet t2"
+      ],
+      "state": "F",
+      "stateSummary": "Phase 0, 10 solves, first 3 residents and rooms, 300 amber (700 earned), story memory cup, streak 3. Every earlier win was offered at the pit (32 words from 10 batches, 150 amber), so the pit shows a lifetime harvest; the win at 11 queues a new batch there.",
+      "viewport": {
+        "width": 720,
+        "height": 1280
+      },
+      "deviceScaleFactor": 2,
+      "pixelSize": {
+        "width": 1440,
+        "height": 2560
+      },
+      "reducedMotion": false,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T03:08:17.512Z",
+      "sha256": "a6d23e43ad33d51054f5f80b59e11bf881f7e73561715578e889961bee2cb1ac",
+      "description": "Tablet frame of the Offering Pit at phase 0 right after a real win, reached through the victory card's Collect button: the solved chain's words float over the pit under Something stirs below..., with the pending and lifetime harvest card and the Offer All button.",
+      "visibleText": "Solved board EARL / BOCK / SINS / HOOK; floating words EAR, BLOC, INKS, SHOOK; hint \"Something stirs below...\"",
+      "boxesCss": {
+        "word:EAR": {
+          "x": 57.68,
+          "y": 539.09,
+          "width": 70.5,
+          "height": 28
+        },
+        "word:BLOC": {
+          "x": 536.27,
+          "y": 651.76,
+          "width": 94,
+          "height": 28
+        },
+        "word:INKS": {
+          "x": 179.3,
+          "y": 434.8,
+          "width": 94,
+          "height": 28
+        },
+        "word:SHOOK": {
+          "x": 124.37,
+          "y": 593.78,
+          "width": 117.5,
+          "height": 28
+        },
+        "hint": {
+          "x": 271.48,
+          "y": 576,
+          "width": 177.03,
+          "height": 22
+        },
+        "summary": {
+          "x": 159.5,
+          "y": 1165,
+          "width": 76.23,
+          "height": 13
+        }
+      },
+      "window": null,
+      "checks": {
+        "take": 0,
+        "pitVisit": 1,
+        "shot": 1,
+        "victoryFramesScreened": 8,
+        "wordsFullyVisible": 4,
+        "wordBoxesOverlap": false,
+        "grimWords": []
+      }
+    },
+    {
+      "file": "t3-cup.png",
+      "job": "t3",
+      "uses": [
+        "tablet t3"
+      ],
+      "state": "A",
+      "stateSummary": "Phase 0, 6 solves, Ember only, 120 amber. EASY is already cleared (the six earlier wins were EASY boards, so no first-clear bonus is paid again). The autosaved opener board (PLAY / PANT / HEAR) is kept; the cup scene is due on Play.",
+      "viewport": {
+        "width": 720,
+        "height": 1280
+      },
+      "deviceScaleFactor": 2,
+      "pixelSize": {
+        "width": 1440,
+        "height": 2560
+      },
+      "reducedMotion": true,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": false,
+      "capturedAt": "2026-09-23T07:45:58.062Z",
+      "sha256": "4b73d12645b7f31aed3e8cf1ffff8381a65cf5546cb3ddf7459dd9f33ef6b779",
+      "description": "Tablet frame of the cup scene choice page (3/3) with the cup-03 art and both answers.",
+      "visibleText": "A place at the table Ember That flower was meant to be a fox. You can be kind about it, but please don't lie. 3 / 3 The flower cup. Cocoa, please. The chipped cup. Tea, please. Previous page Come back to this",
+      "boxesCss": {},
+      "window": null,
+      "checks": {}
+    },
+    {
+      "file": "t4-dusk-well.png",
+      "job": "t4",
+      "uses": [
+        "tablet t4-dusk-well"
+      ],
+      "state": "C",
+      "stateSummary": "Phase 2 (dusk), 60 solves, first 8 residents and rooms, 900 amber (3800 earned), story memories through supper/plan/shelter, streak 4. Sessions and read ids leave only Ember with news.",
+      "viewport": {
+        "width": 720,
+        "height": 1280
+      },
+      "deviceScaleFactor": 2,
+      "pixelSize": {
+        "width": 1440,
+        "height": 2560
+      },
+      "reducedMotion": false,
+      "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+      "gameSourceMatchesHead": true,
+      "capturedAt": "2026-09-23T06:16:23.708Z",
+      "sha256": "7e79c2f9a9fe782d0b8bb187f662059e8a1c0c4c5ec944c5b08c8daf2bf190ce",
+      "description": "Tablet frame of the dusk house (phase 2 sky) at the bottom clamp: the lower rooms, Ember by the fire with her \"!\" badge, the foundation and the glowing well. Motion on; the game clock was fast-forwarded and paused on a moment with no cloud sliced by the house column.",
+      "visibleText": "Residents: Warren the wombat, resting, a little longer | Chill the capybara, resting, a little longer | Fennick the fennec fox, resting, a little longer | Sloane the sloth, resting, needs more puzzles | Axel the axolotl, resting, needs more puzzles | Archimedes the owl, resting, needs more puzzles | Panko the pangolin, resting, needs more puzzles | Ember the fox",
+      "boxesCss": {
+        "room:Underground Burrow": {
+          "x": 235,
+          "y": -104.08,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Underground Burrow": {
+          "x": 264.56,
+          "y": -100.08,
+          "width": 190.86,
+          "height": 28.55
+        },
+        "namePlaque:WARREN": {
+          "x": 241,
+          "y": -1.1,
+          "width": 74.91,
+          "height": 18.47
+        },
+        "room:Chill Office": {
+          "x": 235,
+          "y": 35.37,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Chill Office": {
+          "x": 295.69,
+          "y": 39.37,
+          "width": 128.63,
+          "height": 28.55
+        },
+        "namePlaque:CHILL": {
+          "x": 241,
+          "y": 138.35,
+          "width": 62.16,
+          "height": 18.47
+        },
+        "room:Desert Camp": {
+          "x": 235,
+          "y": 174.82,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Desert Camp": {
+          "x": 295.03,
+          "y": 178.82,
+          "width": 129.94,
+          "height": 28.55
+        },
+        "namePlaque:FENNICK": {
+          "x": 241,
+          "y": 277.81,
+          "width": 76.8,
+          "height": 18.47
+        },
+        "room:Jungle Hammock": {
+          "x": 235,
+          "y": 314.27,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Jungle Hammock": {
+          "x": 280.61,
+          "y": 318.27,
+          "width": 158.78,
+          "height": 28.55
+        },
+        "namePlaque:SLOANE": {
+          "x": 241,
+          "y": 417.26,
+          "width": 72.59,
+          "height": 18.47
+        },
+        "room:Aquarium Room": {
+          "x": 235,
+          "y": 453.73,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Aquarium Room": {
+          "x": 284.83,
+          "y": 457.73,
+          "width": 150.33,
+          "height": 28.55
+        },
+        "namePlaque:AXEL": {
+          "x": 241,
+          "y": 556.71,
+          "width": 58.39,
+          "height": 18.47
+        },
+        "room:Scholar's Study": {
+          "x": 235,
+          "y": 593.18,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Scholar's Study": {
+          "x": 281.98,
+          "y": 597.18,
+          "width": 156.03,
+          "height": 28.55
+        },
+        "namePlaque:ARCHIMEDES": {
+          "x": 241,
+          "y": 696.17,
+          "width": 97.17,
+          "height": 18.47
+        },
+        "room:Rustic Kitchen": {
+          "x": 235,
+          "y": 732.63,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Rustic Kitchen": {
+          "x": 286.91,
+          "y": 736.63,
+          "width": 146.19,
+          "height": 28.55
+        },
+        "namePlaque:PANKO": {
+          "x": 241,
+          "y": 835.62,
+          "width": 67.78,
+          "height": 18.47
+        },
+        "room:Cozy Den": {
+          "x": 235,
+          "y": 872.09,
+          "width": 250,
+          "height": 123.45
+        },
+        "roomPlaque:Cozy Den": {
+          "x": 305.14,
+          "y": 876.09,
+          "width": 109.7,
+          "height": 28.55
+        },
+        "namePlaque:EMBER": {
+          "x": 241,
+          "y": 975.07,
+          "width": 65.78,
+          "height": 18.47
+        }
+      },
+      "window": null,
+      "checks": {
+        "draggedDownFromClampCss": 17,
+        "slicedAtClamp": [
+          "DESERT CAMP"
+        ],
+        "clockFastForwardMs": 0,
+        "cloudsClearOfColumn": true,
+        "clouds": [
+          {
+            "x": -152.6,
+            "y": 168.13,
+            "width": 149.59,
+            "height": 71.39
+          },
+          {
+            "x": 695.47,
+            "y": 226.93,
+            "width": 114.39,
+            "height": 54.59
+          },
+          {
+            "x": -53.73,
+            "y": 196.13,
+            "width": 105.59,
+            "height": 50.39
+          }
+        ],
+        "emoteOverPlaque": [],
+        "sparkleOpacities": [
+          0.39,
+          0.28,
+          0.84
+        ],
+        "wellCss": {
+          "x": 295,
+          "y": 1050.54,
+          "width": 130,
+          "height": 140
+        },
+        "roadSeamRows": [],
+        "retakes": [
+          {
+            "seam": [
+              {
+                "y": 2094,
+                "luma": 87,
+                "base": 140
+              }
+            ],
+            "nudgeCss": 0.6
+          },
+          {
+            "seam": [
+              {
+                "y": 2099,
+                "luma": 96,
+                "base": 140
+              }
+            ],
+            "nudgeCss": -0.6
+          },
+          {
+            "seam": [
+              {
+                "y": 2094,
+                "luma": 87,
+                "base": 140
+              }
+            ],
+            "nudgeCss": 1.2
+          }
+        ]
+      }
+    }
+  ]
+}

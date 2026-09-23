@@ -5,6 +5,7 @@
  * screen-space X coordinate into the closest slot index.
  */
 import { Dimensions } from 'react-native';
+import type { ViewStyle } from 'react-native';
 // Single source of truth: the arc geometry lives in a neutral constants module
 // shared with Row.tsx/LetterTile.tsx, so the drag-drop slot math can never
 // silently drift from the rendered layout.
@@ -81,6 +82,35 @@ export function computeBoardScale(
     return Math.min(TABLET_MAX_SCALE, rowInnerW / natural);
   }
   return 1;
+}
+
+/**
+ * Style for the board's scale-to-fit wrapper.
+ *
+ * Scale 1 returns undefined, so the wrapper is layout-transparent on the
+ * ordinary phone. A shrink (a long word on a narrow phone) is a bare scale
+ * around the board's centre, as it always was.
+ *
+ * A tablet ENLARGEMENT used to be a bare scale too, and every row card is
+ * already as wide as the board area, so at 1.2 the PICK and DROP cards ran off
+ * both screen edges with their tags cut in half, and the top and bottom rows
+ * slid under the header and the action buttons (a transform never changes the
+ * layout box). Now the wrapper lays the rows out at `1 / scale` of the width,
+ * so after the scale they span exactly the board area, and takes vertical
+ * margins equal to the height the scale adds (`layoutHeight` is the wrapper's
+ * own unscaled height from onLayout; 0 before the first layout). The wrapper
+ * stays centred, so the board's centreline is still the window's and the drag
+ * math (estimateSlotIndex, the flight ghost) is unchanged.
+ */
+export function getBoardScaleWrapperStyle(scale: number, layoutHeight: number): ViewStyle | undefined {
+  if (!Number.isFinite(scale) || scale === 1) return undefined;
+  if (scale < 1) return { transform: [{ scale }] };
+  return {
+    width: `${100 / scale}%`,
+    alignSelf: 'center',
+    marginVertical: layoutHeight > 0 ? ((scale - 1) * layoutHeight) / 2 : 0,
+    transform: [{ scale }],
+  };
 }
 
 /**

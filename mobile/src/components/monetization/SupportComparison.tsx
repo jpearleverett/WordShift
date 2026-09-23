@@ -24,7 +24,7 @@ export function SupportComparison({ phase }: { phase: number }) {
       <AppText textRole="reading" style={[styles.body, { color: theme.body }]}>Includes Remove Ads, +{PATRON_AMBER_BONUS} amber per solved puzzle, and the Patron tile theme. Claim {DAILY_AMBER_REWARD} daily amber up to {DAILY_AMBER_DAILY_CAP} times without a clip.</AppText>
       <AppText textRole="title" accessibilityRole="header" style={[styles.title, { color: theme.title }]}>Supporter · monthly subscription</AppText>
       <AppText textRole="reading" style={[styles.body, { color: theme.body }]}>Ad-free play, {SUPPORTER_MONTHLY_AMBER} amber each calendar month, the season premium track and exclusive confetti. Renews monthly until cancelled.</AppText>
-      <AppText textRole="caption" style={[styles.note, { color: theme.muted }]}>Daily free claims and the per-puzzle bonus belong to Patron. All three keep the same story pace. Current prices appear beside each purchase.</AppText>
+      <AppText textRole="caption" style={[styles.note, { color: theme.muted }]}>Daily free claims and the per-puzzle bonus belong to Patron. None of them is needed to finish the story. Current prices appear beside each purchase.</AppText>
     </PanelCard>}
   </View>;
 }

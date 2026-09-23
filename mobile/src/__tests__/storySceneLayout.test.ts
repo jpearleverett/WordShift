@@ -14,7 +14,8 @@ describe('decision illustrations leave room for the conversation', () => {
     expect(layout.cardMaxHeight + top + bottom + 32).toBeLessThanOrEqual(height);
     expect(layout.scrollMaxHeight + SURFACE.panelPadY * 2).toBe(layout.cardMaxHeight);
     expect(layout.artWidth).toBeGreaterThan(0);
-    expect(layout.artWidth).toBeLessThanOrEqual(layout.cardWidth - SURFACE.panelPadX * 2);
+    expect(layout.contentPadX).toBeGreaterThan(SURFACE.panelPadX);
+    expect(layout.artWidth).toBeLessThanOrEqual(layout.cardWidth - layout.contentPadX * 2);
     expect(layout.artHeight).toBeLessThanOrEqual(136);
     expect(layout.artWidth / layout.artHeight).toBeCloseTo(16 / 9);
     expect(layout.scrollMaxHeight - layout.artHeight).toBeGreaterThan(180);

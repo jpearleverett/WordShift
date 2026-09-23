@@ -1,0 +1,303 @@
+{
+  "locale": "en-US",
+  "campaign": "refresh-2026-09",
+  "app_name": "WordShift: Cozy Word Puzzle",
+  "short_description": "A cozy word puzzle game with 13 animal friends and a house that keeps secrets",
+  "full_description": "Pick up the L in PLAY. Drop it into PANT. Now you have PAY and PLANT, and a fox by the fire looks very pleased with you.\n\nWordShift is a cozy word puzzle game built on one small move. Take a letter from one word and place it in the next. Both words must stay real. The letter you move locks into the word it joins, so every choice shapes the rest of the chain. If you enjoy word ladders, you'll feel at home here: this word game takes one move to learn, and its chains keep finding fresh ways to make you think.\n\nHow it plays\n- Move one letter at a time down a chain of words\n- Solve the whole chain to earn stars and amber\n- Tap a letter to preview the words it would make, or drag it into place\n- Use a hint when you want a nudge: you start with five and can earn more\n- No energy meters or lives, and no countdown clock unless you want one\n\nA word game that grows with you\n- Over 4,000 word puzzles across five difficulty levels, from four-letter warmups to six-letter Expert chains\n- Reverse Shift: play down the chain, then carry it back up\n- Double Shift: move two letters at every step\n- Four modifiers you can layer on any of the three styles: Challenge Mode, Speed Shift, Blind Mode and Lexicon for rarer words\n- A daily word puzzle with streaks and your rank among the day's players\n- Five daily and five weekly quests, plus 56 achievements\n- More styles and modifiers open as you progress\n\nGrow a home, room by room\nEvery puzzle you solve earns amber. Spend it to build rooms in a pixel-art house and welcome 13 animal housemates, each with a room of their own. Ember the fox keeps the fire going in the Cozy Den. Panko the pangolin runs the kitchen, and anyone who helps eats first. Archimedes the owl reads in his study. Axel the axolotl drifts around his aquarium in a scuba mask. As the house grows, a sloth strings up a jungle hammock, a calm capybara takes the office and a nervous rabbit tends the garden, all the way up to a tarsier who watches the stars and an old kakapo in the rooftop sky garden.\n\nEvery resident walks around their own room, talks about their day and picks up the conversation where you left off, with more than 2,000 lines of dialogue to discover. The animals talk about you when you're away. All good things. Probably. Later, you can decorate every room, and each decoration is a gift you hand to the friend who lives there.\n\nStay for the story\nThe words you make are gathered at a glowing well below the house, and you offer them there to collect the amber they earned. The story unfolds in illustrated scenes, from a chipped cup of tea to supper by candlelight, and your answers are remembered and come back later. Then small things start to shift. Panko went to bed with her spice jars in one order and woke up to find them in another. Ember's fire has taken up drawing. Some evenings, the conversations sound a little different.\n\nMake it yours\n- Tile themes and finishes, confetti and move sparks to buy with amber\n- A monthly season pass with a reward track that advances as you solve\n- Twelve music tracks that change as the story unfolds\n- Settings for sound, music, haptics and reduced motion\n\nGood to know\nCore puzzles work offline and no account is needed. Your progress backs up automatically when you're online, with a recovery code to restore it on another device. Share your results with friends. Online features and purchases need an internet connection.\n\nContains ads and in-app purchases, including an optional auto-renewing Supporter subscription and an optional purchase that removes ads. No purchase is needed to follow the main story. The story develops unsettling themes and mild horror.\n\nA cozy word game. Mostly.",
+  "character_counts": {
+    "app_name": 27,
+    "short_description": 77,
+    "full_description": 3677,
+    "limits": {
+      "app_name": 30,
+      "short_description": 80,
+      "full_description": 4000
+    },
+    "note": "Counts are Unicode characters of the field text, excluding the final newline of each .txt file."
+  },
+  "short_description_alternatives": [
+    {
+      "id": "SD-A",
+      "angle": "mechanic first; two sentences, each ending with a period",
+      "text": "Move one letter, change two words. A cozy word puzzle with a secret of its own.",
+      "characters": 79
+    },
+    {
+      "id": "SD-B",
+      "angle": "pure cozy",
+      "text": "Grow a cozy home for 13 animal housemates, one word puzzle at a time",
+      "characters": 68
+    },
+    {
+      "id": "SD-C",
+      "angle": "wink",
+      "text": "A cozy word puzzle game with a household of animals who are almost too kind",
+      "characters": 75
+    }
+  ],
+  "app_name_alternative": {
+    "id": "AN-A",
+    "text": "WordShift: Cozy Word Mystery",
+    "characters": 28,
+    "use": "Custom store listing with search keyword targeting (for example \"cozy mystery\" or \"spooky cozy\") once Play Console reports those terms. Store listing experiments cannot test the app name."
+  },
+  "category": "Game > Word",
+  "tags_suggested": [
+    "Word",
+    "Puzzle",
+    "Casual",
+    "Offline",
+    "a stylized or pixel art tag if the Console offers one"
+  ],
+  "screenshots": [
+    {
+      "order": 1,
+      "slug": "01-shift-one-letter",
+      "band": "day",
+      "headline": "Shift one letter.",
+      "subtitle": "Keep both words real.",
+      "alt_text": "Shift one letter. Keep both words real. The L lifts out of PLAY, a check marks PLANT, then the rows read PAY and PLANT",
+      "file": "upload/phone/01-shift-one-letter.png"
+    },
+    {
+      "order": 2,
+      "slug": "02-words-build-a-home",
+      "band": "day",
+      "headline": "Words build a home.",
+      "subtitle": "",
+      "alt_text": "Words build a home. A pixel-art house on a sunny afternoon: a capybara's office, a fennec's camp, a sloth's hammock, an axolotl's aquarium",
+      "file": "upload/phone/02-words-build-a-home.png"
+    },
+    {
+      "order": 3,
+      "slug": "03-cozy-mostly",
+      "band": "dusk",
+      "headline": "A cozy game. Mostly.",
+      "subtitle": "",
+      "alt_text": "A cozy game. Mostly. The house at sunset: Panko in her kitchen, Ember by the fire in the den and a softly glowing well",
+      "file": "upload/phone/03-cozy-mostly.png"
+    },
+    {
+      "order": 4,
+      "slug": "04-stories-in-each-room",
+      "band": "day",
+      "headline": "Stories in each room.",
+      "subtitle": "13 housemates to get to know.",
+      "alt_text": "Stories in each room. Panko the pangolin: \"I went to bed with the spice jars in one order and woke up to find them in another.\"",
+      "file": "upload/phone/04-stories-in-each-room.png"
+    },
+    {
+      "order": 5,
+      "slug": "05-then-the-rules-shift",
+      "band": "parchment",
+      "headline": "Then the rules shift.",
+      "subtitle": "Styles and challenges that stack.",
+      "alt_text": "Then the rules shift. A Double Shift puzzle with Challenge and Speed on: a countdown clock, an undo limit and a lifted letter",
+      "file": "upload/phone/05-then-the-rules-shift.png"
+    },
+    {
+      "order": 6,
+      "slug": "06-every-word-goes-somewhere",
+      "band": "parchment",
+      "headline": "Every word goes somewhere.",
+      "headline_lines": [
+        "Every word goes",
+        "somewhere."
+      ],
+      "subtitle": "",
+      "alt_text": "Every word goes somewhere: words from a solved puzzle float over a hole in a forest clearing. \"Something stirs below\"",
+      "file": "upload/phone/06-every-word-goes-somewhere.png"
+    },
+    {
+      "order": 7,
+      "slug": "07-tea-or-cocoa",
+      "band": "parchment",
+      "headline": "Tea or cocoa?",
+      "subtitle": "Ember will remember your answer.",
+      "alt_text": "Tea or cocoa? A painted story page with a flower-painted cup: Ember asks you to be kind but honest, and you choose tea or cocoa",
+      "file": "upload/phone/07-tea-or-cocoa.png"
+    },
+    {
+      "order": 8,
+      "slug": "08-stay-for-supper",
+      "band": "dusk",
+      "headline": "Stay for supper.",
+      "subtitle": "",
+      "alt_text": "Stay for supper. A painted supper table set with soup and bread. Panko says the empty place at the table can wait",
+      "file": "upload/phone/08-stay-for-supper.png"
+    }
+  ],
+  "landscape": [],
+  "landscape_note": "No landscape phone screenshots, by design (brief section 4): the app is portrait-locked, so landscape shots would misrepresent it. The only 16:9 asset is the trailer master.",
+  "tablet_screenshots": [
+    {
+      "order": 1,
+      "slug": "t1-board",
+      "alt_text": "A WordShift puzzle on a tablet: the L lifts out of PLAY and a check marks PLANT on the row below",
+      "file": "upload/tablet/t1-board.png",
+      "caption": null
+    },
+    {
+      "order": 2,
+      "slug": "t2-house",
+      "alt_text": "The WordShift house on a tablet: rooms stacked one above another with animal residents under a sunny mountain sky",
+      "file": "upload/tablet/t2-house.png",
+      "caption": null
+    },
+    {
+      "order": 3,
+      "slug": "t3-cup",
+      "alt_text": "A painted story page on a tablet: a flower-painted cup by the fire and two answers to choose from",
+      "file": "upload/tablet/t3-cup.png",
+      "caption": null
+    },
+    {
+      "order": 4,
+      "slug": "t4-pit",
+      "alt_text": "On a tablet, words from a solved puzzle float over a hole in a sunny forest clearing, with amber waiting to be offered",
+      "file": "upload/tablet/t4-pit.png",
+      "caption": null
+    }
+  ],
+  "tablet_note": "Upload t1 to t4, in this order, to both the 7-inch and 10-inch slots: 1440x2560 full-frame genuine captures (720x1280 CSS at DPR 2) with no caption, band or added text. The board leads so the first tablet image shows the puzzle. It needs the tablet board fix in this build (getBoardScaleWrapperStyle in src/services/slotEstimation.ts): before it, the enlarged board's row cards ran off both screen edges on 600 dp and wider screens, so upload the tablet set only once a build carrying the fix is live on Play.",
+  "feature_graphic": {
+    "id": "FG-A",
+    "file": "upload/feature-graphic.png",
+    "tagline": "Your words keep this house warm.",
+    "tagline_lines": [
+      "Your words keep",
+      "this house warm."
+    ],
+    "alt_text": "Painted art of eight animal friends at a candlelit table with a folded note, the WordShift logo and Your words keep this house warm"
+  },
+  "feature_graphic_variant_b": {
+    "id": "FG-B",
+    "file": "upload/experiments/feature-graphic-b.png",
+    "tagline": "Every letter counts.",
+    "tagline_lines": [
+      "Every letter",
+      "counts."
+    ],
+    "alt_text": "A sunny pixel-art den with the WordShift logo, the line Every letter counts and letter tiles spelling PLANT",
+    "use": "Graphics experiment only (experiments.md). Keep out of the main listing unless it wins or review flags FG-A."
+  },
+  "icon": {
+    "file": "docs/store-icon-512.png (unchanged in this refresh; no new icon)",
+    "alt_text": "Ember the fox in a green knit sweater holds a wooden W letter tile against a deep green background"
+  },
+  "trailer": {
+    "title": "WordShift: Cozy Word Puzzle (Trailer)",
+    "description": "Pick up a letter from one word and drop it into the next. Both words have to stay real, and the letter you move stays where you put it.\n\nWordShift is a cozy word puzzle game about one small move and a pixel-art house you build with the amber your puzzles earn. Add rooms, welcome 13 animal housemates, and get to know them one conversation at a time. They remember what you tell them.\n\nOver 4,000 word puzzles across five difficulty levels, a daily word puzzle with streaks, Reverse Shift, Double Shift and challenges that stack on any style.\n\nAll gameplay in this trailer is captured from WordShift. Contains ads and in-app purchases. The story develops unsettling themes and mild horror.\n\nWordShift on Google Play:\nhttps://play.google.com/store/apps/details?id=com.wordshift.app\n\n#wordgame #puzzlegame #cozygames",
+    "alt": "Trailer for WordShift: a letter moves from PLAY into PANT to make PAY and PLANT, animal residents chat in a pixel-art house, and the house glows at sunset",
+    "captions": [
+      {
+        "shot": "S1",
+        "frames": [
+          0,
+          41
+        ],
+        "start": "00:00:00,000",
+        "end": "00:00:01,400",
+        "text": "Lift a letter."
+      },
+      {
+        "shot": "S2",
+        "frames": [
+          42,
+          101
+        ],
+        "start": "00:00:01,400",
+        "end": "00:00:03,400",
+        "text": "Drop it in. Two real words."
+      },
+      {
+        "shot": "S4",
+        "frames": [
+          156,
+          239
+        ],
+        "start": "00:00:05,200",
+        "end": "00:00:08,000",
+        "text": "Over 4,000 puzzles."
+      },
+      {
+        "shot": "S5",
+        "frames": [
+          240,
+          281
+        ],
+        "start": "00:00:08,000",
+        "end": "00:00:09,400",
+        "text": "Your wins build the house."
+      },
+      {
+        "shot": "S6-S7",
+        "frames": [
+          282,
+          422
+        ],
+        "start": "00:00:09,400",
+        "end": "00:00:14,100",
+        "text": "Everyone has something to say."
+      },
+      {
+        "shot": "S8",
+        "frames": [
+          423,
+          494
+        ],
+        "start": "00:00:14,100",
+        "end": "00:00:16,500",
+        "text": "Reverse. Double. Race the clock."
+      },
+      {
+        "shot": "S9",
+        "frames": [
+          495,
+          566
+        ],
+        "start": "00:00:16,500",
+        "end": "00:00:18,900",
+        "text": "Your answers stay with them."
+      },
+      {
+        "shot": "S10",
+        "frames": [
+          567,
+          632
+        ],
+        "start": "00:00:18,900",
+        "end": "00:00:21,100",
+        "text": "Where do the words go?"
+      },
+      {
+        "shot": "End card",
+        "frames": [
+          846,
+          899
+        ],
+        "start": "00:00:28,200",
+        "end": "00:00:30,000",
+        "text": "The house is very fond of you."
+      }
+    ],
+    "youtube_settings": "Public or unlisted; monetization off; \"No, it's not made for kids\"; not age-restricted; embedding allowed; captions-en.srt as the caption track."
+  },
+  "video": {
+    "play_preview": "video/trailer-9x16-1080x1920.mp4",
+    "master_16x9": "video/trailer-16x9-1920x1080.mp4",
+    "captions_file": "video/captions-en.srt",
+    "youtube_thumbnail": "video/youtube-thumbnail-1280x720.png",
+    "play_console_url_format": "https://www.youtube.com/watch?v=<ID> (never the /shorts/ URL, never a timecode)",
+    "duration_seconds": 30
+  },
+  "scope": "English (United States) Google Play main listing for the refresh-2026-09 campaign. Promotional copy only; this file publishes nothing. If the stills build rewrites an alt text to match a final crop, alt-text.tsv at the campaign root is authoritative for that image.",
+  "full_description_fallbacks": [
+    {
+      "id": "daily-rank",
+      "replace": "- A daily word puzzle with streaks and your rank among the day's players",
+      "with": "- A daily word puzzle with streaks",
+      "when": "Use this line instead if, on upload day, a signed production build has not yet been seen posting a Daily rank end to end (docs/LAUNCH_CHECKLIST.md). It keeps the keyword counts (daily 2) and passes verifyCopy.mjs."
+    }
+  ]
+}

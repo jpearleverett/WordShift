@@ -32,6 +32,7 @@ import {
   Linking,
   Share,
 } from 'react-native';
+import type { LayoutChangeEvent } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { DragOverlayProvider } from './src/components/DragOverlay';
@@ -235,7 +236,7 @@ import { isStorageTransactionActive, subscribeStorageTransaction, StorageRecover
 import { markPendingChanges, uploadToCloud, refreshRestoredServiceCaches } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
-import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from './src/services/slotEstimation';
+import { estimateSlotIndex, findClosestValidSlot, computeBoardScale, getBoardScaleWrapperStyle } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, STARBURST_DURATION_MS, STARBURST_ORIGIN_LIFT_DP, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, SWIFT_HINT_TOAST_DELAY_MS, SCREEN_FADE_COVER_MS, SCREEN_FADE_REVEAL_MS, SCREEN_READY_TIMEOUT_MS, SCREEN_REVEAL_SETTLE_MS, speedTickKind } from './src/constants/timing';
 import { ScreenTransitionOverlay } from './src/components/ui/ScreenTransitionOverlay';
 import { armScreenReady, waitForScreenReady } from './src/services/screenReady';
@@ -3649,6 +3650,18 @@ function MainApp() {
   );
   const boardScaleRef = useRef(1);
   boardScaleRef.current = boardScale;
+  // The wrapper's unscaled height, read only while the board is ENLARGED
+  // (tablets): the enlargement needs vertical margins equal to the height the
+  // scale adds, or the top and bottom rows slide under the chrome.
+  const [boardLayoutHeight, setBoardLayoutHeight] = useState(0);
+  const handleBoardWrapperLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.height);
+    setBoardLayoutHeight((prev) => (prev === next ? prev : next));
+  }, []);
+  const boardWrapperStyle = useMemo(
+    () => getBoardScaleWrapperStyle(boardScale, boardLayoutHeight),
+    [boardScale, boardLayoutHeight],
+  );
   const rowNodeRefs = useRef(new Map<number, any>());
   const registerRowNode = useCallback((rowIndex: number, node: any) => {
     if (node) rowNodeRefs.current.set(rowIndex, node);
@@ -5826,8 +5839,11 @@ function MainApp() {
             {/* Board scale-to-fit wrapper (F139/F140): a single uniform scale
                 around the board's horizontal center. undefined at scale 1 (the
                 ordinary-phone case), so the wrapper is layout-transparent there;
-                the drag math is fed the same scale so drops stay aligned. */}
-            <View style={boardScale !== 1 ? { transform: [{ scale: boardScale }] } : undefined}>
+                the drag math is fed the same scale so drops stay aligned. A
+                tablet enlargement lays the rows out narrower and reserves the
+                added height (getBoardScaleWrapperStyle), so no row card runs
+                off the screen. */}
+            <View style={boardWrapperStyle} onLayout={boardScale > 1 ? handleBoardWrapperLayout : undefined}>
             {puzzle.rows.map((row, idx) => (
               <Row
                 key={row.id}

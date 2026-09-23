@@ -12,7 +12,7 @@ jest.mock('react-native', () => ({
   },
 }));
 
-import { estimateSlotIndex, findClosestValidSlot, computeBoardScale } from '../services/slotEstimation';
+import { estimateSlotIndex, findClosestValidSlot, computeBoardScale, getBoardScaleWrapperStyle } from '../services/slotEstimation';
 
 describe('estimateSlotIndex', () => {
   // With a 400px screen width:
@@ -241,5 +241,30 @@ describe('findClosestValidSlot', () => {
     // Target at 3 → equidistant to 1 and 4, left bias → searches left first but 2 is invalid, then right → 4
     // Actually offset=1: left=2 (invalid), right=4 (valid) → 4
     expect(findClosestValidSlot(3, previews)).toBe(4);
+  });
+});
+
+describe('getBoardScaleWrapperStyle', () => {
+  it('is layout-transparent at scale 1 and a bare shrink below it', () => {
+    expect(getBoardScaleWrapperStyle(1, 500)).toBeUndefined();
+    expect(getBoardScaleWrapperStyle(0.87, 500)).toEqual({ transform: [{ scale: 0.87 }] });
+  });
+
+  it('lays a tablet enlargement out narrower so the scaled rows span exactly the board area', () => {
+    const scale = computeBoardScale(720, 4);
+    expect(scale).toBeGreaterThan(1);
+    const style = getBoardScaleWrapperStyle(scale, 600)!;
+    const pct = parseFloat(String(style.width));
+    // (board area x pct%) x scale == board area: nothing leaves the screen.
+    expect((pct / 100) * scale).toBeCloseTo(1);
+    expect(style.alignSelf).toBe('center');
+    expect(style.transform).toEqual([{ scale }]);
+  });
+
+  it('reserves exactly the height the enlargement adds, split above and below', () => {
+    const style = getBoardScaleWrapperStyle(1.2, 500)!;
+    expect(style.marginVertical).toBeCloseTo(50);
+    // Before the first layout the margin is simply 0, never NaN.
+    expect(getBoardScaleWrapperStyle(1.2, 0)!.marginVertical).toBe(0);
   });
 });

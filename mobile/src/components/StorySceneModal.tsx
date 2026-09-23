@@ -103,7 +103,7 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   return <Modal visible={!!memory && !!line} transparent animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'} onRequestClose={close}>
     <View style={[styles.overlay, { backgroundColor: theme.overlay, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} accessibilityViewIsModal>
       <PanelCard phase={phase} kind="panel" style={{ width: layout.cardWidth, maxHeight: layout.cardMaxHeight, paddingVertical: SURFACE.panelPadY }}>
-        <ScrollView ref={scroll} testID="story-scene-scroll" style={{ flexShrink: 1, maxHeight: layout.scrollMaxHeight }} contentContainerStyle={[styles.content, { width: layout.cardWidth }]} bounces={false} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scroll} testID="story-scene-scroll" style={{ flexShrink: 1, maxHeight: layout.scrollMaxHeight }} contentContainerStyle={[styles.content, { width: layout.cardWidth, paddingHorizontal: layout.contentPadX }]} bounces={false} keyboardShouldPersistTaps="handled">
           {illustration && <Image source={illustration.source} testID="story-scene-art" resizeMode="contain" style={[styles.sceneArt, { width: layout.artWidth, height: layout.artHeight }]} accessible={false} />}
           <AppText textRole="title" accessibilityRole="header"  style={[styles.title, { color: theme.title }]}>{memory?.scene.title}</AppText>
           {/* The row keeps the portrait's height on every page, so a narrated
