@@ -32,6 +32,9 @@ export const STORE_ART: { [key: string]: ImageSourcePropType } = {
   [PRODUCT_IDS.COSMETIC_BUNDLE]: require('../../../assets/ui/store/cosmetic_bundle.png'),
   [PRODUCT_IDS.PATRON_KEY]: require('../../../assets/ui/store/patron_key.png'),
   [PRODUCT_IDS.REMOVE_ADS]: require('../../../assets/ui/store/remove_ads.png'),
+  // The paid season unlock is the same premium track the wreath already names.
+  [PRODUCT_IDS.SEASON_PREMIUM]: require('../../../assets/ui/store/season_premium.png'),
+  [PRODUCT_IDS.KEEPERS_EDITION]: require('../../../assets/ui/store/keepers_edition.png'),
 
   // --- Not store SKUs, but they sit in the same rows -------------------------
   daily_amber: require('../../../assets/ui/store/daily_amber.png'),

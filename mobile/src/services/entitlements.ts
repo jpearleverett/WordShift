@@ -41,6 +41,11 @@ export const ENTITLEMENTS = {
   COSMETIC_BUNDLE: 'cosmetic_bundle',
   /** Starter Pack — one-time-per-account welcome bundle (amber + hints). */
   STARTER_PACK: 'starter_pack',
+  /**
+   * The Keeper's Edition — a one-time post-ending purchase that opens the
+   * music box (every authored bed, playable on demand). Expression only.
+   */
+  KEEPERS_EDITION: 'keepers_edition',
 } as const;
 
 export type EntitlementKey = string;

@@ -1,0 +1,1579 @@
+{
+ "clip": "R9",
+ "state": "D",
+ "recordedAt": "2026-09-23T06:48:39.260Z",
+ "gitHead": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+ "gameSourceMatchesHead": true,
+ "method": "clock-stepped capture: Playwright fake clock paused, runFor(1000/30 ms) then a CDP Page.captureScreenshot per frame of the 432x768 CSS window from y 0 of a 432x768 viewport at DPR 2.5 = 1080x1920; reducedMotion false; sound/music/haptics off in-game",
+ "fps": 30,
+ "handle": 15,
+ "frameSize": {
+  "width": 1080,
+  "height": 1920
+ },
+ "viewport": {
+  "width": 432,
+  "height": 768
+ },
+ "cropTopCss": 0,
+ "frames": 165,
+ "firstFrame": -15,
+ "lastFrame": 149,
+ "framesDir": "clips/R9",
+ "fileIndex": "file f%05d.png = clip frame + handle",
+ "events": [
+  {
+   "frame": 3,
+   "action": "tap Panko the pangolin; her conversation opens",
+   "sfx": "dialogue.wav"
+  }
+ ],
+ "screening": {
+  "glitch": [],
+  "grim": [],
+  "ok": true,
+  "emoteOverPlaqueInUsedFrames": []
+ },
+ "notes": [],
+ "line": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+ "houseDraggedDownCss": 385.5,
+ "sheetCss": {
+  "x": 0,
+  "y": 403,
+  "width": 432,
+  "height": 365
+ },
+ "sheetWhileTypingCss": {
+  "x": 0,
+  "y": 547.65625,
+  "width": 432,
+  "height": 220.34375
+ },
+ "probes": {
+  "0": {
+   "text": "",
+   "emote": []
+  },
+  "1": {
+   "text": "",
+   "emote": []
+  },
+  "2": {
+   "text": "",
+   "emote": []
+  },
+  "3": {
+   "text": "So",
+   "sheet": {
+    "x": 0,
+    "y": 813.3006591796875,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "4": {
+   "text": "Some",
+   "sheet": {
+    "x": 0,
+    "y": 735.4595336914062,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "5": {
+   "text": "Someth",
+   "sheet": {
+    "x": 0,
+    "y": 653.8724975585938,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "6": {
+   "text": "Somethin",
+   "sheet": {
+    "x": 0,
+    "y": 589.1506958007812,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "7": {
+   "text": "Something f",
+   "sheet": {
+    "x": 0,
+    "y": 547.6192626953125,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "8": {
+   "text": "Something fun",
+   "sheet": null,
+   "emote": []
+  },
+  "9": {
+   "text": "Something funny",
+   "sheet": null,
+   "emote": []
+  },
+  "10": {
+   "text": "Something funny h",
+   "sheet": null,
+   "emote": []
+  },
+  "11": {
+   "text": "Something funny happ",
+   "sheet": null,
+   "emote": []
+  },
+  "12": {
+   "text": "Something funny happen",
+   "sheet": null,
+   "emote": [
+    "RUSTIC KITCHEN"
+   ]
+  },
+  "13": {
+   "text": "Something funny happened",
+   "sheet": {
+    "x": 0,
+    "y": 546.2971801757812,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "14": {
+   "text": "Something funny happened.",
+   "sheet": {
+    "x": 0,
+    "y": 548.839111328125,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "15": {
+   "text": "Something funny happened. I",
+   "sheet": {
+    "x": 0,
+    "y": 549.8250122070312,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "16": {
+   "text": "Something funny happened. I wen",
+   "sheet": {
+    "x": 0,
+    "y": 549.8150634765625,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "17": {
+   "text": "Something funny happened. I went",
+   "sheet": {
+    "x": 0,
+    "y": 549.3148193359375,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "18": {
+   "text": "Something funny happened. I went to",
+   "sheet": {
+    "x": 0,
+    "y": 548.6868896484375,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "19": {
+   "text": "Something funny happened. I went to b",
+   "sheet": {
+    "x": 0,
+    "y": 548.139892578125,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "20": {
+   "text": "Something funny happened. I went to bed",
+   "sheet": {
+    "x": 0,
+    "y": 547.7583618164062,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "21": {
+   "text": "Something funny happened. I went to bed wi",
+   "sheet": {
+    "x": 0,
+    "y": 547.5462646484375,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "22": {
+   "text": "Something funny happened. I went to bed with",
+   "sheet": {
+    "x": 0,
+    "y": 547.466552734375,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "23": {
+   "text": "Something funny happened. I went to bed with t",
+   "sheet": {
+    "x": 0,
+    "y": 547.65625,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "24": {
+   "text": "Something funny happened. I went to bed with the",
+   "sheet": {
+    "x": 0,
+    "y": 547.65625,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "25": {
+   "text": "Something funny happened. I went to bed with the sp",
+   "sheet": {
+    "x": 0,
+    "y": 547.65625,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "26": {
+   "text": "Something funny happened. I went to bed with the spic",
+   "sheet": {
+    "x": 0,
+    "y": 547.65625,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "27": {
+   "text": "Something funny happened. I went to bed with the spice",
+   "sheet": {
+    "x": 0,
+    "y": 547.65625,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "28": {
+   "text": "Something funny happened. I went to bed with the spice ja",
+   "sheet": {
+    "x": 0,
+    "y": 547.65625,
+    "width": 432,
+    "height": 220.34375
+   },
+   "emote": []
+  },
+  "29": {
+   "text": "Something funny happened. I went to bed with the spice jars",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "30": {
+   "text": "Something funny happened. I went to bed with the spice jars in",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "31": {
+   "text": "Something funny happened. I went to bed with the spice jars in o",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "32": {
+   "text": "Something funny happened. I went to bed with the spice jars in one",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "33": {
+   "text": "Something funny happened. I went to bed with the spice jars in one o",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "34": {
+   "text": "Something funny happened. I went to bed with the spice jars in one orde",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "35": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "36": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order an",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "37": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "38": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and wok",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "39": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "40": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up",
+   "sheet": {
+    "x": 0,
+    "y": 525,
+    "width": 432,
+    "height": 243
+   },
+   "emote": []
+  },
+  "41": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up t",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "42": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "43": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to fin",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "44": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "45": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find th",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "46": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "47": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "48": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in a",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "49": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in ano",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "50": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in anoth",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "51": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another",
+   "sheet": {
+    "x": 0,
+    "y": 498,
+    "width": 432,
+    "height": 270
+   },
+   "emote": []
+  },
+  "52": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "53": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I m",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "54": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I mus",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "55": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "56": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must hav",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "57": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "58": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have mo",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "59": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have move",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "60": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "61": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved the",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "62": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "63": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "64": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in m",
+   "sheet": {
+    "x": 0,
+    "y": 464,
+    "width": 432,
+    "height": 304
+   },
+   "emote": []
+  },
+  "65": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my s",
+   "sheet": {
+    "x": 0,
+    "y": 437,
+    "width": 432,
+    "height": 331
+   },
+   "emote": []
+  },
+  "66": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sle",
+   "sheet": {
+    "x": 0,
+    "y": 437,
+    "width": 432,
+    "height": 331
+   },
+   "emote": []
+  },
+  "67": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep",
+   "sheet": {
+    "x": 0,
+    "y": 437,
+    "width": 432,
+    "height": 331
+   },
+   "emote": []
+  },
+  "68": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep.",
+   "sheet": {
+    "x": 0,
+    "y": 437,
+    "width": 432,
+    "height": 331
+   },
+   "emote": []
+  },
+  "69": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "70": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I mus",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "71": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "72": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must ha",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "73": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "74": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "75": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "76": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "77": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "78": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "79": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "80": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "81": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "82": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "83": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "84": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "85": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "86": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "87": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "88": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "89": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "90": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "91": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "92": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "93": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "94": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "95": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "96": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "97": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "98": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "99": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "100": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "101": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "102": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "103": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "104": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "105": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "106": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "107": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "108": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "109": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "110": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "111": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "112": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "113": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "114": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "115": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "116": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "117": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "118": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "119": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "120": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "121": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "122": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "123": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "124": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "125": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "126": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "127": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "128": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "129": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "130": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "131": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "132": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "133": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "134": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "135": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "136": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "137": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "138": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "139": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "140": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "141": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "142": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "143": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "144": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "145": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "146": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "147": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "148": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "149": {
+   "text": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
+   "sheet": {
+    "x": 0,
+    "y": 403,
+    "width": 432,
+    "height": 365
+   },
+   "emote": []
+  },
+  "-15": {
+   "text": "",
+   "emote": []
+  },
+  "-14": {
+   "text": "",
+   "emote": []
+  },
+  "-13": {
+   "text": "",
+   "emote": []
+  },
+  "-12": {
+   "text": "",
+   "emote": []
+  },
+  "-11": {
+   "text": "",
+   "emote": []
+  },
+  "-10": {
+   "text": "",
+   "emote": []
+  },
+  "-9": {
+   "text": "",
+   "emote": []
+  },
+  "-8": {
+   "text": "",
+   "emote": []
+  },
+  "-7": {
+   "text": "",
+   "emote": []
+  },
+  "-6": {
+   "text": "",
+   "emote": []
+  },
+  "-5": {
+   "text": "",
+   "emote": []
+  },
+  "-4": {
+   "text": "",
+   "emote": []
+  },
+  "-3": {
+   "text": "",
+   "emote": []
+  },
+  "-2": {
+   "text": "",
+   "emote": []
+  },
+  "-1": {
+   "text": "",
+   "emote": []
+  }
+ },
+ "marks": {
+  "revealComplete": 74,
+  "usedFrom": 17,
+  "usedTo": 134,
+  "hold": 60
+ }
+}

@@ -2,6 +2,8 @@
 
 > **Live Play listing (confirmed by the owner 2026-09-22):** the September 7 campaign in [launch-2026-09](../mobile/assets/Play_store/launch-2026-09/README.md). The unpublished September 17 refresh (`launch-2026-09-v2` and its copy in `mobile/docs/store-launch/`), the September 19 `assembled-listing-2026-09` campaign and the `assembly-experiment` were deleted on 2026-09-22 with the scripts that built them; git history holds them.
 
+> **Ready to upload (2026-09-23):** the [refresh-2026-09](../mobile/assets/Play_store/refresh-2026-09/README.md) campaign replaces it: new name, short and full description, eight phone and four tablet screenshots, a feature graphic plus an experiment variant, and a 30 second trailer for YouTube. It is not live until the owner uploads it by hand; keep `launch-2026-09` until the new listing passes review.
+
 Reviewed against main `6f96ebb` on 2026-09-13. [Current build](CURRENT_BUILD.md) is
 the source of truth for merged behavior and configured versions; [build and
 upload](BUILD_AND_UPLOAD.md) covers EAS archives and Android optimization. Checked
@@ -86,6 +88,17 @@ verify the latest binary, backend deployment or public release.
 - [ ] **Story pilot (recommended).** Run the unfamiliar-reader
   [story playtest protocol](STORY_PLAYTEST_PROTOCOL.md), including a Phase-3
   late recruit; no completed report exists yet.
+- [ ] **Store products for the new purchases (owner).** Create and activate in
+  Play Console, then import into RevenueCat:
+  `com.wordshift.season_premium` (one-time product, CONSUMABLE; suggested
+  $2.99; RevenueCat product type Consumable, attached to no entitlement) and
+  `com.wordshift.keepers_edition` (one-time product, NON-CONSUMABLE; suggested
+  $4.99; attached to a new RevenueCat entitlement with identifier EXACTLY
+  `keepers_edition`). Until they exist the season cash button and the music box
+  purchase simply do not appear (no live price, no sale).
+- [ ] **AdMob mediation (owner).** The build carries the AppLovin and Unity Ads
+  adapters (`plugins/withAdMediation.js`); they do nothing until mediation
+  groups exist. Steps are in [monetization setup](MONETIZATION_SETUP.md#admob-mediation-applovin-and-unity-ads).
 - [ ] **Ad and consent matrix.** Keep `adsUseTestIds: true` through internal and
   closed testing: with the channel-derived flag that means running this matrix
   on an `internal-testing`-profile build (its channel keeps Google test units,
@@ -171,6 +184,25 @@ verify the latest binary, backend deployment or public release.
   gradient and no longer writes it at all. Both Graphics assets are manual, so
   changing either file in Git does NOT update Play Console: re-upload by hand.
 
+- [ ] **Upload the refresh-2026-09 listing BY HAND.** Everything is in
+  `mobile/assets/Play_store/refresh-2026-09/` (its README maps each file to its
+  Play Console field; `preview.html` shows the whole listing). Before upload:
+  confirm the Suno plan covers commercial use of the trailer beds, listen to the
+  trailer once, and use the pre-checked daily fallback line until a signed build
+  has posted a Daily rank end to end. Then: (1) Play Console -> Main store
+  listing: paste `copy/app-name.txt`, `copy/short-description.txt` and
+  `copy/full-description.txt`; (2) Graphics: `upload/feature-graphic.png`, then
+  phone screenshots `upload/phone/01` to `08` in order; (3) tablet screenshots
+  `upload/tablet/t1` to `t4` to both the 7-inch and 10-inch slots, but only once
+  a build with the tablet board fix is live (the board shot shows the fixed
+  layout); (4) upload `video/trailer-9x16-1080x1920.mp4` to YouTube as Public or
+  Unlisted with ads and monetization off, wait for any Content ID claim to clear,
+  and paste `https://www.youtube.com/watch?v=<ID>` into the Video field; (5)
+  after review passes, copy `upload/feature-graphic.png` over
+  `docs/feature-graphic.png`, record `refresh-2026-09` as the live campaign in
+  CLAUDE.md and here, and run the experiments in `copy/experiments.md` one at a
+  time.
+
 - [ ] **Production configuration cut.** Do NOT edit `expo.extra.adsUseTestIds`
   or `ci.yml`: `app.config.js` derives the shipped flag from
   `WORDSHIFT_RELEASE_CHANNEL`, so `eas build --profile production` resolves live
@@ -186,7 +218,8 @@ verify the latest binary, backend deployment or public release.
   Policy updated (effective September 22, 2026) and Terms updated (effective
   September 22, 2026): clarified purchase restore and Reset All behavior, added
   data retention periods, described network addresses, the purchase identifier
-  and anonymous daily totals, and added a governing-law clause."
+  and anonymous daily totals, named our ad mediation partners (AppLovin, Unity
+  Ads), and added a governing-law clause."
 - [ ] **Publish the documentation clarification with release notes.** The
   September 13 privacy/terms revision clarifies existing purchase delivery,
   restore and reset behavior; the September 14 revision adds retention periods

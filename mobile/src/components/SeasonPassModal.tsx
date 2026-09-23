@@ -38,7 +38,7 @@ import { AmberSparkle } from './home/AmberSparkle';
 import { Confetti } from './Confetti';
 import { hapticLight, hapticMedium } from '../services/haptics';
 import { showGameAlert } from '../services/gameAlert';
-import { getSeasonPassCopy } from '../services/phaseNarrative';
+import { getSeasonPassCopy, getStoreUnavailableMessage } from '../services/phaseNarrative';
 import { DialoguePhase } from '../types/homeWorld';
 import {
   getSeasonPassView,
@@ -49,6 +49,9 @@ import {
 } from '../services/seasonPass';
 import { logEvent } from '../services/eventLogger';
 import { FONT_SIZE } from '../theme/typeScale';
+import { SEASON_PREMIUM_INFO } from '../services/iap';
+import { buySeasonPremium } from '../services/seasonPremiumCheckout';
+import { useProductPrice } from '../hooks/useProductPrice';
 
 interface SeasonPassModalProps {
   visible: boolean;
@@ -333,6 +336,36 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
     }
   }, [busy, currentAmber, puzzlesSolved, onAmberChange, refresh]);
 
+  // Real-money unlock (beside amber and Supporter). The purchase ledger
+  // settles it: the track opens, or its amber price is paid if the month
+  // ended first, so a confirmed payment is never lost.
+  const premiumPrice = useProductPrice(SEASON_PREMIUM_INFO.productId, SEASON_PREMIUM_INFO.fallbackPrice, visible && !!view?.canBuyPremium);
+  const buyPremium = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const outcome = await buySeasonPremium(puzzlesSolved);
+      if (outcome.status === 'unlocked' || outcome.status === 'amber_instead') {
+        onAmberChange(outcome.amberBalance);
+        hapticMedium();
+        if (outcome.status === 'amber_instead') {
+          showGameAlert('Added as amber', `The premium track was no longer open to you, so ${outcome.amber} amber was added instead.`);
+        }
+        await refresh();
+      } else if (outcome.status === 'pending') {
+        showGameAlert('Waiting for the store', 'The store is still confirming this purchase. The premium track opens as soon as it does.');
+      } else if (outcome.status === 'already_owned') {
+        await refresh();
+      } else if (outcome.status === 'unavailable' || outcome.status === 'failed') {
+        showGameAlert('Not available right now', outcome.status === 'unavailable'
+          ? getStoreUnavailableMessage(phase)
+          : "We couldn't confirm this purchase. Check your store purchase history before trying again.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, puzzlesSolved, onAmberChange, refresh, phase]);
+
   const hostDark = phase >= 2;
   const cost = getSeasonPremiumAmberCost();
 
@@ -398,6 +431,16 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                       ? `This month's confetti is already in your collection. Your free amber track continues, and Supporters receive ${view.premiumCosmeticAmberEquivalent} amber in its place.`
                       : `${copy.lockedLine} The complete premium track adds ${view.tiers.reduce((sum, tier) => sum + tier.premiumAmber, 0)} amber and one confetti palette.`}
                   </Text>
+                  {view.canBuyPremium && premiumPrice.available && <CandyButton
+                    label={`Unlock premium · ${premiumPrice.label}`}
+                    variant="primary"
+                    phase={phase}
+                    hostDark={hostDark}
+                    disabled={busy}
+                    onPress={() => { hapticLight(); buyPremium().catch(() => {}); }}
+                    style={styles.premiumBtn}
+                    accessibilityLabel={`Unlock this season's premium track for ${premiumPrice.label}`}
+                  />}
                   {view.canUnlockPremiumWithAmber && <CandyButton
                     label={`Unlock premium · ${cost} amber`}
                     variant="amber"
@@ -405,7 +448,7 @@ export const SeasonPassModal: React.FC<SeasonPassModalProps> = ({
                     hostDark={hostDark}
                     disabled={busy}
                     onPress={() => { hapticLight(); unlockPremiumWithAmber().catch(() => {}); }}
-                    style={styles.premiumBtn}
+                    style={view.canBuyPremium && premiumPrice.available ? StyleSheet.flatten([styles.premiumBtn, styles.premiumBtnSecond]) : styles.premiumBtn}
                   />}
                   {onSubscribe && (
                     <TouchableOpacity
@@ -566,6 +609,7 @@ const styles = StyleSheet.create({
   premiumArt: { width: 56, height: 56, alignSelf: 'center', marginBottom: 8 },
   premiumLocked: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 10 },
   premiumBtn: { alignSelf: 'center' },
+  premiumBtnSecond: { marginTop: 8 },
   subscribeLink: { fontFamily: BODY_FONT, fontSize: FONT_SIZE.small, textAlign: 'center', marginTop: 10 },
   premiumActive: { fontFamily: PIXEL_FONT_BOLD, fontSize: FONT_SIZE.body, textAlign: 'center', marginBottom: 8 },
   track: { flexGrow: 0, marginBottom: 8 },

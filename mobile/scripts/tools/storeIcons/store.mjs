@@ -1,5 +1,5 @@
 /**
- * storeIcons/store.mjs — item art for the REAL-MONEY store (13 icons).
+ * storeIcons/store.mjs — item art for the REAL-MONEY store (14 icons).
  *
  * The Store (src/components/monetization/StoreModal.tsx, plus the two tiers in
  * PatronModal.tsx and the premium track in SeasonPassModal.tsx) sold everything
@@ -21,7 +21,8 @@
  *   cosmetic_bundle    "The Keeper's Collection"  Eclipse tile set + confetti
  *   patron_key         "Become a Patron"    +2 amber a puzzle, Patron tiles, quiet
  *   remove_ads         "Remove Ads"         the cheaper one-time quiet
- *   season_premium     the Season Pass premium track (amber or Supporter)
+ *   season_premium     the Season Pass premium track (amber, cash or Supporter)
+ *   keepers_edition    "The Keeper's Edition"  post-ending: the music box
  *   (the unmapped-id fallback reuses the shop's parcel; see the note in draw())
  *
  * TWO RULES SPECIFIC TO THIS SET, ON TOP OF THE SHOP'S DOCTRINE.
@@ -1023,6 +1024,55 @@ export function draw() {
     sheen(cv, 128, 112, 26, 17, 0.35);
     sheen(cv, 170, 274, 14, 10, 0.5);
     savePNG(path.join(OUT, 'season_premium.png'), W, W, down2(cv, W, W));
+  }
+
+  { // === keepers_edition.png — "The Keeper's Edition" =========================
+    // Sold only after the ending, and what it gives is the MUSIC BOX: every
+    // authored bed in the house, played on demand. Honest by construction, so
+    // the object is exactly that — a small wooden box with its lid open, the
+    // brass cylinder inside, a winding key at the side, and one oversized note
+    // rising out of it. No burst and no glow promising more than a song.
+    // Silhouette check against the set: the starter tray is open but LOW with
+    // goods in it; this is tall at the back (the raised lid) with nothing but
+    // the note, and the note is the one shape no other store icon owns.
+    const { cv } = canvas();
+    contactShadow(cv, 186, 346, 138, 20, 0.32);
+    ellipse(cv, 196, 196, 170, 166, '#FFF6DC', 0.22, 36);
+    withOutline(cv, t => {
+      // the raised lid, tipped back: its lit inner face and a darker rim
+      // Sheared so it reads as a lid leaning back on its hinge, not a wall.
+      poly(t, [[64, 212], [304, 212], [262, 104], [40, 104]], WOOD.mid, 1, WOOD.dark);
+      poly(t, [[84, 204], [286, 204], [250, 116], [60, 116]], WOOD.light, 1, WOOD.base);
+      poly(t, [[118, 190], [236, 190], [216, 132], [98, 132]], ACCENT.main, 1, ACCENT.lo); // sage lining
+      // the box body
+      roundRect(t, 185, 272, 124, 66, 14, WOOD.base, 1, WOOD.dark);
+      roundRect(t, 185, 218, 124, 16, 7, WOOD.rim, 1, WOOD.light);       // open top edge
+      // the brass cylinder sitting in the mouth, one big capsule
+      capsule(t, 102, 226, 268, 226, 26, BRASS.lo, 1);
+      capsule(t, 104, 222, 266, 222, 18, BRASS.hi, 1);
+      // three big pins on the cylinder: what makes it a MUSIC box, not a drawer
+      for (const x of [140, 185, 230]) ellipse(t, x, 222, 7, 7, BRASS.lo, 1, 2);
+      // front brass plate
+      roundRect(t, 185, 282, 34, 22, 6, BRASS.lo, 1);
+      roundRect(t, 185, 280, 27, 16, 5, BRASS.hi, 1, BRASS.lo);
+      // the winding key on the right side
+      capsule(t, 306, 268, 332, 268, 14, BRASS.lo, 1);
+      ellipse(t, 340, 256, 16, 22, BRASS.lo, 1, 2);
+      ellipse(t, 340, 256, 11, 16, BRASS.hi, 1, 2);
+      ellipse(t, 340, 282, 16, 16, BRASS.lo, 1, 2);
+      ellipse(t, 340, 282, 11, 11, BRASS.hi, 1, 2);
+    }, { width: 10 });
+    withOutline(cv, t => {
+      // one oversized eighth note rising from the box, in the game's amber
+      capsule(t, 324, 34, 324, 142, 14, AMBER.lo, 1);
+      poly(t, [[317, 34], [358, 62], [358, 90], [317, 64]], AMBER.mid, 1, AMBER.lo);
+      ellipse(t, 302, 148, 30, 22, AMBER.lo, 1, 2);
+      ellipse(t, 300, 144, 25, 17, AMBER.mid, 1, 2);
+    }, { width: 10 });
+    sheen(cv, 96, 132, 18, 10, 0.35);
+    sheen(cv, 150, 220, 26, 5, 0.5);
+    sheen(cv, 292, 138, 9, 6, 0.5);
+    savePNG(path.join(OUT, 'keepers_edition.png'), W, W, down2(cv, W, W));
   }
 
   // NOTE: there is deliberately no store_placeholder.png. The unmapped-id

@@ -57,6 +57,8 @@ async function seedCeremonySave(page: Page, pendingWard = false) {
     localStorage.setItem('wordshift_first_win_glitch', 'true');
     localStorage.setItem('wordshift_preview_graduation_seen_v2', 'true');
     localStorage.setItem('wordshift_share_prompts', JSON.stringify({ sharePromptShown: true }));
+    // The one-time ceremony offer is its own beat; this cohort has had it.
+    localStorage.setItem('wordshift_monet_prompts', JSON.stringify({ momentOffersShown: ['ceremony'] }));
     localStorage.setItem('wordshift_word_harvest', JSON.stringify({ pendingBatches: [], totalWordsOffered: 0 }));
   }, { id: pendingId, ward: pendingWard });
 }

@@ -34,7 +34,10 @@ import {
   IMMEDIATE_PRELOAD_SOUND_NAMES,
   DEFERRED_PRELOAD_SOUND_NAMES,
   SFX_CACHE_LIMIT,
+  playMusicBoxTrack,
 } from '../services/audio';
+import { MUSIC_BOX_TRACKS } from '../services/musicBox';
+import { getMusicBoxCopy } from '../services/phaseNarrative';
 import { resetSettings, updateSetting } from '../services/settings';
 
 jest.mock('expo-audio', () => {
@@ -480,5 +483,36 @@ describe('audio', () => {
       expect(getActiveMusicTrack()).toBe('music_home_0');
       expect(expoAudio.createAudioPlayer).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('the Keeper\'s Edition music box', () => {
+  afterEach(async () => {
+    await stopMusic();
+    await resetSettings();
+  });
+
+  test('lists all twelve authored beds, each titled and real', () => {
+    expect(MUSIC_BOX_TRACKS).toHaveLength(12);
+    const titles = getMusicBoxCopy().trackTitles;
+    for (const track of MUSIC_BOX_TRACKS) {
+      expect(hasMusicTrack(track)).toBe(true);
+      expect(titles[track]).toBeTruthy();
+      expect(titles[track]).not.toMatch(/phase/i);
+    }
+    expect(new Set(Object.values(titles)).size).toBe(12);
+  });
+
+  test('plays the chosen song even with background music switched off', async () => {
+    await updateSetting('musicEnabled', false);
+    await startMusicForScreen('home', 2);
+    expect(getActiveMusicTrack()).toBeNull();
+    await playMusicBoxTrack('music_puzzle_4');
+    expect(getActiveMusicTrack()).toBe('music_puzzle_4');
+  });
+
+  test('ignores a name that is not one of its songs', async () => {
+    await playMusicBoxTrack('music_home_9');
+    expect(getActiveMusicTrack()).toBeNull();
   });
 });

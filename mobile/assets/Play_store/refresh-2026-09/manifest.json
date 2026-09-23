@@ -1,0 +1,434 @@
+{
+  "campaign": "refresh-2026-09",
+  "generated_by": "node mobile/scripts/store/buildRefresh.mjs",
+  "git_head": "5e8d9d3d310e216a8820604ef60bdf8f27ee3840",
+  "locale": "en-US",
+  "gameplay_provenance": "Gameplay images are genuine renders of the current WordShift build (Expo web, headless Chromium) from raw/, made by scripts/store/captureRefresh.mjs; see raw/provenance.json and raw/SUBSTITUTIONS.md. Only local progression was seeded and only real UI input was used. Captions, bands, seams, backdrops, arrows and shadows sit outside the captures. Not Android device captures.",
+  "phone_template": {
+    "size": "1080x1920",
+    "band_px": 348,
+    "seam_px": 12,
+    "caption_region_fraction": 0.1875,
+    "headline": "Figtree-Bold 96/104",
+    "support": "EpundaSlab-Bold 60/70"
+  },
+  "assets": [
+    {
+      "file": "upload/phone/01-shift-one-letter.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 322296,
+      "sha256": "5553eb14fdd5a756b102afe4ccd9f6b8a45ae98186bd16a8ccb1dff1bbffc5ef",
+      "use": "Phone screenshot 1 of 8",
+      "alt_id": "01",
+      "alt_text": "Shift one letter. Keep both words real. The L lifts out of PLAY, a check marks PLANT, then the rows read PAY and PLANT",
+      "headline": "Shift one letter.",
+      "support": "Keep both words real.",
+      "band": "day",
+      "caption_region": {
+        "height_px": 360,
+        "fraction": 0.1875
+      },
+      "captures": [
+        {
+          "file": "raw/s01-frame-a-letter-lifted.png",
+          "sha256": "1f2b188cc675ba2431b5daf3b66ba70546860ea57218bd6986c7801fbc5cd476",
+          "window_px": {
+            "left": 32,
+            "top": 1028,
+            "width": 1496,
+            "height": 1116
+          }
+        },
+        {
+          "file": "raw/s01-frame-b-after-move.png",
+          "sha256": "0fea66f26a4ab09a6377e89e691c372de1088b935afc72e77b9743a41f04e740",
+          "window_px": {
+            "left": 32,
+            "top": 1017,
+            "width": 1496,
+            "height": 1096
+          }
+        }
+      ],
+      "treatment": "frames A and B cropped to their rows (8 CSS in from each screen edge), scaled together with lanczos3 and shown as two framed panels with a gap and a down arrow between, on a darker board green",
+      "scale": 0.61664
+    },
+    {
+      "file": "upload/phone/02-words-build-a-home.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 1349046,
+      "sha256": "d03e415ca826ec8b9676614a19a0a5b86d8888e71f0728378950349f8c711584",
+      "use": "Phone screenshot 2 of 8",
+      "alt_id": "02",
+      "alt_text": "Words build a home. A pixel-art house on a sunny afternoon: a capybara's office, a fennec's camp, a sloth's hammock, an axolotl's aquarium",
+      "headline": "Words build a home.",
+      "support": null,
+      "band": "day",
+      "caption_region": {
+        "height_px": 360,
+        "fraction": 0.1875
+      },
+      "captures": [
+        {
+          "file": "raw/s02-day-house.png",
+          "sha256": "f1a17c6bfe4fc4faa23d48f31696f79e4524a99b30dc803d5ec56d43f13c79c7",
+          "window_px": {
+            "left": 108,
+            "top": 504,
+            "width": 1080,
+            "height": 1560
+          }
+        }
+      ],
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
+    },
+    {
+      "file": "upload/phone/03-cozy-mostly.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 1704284,
+      "sha256": "c8f13d9326004cc1ae72fc2328a0785250458f17ab176a60f3c764de17db8f1a",
+      "use": "Phone screenshot 3 of 8",
+      "alt_id": "03",
+      "alt_text": "A cozy game. Mostly. The house at sunset: Panko in her kitchen, Ember by the fire in the den and a softly glowing well",
+      "headline": "A cozy game. Mostly.",
+      "support": null,
+      "band": "dusk",
+      "caption_region": {
+        "height_px": 360,
+        "fraction": 0.1875
+      },
+      "captures": [
+        {
+          "file": "raw/s03-dusk-house.png",
+          "sha256": "0a45ceb96bef28d5ef49bbd39308f5b6578993b8db0f8b5437795fc85533b1c6",
+          "window_px": {
+            "left": 175,
+            "top": 653,
+            "width": 1080,
+            "height": 1560
+          }
+        }
+      ],
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
+    },
+    {
+      "file": "upload/phone/04-stories-in-each-room.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 444007,
+      "sha256": "d6c7f6919464ce369e4e489668a568a13a0e52aef0e2ce3708b7d3672b6f5461",
+      "use": "Phone screenshot 4 of 8",
+      "alt_id": "04",
+      "alt_text": "Stories in each room. Panko the pangolin: \"I went to bed with the spice jars in one order and woke up to find them in another.\"",
+      "headline": "Stories in each room.",
+      "support": "13 housemates to get to know.",
+      "band": "day",
+      "caption_region": {
+        "height_px": 360,
+        "fraction": 0.1875
+      },
+      "captures": [
+        {
+          "file": "raw/s04-panko-dialogue.png",
+          "sha256": "bdb216283720fb398e039f747497921d4721c0916ae4d9905c0f083072958c84",
+          "window_px": {
+            "left": 0,
+            "top": 762,
+            "width": 1080,
+            "height": 1560
+          }
+        }
+      ],
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
+    },
+    {
+      "file": "upload/phone/05-then-the-rules-shift.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 351988,
+      "sha256": "a45164e41c1e235558707c1f3871f76f947a237ece977b3190705b63b791990b",
+      "use": "Phone screenshot 5 of 8",
+      "alt_id": "05",
+      "alt_text": "Then the rules shift. A Double Shift puzzle with Challenge and Speed on: a countdown clock, an undo limit and a lifted letter",
+      "headline": "Then the rules shift.",
+      "support": "Styles and challenges that stack.",
+      "band": "parchment",
+      "caption_region": {
+        "height_px": 360,
+        "fraction": 0.1875
+      },
+      "captures": [
+        {
+          "file": "raw/s05-stacked-modes.png",
+          "sha256": "fc5c1e775da844d93e7e2c79726afafa5cacf6cd10b0c42eada8d919875e6a88",
+          "window_px": {
+            "left": 0,
+            "top": 133,
+            "width": 1080,
+            "height": 1560
+          }
+        }
+      ],
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
+    },
+    {
+      "file": "upload/phone/06-every-word-goes-somewhere.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 2338703,
+      "sha256": "9b477a5cae93880edd99279b2bc869b2aaadb10fbfba428a3df6213fd1c54ba0",
+      "use": "Phone screenshot 6 of 8",
+      "alt_id": "06",
+      "alt_text": "Every word goes somewhere: words from a solved puzzle float over a hole in a forest clearing. \"Something stirs below\"",
+      "headline": "Every word goes somewhere.",
+      "support": null,
+      "band": "parchment",
+      "caption_region": {
+        "height_px": 360,
+        "fraction": 0.1875
+      },
+      "captures": [
+        {
+          "file": "raw/s06-pit.png",
+          "sha256": "c24913687f6574b993f4c0b13d537b11db2cf6276f271a7a0bf5273b02f12243",
+          "window_px": {
+            "left": 0,
+            "top": 350,
+            "width": 1080,
+            "height": 1560
+          }
+        }
+      ],
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
+    },
+    {
+      "file": "upload/phone/07-tea-or-cocoa.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 706365,
+      "sha256": "f4d26bc81d046c576a0f509484fd6d377b42ee9f33d98e8b37485759fd53132c",
+      "use": "Phone screenshot 7 of 8",
+      "alt_id": "07",
+      "alt_text": "Tea or cocoa? A painted story page with a flower-painted cup: Ember asks you to be kind but honest, and you choose tea or cocoa",
+      "headline": "Tea or cocoa?",
+      "support": "Ember will remember your answer.",
+      "band": "parchment",
+      "caption_region": {
+        "height_px": 360,
+        "fraction": 0.1875
+      },
+      "captures": [
+        {
+          "file": "raw/s07-cup-choice.png",
+          "sha256": "8d7073fb17ca222dae81b84d8224878d6301f8514fb810374fd241986274f21b",
+          "window_px": {
+            "left": 40,
+            "top": 120,
+            "width": 1000,
+            "height": 1680
+          }
+        }
+      ],
+      "treatment": "story card lifted off the dimmed scene at its frame outline, placed on its own art (cover, blur 24, brightness 0.8) with a soft shadow",
+      "scale": 0.89286
+    },
+    {
+      "file": "upload/phone/08-stay-for-supper.png",
+      "width": 1080,
+      "height": 1920,
+      "channels": 3,
+      "bytes": 1198690,
+      "sha256": "f46a13d1875fae15bc256f34bf55c9c7251ea10e8719b22eace726f0e9fdb2e3",
+      "use": "Phone screenshot 8 of 8",
+      "alt_id": "08",
+      "alt_text": "Stay for supper. A painted supper table set with soup and bread. Panko says the empty place at the table can wait",
+      "headline": "Stay for supper.",
+      "support": null,
+      "band": "dusk",
+      "caption_region": {
+        "height_px": 360,
+        "fraction": 0.1875
+      },
+      "captures": [
+        {
+          "file": "raw/s08-supper-02.png",
+          "sha256": "7a40b1db5bc77e5b516f82f17566822a94b5f2eebe6799caf2946a3b0429e267",
+          "window_px": {
+            "left": 40,
+            "top": 224,
+            "width": 1000,
+            "height": 1473
+          }
+        }
+      ],
+      "treatment": "story card lifted off the dimmed scene at its frame outline and scaled to fit below the page's own painting, which is shown sharp and full width above it and fades into the same painting blurred (blur 24, brightness 0.8); soft shadow under the card",
+      "scale": 0.7427
+    },
+    {
+      "file": "upload/tablet/t1-board.png",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "bytes": 397576,
+      "sha256": "a0cd091f6c829b8e5cecac26a772b0177ca92adfbe07386efbcc3708bf0f23a4",
+      "use": "Tablet screenshot (7-inch and 10-inch slots)",
+      "alt_id": "T1",
+      "alt_text": "A WordShift puzzle on a tablet: the L lifts out of PLAY and a check marks PLANT on the row below",
+      "captures": [
+        {
+          "file": "raw/t2-board.png",
+          "sha256": "462b90cc56e6c6349df4ebcdc7575d3abfab84c1f4007d0a4933e0268d06e99f",
+          "viewport": {
+            "width": 720,
+            "height": 1280
+          },
+          "device_scale_factor": 2
+        }
+      ],
+      "treatment": "full frame, pixels unchanged, re-encoded as RGB"
+    },
+    {
+      "file": "upload/tablet/t2-house.png",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "bytes": 3951074,
+      "sha256": "5264984330b6210481fb4ef7920158f84f3f2ce77ea3f3c52bd8a61719ab7638",
+      "use": "Tablet screenshot (7-inch and 10-inch slots)",
+      "alt_id": "T2",
+      "alt_text": "The WordShift house on a tablet: rooms stacked one above another with animal residents under a sunny mountain sky",
+      "captures": [
+        {
+          "file": "raw/t1-house.png",
+          "sha256": "37c3f87bd46f7f52f71051452a00a011b836b78a33c15faf05ce69715b41a49c",
+          "viewport": {
+            "width": 720,
+            "height": 1280
+          },
+          "device_scale_factor": 2
+        }
+      ],
+      "treatment": "full frame, pixels unchanged, re-encoded as RGB"
+    },
+    {
+      "file": "upload/tablet/t3-cup.png",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "bytes": 1499142,
+      "sha256": "1065ead1dc56fc80073edbc00c59383073bbe2113c83d7fb6085890a0a100916",
+      "use": "Tablet screenshot (7-inch and 10-inch slots)",
+      "alt_id": "T3",
+      "alt_text": "A painted story page on a tablet: a flower-painted cup by the fire and two answers to choose from",
+      "captures": [
+        {
+          "file": "raw/t3-cup.png",
+          "sha256": "4b73d12645b7f31aed3e8cf1ffff8381a65cf5546cb3ddf7459dd9f33ef6b779",
+          "viewport": {
+            "width": 720,
+            "height": 1280
+          },
+          "device_scale_factor": 2
+        }
+      ],
+      "treatment": "full frame, pixels unchanged, re-encoded as RGB"
+    },
+    {
+      "file": "upload/tablet/t4-pit.png",
+      "width": 1440,
+      "height": 2560,
+      "channels": 3,
+      "bytes": 4462773,
+      "sha256": "7b6c0098240fa16c008ac5663644e584992c3c2081d1b8e19a8abb85a1b795cc",
+      "use": "Tablet screenshot (7-inch and 10-inch slots)",
+      "alt_id": "T4",
+      "alt_text": "On a tablet, words from a solved puzzle float over a hole in a sunny forest clearing, with amber waiting to be offered",
+      "captures": [
+        {
+          "file": "raw/t2-pit.png",
+          "sha256": "a6d23e43ad33d51054f5f80b59e11bf881f7e73561715578e889961bee2cb1ac",
+          "viewport": {
+            "width": 720,
+            "height": 1280
+          },
+          "device_scale_factor": 2
+        }
+      ],
+      "treatment": "full frame, pixels unchanged, re-encoded as RGB"
+    },
+    {
+      "file": "upload/feature-graphic.png",
+      "width": 1024,
+      "height": 500,
+      "channels": 3,
+      "bytes": 902043,
+      "sha256": "3f5c3e6a40ea9dce50c2fde8506a9d46a9e48aa3918d6a71b8ef2f6fb12f5961",
+      "use": "Feature graphic (main listing)",
+      "alt_id": "FG-A",
+      "alt_text": "Painted art of eight animal friends at a candlelit table with a folded note, the WordShift logo and Your words keep this house warm",
+      "mean_luma": 93.7,
+      "art": "assets/story/pages/witness-05.webp (picture only), assets/ui/wordmark.png"
+    },
+    {
+      "file": "upload/experiments/feature-graphic-b.png",
+      "width": 1024,
+      "height": 500,
+      "channels": 3,
+      "bytes": 461597,
+      "sha256": "560b22e94130c985bff16fafd21fc13a8ce1c6ec53d6fda759ef7eb2c8e6d368",
+      "use": "Feature graphic B (experiment only)",
+      "alt_id": "FG-B",
+      "alt_text": "A sunny pixel-art den with the WordShift logo, the line Every letter counts and letter tiles spelling PLANT",
+      "mean_luma": 112.7,
+      "art": "assets/rooms/cozy_den.webp, assets/ui/wordmark.png, the five PLANT PICK-row tiles from raw/s01-frame-b-after-move.png"
+    },
+    {
+      "file": "upload/store-icon-512.png",
+      "width": 512,
+      "height": 512,
+      "channels": 4,
+      "bytes": 409337,
+      "sha256": "7192d085bc2fc3e94d9ac907d5b1cede02d4dd6eaf6283ff2433c611daa1b78d",
+      "use": "Store icon (unchanged; byte copy of launch-2026-09/upload/store-icon-512.png)"
+    },
+    {
+      "file": "video/trailer-9x16-1080x1920.mp4",
+      "bytes": 14179625,
+      "sha256": "5a3f14bbf243b3ee245a33b0188dc30d4a7a37c5542353f476aa414013f59205",
+      "use": "Play preview video (upload to YouTube)"
+    },
+    {
+      "file": "video/trailer-16x9-1920x1080.mp4",
+      "bytes": 10100632,
+      "sha256": "21634223791ae1ce8f0a8e353b7414c34035c0bbf43e6915a1c275615cca7597",
+      "use": "Trailer master (YouTube channel, press)"
+    },
+    {
+      "file": "video/youtube-thumbnail-1280x720.png",
+      "bytes": 1959390,
+      "sha256": "b4fab42f0ec2e5a391ecca23e5675123a6efc310869f79650f0e4924afa52f76",
+      "use": "YouTube thumbnail"
+    },
+    {
+      "file": "video/captions-en.srt",
+      "bytes": 533,
+      "sha256": "a982b925b5a878a14e12fda92fdbb0f39e92e51944733960824d2b6fb45b310c",
+      "use": "Trailer captions"
+    }
+  ]
+}

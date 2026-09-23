@@ -19,7 +19,11 @@ import { SacrificeModal } from './SacrificeModal';
 import { RulesModal } from '../puzzle/RulesModal';
 import { getShopTitle, getNewCycleTitle } from '../../services/phaseNarrative';
 import { isSacrificeAvailable, getSacrificePrompt } from '../../services/sacrifice';
-import { canStartNewCycle } from '../../services/amberCurrency';
+import { canStartNewCycle, isPostRevelation } from '../../services/amberCurrency';
+import { ENTITLEMENTS, hasEntitlementSync } from '../../services/entitlements';
+import { KEEPERS_EDITION_INFO } from '../../services/iap';
+import { getStoreArt } from '../monetization/storeArt';
+import { MusicBoxModal } from '../MusicBoxModal';
 
 // Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
 // Statistics wears the painted-bars stats sprite generateUiIcons drew for it
@@ -78,9 +82,16 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
   // Whether the New Cycle door shows (true endgame only). Re-read on every
   // open so both surfaces agree without the host precomputing it.
   const [canCycle, setCanCycle] = useState(false);
+  // The music box (the Keeper's Edition) is offered from the ending on, and
+  // stays reachable for an owner even after a New Cycle brings the bright days back.
+  const [showMusicBoxRow, setShowMusicBoxRow] = useState(false);
+  const [showMusicBox, setShowMusicBox] = useState(false);
   useEffect(() => {
     let alive = true;
     canStartNewCycle().then(v => { if (alive) setCanCycle(v); }).catch(() => {});
+    isPostRevelation()
+      .then(post => { if (alive) setShowMusicBoxRow(post || hasEntitlementSync(ENTITLEMENTS.KEEPERS_EDITION)); })
+      .catch(() => {});
     return () => { alive = false; };
   }, [visible]);
 
@@ -216,6 +227,19 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
                 Phase-5 player actually lives on. Previously findable only in
                 Settings, which the in-world pointer lines are forbidden from
                 naming; this row IS the door those lines allude to. */}
+            {showMusicBoxRow && (
+              <HubRow
+                phase={phase}
+                hostDark={dtHostDark}
+                icon={getStoreArt(KEEPERS_EDITION_INFO.productId)}
+                label="The Music Box"
+                onPress={() => {
+                  onClose();
+                  setShowMusicBox(true);
+                }}
+                accessibilityLabel="Open the music box"
+              />
+            )}
             {canCycle && onStartNewCycle && (
               <HubRow
                 phase={phase}
@@ -238,6 +262,13 @@ export const UtilityMenu: React.FC<UtilityMenuProps> = ({
         visible={showRules}
         phase={phase}
         onClose={() => setShowRules(false)}
+      />
+
+      {/* The Keeper's Edition music box (from the ending on) */}
+      <MusicBoxModal
+        visible={showMusicBox}
+        phase={phase}
+        onClose={() => setShowMusicBox(false)}
       />
 
       {/* The Offering altar (Phase 4+) */}

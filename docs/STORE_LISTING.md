@@ -2,6 +2,8 @@
 
 > **Live Play listing (confirmed by the owner 2026-09-22):** the September 7 campaign in [launch-2026-09](../mobile/assets/Play_store/launch-2026-09/README.md). The unpublished September 17 refresh (`launch-2026-09-v2` and its copy in `mobile/docs/store-launch/`), the September 19 `assembled-listing-2026-09` campaign and the `assembly-experiment` were deleted on 2026-09-22 with the scripts that built them; git history holds them.
 
+> **Ready to upload (2026-09-23):** the [refresh-2026-09](../mobile/assets/Play_store/refresh-2026-09/README.md) campaign replaces it: new name, short and full description, eight phone and four tablet screenshots, a feature graphic plus an experiment variant, and a 30 second trailer for YouTube. It is not live until the owner uploads it by hand; keep `launch-2026-09` until the new listing passes review.
+
 > **September 13 source review:** the current configuration and release checks
 > are in [CURRENT_BUILD.md](CURRENT_BUILD.md). The September 7 image pack has
 > not been recaptured for the subsequent dialogue and room changes. Compare

@@ -19,6 +19,13 @@ describe('season premium unlock analytics', () => {
     expect(modal).not.toMatch(/type:\s*'iap_purchase'/);
   });
 
+  test('the real-money unlock is a real purchase under its own kind, which the funnel counts', () => {
+    const checkout = fs.readFileSync(path.join(MOBILE, 'src', 'services', 'seasonPremiumCheckout.ts'), 'utf8');
+    expect(checkout).toMatch(/type:\s*'iap_purchase'/);
+    expect(checkout).toContain("const KIND = 'season_premium';");
+    expect(checkout).not.toMatch(/kind:\s*'season'/);
+  });
+
   test('the purchase-funnel view excludes amber spends, old and new', () => {
     const sql = fs.readFileSync(path.join(REPO, 'docs', 'supabase', 'analytics_views_v1.sql'), 'utf8');
     const funnel = sql.slice(sql.indexOf('create or replace view public.analytics_purchase_funnel'));
