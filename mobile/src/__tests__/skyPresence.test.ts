@@ -11,7 +11,11 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { PNG } from 'pngjs';
+
+// pngjs ships no type declarations; load it the way the other asset tests do.
+const { PNG } = require('pngjs') as {
+  PNG: { sync: { read(bytes: Buffer): { width: number; height: number; data: Buffer } } };
+};
 
 const src = fs.readFileSync(path.join(__dirname, '../components/home/HouseWorld.tsx'), 'utf8');
 const flat = src.replace(/\s+/g, ' ');
