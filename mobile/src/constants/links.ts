@@ -13,7 +13,7 @@ export const EXTERNAL_LINKS = {
   privacyPolicy: 'https://jpearleverett.github.io/WordShift/privacy-policy/',
   termsOfService: 'https://jpearleverett.github.io/WordShift/terms/',
   dataDeletion: 'https://jpearleverett.github.io/WordShift/data-deletion/',
-  supportEmail: 'jpearleverett@gmail.com',
+  supportEmail: 'info@iridescent-games.com',
 } as const;
 
 /**

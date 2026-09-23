@@ -94,7 +94,7 @@ We do **not** sell your personal data. Data is shared only with the service prov
 
 ## Contact
 
-jpearleverett@gmail.com
+info@iridescent-games.com
 
 ## Changes to this policy
 

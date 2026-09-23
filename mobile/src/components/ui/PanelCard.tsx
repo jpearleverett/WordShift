@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, View, ViewStyle } from 'react-native';
 import {
   getPixelSkin,
   PANEL_CORNER_DP,
@@ -22,6 +22,7 @@ interface PanelCardProps {
    */
   hostDark?: boolean;
   style?: ViewStyle;
+  onLayout?: (event: LayoutChangeEvent) => void;
 }
 
 /**
@@ -44,11 +45,12 @@ export const PanelCard: React.FC<PanelCardProps> = ({
   kind = 'card',
   hostDark = false,
   style,
+  onLayout,
 }) => {
   const skin = getPixelSkin(phase, hostDark);
   const isPanel = kind === 'panel';
   return (
-    <View style={[styles.body, style]}>
+    <View style={[styles.body, style]} onLayout={onLayout}>
       <NineSliceFrame
         skin={isPanel ? skin.panel : skin.card}
         cornerDp={isPanel ? PANEL_CORNER_DP : CARD_CORNER_DP}

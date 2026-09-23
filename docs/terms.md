@@ -56,7 +56,7 @@ You may stop using the app at any time by deleting it. These terms terminate aut
 
 ## 9. Contact
 
-Questions about these terms: jpearleverett@gmail.com
+Questions about these terms: info@iridescent-games.com
 
 
 ## 10. Governing law

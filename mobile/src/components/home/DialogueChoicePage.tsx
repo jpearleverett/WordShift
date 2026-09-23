@@ -118,7 +118,7 @@ export function DialogueChoicePage({
             accessibilityRole="image"
             accessibilityLabel={`${name} portrait`}
           >
-            <Image source={portrait} style={[styles.portraitLayer, frame.layer]} resizeMode="cover" />
+            <Image source={portrait} style={[styles.portraitLayer, frame.layer]} resizeMode="cover" fadeDuration={0} />
           </View>
         ) : null}
         <AppText textRole="label" style={[styles.name, { color: nameColor }]}>

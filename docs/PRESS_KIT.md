@@ -41,7 +41,7 @@ exactly why what follows lands.
 | **Audience / rating** | Intended for ages 13+ with dark-fantasy/horror themes. Publish only the regional ratings actually assigned in the store console. |
 | **Genre** | Word puzzle / narrative slow burn |
 | **Session length** | Varies by difficulty and reading; no measured average is claimed |
-| **Press contact** | jpearleverett@gmail.com |
+| **Press contact** | info@iridescent-games.com |
 
 **By the numbers:** 13 animal companions, a 13-room house built bottom-up,
 5 difficulty tiers (topped by a 6-letter EXPERT), 3 play styles (standard,
