@@ -44,6 +44,10 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   // Visible only for a SLOW write (see SAVING_REVEAL_MS). Double-tap protection
   // does not depend on it: `busy` swallows re-entry for the whole write.
   const [showSaving, setShowSaving] = useState(false);
+  // The card is centred, so a page of a different length used to move BOTH of
+  // its edges on every Continue. Within a scene it keeps the tallest height it
+  // has reached, so only a longer page can grow it and nothing ever snaps back.
+  const [cardFloor, setCardFloor] = useState<{ scene: string; height: number } | null>(null);
   const pageKey = `${memory?.scene.id ?? ''}:${memory?.page ?? 0}`;
   const [errorPage, setErrorPage] = useState<string | null>(null);
   const setError = (value: boolean) => setErrorPage(value ? pageKey : null);
@@ -102,9 +106,13 @@ export const StorySceneModal: React.FC<StorySceneModalProps> = ({ memory, phase,
   const close = () => { void run(onClose); };
   return <Modal visible={!!memory && !!line} transparent animationType={getSettingsSync().reducedMotion ? 'none' : 'fade'} onRequestClose={close}>
     <View style={[styles.overlay, { backgroundColor: theme.overlay, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} accessibilityViewIsModal>
-      <PanelCard phase={phase} kind="panel" style={{ width: layout.cardWidth, maxHeight: layout.cardMaxHeight, paddingVertical: SURFACE.panelPadY }}>
+      <PanelCard phase={phase} kind="panel" onLayout={(event) => {
+        const scene = memory?.scene.id ?? '';
+        const measured = Math.round(event.nativeEvent.layout.height);
+        setCardFloor(prev => (prev?.scene === scene && prev.height >= measured ? prev : { scene, height: measured }));
+      }} style={{ width: layout.cardWidth, maxHeight: layout.cardMaxHeight, minHeight: cardFloor && cardFloor.scene === memory?.scene.id ? Math.min(cardFloor.height, layout.cardMaxHeight) : undefined, paddingVertical: SURFACE.panelPadY }}>
         <ScrollView ref={scroll} testID="story-scene-scroll" style={{ flexShrink: 1, maxHeight: layout.scrollMaxHeight }} contentContainerStyle={[styles.content, { width: layout.cardWidth, paddingHorizontal: layout.contentPadX }]} bounces={false} keyboardShouldPersistTaps="handled">
-          {illustration && <Image source={illustration.source} testID="story-scene-art" resizeMode="contain" style={[styles.sceneArt, { width: layout.artWidth, height: layout.artHeight }]} accessible={false} />}
+          {illustration && <Image source={illustration.source} testID="story-scene-art" resizeMode="contain" fadeDuration={0} style={[styles.sceneArt, { width: layout.artWidth, height: layout.artHeight }]} accessible={false} />}
           <AppText textRole="title" accessibilityRole="header"  style={[styles.title, { color: theme.title }]}>{memory?.scene.title}</AppText>
           {/* The row keeps the portrait's height on every page, so a narrated
               page (portrait, no nameplate) and the player's own line (nameplate,

@@ -77,6 +77,7 @@ const EDGE_SHADOW_IMG = require('../../../assets/environment/wall_edge_shadow.pn
 const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png');
 const HOUSE_SHADOW_IMG = require('../../../assets/environment/house_shadow.png');
 const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
+const SHADOW_HALO_IMG = require('../../../assets/environment/shadow_halo.png');
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -687,18 +688,18 @@ const shootingStarStyles = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════
 // For the longest single-sky stretch of the descent (floor 62 to the reveal
 // at ~90) the "oppressive pre-storm night" was a static image. This is a
-// rare, silent, two-pulse flicker on the upper sky band: cold pale slate, so
-// faint it reads as weather at the horizon, never a render glitch. Phase 4+
+// silent two-pulse flicker across the whole sky behind the house, cold pale
+// slate, every 25-60 s: strong enough that a player resting on the home screen
+// sees it, brief enough to read as weather rather than a glitch. Phase 4+
 // deliberately excluded — that sky belongs to the entity, and the "honestly
 // empty" rule stays true there. No thunder: silent lightning is wronger.
 // Self-scheduling timer (the ShootingStar pattern, no perpetual loop);
 // callers gate on ambientMotionEnabled so reduced motion / low tier skip it.
-const LIGHTNING_MIN_GAP_MS = 60000;
-const LIGHTNING_GAP_RANGE_MS = 90000;
-const LIGHTNING_PEAK_OPACITY = 0.07;
+const LIGHTNING_MIN_GAP_MS = 25000;
+const LIGHTNING_GAP_RANGE_MS = 35000;
+const LIGHTNING_PEAK_OPACITY = 0.16;
 
-const DistantLightning: React.FC = () => {
-  const { height: SCREEN_HEIGHT } = useWindowDimensions();
+const DistantLightning: React.FC<{ height: number }> = ({ height }) => {
   const [flash] = useState(() => new Animated.Value(0));
   const mountedRef = useRef(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -742,13 +743,19 @@ const DistantLightning: React.FC = () => {
 
   return (
     <Animated.View
+      testID="sky-lightning"
       pointerEvents="none"
       style={{
+        // The whole sky, behind the house, measured UP from the scene box's
+        // bottom like every other sky layer. The scene box is only one screen
+        // tall and the house and sky are drawn upward out of it, so the old
+        // `top: 0, height: 38%` band sat below the screen at every pan and the
+        // lightning never once showed.
         position: 'absolute',
-        top: 0,
+        bottom: 0,
         left: 0,
         right: 0,
-        height: SCREEN_HEIGHT * 0.38,
+        height,
         backgroundColor: '#AEB8CC',
         opacity: flash.interpolate({
           inputRange: [0, 1],
@@ -1242,8 +1249,10 @@ const sigilOverlayStyles = StyleSheet.create({
  */
 const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
   const [breatheAnim] = useState(() => new Animated.Value(0));
+  const [eyeAnim] = useState(() => new Animated.Value(0));
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
   const visible = phase >= 3;
+  const look = SHADOW_FIGURE_LOOK[Math.min(Math.max(phase, 3), 5) as 3 | 4 | 5];
 
   // The settled entity (phase 5) breathes SLOWER than the looming one —
   // sleeping, not watching. Only the durations change; reduced motion stays
@@ -1271,37 +1280,101 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
     return () => loop.stop();
   }, [visible, isStatic, breatheAnim, breathHalfMs]);
 
+  // The eyes pulse on their own slower clock, only while it watches (phase 4).
+  const eyesPulse = visible && !isStatic && look.eyePulse;
+  useEffect(() => {
+    if (!eyesPulse) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(eyeAnim, { toValue: 1, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(eyeAnim, { toValue: 0, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [eyesPulse, eyeAnim]);
+
   if (!visible) return null;
 
-  // Phase 3: faint silhouette. Phase 4: full presence. Phase 5: settled, calmer.
-  const baseOpacity = phase >= 5 ? 0.35 : phase >= 4 ? 0.5 : 0.18;
   const height = phase >= 4 ? ROOM_WIDTH * 2 : ROOF_WIDTH * 1.6;
   const width = height * SHADOW_FIGURE_ASPECT;
 
   const opacity = isStatic
-    ? baseOpacity
+    ? look.figure
     : breatheAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: [baseOpacity - 0.05, baseOpacity + 0.05],
+        outputRange: [look.figure - 0.05, look.figure + 0.05],
       });
+  const eyeOpacity = eyesPulse
+    ? eyeAnim.interpolate({ inputRange: [0, 1], outputRange: [look.eyes * 0.55, look.eyes] })
+    : look.eyes;
 
-  return (
-    <Animated.Image
-      source={SHADOW_FIGURE_IMG}
-      resizeMode="contain"
-      resizeMethod="resize"
+  // A near-black figure over a near-black sky cannot be seen, so it stands in
+  // front of a soft backlight in the phase's colour: the halo is what gives
+  // the silhouette an edge. One tinted radial-gradient image stretched to an
+  // oval (stacked Views banded into visible rings; no shadowRadius on Android).
+  const haloW = width * SHADOW_HALO_WIDTH;
+  const haloH = height * SHADOW_HALO_HEIGHT;
+  const halo = (
+    <Image
+      source={SHADOW_HALO_IMG}
+      resizeMode="stretch"
+      fadeDuration={0}
       style={{
         position: 'absolute',
-        // Rise well above the roofline; the base dissolves behind the house.
-        top: -height * 0.55,
+        left: width / 2 - haloW / 2,
+        top: height * SHADOW_HALO_CENTER_Y - haloH / 2,
+        width: haloW,
+        height: haloH,
+        tintColor: look.halo,
+        opacity: look.haloOpacity,
+      }}
+    />
+  );
+  const eye = (fx: number, key: string) => {
+    const core = width * SHADOW_EYE_CORE;
+    const glow = width * SHADOW_EYE_GLOW;
+    const cx = width * fx;
+    const cy = height * SHADOW_EYE_Y;
+    return (
+      <React.Fragment key={key}>
+        <View style={{ position: 'absolute', left: cx - glow / 2, top: cy - glow / 2, width: glow, height: glow, borderRadius: glow / 2, backgroundColor: look.eyeGlow, opacity: 0.45 }} />
+        <View style={{ position: 'absolute', left: cx - core / 2, top: cy - core / 2, width: core, height: core, borderRadius: core / 2, backgroundColor: look.eyeCore }} />
+      </React.Fragment>
+    );
+  };
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        // The head and shoulders rise above the roofline (low enough that the
+        // eyes clear the header when the roof is in view); the base dissolves
+        // behind the house.
+        top: -height * SHADOW_FIGURE_RISE,
         alignSelf: 'center',
         width,
         height,
-        opacity,
         zIndex: -3, // Behind ground (-2) and trees (-1), in front of the sky
         transform: [{ translateX: 14 }], // Slight off-center for composition
       }}
-    />
+    >
+      {halo}
+      <Animated.Image
+        source={SHADOW_FIGURE_IMG}
+        resizeMode="contain"
+        resizeMethod="resize"
+        fadeDuration={0}
+        style={{ position: 'absolute', left: 0, top: 0, width, height, opacity }}
+      />
+      {look.eyes > 0 && (
+        <Animated.View style={{ position: 'absolute', left: 0, top: 0, width, height, opacity: eyeOpacity }}>
+          {eye(SHADOW_EYE_LEFT_X, 'l')}
+          {eye(SHADOW_EYE_RIGHT_X, 'r')}
+        </Animated.View>
+      )}
+    </View>
   );
 };
 
@@ -1586,6 +1659,34 @@ const PIT_MARGIN_TOP = 0;
 // the contact shadow seat, and the house-vs-art geometry notes below.
 const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 140
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
+// How far the figure rises above the house container's top, as a share of
+// its height (was 0.55, which parked the eyes behind the header even with the
+// roof in view).
+const SHADOW_FIGURE_RISE = 0.4;
+// Eye centres measured from shadow_figure.png (600x1200): x 273.7 / 325.7,
+// y 210.8. The eye layer redraws them brighter over the baked 66-pixel eyes.
+const SHADOW_EYE_LEFT_X = 273.7 / 600;
+const SHADOW_EYE_RIGHT_X = 325.7 / 600;
+const SHADOW_EYE_Y = 210.8 / 1200;
+const SHADOW_EYE_CORE = 0.024;
+const SHADOW_EYE_GLOW = 0.075;
+// Backlight halo: an oval around the head and shoulders.
+const SHADOW_HALO_WIDTH = 1.25;
+const SHADOW_HALO_HEIGHT = 0.62;
+const SHADOW_HALO_CENTER_Y = 0.3;
+/**
+ * Per-phase look. Phase 3: a faint violet backlight, no eyes yet (the eyes are
+ * the reveal). Phase 4: crimson backlight, the figure near-solid, eyes lit and
+ * pulsing. Phase 5: settled mauve, the eyes dim and still.
+ */
+const SHADOW_FIGURE_LOOK: Record<3 | 4 | 5, {
+  figure: number; halo: string; haloOpacity: number;
+  eyes: number; eyeCore: string; eyeGlow: string; eyePulse: boolean;
+}> = {
+  3: { figure: 0.55, halo: '#6B55A8', haloOpacity: 0.6, eyes: 0, eyeCore: '#FF3B3B', eyeGlow: '#C0122B', eyePulse: false },
+  4: { figure: 0.9, halo: '#A3203A', haloOpacity: 0.85, eyes: 1, eyeCore: '#FF4A3D', eyeGlow: '#D0142E', eyePulse: true },
+  5: { figure: 0.65, halo: '#6E5A86', haloOpacity: 0.55, eyes: 0.45, eyeCore: '#E0707A', eyeGlow: '#8E3A55', eyePulse: false },
+};
 
 // Baseline gap between the pit entrance and the container bottom (before the
 // PLAY-dock clearance below is added). House-vs-art alignment comes from the
@@ -2523,7 +2624,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(function HouseWo
                 {/* The pre-storm sky stirs: rare silent heat lightning at the
                     horizon, Phase 3 ONLY (the Phase 4+ sky belongs to the
                     entity and stays honestly empty). */}
-                {ambientMotionEnabled && currentPhase === 3 && <DistantLightning />}
+                {ambientMotionEnabled && currentPhase === 3 && <DistantLightning height={SKY_BOX_HEIGHT + upperAtmosphereHeight + 240} />}
 
               {/* Songbirds cross only the bright phases (F16); from Phase 3 on
                   the sky stays honestly empty rather than an unnatural cross-

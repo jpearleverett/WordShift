@@ -30,11 +30,17 @@ export function StoryPortrait({ speaker, phase, passage, size = STORY_PORTRAIT_S
   if (!sprites) return null;
   const idle = phase >= 4 ? sprites.robed ?? sprites.idle : sprites.idle;
   const talk = phase >= 4 ? sprites.robedTalk ?? idle : sprites.talk ?? idle;
+  // Both frames stay mounted and only their opacity changes. Swapping one
+  // Image's `source` re-decoded it and, on Android, replayed the default
+  // 300 ms fade-in, so the resident blinked on every talk tick and every page.
+  const layer = [styles.sprite, { width: size * 1.36, height: size * 1.36, left: -size * 0.18, top: -size * 0.17 }];
   return <View style={[styles.frame, { width: size, height: size }]} accessible={false} pointerEvents="none">
-    <Image source={talking ? talk : idle} resizeMode="contain" style={[styles.sprite, { width: size * 1.36, height: size * 1.36, left: -size * 0.18, top: -size * 0.17 }]} accessible={false} />
+    <Image source={idle} resizeMode="contain" fadeDuration={0} style={[layer, talking && talk !== idle && styles.hidden]} accessible={false} />
+    {talk !== idle && <Image source={talk} resizeMode="contain" fadeDuration={0} style={[layer, !talking && styles.hidden]} accessible={false} />}
   </View>;
 }
 const styles = StyleSheet.create({
   frame: { width: STORY_PORTRAIT_SIZE, height: STORY_PORTRAIT_SIZE, alignSelf: 'center', overflow: 'hidden', marginBottom: STORY_PORTRAIT_MARGIN_BOTTOM },
   sprite: { width: 158, height: 158, position: 'absolute', left: -21, top: -20 },
+  hidden: { opacity: 0 },
 });

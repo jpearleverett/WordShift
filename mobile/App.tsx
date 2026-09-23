@@ -5206,6 +5206,7 @@ function MainApp() {
             pendingPhaseTransition={persistence.pendingPhaseTransition}
             onNavigationGuardChange={setPitNavigationGuard}
             onPhaseTransitionReady={showPendingCeremony}
+            cinematicActive={phaseTransitionEvent !== null && phaseTransitionEvent.presentation !== 'dialogue'}
             onPhaseTransitionConfirmed={(newPhase) => {
               // Refresh all persistence state to pick up the new currentPhase
               persistenceActions.refreshStats();

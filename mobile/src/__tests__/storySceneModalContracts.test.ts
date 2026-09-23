@@ -124,3 +124,18 @@ describe('StorySceneModal saving affordance is delayed, never per-page', () => {
     expect(src).toContain('visible={!!memory && !!line}');
   });
 });
+
+describe('story pages never blink on Android', () => {
+  const portrait = fs.readFileSync(path.join(__dirname, '../components/StoryPortrait.tsx'), 'utf8');
+  it('draws page art without the default 300 ms Android fade', () => {
+    expect(flat).toContain('testID="story-scene-art" resizeMode="contain" fadeDuration={0}');
+  });
+  it('keeps both portrait frames mounted and toggles opacity instead of swapping source', () => {
+    expect(portrait).not.toContain('source={talking ? talk : idle}');
+    expect((portrait.match(/fadeDuration=\{0\}/g) ?? []).length).toBe(2);
+    expect(portrait).toContain('hidden: { opacity: 0 }');
+  });
+  it('holds the card at its tallest height within a scene', () => {
+    expect(flat).toContain('minHeight: cardFloor && cardFloor.scene === memory?.scene.id');
+  });
+});

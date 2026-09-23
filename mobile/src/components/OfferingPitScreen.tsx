@@ -900,6 +900,9 @@ export function computeDevourAmberIncrement(
 }
 
 /** Timers count foreground viewing time, so backgrounding cannot finish a rite. */
+/** Longest the hand-off cover waits for a cinematic that never arrives. */
+const HANDOFF_COVER_SAFETY_MS = 5000;
+
 export function createPitCeremonyClock(initiallyActive = true) {
   type Entry = { callback: () => void; remaining: number; started: number; timer: ReturnType<typeof setTimeout> | null };
   const entries = new Set<Entry>();
@@ -963,6 +966,12 @@ interface OfferingPitScreenProps {
   onPhaseTransitionConfirmed?: (newPhase: DialoguePhase) => void;
   /** Drain any already-committed ceremony after a recovered phase save. */
   onPhaseTransitionReady?: () => void;
+  /**
+   * True while the app-level phase cinematic is on screen. The pit holds an
+   * opaque cover from its last ceremony line until that cinematic has come
+   * and gone, so the redrawn next-phase pit never shows in between.
+   */
+  cinematicActive?: boolean;
   /** Let App's Android Back handler consult this screen's immediate lock. */
   onNavigationGuardChange?: (guard: (() => boolean) | null) => void;
   /** Whether onboarding is active — suppresses normal interaction */
@@ -997,6 +1006,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   pendingPhaseTransition,
   onPhaseTransitionConfirmed,
   onPhaseTransitionReady,
+  cinematicActive = false,
   onNavigationGuardChange,
   isOnboarding,
   onboardingStep,
@@ -1173,6 +1183,32 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     }
   }, [ceremonyStatus, pendingPhaseTransition]);
   const [ceremonyIgniteStep, setCeremonyIgniteStep] = useState(-1);
+  // Hand-off cover. A confirmed transition used to drop the ceremony overlay
+  // at once: the pit re-rendered in the NEW phase (sky, glow, wards) while the
+  // app was still reading the ceremony queue and fading its cinematic in, so
+  // the player saw the next phase's pit flash before the scene. The cover goes
+  // opaque with the last line and lifts only once the cinematic has appeared
+  // and finished; if no cinematic arrives, a safety timeout lifts it anyway.
+  const [handoffCover, setHandoffCover] = useState(false);
+  const [handoffOpacity] = useState(() => new Animated.Value(0));
+  const handoffSawCinematic = useRef(false);
+  useEffect(() => {
+    if (!handoffCover) return;
+    if (cinematicActive) { handoffSawCinematic.current = true; return; }
+    // Fade the cover off, then unmount it on a timer rather than on the
+    // animation callback, so an interrupted fade can never leave it blocking.
+    const lift = () => {
+      Animated.timing(handoffOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+      return setTimeout(() => setHandoffCover(false), 320);
+    };
+    let unmountTimer: ReturnType<typeof setTimeout> | null = null;
+    const safety = handoffSawCinematic.current ? null : setTimeout(() => { unmountTimer = lift(); }, HANDOFF_COVER_SAFETY_MS);
+    if (handoffSawCinematic.current) unmountTimer = lift();
+    return () => {
+      if (safety) clearTimeout(safety);
+      if (unmountTimer) clearTimeout(unmountTimer);
+    };
+  }, [handoffCover, cinematicActive, handoffOpacity]);
   const [ceremonyTextIndex, setCeremonyTextIndex] = useState(-1);
   // Tap-to-advance: the pending "advance to next line" action, so a tap can
   // pace the sequence (an NG+ player's fourth ignition need not sit through
@@ -1968,11 +2004,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               // during this save must still hand it the committed transition.
               if (result) {
                 if (mountedRef.current) {
-                  Animated.timing(ceremonyOverlayOpacity, {
-                    toValue: 0,
-                    duration: 300,
-                    useNativeDriver: true,
-                  }).start();
+                  // Cover first, then retire the ceremony overlay, so no
+                  // frame shows the pit already redrawn in the new phase.
+                  // The ceremony overlay is already 70% black, so the cover
+                  // lands at full opacity in the same commit that retires it.
+                  handoffSawCinematic.current = false;
+                  handoffOpacity.setValue(1);
+                  setHandoffCover(true);
                   setCeremonyStatus('complete');
                 }
                 onPhaseTransitionConfirmed?.(result.newPhase);
@@ -2033,7 +2071,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         }, 650);
       }, PIT_WARD_COUNT * 200 + 200);
     };
-  }, [ceremonyStatus, pendingPhaseTransition, wardFlashAnims, flashPitSurge, spawnShockwave, ceremonyOverlayOpacity, ceremonyTextOpacity, onPhaseTransitionConfirmed, onPhaseTransitionReady, ceremonyClock]);
+  }, [ceremonyStatus, pendingPhaseTransition, wardFlashAnims, flashPitSurge, spawnShockwave, ceremonyOverlayOpacity, ceremonyTextOpacity, handoffOpacity, onPhaseTransitionConfirmed, onPhaseTransitionReady, ceremonyClock]);
 
   // ---- Spawn amber rise ----
   const spawnAmberRise = useCallback((_amberAmount: number) => {
@@ -3324,6 +3362,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           />
         )}
       </View>
+      {handoffCover && (
+        <Animated.View
+          testID="pit-handoff-cover"
+          style={[styles.handoffCover, { opacity: handoffOpacity }]}
+          pointerEvents="auto"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
+      )}
     </View>
   );
 };
@@ -3619,6 +3666,13 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number) => {
     textShadowColor: 'rgba(20, 10, 6, 0.9)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
+  },
+  handoffCover: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#000',
+    zIndex: 1000,
+    elevation: 1000,
   },
   ceremonyOverlay: {
     position: 'absolute',
