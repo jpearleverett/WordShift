@@ -1,0 +1,46 @@
+# Publish an over-the-air update on Expo's servers.
+#
+# Run from mobile/ (Termux works: nothing is bundled on the phone, which
+# cannot run the Hermes compiler):
+#   npx eas-cli@latest workflow:run .eas/workflows/publish-update.yml \
+#     -F channel=production -F message="What changed"
+#
+# JavaScript and asset changes only. Anything native needs a new build.
+# WORDSHIFT_RELEASE_CHANNEL must equal the channel: app.config.js derives the
+# runtime (<version>-<channel>) and the ad mode from it, so a mismatch would
+# publish an update no installed build accepts. The before_update check
+# refuses to publish if they disagree. See docs/OTA_UPDATES.md.
+name: Publish OTA update
+run_name: OTA to ${{ inputs.channel }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        type: choice
+        description: 'Which installed builds receive it (production = the store build).'
+        options:
+          - production
+          - internal-testing
+        required: true
+      message:
+        type: string
+        description: 'What changed, for the update list.'
+        required: true
+
+jobs:
+  publish:
+    name: Publish Android update
+    type: update
+    environment: production
+    env:
+      WORDSHIFT_RELEASE_CHANNEL: ${{ inputs.channel }}
+    params:
+      channel: ${{ inputs.channel }}
+      platform: android
+      message: ${{ inputs.message }}
+    hooks:
+      before_update:
+        - name: Check the runtime and ad mode match the channel
+          run: |
+            if [ -f eas.json ]; then node scripts/tools/checkOtaConfig.mjs; else cd mobile && node scripts/tools/checkOtaConfig.mjs; fi

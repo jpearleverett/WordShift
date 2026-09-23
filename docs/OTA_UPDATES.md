@@ -55,6 +55,29 @@ commit when preparing the production-compatible update, then validate it on its
 matching signed binary.
 [Expo deployment documentation](https://docs.expo.dev/eas-update/deployment/)
 
+## Publishing from a phone (Termux): run it on Expo's servers
+
+`eas update` bundles the JavaScript on the machine it runs on, and the Hermes
+compiler has no Android build, so from Termux it fails with `Unsupported host
+platform for Hermes compiler: android`. Use the EAS workflow instead; it uploads
+the project and bundles on Expo's Linux servers. From `mobile/`, on the reviewed
+commit:
+
+```bash
+npx eas-cli@latest workflow:run .eas/workflows/publish-update.yml -F channel=production -F message="Describe the reviewed fix"
+```
+
+`.eas/workflows/publish-update.yml` sets `WORDSHIFT_RELEASE_CHANNEL` from the same
+`channel` input it publishes to (`production` or `internal-testing`), publishes
+Android only, and runs `scripts/tools/checkOtaConfig.mjs` before publishing: the
+check stops the job unless the runtime is `<version>-<channel>`, the ad mode matches
+the channel (live only on production) and `creatorCode` is empty. The CLI prints a
+link to the run on expo.dev; its logs show the check and the published group. Then
+verify and confirm delivery with steps 3 and 4 below. Sentry source maps upload
+automatically when `SENTRY_AUTH_TOKEN` is an EAS environment variable in the
+`production` environment; if it is missing, the job logs the failure and still
+publishes. `otaWorkflow.test.ts` pins the workflow's channel wiring.
+
 ## Production hotfix runbook
 
 Only JavaScript/asset changes ship this way; anything native needs a new binary
