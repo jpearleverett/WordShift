@@ -1,7 +1,7 @@
 {
   "campaign": "refresh-2026-09",
   "generated_by": "node mobile/scripts/store/buildRefresh.mjs",
-  "git_head": "4fc0121f34bbbc6d979190d512e4b60c6a132419",
+  "git_head": "5e8d9d3d310e216a8820604ef60bdf8f27ee3840",
   "locale": "en-US",
   "gameplay_provenance": "Gameplay images are genuine renders of the current WordShift build (Expo web, headless Chromium) from raw/, made by scripts/store/captureRefresh.mjs; see raw/provenance.json and raw/SUBSTITUTIONS.md. Only local progression was seeded and only real UI input was used. Captions, bands, seams, backdrops, arrows and shadows sit outside the captures. Not Android device captures.",
   "phone_template": {
@@ -52,7 +52,8 @@
           }
         }
       ],
-      "treatment": "frames A and B cropped to their rows (8 CSS in from each screen edge), scaled together with lanczos3 and shown as two framed panels with a gap and a down arrow between, on a darker board green"
+      "treatment": "frames A and B cropped to their rows (8 CSS in from each screen edge), scaled together with lanczos3 and shown as two framed panels with a gap and a down arrow between, on a darker board green",
+      "scale": 0.61664
     },
     {
       "file": "upload/phone/02-words-build-a-home.png",
@@ -83,7 +84,8 @@
           }
         }
       ],
-      "treatment": "capture window placed 1:1 (no resampling)"
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
     },
     {
       "file": "upload/phone/03-cozy-mostly.png",
@@ -114,7 +116,8 @@
           }
         }
       ],
-      "treatment": "capture window placed 1:1 (no resampling)"
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
     },
     {
       "file": "upload/phone/04-stories-in-each-room.png",
@@ -145,7 +148,8 @@
           }
         }
       ],
-      "treatment": "capture window placed 1:1 (no resampling)"
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
     },
     {
       "file": "upload/phone/05-then-the-rules-shift.png",
@@ -176,7 +180,8 @@
           }
         }
       ],
-      "treatment": "capture window placed 1:1 (no resampling)"
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
     },
     {
       "file": "upload/phone/06-every-word-goes-somewhere.png",
@@ -207,7 +212,8 @@
           }
         }
       ],
-      "treatment": "capture window placed 1:1 (no resampling)"
+      "treatment": "capture window placed 1:1 (no resampling)",
+      "pixel_proof": "capture area equals the raw window pixel for pixel"
     },
     {
       "file": "upload/phone/07-tea-or-cocoa.png",
@@ -238,7 +244,8 @@
           }
         }
       ],
-      "treatment": "story card lifted off the dimmed scene at its frame outline, placed on its own art (cover, blur 24, brightness 0.8) with a soft shadow"
+      "treatment": "story card lifted off the dimmed scene at its frame outline, placed on its own art (cover, blur 24, brightness 0.8) with a soft shadow",
+      "scale": 0.89286
     },
     {
       "file": "upload/phone/08-stay-for-supper.png",
@@ -269,7 +276,8 @@
           }
         }
       ],
-      "treatment": "story card lifted off the dimmed scene at its frame outline and scaled to fit below the page's own painting, which is shown sharp and full width above it and fades into the same painting blurred (blur 24, brightness 0.8); soft shadow under the card"
+      "treatment": "story card lifted off the dimmed scene at its frame outline and scaled to fit below the page's own painting, which is shown sharp and full width above it and fades into the same painting blurred (blur 24, brightness 0.8); soft shadow under the card",
+      "scale": 0.7427
     },
     {
       "file": "upload/tablet/t1-board.png",
