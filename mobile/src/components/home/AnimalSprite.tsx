@@ -659,33 +659,37 @@ const FLOOR_OFFSET: Record<AnimalType, number> = {
   kakapo: 0,
 };
 
-// Where the "!" new-dialogue badge sits, per animal (dp inside the 90x90 sprite
-// box; the pair is the badge's own absolute top/right inset). Measured off the
-// art like FLOOR_OFFSET, not guessed: every character PNG is 500x500 drawn
-// `contain` into a 90dp box and none of them fills it, so a badge pinned to the
-// CONTAINER corner floated 13-20dp out in dead space instead of hugging the
-// animal. Derivation (re-run if character art is re-exported): take the alpha
-// bbox point P that maximises (x - y) in dp space (the up-right extreme of the
-// silhouette), put the 20dp badge's centre at P + (4.95, -4.95) so it sits
-// tangent to that diagonal with a ~3dp bite; repeat on the mirrored art (the
-// up-LEFT extreme, since `body` carries a scaleX facing flip the badge never
-// inherits) and average the two so the anchor holds in both facings. Then
-// right = 80 - centreX and top = centreY - 10. Values are the idle/robed
-// average, rounded to whole dp.
-const BADGE_ANCHOR: Record<AnimalType, { top: number; right: number }> = {
-  axolotl: { top: 8, right: 3 },
-  aye_aye: { top: -4, right: 6 },
-  capybara: { top: 6, right: 17 },
-  fennec_fox: { top: 3, right: 6 },
-  fox: { top: 5, right: 19 },
-  kakapo: { top: 0, right: 21 },
-  owl: { top: 7, right: 20 },
-  pangolin: { top: 12, right: 18 },
-  rabbit: { top: -2, right: 18 },
-  red_panda: { top: 4, right: 15 },
-  sloth: { top: 9, right: 19 },
-  tarsier: { top: 3, right: 15 },
-  wombat: { top: 5, right: 17 },
+// Where the "!" new-dialogue badge sits, per animal AND per facing (dp inside
+// the 90x90 sprite box; each pair is the badge's own absolute top/right
+// inset). Measured off the art like FLOOR_OFFSET, not guessed: every character
+// PNG is 500x500 drawn `contain` into a 90dp box and none of them fills it, so
+// a badge pinned to the CONTAINER corner floated 13-20dp out in dead space.
+// Derivation (re-run if character art is re-exported): take the alpha bbox
+// point P that maximises (x - y) in dp space (the up-right extreme of the
+// silhouette) and put the 20dp badge's centre at P + (7.07, -7.07), tangent to
+// that diagonal; right = 80 - centreX and top = centreY - 10, averaged over
+// idle and robed. `right` is for the animal facing right (body scaleX 1),
+// `flipped` for facing left, measured on the mirrored art: the badge is an
+// unflipped sibling of `body`, and one anchor averaged over both facings put
+// it on the head of any animal whose head sits off-centre (Panko's swings
+// 19dp). The fennec's idle art natively faces left, so its pairs swap. Axel
+// keeps one tuned pair: his art carries its own scale transform and swings
+// under 5dp.
+type BadgeInset = { top: number; right: number };
+const BADGE_ANCHOR: Record<AnimalType, { facingRight: BadgeInset; flipped: BadgeInset }> = {
+  axolotl: { facingRight: { top: 8, right: 3 }, flipped: { top: 8, right: 3 } },
+  aye_aye: { facingRight: { top: -5, right: 2 }, flipped: { top: -7, right: 7 } },
+  capybara: { facingRight: { top: 5, right: 16 }, flipped: { top: 4, right: 14 } },
+  fennec_fox: { facingRight: { top: 0, right: 5 }, flipped: { top: 1, right: 3 } },
+  fox: { facingRight: { top: 3, right: 11 }, flipped: { top: 2, right: 22 } },
+  kakapo: { facingRight: { top: -2, right: 17 }, flipped: { top: -3, right: 20 } },
+  owl: { facingRight: { top: 6, right: 11 }, flipped: { top: 6, right: 23 } },
+  pangolin: { facingRight: { top: 13, right: 5 }, flipped: { top: 9, right: 24 } },
+  rabbit: { facingRight: { top: -4, right: 17 }, flipped: { top: -4, right: 16 } },
+  red_panda: { facingRight: { top: 2, right: 13 }, flipped: { top: 2, right: 14 } },
+  sloth: { facingRight: { top: 5, right: 15 }, flipped: { top: 6, right: 20 } },
+  tarsier: { facingRight: { top: 1, right: 9 }, flipped: { top: 0, right: 17 } },
+  wombat: { facingRight: { top: 4, right: 15 }, flipped: { top: 3, right: 16 } },
 };
 
 // The emoji fallback body is a 70dp circle, not the 90dp sprite box (see
@@ -1473,6 +1477,24 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   // Phase-aware cottage puff behind the ambient emote sprite.
   const emoteBubbleTheme = getEmoteBubbleTheme(currentPhase);
 
+
+  // The badge is an unflipped sibling of `body`, so it follows the facing
+  // flip itself: it sits at the facing-right anchor and slides to the
+  // mirrored one on the same scaleX value (native driver, so it travels with
+  // the 150ms turn instead of jumping).
+  // Built once per sprite (an animal's type never changes under a mounted
+  // sprite), both variants up front, so a re-render never swaps the
+  // interpolation nodes the native driver is tracking.
+  const [badgeAnchors] = useState(() => {
+    const build = (facingRight: BadgeInset, flipped: BadgeInset) => ({
+      inset: facingRight,
+      translateX: scaleX.interpolate({ inputRange: [-1, 1], outputRange: [facingRight.right - flipped.right, 0] }),
+      translateY: scaleX.interpolate({ inputRange: [-1, 1], outputRange: [flipped.top - facingRight.top, 0] }),
+    });
+    const { facingRight, flipped } = BADGE_ANCHOR[animal.type] ?? { facingRight: EMOJI_BADGE_ANCHOR, flipped: EMOJI_BADGE_ANCHOR };
+    return { sprite: build(facingRight, flipped), emoji: build(EMOJI_BADGE_ANCHOR, EMOJI_BADGE_ANCHOR) };
+  });
+  const badgeAnchor = CHARACTER_SPRITES[animal.type] && !spriteLoadFailed ? badgeAnchors.sprite : badgeAnchors.emoji;
   return (
     <Animated.View
       style={[
@@ -1772,11 +1794,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               testID="animal-pending-gift"
               style={[
                 styles.notificationBadge,
-                CHARACTER_SPRITES[animal.type] && !spriteLoadFailed
-                  ? BADGE_ANCHOR[animal.type]
-                  : EMOJI_BADGE_ANCHOR,
+                badgeAnchor.inset,
                 styles.giftBadge,
-                { transform: [{ scale: notificationPulse }] },
+                { transform: [{ translateX: badgeAnchor.translateX }, { translateY: badgeAnchor.translateY }, { scale: notificationPulse }] },
               ]}
               pointerEvents="none"
               importantForAccessibility="no-hide-descendants"
@@ -1796,10 +1816,8 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             <Animated.View
               style={[
                 styles.notificationBadge,
-                CHARACTER_SPRITES[animal.type] && !spriteLoadFailed
-                  ? BADGE_ANCHOR[animal.type]
-                  : EMOJI_BADGE_ANCHOR,
-                { transform: [{ scale: notificationPulse }] },
+                badgeAnchor.inset,
+                { transform: [{ translateX: badgeAnchor.translateX }, { translateY: badgeAnchor.translateY }, { scale: notificationPulse }] },
               ]}
             >
               {/* The candy alert pip (generateGameIcons chrome) fills the badge

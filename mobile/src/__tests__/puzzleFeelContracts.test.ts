@@ -875,10 +875,12 @@ describe('new-dialogue badge anchor contract', () => {
     expect(from).toBeGreaterThan(-1);
     const block = SPRITE_SRC.slice(from, SPRITE_SRC.indexOf('};', from));
     const out: Record<string, { top: number; right: number }> = {};
-    const re = /(\w+): \{ top: (-?\d+), right: (-?\d+) \}/g;
+    // One anchor per facing: `facingRight` and `flipped` (the mirrored art).
+    const re = /(\w+): \{ facingRight: \{ top: (-?\d+), right: (-?\d+) \}, flipped: \{ top: (-?\d+), right: (-?\d+) \} \}/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(block)) !== null) {
       out[m[1]] = { top: Number(m[2]), right: Number(m[3]) };
+      out[`${m[1]}:flipped`] = { top: Number(m[4]), right: Number(m[5]) };
     }
     return out;
   };
@@ -887,18 +889,20 @@ describe('new-dialogue badge anchor contract', () => {
     const table = anchorTable();
     for (const type of animalTypes()) {
       expect(table[type]).toBeDefined();
+      expect(table[`${type}:flipped`]).toBeDefined();
     }
   });
 
   it('pulls the badge inside the 90dp sprite box for every animal', () => {
     // The old corner pin (top -8 / right -8) put the badge centre entirely
     // outside the box, ~13-20dp from the nearest painted pixel. Every tuned
-    // anchor must sit at or inside the box edge (right >= -1, top >= -5) and
-    // stay in the upper-right quadrant.
+    // anchor must sit at or inside the box edge (right >= -1, top >= -8: the
+    // aye-aye's ears reach the top of its box) and stay in the upper-right
+    // quadrant.
     for (const a of Object.values(anchorTable())) {
       expect(a.right).toBeGreaterThan(-2);
       expect(a.right).toBeLessThan(35);
-      expect(a.top).toBeGreaterThan(-6);
+      expect(a.top).toBeGreaterThan(-9);
       expect(a.top).toBeLessThan(35);
     }
   });
@@ -911,6 +915,13 @@ describe('new-dialogue badge anchor contract', () => {
     const bodyClose = SPRITE_SRC.indexOf('</Animated.View>', bodyOpen);
     expect(bodyOpen).toBeGreaterThan(-1);
     expect(badge).toBeGreaterThan(bodyClose);
+  });
+
+  it('follows the facing flip on the body\'s own scaleX, not one averaged anchor', () => {
+    // An average of both facings put the badge on the head of every animal
+    // whose head sits off-centre (Panko swings 19dp between facings).
+    expect(SPRITE_SRC).toContain("translateX: scaleX.interpolate({ inputRange: [-1, 1], outputRange: [facingRight.right - flipped.right, 0] }),");
+    expect(SPRITE_SRC).toContain('{ transform: [{ translateX: badgeAnchor.translateX }, { translateY: badgeAnchor.translateY }, { scale: notificationPulse }] }');
   });
 });
 
