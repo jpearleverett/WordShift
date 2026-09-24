@@ -20,7 +20,8 @@ const CONFIG = path.join(DOCS, '_config.yml');
 /** The four public pages. Their URLs are wired into the app and the store listing. */
 const PUBLIC_PAGES = ['index.md', 'privacy-policy.md', 'terms.md', 'data-deletion.md'];
 /** Published on purpose when present (AdMob verification). */
-const OPTIONAL_PUBLIC = ['app-ads.txt'];
+// CNAME is written by GitHub when a custom domain is set in Settings > Pages.
+const OPTIONAL_PUBLIC = ['app-ads.txt', 'CNAME'];
 
 function readExcludes(): string[] {
   const lines = fs.readFileSync(CONFIG, 'utf8').split('\n');
