@@ -1,0 +1,150 @@
+{
+  "model": "RunPod seedream-v4-edit, 1536*1024",
+  "style_suffix": "ART STYLE (must match the reference illustration's style exactly): sophisticated 16-bit storybook pixel art, disciplined hand-placed pixel clusters, rich dimensional lighting and tactile material shading, restrained palette, polished indie game chapter illustration, cozy woodland animal cottage world (wooden beams, stone hearth, knitted blankets, moss green and walnut brown). Use the reference image only for style, palette handling and rendering quality, not for its composition. Landscape composition, strong readable silhouettes at phone size, darker quieter edges. No text, no letters, no numbers, no signs with writing, no UI, no logo, no watermark, no people, no humans.",
+  "references": {
+    "ref_night.png": "assets/story/pages/council-07.webp",
+    "ref_day.png": "assets/story/pages/after-02.webp",
+    "ref_demon_head.png": "entity_back.png + entity_eyes.png composited on #141033, top 760px"
+  },
+  "chosen": {
+    "arrival_table": {
+      "candidate": "arrival_table_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. Midnight inside the cottage: close view of a long wooden table in a dark room lit by one candle. On the table lies a short row of small plain wooden letter tiles (blank faces, no letters), the last tile just placed and faintly glowing. Two cups, a folded blanket over a chair. A thin line of crimson light glows between the floorboards. Everything very still, holding its breath.",
+      "refs": [
+        "ref_night.png"
+      ]
+    },
+    "arrival_call": {
+      "candidate": "arrival_call_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. Night, outside a cozy woodland cottage. In front of the house is an old round stone well (a pit) glowing from inside. Dozens of thin ribbons of pale gold light rise out of the well and stream up into the cottage walls, windows and roof, as if the house is drinking them in; the whole house is traced in rising light. Deep indigo sky, dark pines. Beautiful and eerie.",
+      "refs": [
+        "ref_night.png"
+      ]
+    },
+    "arrival_house": {
+      "candidate": "arrival_house_a",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. Night, the cozy woodland cottage seen from its garden gate. Every window and doorway glows warm amber, and in the lit doorways and windows stand small dark silhouettes of woodland animals waiting (a fox, a rabbit, an owl, a wombat, a tiny bird on the roof). Lanterns along the path. Quiet anticipation under a deep indigo sky.",
+      "refs": [
+        "ref_night.png"
+      ]
+    },
+    "arrival_seam": {
+      "candidate": "arrival_seam_a",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. Night, looking up past the cottage roof and chimney at the sky. The dark indigo sky is split open along one perfectly straight vertical crimson seam, like fabric coming undone at a stitch, crimson light leaking out, stars bending toward it. On the roof ridge a small round green parrot (a kakapo) stands in a little hollow, looking up.",
+      "refs": [
+        "ref_night.png"
+      ]
+    },
+    "arrival_descent": {
+      "candidate": "arrival_descent_t2",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image (a detailed cozy cottage pixel-art painting). Scene: midnight, outside, looking up at a small woodland cottage with warm lit windows at the bottom of the frame, pine trees around it. The whole deep indigo night sky above is torn open by one straight vertical crimson seam, and out of it descends the enormous creature from the SECOND reference image: a colossal demon made of billowing dark smoke, curved horns, two burning red eyes, a wide grin of long fangs, glowing red cracks across its face, long smoky arms with clawed hands reaching down toward the cottage roof. Its smoke is soft, translucent and painterly at the edges, filling the upper sky. The sky is dark everywhere, deep indigo and violet with crimson light spilling from the seam; no white areas. Awe and dread.",
+      "refs": [
+        "ref_night.png",
+        "ref_demon_head.png"
+      ]
+    },
+    "arrival_hold": {
+      "candidate": "arrival_hold_a",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. Night. The giant smoke demon from the SECOND reference image (horned smoke head, burning red eyes, fanged grin with red cracks) has come down behind the small woodland cottage and wraps its two long smoky clawed hands around the house's walls, holding it carefully like a lantern, not crushing it. Its head rises above the roof, eyes glowing; the cottage windows still glow warm amber below. Dark indigo sky, crimson light. Tender and terrifying.",
+      "refs": [
+        "ref_night.png",
+        "ref_demon_head.png"
+      ]
+    },
+    "arrival_rooms": {
+      "candidate": "arrival_rooms_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. Inside a cozy cottage living room at night, lamplit. Thin tendrils of dark violet smoke curl through the room, straightening a crooked picture frame on the wall, closing the crack in a chipped teacup that hovers just above the table, smoothing a rumpled blanket. Warm amber lamplight against cool violet smoke with faint crimson glints. Uncanny and gentle.",
+      "refs": [
+        "ref_night.png"
+      ]
+    },
+    "arrival_door": {
+      "candidate": "arrival_door_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. Inside the cottage at night: a narrow wooden hallway filling with dark violet smoke that presses right up against one closed wooden door and stops at its frame; not a wisp crosses it. A warm line of lamplight glows under the door. A simple wooden latch holds it shut. Protective, tense.",
+      "refs": [
+        "ref_night.png"
+      ]
+    },
+    "arrival_gate": {
+      "candidate": "arrival_gate_a",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. Night at the cottage garden gate: the little wooden gate stands open and a pale stone path leads away past the last trees into moonlit meadows and distant hills. Behind, the garden is full of dark violet smoke, but the smoke parts and draws back from the gate, leaving the path completely clear. A small flat stone beside the gate points outward. Freedom to leave.",
+      "refs": [
+        "ref_night.png"
+      ]
+    },
+    "arrival_bell": {
+      "candidate": "arrival_bell_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. Inside a small wooden bell tower at night: a large old bronze bell caught mid-swing, its rope pulled taut, moonlight slanting through the wooden louvers, dust in the light, and through the openings a crimson glow in the sky. A single ring about to sound.",
+      "refs": [
+        "ref_night.png"
+      ]
+    },
+    "arrival_settle": {
+      "candidate": "arrival_settle_a",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. The hour before dawn. The woodland cottage seen from the garden. The giant smoke creature from the SECOND reference image has settled down around the house like low heavy fog: its horns just visible in the mist above the roof, its eyes now closed, its smoky arms lying around the walls. The crimson seam in the sky has closed to a faint scar. First grey-blue light on the horizon, one warm window still lit. An uneasy calm.",
+      "refs": [
+        "ref_night.png",
+        "ref_demon_head.png"
+      ]
+    },
+    "morning_house": {
+      "candidate": "arrival_settle_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image. The hour before dawn. The woodland cottage seen from the garden. The giant smoke creature from the SECOND reference image has settled down around the house like low heavy fog: its horns just visible in the mist above the roof, its eyes now closed, its smoky arms lying around the walls. The crimson seam in the sky has closed to a faint scar. First grey-blue light on the horizon, one warm window still lit. An uneasy calm.",
+      "refs": [
+        "ref_night.png",
+        "ref_demon_head.png"
+      ],
+      "note": "the generated morning creature read as a cute plush animal to a blind reviewer; replaced by this candidate"
+    },
+    "morning_door": {
+      "candidate": "morning_door_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image, soft morning light. Inside the cottage: a hallway with one plain wooden door, shut, with a simple wooden latch and a small hanging wooden plaque with no writing. A faint mauve haze hangs in the hall and stops a hand's width from the door. Quiet, kept.",
+      "refs": [
+        "ref_day.png"
+      ]
+    },
+    "morning_road": {
+      "candidate": "morning_road_a",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image, early morning light. The cottage gate stands open and a pale stone path runs out across a dewy meadow toward low hills; small muddy animal footprints lead away along the path and other footprints lead back. Behind, a faint mauve haze lies over the house. Hopeful, a little uncertain.",
+      "refs": [
+        "ref_day.png"
+      ]
+    },
+    "morning_kitchen": {
+      "candidate": "morning_kitchen_a",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image, morning. A cottage kitchen: a pan with slightly burnt toast still smoking a little, a cup set down crooked at the edge of the table, crumbs, an open jam jar. Through the window, a faint mauve haze over the garden. Ordinary, imperfect, left as it is.",
+      "refs": [
+        "ref_day.png"
+      ]
+    },
+    "morning_table": {
+      "candidate": "morning_table_a",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image, morning light. The long cottage table after a sleepless night: chairs pulled out at different angles, one pushed far back, one tucked in neatly, half-finished breakfasts, a cup left full. It feels like everyone reacted differently. A faint mauve haze outside the window.",
+      "refs": [
+        "ref_day.png"
+      ]
+    },
+    "morning_window": {
+      "candidate": "morning_road_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image, early morning light. The cottage gate stands open and a pale stone path runs out across a dewy meadow toward low hills; small muddy animal footprints lead away along the path and other footprints lead back. Behind, a faint mauve haze lies over the house. Hopeful, a little uncertain.",
+      "refs": [
+        "ref_day.png"
+      ],
+      "note": "the generated morning creature read as a cute plush animal to a blind reviewer; replaced by this candidate"
+    },
+    "reply-01": {
+      "candidate": "morning_kitchen_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image, morning. A cottage kitchen: a pan with slightly burnt toast still smoking a little, a cup set down crooked at the edge of the table, crumbs, an open jam jar. Through the window, a faint mauve haze over the garden. Ordinary, imperfect, left as it is.",
+      "refs": [
+        "ref_day.png"
+      ]
+    },
+    "reply-02": {
+      "candidate": "morning_table_b",
+      "prompt": "Chapter illustration in exactly the style of the FIRST reference image, morning light. The long cottage table after a sleepless night: chairs pulled out at different angles, one pushed far back, one tucked in neatly, half-finished breakfasts, a cup left full. It feels like everyone reacted differently. A faint mauve haze outside the window.",
+      "refs": [
+        "ref_day.png"
+      ]
+    }
+  }
+}

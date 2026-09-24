@@ -5,7 +5,7 @@ import { getStoryPageArt, STORY_PAGE_IMAGES } from '../components/storyPageArt';
 import {
   StoryContext, StoryLine, StoryMemory, StoryScene, StorySceneId, StoryState,
   advanceStoryPage, buildStoryScene, chooseStoryOption, clearStoryState,
-  getStoryPages, getStoryPortraitSpeaker, getStoryPresentationPhase,
+  getStoryPages, getStoryPortraitSpeaker, getStorySceneResident, getStoryPresentationPhase,
   invalidateStoryCache, loadStoryState, openStoryScene, STORY_STORAGE_KEY,
 } from '../services/storySpine';
 
@@ -126,53 +126,48 @@ test('earlier unknown wording gets distinct related scene art without editing th
   expect(JSON.stringify(saved)).toBe(before);
 });
 
-test('Ember remains present through narration and both fox decision responses', () => {
+test('the cup scene shows Ember on her own lines and on narration that names nobody shows no one', () => {
   const scene = buildStoryScene('cup', context(), state());
   for (const choice of ['flower', 'chip']) {
     const saved = memoryFor(scene, { choice });
+    // cup-01 Ember, cup-02 narration (no name), cup-03 Ember, response Ember, response narration (no name).
     expect(getStoryPages(saved).map((_, page) => getStoryPortraitSpeaker(saved, page)))
-      .toEqual(['fox', 'fox', 'fox', 'fox', 'fox']);
+      .toEqual(['fox', null, 'fox', 'fox', null]);
   }
 });
 
-test('Axel stays visible during both narrated aquarium pages', () => {
-  const saved = memoryFor(buildStoryScene('plum', context(), state()));
-  expect(getStoryPages(saved).map((_, page) => getStoryPortraitSpeaker(saved, page)))
-    .toEqual(['axolotl', 'axolotl', 'axolotl', 'axolotl']);
-});
-
-test('narrator and player pages keep the latest animal, and going back restores the previous speaker', () => {
+test('a narrated page never borrows the face of whoever spoke last', () => {
   const lines: StoryLine[] = [
     { speaker: 'narrator', text: 'A visitor opens the notebook.' },
     { speaker: 'owl', text: 'These are my notes.' },
     { speaker: 'player', text: 'May I read them?' },
     { speaker: 'narrator', text: 'The owl turns a page.' },
     { speaker: 'fox', text: 'I remember that evening.' },
-    { speaker: 'narrator', text: 'She pours the tea.' },
+    { speaker: 'narrator', text: 'Archimedes pours the tea for Ember.' },
   ];
   const saved = memoryFor({ id: 'echo', title: 'Kept words', memory: 'A visit', lines });
-  expect([0, 1, 2, 3, 4, 5, 3, 1, 0].map(page => getStoryPortraitSpeaker(saved, page)))
-    .toEqual(['owl', 'owl', 'owl', 'owl', 'fox', 'fox', 'owl', 'owl', 'owl']);
+  expect([0, 1, 2, 3, 4, 5].map(page => getStoryPortraitSpeaker(saved, page)))
+    .toEqual([null, 'owl', null, null, 'fox', 'owl']);
   expect(saved.page).toBe(0);
 });
 
-test('an opening narration shows the resident it NAMES, not the scene\'s first speaker', () => {
-  // The supper scene opens on narration about Ember and only then hands the
-  // room to Panko. Walking backward for a speaker found none and fell through
-  // to "the first animal anywhere in this scene", so the player read
-  // "Ember sets your flower cup at your place." beside a pangolin.
+test('supper: narration about Ember shows Ember, even after Panko has spoken', () => {
+  // The owner-reported case: on the private-witness branch, "Ember glances
+  // toward you" ran under Panko's face and name because Panko spoke last.
   const ctx = context();
-  const progress = state({ memories: { cup: memoryFor(buildStoryScene('cup', ctx, state()), { choice: 'flower', completed: true }) } });
+  const progress = state({ memories: {
+    cup: memoryFor(buildStoryScene('cup', ctx, state()), { choice: 'flower', completed: true }),
+    witness: memoryFor(buildStoryScene('witness', ctx, state()), { choice: 'private', completed: true }),
+  } });
   const saved = memoryFor(buildStoryScene('supper', ctx, progress));
   const pages = getStoryPages(saved);
-  expect(pages[0].speaker).toBe('narrator');
   expect(pages[0].text).toContain('Ember');
-  expect(pages.find(page => page.speaker !== 'narrator' && page.speaker !== 'player')!.speaker).toBe('pangolin');
   expect(getStoryPortraitSpeaker(saved, 0)).toBe('fox');
-  // ...and from Panko's line on, the room is hers: a named narration never
-  // overrides a resident already in view.
-  expect(getStoryPortraitSpeaker(saved, 1)).toBe('pangolin');
-  expect(getStoryPortraitSpeaker(saved, 2)).toBe('pangolin');
+  const glance = pages.findIndex(page => page.text.includes('Ember glances toward you'));
+  expect(glance).toBeGreaterThan(0);
+  expect(pages.slice(0, glance).some(page => page.speaker === 'pangolin')).toBe(true);
+  expect(getStoryPortraitSpeaker(saved, glance)).toBe('fox');
+  expect(getStoryPortraitSpeaker(saved, pages.findIndex(page => page.speaker === 'pangolin'))).toBe('pangolin');
 });
 
 test('a name is matched whole, never inside another word', () => {
@@ -181,13 +176,22 @@ test('a name is matched whole, never inside another word', () => {
     { speaker: 'owl', text: 'Nobody is here yet.' },
   ] });
   // Moss / Chill / Tock all sit inside those words; none of them is present.
-  expect(getStoryPortraitSpeaker(saved, 0)).toBe('owl');
+  expect(getStoryPortraitSpeaker(saved, 0)).toBeNull();
 });
 
-test('a narrator-only historical transcript still has a resident portrait', () => {
-  const saved = memoryFor({ id: 'old_mark', title: 'An earlier morning', memory: 'A mark',
-    lines: [{ speaker: 'narrator', text: 'Two chairs sit beside the hearth.' }] });
-  expect(getStoryPortraitSpeaker(saved, 0)).toBe('fox');
+test('the earliest name in a narrated line is the one drawn', () => {
+  const saved = memoryFor({ id: 'old_mark', title: 'A quiet hour', memory: 'A mark', lines: [
+    { speaker: 'narrator', text: 'Warren hands the lamp to Ember.' },
+  ] });
+  expect(getStoryPortraitSpeaker(saved, 0)).toBe('wombat');
+});
+
+test('the journal files a scene under its first speaker, else the first resident named, else Ember', () => {
+  expect(getStorySceneResident(memoryFor(buildStoryScene('plum', context(), state())))).toBe('axolotl');
+  expect(getStorySceneResident(memoryFor({ id: 'old_mark', title: 'x', memory: 'x',
+    lines: [{ speaker: 'narrator', text: 'Thyme left the gate open.' }] }))).toBe('rabbit');
+  expect(getStorySceneResident(memoryFor({ id: 'old_mark', title: 'x', memory: 'x',
+    lines: [{ speaker: 'narrator', text: 'Two chairs sit beside the hearth.' }] }))).toBe('fox');
 });
 
 test('resuming and reading an old answered save preserves its text, choice, phase and durable page', async () => {

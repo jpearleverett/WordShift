@@ -3,7 +3,7 @@ import { saveWithPlayerRetry } from './src/services/saveRetry';
 import { createCeremonyPlayback } from './src/services/ceremonyPlayback';
 import { buildPhaseReactionEvent } from './src/services/phaseTransitionReactions';
 import { PhaseReactionDialogue } from './src/components/PhaseReactionDialogue';
-import { subscribeBillingChanges } from './src/services/iap';
+import { subscribeBillingChanges, getProducts, isBillingReady, PRODUCT_IDS, ProductId } from './src/services/iap';
 import { useLaunchIntents } from './src/hooks/useLaunchIntents';
 import { useInitialGameRoute } from './src/hooks/useInitialGameRoute';
 import { useAppBoot } from './src/hooks/useAppBoot';
@@ -59,10 +59,11 @@ import { useVictoryDouble } from './src/hooks/useVictoryDouble';
 import { useStoryFlow } from './src/hooks/useStoryFlow';
 import { StorySceneModal } from './src/components/StorySceneModal';
 import { StoryJournalModal } from './src/components/StoryJournalModal';
-import { StoryContext, loadStoryState } from './src/services/storySpine';
+import { StoryContext, StoryBoundary, StorySceneId, loadStoryState, isEpilogueOwed, markEpilogueSeen } from './src/services/storySpine';
+import { EpilogueCard } from './src/components/EpilogueCard';
 import { useOnboardingFlow } from './src/hooks/useOnboardingFlow';
 import { useAutosave } from './src/hooks/useAutosave';
-import { logEvent } from './src/services/eventLogger';
+import { logEvent, getInstallAgeDays } from './src/services/eventLogger';
 import { SettingsScreen, performNewCycle } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
 import {
@@ -166,6 +167,12 @@ import {
   getStreakFreezeGrantedMessage,
   getDwellLine,
   getPostCapDwellLine,
+  getVigilLine,
+  getPostCapVigilLine,
+  getFinalWordCoda,
+  getEpilogueCopy,
+  EpilogueCopy,
+  VigilLine,
   getNoValidMovesMessage,
   getHintGrantMessage,
   getColdOpenSkipLabel,
@@ -226,7 +233,7 @@ import { installGlobalFont } from './src/theme/fonts';
 import { addHints, grantBonusHint } from './src/services/hints';
 import { hasEntitlementSync, isAdFreeSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
-import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, canShowExitNudge, recordExitNudgeShown, consumeMomentOffer, MomentOfferMoment } from './src/services/monetizationPrompts';
+import { recordInterstitialSeen, consumePatronNudge, armRemoveAdsNudgeIfEligible, consumePendingRemoveAdsNudge, canOfferRewardedDouble, canShowExitNudge, recordExitNudgeShown, consumeMomentOffer, MomentOfferMoment, MomentOfferTarget } from './src/services/monetizationPrompts';
 import { MusicBoxModal } from './src/components/MusicBoxModal';
 import { installGlobalErrorHandler, setErrorForwarder, reportError } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES, INTERSTITIAL_MIN_PUZZLES, HOUSE_ASK_MIN_PUZZLES, HOUSE_ASK_CHANCE, HOUSE_ASK_REWARD_AMBER, REWARDED_HINT_GRANT, EXPERT_DIFFICULTY_UNLOCK_PUZZLES, LEXICON_UNLOCK_PUZZLES } from './src/constants/gameBalance';
@@ -386,6 +393,21 @@ if (sentryDsn) {
 // React compiler analysis of this imperative coordinator did not finish in a
 // ten-hour lint run. Keep it out of compiler optimization until the lifecycle
 // split is complete; normal Hooks and dependency lint checks remain enabled.
+const MOMENT_TARGET_PRODUCTS: Record<MomentOfferTarget, ProductId> = {
+  starter: PRODUCT_IDS.STARTER_PACK as ProductId,
+  supporter: PRODUCT_IDS.SUPPORTER_SUB as ProductId,
+  collection: PRODUCT_IDS.COSMETIC_BUNDLE as ProductId,
+  keepers_edition: PRODUCT_IDS.KEEPERS_EDITION as ProductId,
+};
+
+/** Only offer a moment card for a product the store returns a live price for. */
+async function canSellMomentTarget(target: MomentOfferTarget): Promise<boolean> {
+  if (!isBillingReady()) return false;
+  const id = MOMENT_TARGET_PRODUCTS[target];
+  const products = await getProducts([id]);
+  return products.some(product => product.productId === id && !!product.priceString);
+}
+
 function MainApp() {
   'use no memo';
   const storageBusy = useSyncExternalStore(subscribeStorageTransaction, isStorageTransactionActive, () => false);
@@ -1251,7 +1273,35 @@ function MainApp() {
       houseComplete: progress.houseCompleted,
     };
   }, []);
-  const storyFlow = useStoryFlow(getStoryContext, !onboardingFlow.isOnboarding);
+  // The closing card, once, after the morning-after reply (or on the next
+  // quiet home landing if the app closed before it could show).
+  const [epilogue, setEpilogue] = useState<{ copy: EpilogueCopy; boundary: StoryBoundary | null } | null>(null);
+  const epilogueCheckRef = useRef(false);
+  const maybeShowEpilogue = useCallback(async () => {
+    if (epilogueCheckRef.current) return;
+    epilogueCheckRef.current = true;
+    try {
+      const context = await getStoryContext();
+      const state = await loadStoryState(context);
+      if (!isEpilogueOwed(state, context)) return;
+      const days = await getInstallAgeDays().catch(() => 1);
+      setEpilogue({
+        boundary: state.boundary,
+        copy: getEpilogueCopy({
+          boundary: state.boundary, puzzlesSolved: context.puzzlesSolved,
+          daysSinceArrival: days, residents: context.unlockedAnimals.length,
+        }),
+      });
+    } catch { /* the card waits for the next quiet landing */ } finally { epilogueCheckRef.current = false; }
+  }, [getStoryContext]);
+  const closeEpilogue = useCallback(() => {
+    setEpilogue(null);
+    void getStoryContext().then(markEpilogueSeen).catch(() => {});
+  }, [getStoryContext]);
+  const onStorySceneCompleted = useCallback((id: StorySceneId) => {
+    if (id === 'reply') void maybeShowEpilogue();
+  }, [maybeShowEpilogue]);
+  const storyFlow = useStoryFlow(getStoryContext, !onboardingFlow.isOnboarding, onStorySceneCompleted);
   const { active: activeStory, prepare: prepareStory, run: runStory, reset: resetStory } = storyFlow;
   const storyOverlayActive = !!activeStory || !!storyFlow.journalContext;
   const storyExitPreparing = useRef(false);
@@ -3341,22 +3391,25 @@ function MainApp() {
         // Its victory — and only its victory — plays FINAL_PUZZLE_EVENT. The win
         // after that triggers POST_REVELATION_EVENT + markPostRevelation,
         // exactly as before.
-        let dwellLineForWin: string | null = null;
+        let dwellLineForWin: string | VigilLine | null = null;
         // The completion receipt owns ending state. This block only presents
         // the committed consequence, so retry/recovery cannot advance dwell twice.
         const endgame = victory.endgame;
         if (endgame?.kind === 'arrival') {
-          orchestrationActions.setCompletionCoda({
-            title: endgame.houseComplete ? 'THE HOUSE STANDS COMPLETE' : 'THE ARRANGEMENT IS COMPLETE',
-            text: endgame.houseComplete
-              ? 'The last word has settled. What happens next belongs to everyone who lives here.'
-              : 'There is still room to build. Tonight, the words call something down to the unfinished house.',
-          });
+          const finalWords = result.completedWords ?? [];
+          orchestrationActions.setCompletionCoda(getFinalWordCoda(finalWords[finalWords.length - 1], endgame.houseComplete));
           queueEndgameCinematic();
         } else if (endgame?.kind === 'dwell') {
-          dwellLineForWin = (endgame.dwellBefore ?? 0) >= FINALE_DWELL_PUZZLES
+          // The vigil: at phase 4 one resident speaks on each night before the
+          // end; the house narration is the fallback (a resident not yet here,
+          // or a later cycle's serene dwell).
+          const residents = persistence.currentPhase === 4 ? ((await getFullProgress()).unlockedAnimals ?? []) : [];
+          const vigil = persistence.currentPhase !== 4 ? null : (endgame.dwellBefore ?? 0) >= FINALE_DWELL_PUZZLES
+            ? getPostCapVigilLine(completedTotal, residents)
+            : getVigilLine(Math.min(endgame.dwell ?? 0, FINALE_DWELL_PUZZLES), residents);
+          dwellLineForWin = vigil ?? ((endgame.dwellBefore ?? 0) >= FINALE_DWELL_PUZZLES
             ? getPostCapDwellLine(completedTotal, persistence.currentPhase)
-            : getDwellLine(Math.min(endgame.dwell ?? 0, FINALE_DWELL_PUZZLES), persistence.currentPhase, endgame.houseComplete);
+            : getDwellLine(Math.min(endgame.dwell ?? 0, FINALE_DWELL_PUZZLES), persistence.currentPhase, endgame.houseComplete));
         } else if (endgame?.kind === 'post_arrival') {
           orchestrationActions.setCompletionCoda({
             title: 'THE MORNING AFTER',
@@ -4385,7 +4438,7 @@ function MainApp() {
   const maybeShowMomentOffer = useCallback(async (moment: MomentOfferMoment): Promise<boolean> => {
     if (onboardingFlow.isOnboarding) return false;
     if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return false;
-    const target = await consumeMomentOffer(moment);
+    const target = await consumeMomentOffer(moment, undefined, canSellMomentTarget);
     if (!target) return false;
     const copy = getMomentOfferCopy(moment, target, persistence.currentPhase);
     logEvent({ type: 'moment_offer_shown', data: { moment, target } });
@@ -5071,6 +5124,10 @@ function MainApp() {
       maybeShowMomentOffer('house_whole').catch(() => {});
     }
   };
+
+  useEffect(() => {
+    if (currentScreen === 'home' && overlayOwner === null && persistence.currentPhase === 5 && !epilogue) void maybeShowEpilogue();
+  }, [currentScreen, overlayOwner, persistence.currentPhase, epilogue, maybeShowEpilogue]);
 
   useLaunchIntents(
     onboardingFlow.onboardingReady && !bootRouting &&
@@ -6429,6 +6486,11 @@ function MainApp() {
         onAdvance={storyFlow.advance}
         onChoose={storyFlow.choose}
         onClose={storyFlow.close}
+      />
+      <EpilogueCard
+        copy={overlayOwner === null ? epilogue?.copy ?? null : null}
+        boundary={epilogue?.boundary ?? null}
+        onClose={closeEpilogue}
       />
       <StoryJournalModal
         visible={overlayOwner === 'journal'}

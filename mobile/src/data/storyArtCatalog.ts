@@ -210,7 +210,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "She sets the covered dish aside on the floor and serves everyone from the ordinary pot.",
-      "She sets aside the covered dish she'd kept for the empty place, and serves everyone from the ordinary pot."
+      "She sets aside the covered dish she'd kept for the empty place, and serves everyone from the ordinary pot.",
+      "She sets aside the covered dish she had kept for the empty place, and serves everyone from the ordinary pot."
     ]
   },
   {

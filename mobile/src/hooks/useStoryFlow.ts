@@ -6,7 +6,11 @@ import {
 import { logStoryEvent } from '../services/storyTelemetry';
 
 /** A saved conversation owns one exit action, including through cinematic transitions. */
-export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: boolean) {
+export function useStoryFlow(
+  getContext: () => Promise<StoryContext>,
+  enabled: boolean,
+  onCompleted?: (id: StorySceneId) => void,
+) {
   const [active, setActive] = useState<{ context: StoryContext; memory: StoryMemory } | null>(null);
   const [journalContext, setJournalContext] = useState<StoryContext | null>(null);
   const prepared = useRef<typeof active>(null);
@@ -89,13 +93,14 @@ export function useStoryFlow(getContext: () => Promise<StoryContext>, enabled: b
         readingStarted.current = null;
         operation.current = false;
         dismiss();
+        onCompleted?.(memory.scene.id);
       } else if (memory) {
         const next = { context: active.context, memory };
         prepared.current = next;
         setActive(next);
       }
     } finally { if (started === epoch.current) operation.current = false; }
-  }, [active, dismiss]);
+  }, [active, dismiss, onCompleted]);
 
   const openJournal = useCallback(async () => {
     const started = epoch.current;

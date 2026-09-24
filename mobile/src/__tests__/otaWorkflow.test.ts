@@ -33,4 +33,17 @@ describe('OTA publish workflow', () => {
     expect(wf).toMatch(/before_update:[\s\S]*node scripts\/tools\/checkOtaConfig\.mjs/);
     expect(fs.existsSync(path.join(__dirname, '../../scripts/tools/checkOtaConfig.mjs'))).toBe(true);
   });
+
+  it('uploads the update source maps to Sentry and can resolve the project', () => {
+    expect(wf).toContain('upload_sentry_sourcemaps: true');
+    // sentry-expo-upload-sourcemaps only reads org/project from a plugin
+    // entry named exactly '@sentry/react-native/expo'; under the bare package
+    // name it exits 'Could not fetch plugin properties'.
+    const app = JSON.parse(fs.readFileSync(path.join(__dirname, '../../app.json'), 'utf8'));
+    const names = (app.expo.plugins as unknown[]).map(p => (Array.isArray(p) ? p[0] : p));
+    expect(names).toContain('@sentry/react-native/expo');
+    expect(names).not.toContain('@sentry/react-native');
+    expect(wf).toContain('SENTRY_ORG: iridescent-games-9n');
+    expect(wf).toContain('SENTRY_PROJECT: wordshift');
+  });
 });

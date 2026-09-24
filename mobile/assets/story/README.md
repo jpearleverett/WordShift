@@ -56,9 +56,19 @@ requires from `src/components/storyPageArt.ts`.
 resolver in `src/services/storyPresentation.ts` recognizes the original text
 without changing saved dialogue, choices, page positions or presentation phase.
 It reserves exact matches before assigning unused related art to older wording.
-An animal portrait remains present on narrator and player pages, retaining the
-most recent resident (or the first resident before their opening line). Narrator
-and player pages use the idle portrait instead of a speaking gesture.
+A narrator page shows the resident its line names (idle, captioned), or no
+portrait when it names no one; player pages show no portrait. A page never
+borrows the previous speaker's face (2026-09-24).
+
+## The Arrival and the Morning After (September 24)
+
+`arrival/` holds one 1440x960 WebP per cinematic beat (`arrival_*`, `morning_*`)
+plus `entity_figure.png`, the in-game entity's head and arms used for the
+house-completion glimpse and the New Cycle backdrop. Generated with RunPod
+Seedream v4 edit, using a story page as the style reference and the in-game
+entity layers as the creature reference; prompts, references and the chosen
+candidate for every file are in `../raw/ARRIVAL_ART_PROMPTS.json`. `reply-01`
+and `reply-02` in `pages/` were replaced from the same batch.
 
 The illustrations remain visible on compact screens and in later phases. The
 card scrolls when necessary. No generic teacup fallback or image-height gate is

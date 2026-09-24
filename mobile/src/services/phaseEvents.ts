@@ -46,7 +46,14 @@ export interface PhaseTransitionEvent {
  * 'ceremony_*' emblems (assets/ui/spots, generateGameIcons) remain registered
  * for authored special scenes. Ordinary passages use the room/road paintings.
  */
-export type SceneImage = 'private_room' | 'outward_road' | 'outward_road_night' | 'kept_table' | 'shadow_figure' | 'house' | 'ceremony_curious' | 'ceremony_deeper' | 'ceremony_shadows';
+export type SceneImage = 'private_room' | 'outward_road' | 'outward_road_night' | 'kept_table' | 'shadow_figure' | 'house' | 'ceremony_curious' | 'ceremony_deeper' | 'ceremony_shadows'
+  | ArrivalImage | MorningImage;
+
+/** The Arrival's own paintings (assets/story/arrival), one per beat. */
+export type ArrivalImage = 'arrival_table' | 'arrival_call' | 'arrival_house' | 'arrival_seam' | 'arrival_descent'
+  | 'arrival_hold' | 'arrival_rooms' | 'arrival_door' | 'arrival_gate' | 'arrival_bell' | 'arrival_settle';
+/** The morning after, with the settled presence in every frame. */
+export type MorningImage = 'morning_house' | 'morning_door' | 'morning_road' | 'morning_kitchen' | 'morning_table' | 'morning_window';
 
 export interface PhaseScene {
   text: string;
@@ -383,7 +390,7 @@ export function buildHouseCompletionEvent(context?: FinalArrivalContext): PhaseT
   scenes[3].text = 'Ember looks from the old hearth to the new rooms.\n"I asked you to build a home. You finished it after you learned what I knew."';
   scenes[4].text = 'The house is whole.\nWhat came through was already here to see it finished.';
   // The settled presence, at the opacity After leaves it: present, not waiting.
-  scenes[4].imageOpacity = POST_REVELATION_EVENT.backdrop?.opacity ?? 0.14;
+  scenes[4].imageOpacity = 0.14;
   return { ...HOUSE_COMPLETION_EVENT, scenes };
 }
 
@@ -412,31 +419,40 @@ export interface FinalArrivalContext {
   standBeside?: boolean;
 }
 
-export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
+const ARRIVAL_STYLE = {
   readAtOwnPace: true,
-  phase: 4,
+  phase: 4 as DialoguePhase,
   title: 'The Arrival',
   bgColor: '#020005',
   textColor: '#C4B5D2',
   accentColor: '#8B2252',
-  particles: { count: 25, color: '#8B2252', direction: 'rise', speed: 6, size: 7, opacity: 0.3 },
+  particles: { count: 25, color: '#8B2252', direction: 'rise' as const, speed: 6, size: 7, opacity: 0.3 },
   vignette: true,
   shakeIntensity: 0.7,
-  scenes: [
-    { text: 'Midnight. The last letter settles.', image: 'kept_table', imageOpacity: 1, imageFraming: 'detail', delay: 0, duration: 3000 },
-    { text: 'Every word you offered rises from the pit and runs through the walls.\nTogether they make one long call. It says: come in.', image: 'house', imageOpacity: 0.9, delay: 3200, duration: 4000 },
-    { text: 'The rooms you raised stand above the old foundation.\nYour friends wait in their doorways.', image: 'house', imageOpacity: 0.9, imageFraming: 'detail', delay: 7400, duration: 4000 },
-    { text: 'Under the long call, a spoon taps a cup.\nThe small, ordinary sound still carries.', image: 'kept_table', imageOpacity: 1, delay: 11600, duration: 3000 },
-    // Hold on the house before the entity appears: the pause stays still,
-    // while every page has an illustration in the shared reading layout.
-    { text: 'For a moment, nothing moves.', image: 'house', imageOpacity: 0.9, delay: 14800, duration: 2000 },
-    { text: 'Above the roof, the sky opens along a seam.\nSomething tall comes down through it. It feels like the warmth under the floor, grown whole.', image: 'shadow_figure', imageOpacity: 0.7, effect: 'descend', delay: 17000, duration: 5000 },
-    { text: 'It moves through every room, warming and straightening as it goes.\nOnly the draft under the front door stays cold. It leaves that alone.', image: 'shadow_figure', imageOpacity: 0.7, delay: 22200, duration: 5000 },
-    { text: 'Ember leaves the door on its latch.\n"I wanted us safe. I did not know it would try to stop us changing."', speaker: 'fox', image: 'shadow_figure', imageOpacity: 0.55, delay: 27400, duration: 4500 },
-    { text: 'The seam in the sky closes. The presence stays.\nSomewhere in the house, a cup of tea goes cold. Nothing warms it back.', image: 'shadow_figure', imageOpacity: 0.45, delay: 32100, duration: 3500 },
-  ],
 };
 
+/** Reading time follows the words; the authored timeline is effect metadata only. */
+function timeScenes(scenes: PhaseScene[]): PhaseScene[] {
+  let nextDelay = 0;
+  return scenes.map(scene => {
+    const duration = Math.max(scene.duration, Math.min(6500, scene.text.split(/\s+/).length * 135));
+    const timed = { ...scene, delay: nextDelay, duration };
+    nextDelay += duration + 200;
+    return timed;
+  });
+}
+
+/**
+ * The Arrival. Every page has its own painting, and a page carries a
+ * resident's portrait ONLY when that resident is the one speaking on it: the
+ * page is then just their words. Narration is never attributed to anyone.
+ * (The previous version put Warren's name over narration about Moss, Tock's
+ * over Fennick's quote, and Tock's over a page where he never spoke.)
+ *
+ * The creature is the SAME one the player has watched behind the house since
+ * the storm: arrival_descent / arrival_hold / arrival_settle were painted
+ * from the in-game entity layers, not the old blurred shadow.
+ */
 export function buildFinalPuzzleEvent(
   ritualWords: string[],
   context?: FinalArrivalContext,
@@ -452,176 +468,143 @@ export function buildFinalPuzzleEvent(
   }
   ranked.sort((a, b) => b.tier - a.tier);
   const top = ranked.slice(0, 3).map(r => r.word);
-  if (top.length < 2 && context === undefined) return FINAL_PUZZLE_EVENT;
-
-  const scenes = FINAL_PUZZLE_EVENT.scenes.map(scene => ({ ...scene }));
-  if (top.length >= 2) {
-    scenes[1].text = `${top.join('. ')}.\nThe words you brought rise from the pit and run through the walls. The incantation says one thing: come in.`;
-  }
+  // Ember is the first resident; an explicit empty roster (a test or a
+  // restored snapshot) keeps every named beat honest.
   const met = new Set(context?.unlockedAnimals ?? ['fox']);
-  scenes[7].image = 'kept_table';
-  scenes[7].imageOpacity = 1;
-  if (met.has('fox') && context?.standBeside === true) {
-    scenes[7].text = 'Ember stands beside you, leaving a little space.\n"I will tell you when I do not know. That promise I can keep."';
-  } else if (met.has('fox') && context?.standBeside === false) {
-    scenes[7].text = 'Ember stays by the hearth, at the distance you asked for.\nShe does not come closer, even now.';
-  }
-  if (context?.boundary) {
-    const boundaryImage = context.boundary === 'remember' ? 'private_room' : 'outward_road_night';
-    scenes[6].image = boundaryImage;
-    scenes[6].imageOpacity = 1;
-    scenes[8].image = boundaryImage;
-    scenes[8].imageOpacity = 1;
-    scenes[8].imageFraming = 'detail';
-  }
-  // Ember is the first resident, but keep even the generic/legacy API honest
-  // when an explicit empty roster is provided by a test or restored snapshot.
-  if (!met.has('fox')) {
-    scenes[7].text = 'The doorway stays open a hand\'s width.\nWarmth and cold meet there without either disappearing.';
-    delete scenes[7].speaker;
-  }
-  if (context?.houseComplete === true) {
-    scenes[2].text = 'Every room you raised stands above the old foundation. The whole household is here.\nOn the roof, Moss stands in his calling bowl, holding the breath he has saved all his life.';
-  } else if (context?.houseComplete === false) {
-    scenes[2].text = 'Some rooms remain unbuilt.\nThe warmth follows the words through the rooms you raised.';
-  }
+  const scenes: PhaseScene[] = [];
+  const add = (scene: Omit<PhaseScene, 'delay' | 'duration' | 'imageOpacity'> & { duration?: number; imageOpacity?: number }) =>
+    scenes.push({ imageOpacity: 1, delay: 0, duration: 3500, ...scene });
+
+  add({ text: 'Midnight. The last letter settles into place.\nAround the long table, nobody moves.', image: 'arrival_table', duration: 3000 });
+  add({
+    text: top.length >= 2
+      ? `${top.join('. ')}.\nEvery word you offered rises out of the pit and runs up through the walls. Together they say one thing: come in.`
+      : 'Every word you offered rises out of the pit and runs up through the walls.\nTogether they say one thing: come in.',
+    image: 'arrival_call', duration: 4000,
+  });
+  add({
+    text: context?.houseComplete === true
+      ? 'Every room you built is lit.\nEveryone who lives here is watching from the doors and windows, waiting.'
+      : context?.houseComplete === false
+        ? 'The rooms you built are lit. Beyond them, the unbuilt ones stand open to the night.\nYour friends wait in their doorways.'
+        : 'The rooms you built are lit.\nYour friends wait in their doorways.',
+    image: 'arrival_house', duration: 4000,
+  });
   if (met.has('wombat')) {
-    scenes[2].text += '\nWarren braces the join. "Let the beam flex. A house that cannot give will crack."';
-    scenes[2].speaker = 'wombat';
+    add({ text: '"Let the beams flex. A house that can\'t give will crack."', speaker: 'wombat', image: 'arrival_house', imageFraming: 'detail', duration: 3000 });
   }
-
-  if (met.has('aye_aye')) {
-    scenes[3].text = 'Tock takes his paw off the bell rope.\n"Your words go first. My bell can answer after."\nFar below, Fennick lays one ear to the floor. "The small sounds are still here. Keep them here."';
-    scenes[3].speaker = 'aye_aye';
-  } else if (met.has('fennec_fox')) {
-    scenes[3].text = 'Fennick lowers one ear to the floor.\n"The small sounds are still here. Keep them here."';
-    scenes[3].speaker = 'fennec_fox';
+  add({
+    text: met.has('kakapo')
+      ? 'Above the roof, the sky splits along one straight line, like a seam coming undone.\nOn the roof, Moss holds the breath he has saved all his life.'
+      : 'Above the roof, the sky splits along one straight line, like a seam coming undone.',
+    image: 'arrival_seam', duration: 4000,
+  });
+  add({
+    text: 'Something enormous comes down through the gap. Under the floor it always felt like warmth.\nUp close it is smoke, and horns, and a grin full of teeth. It has waited a very long time to be let in.',
+    image: 'arrival_descent', effect: 'descend', duration: 5000,
+  });
+  add({ text: 'It settles over the house and closes its hands around the walls.\nNot to crush them. To hold them, the way you hold something you are afraid to lose.', image: 'arrival_hold', duration: 4000 });
+  if (met.has('fennec_fox')) {
+    add({ text: '"The small sounds are still here. The kettle. The floorboards. Keep them here."', speaker: 'fennec_fox', image: 'arrival_hold', imageFraming: 'detail', duration: 3500 });
   }
-
-  if (context?.boundary === 'remember') {
-    scenes[6].text = context.keptRecord
-      ? 'CLOSED. Your last word holds.\nIt fills every room but one. At the private room it stops, and the door stays shut.\nInside, I AM AFRAID is exactly as it was written.'
-      : 'CLOSED. Your last word holds.\nIt fills every room but one. At the private room it stops, and the door stays shut.\nWhatever anyone thinks in there stays their own, uncorrected.';
-  } else if (context?.boundary === 'release') {
-    scenes[6].text = 'CLOSER. Your last word holds.\nIt fills the house, then stops at the front door and steps aside.\nThe road beyond still leads away, and the gate opens both ways.';
-  }
-  if (context?.boundary && met.has('aye_aye')) {
-    scenes[8].text = met.has('kakapo')
-      ? 'The bell rings once in answer. From the roof, Moss answers too, one low boom in his own voice.\nThe seam in the sky closes. The presence stays. A cup of tea goes cold, and nothing warms it without asking.'
-      : 'The bell rings once in answer. The seam in the sky closes.\nThe presence stays. A cup of tea goes cold, and nothing warms it without asking.';
-    scenes[8].speaker = 'aye_aye';
-    scenes[8].cue = 'bell';
-  } else if (context?.boundary && met.has('kakapo')) {
-    scenes[8].text = 'Moss answers with one low boom. The seam in the sky closes.\nThe presence stays. A cup of tea goes cold, and nothing warms it without asking.';
-    scenes[8].speaker = 'kakapo';
-    scenes[8].cue = 'answer';
-  }
+  add({
+    text: 'It moves through every room, warming and straightening as it goes.\nCrooked frames hang true. A chipped cup is whole again. A half-written page finishes itself.',
+    image: 'arrival_rooms', duration: 5000,
+  });
   if (context?.keptRecord && met.has('capybara')) {
-    scenes[4].text = 'Chill holds the original page flat.\n"The corrected copy may sit beside it. It may not replace it."';
-    scenes[4].image = 'kept_table';
-    scenes[4].imageOpacity = 1;
-    scenes[4].imageFraming = 'detail';
-    scenes[4].speaker = 'capybara';
-    scenes[4].duration = 3500;
+    add({ text: '"The corrected copy can sit beside the original. It can\'t replace it."', speaker: 'capybara', image: 'arrival_rooms', imageFraming: 'detail', duration: 3500 });
   } else if (context?.keptPromise && met.has('rabbit')) {
-    scenes[4].text = 'Thyme keeps the seed tin in her own pocket.\n"Still mine."';
-    scenes[4].image = 'private_room';
-    scenes[4].imageOpacity = 1;
-    scenes[4].speaker = 'rabbit';
-    scenes[4].duration = 3000;
+    add({ text: '"My seed tin stays in my pocket. It\'s still mine."', speaker: 'rabbit', image: 'arrival_gate', imageFraming: 'detail', duration: 3000 });
   }
-
-  // Context can add a line to the house tableau or the held pause. Give each
-  // scene reading time and recompute timings without changing the choreography.
-  let nextDelay = 0;
-  for (const scene of scenes) {
-    scene.delay = nextDelay;
-    scene.duration = Math.max(scene.duration, Math.min(6500, scene.text.split(/\s+/).length * 135));
-    nextDelay += scene.duration + 200;
+  if (context?.boundary === 'remember') {
+    add({
+      text: context.keptRecord && met.has('capybara')
+        ? 'Your last word was CLOSED: one room it can never enter. It reaches that room, and stops.\nIt presses against the door. The door holds. Inside, I AM AFRAID is still written in Chill\'s own hand.'
+        : 'Your last word was CLOSED: one room it can never enter. It reaches that room, and stops.\nIt presses against the door. The door holds. Inside, every thought stays exactly as its owner left it.',
+      image: 'arrival_door', duration: 5000,
+    });
+  } else if (context?.boundary === 'release') {
+    add({
+      text: 'Your last word was CLOSER: one road out it can never close. It reaches the front door, and stops.\nIt draws back from the gate and leaves the road open. Anyone can leave. Anyone can come back.',
+      image: 'arrival_gate', duration: 5000,
+    });
+  } else {
+    add({ text: 'In the end it stops at the front door, and goes no further.\nIt does not say why.', image: 'arrival_door', duration: 4000 });
   }
-  return { ...FINAL_PUZZLE_EVENT, scenes };
+  // Ember stands by the boundary the player chose, not back at the table.
+  const emberImage: PhaseScene['image'] = context?.boundary === 'release' ? 'arrival_gate' : 'arrival_door';
+  if (met.has('fox')) {
+    if (context?.standBeside === true) {
+      add({ text: '"I\'m right here. I said I\'d tell you when I don\'t know something. I don\'t know what happens now."', speaker: 'fox', image: emberImage, imageFraming: 'detail', duration: 4000 });
+    } else if (context?.standBeside === false) {
+      add({ text: 'Ember stays by the hearth, at the distance you asked for.\nShe does not come closer, even now.', image: 'arrival_rooms', imageFraming: 'detail', duration: 3500 });
+    } else {
+      add({ text: '"I wanted us safe. I didn\'t know it would try to stop us from changing."', speaker: 'fox', image: emberImage, imageFraming: 'detail', duration: 3500 });
+    }
+  }
+  if (met.has('aye_aye')) {
+    add({
+      text: met.has('kakapo')
+        ? 'Tock rings the bell once.\nFrom the roof, Moss answers with one low boom, in his own voice.'
+        : 'Tock rings the bell once. The sound carries a long way.',
+      image: 'arrival_bell', cue: 'bell', duration: 3500,
+    });
+  } else if (met.has('kakapo')) {
+    add({ text: 'From the roof, Moss answers with one low boom, in his own voice.', image: 'arrival_seam', imageFraming: 'detail', cue: 'answer', duration: 3000 });
+  }
+  add({
+    text: 'The seam in the sky closes. The thing that came through does not leave.\nIt settles around the house like fog, and closes its eyes.',
+    image: 'arrival_settle', duration: 4000,
+  });
+  add({ text: 'Somewhere inside, a cup of tea goes cold.\nNothing warms it back up without asking.', image: 'arrival_table', imageFraming: 'detail', duration: 3500 });
+  return { ...ARRIVAL_STYLE, scenes: timeScenes(scenes) };
 }
+
+/** The legacy, context-free Arrival (tests and old snapshots). */
+export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = buildFinalPuzzleEvent([]);
 
 // ============================================================================
 // POST-REVELATION EVENT
 // ============================================================================
 
 /**
- * Cinematic event marking the transition to post-revelation state (Phase 5).
- * Terrible peace. The shadow figure is here. The animals are serene.
+ * The Morning After. It now plays straight after the Arrival (acknowledging
+ * the Arrival marks post-revelation, see acknowledgeCeremony) instead of
+ * waiting for the player to win one more ordinary board, which left the
+ * story hanging on a routine puzzle at its most important moment. The
+ * presence is painted into every frame, so no separate backdrop floats over
+ * the art.
  */
-export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
-  readAtOwnPace: true,
-  phase: 4,
-  title: 'After',
-  bgColor: '#0A0510',
-  textColor: '#8A7A9A',
-  accentColor: '#4A3060',
-  particles: { count: 10, color: '#4A3060', direction: 'drift', speed: 5, size: 4, opacity: 0.15 },
-  vignette: true,
-  // The settled entity stays present as the camera returns to ordinary life.
-  // Environmental illustrations do not replay its arrival.
-  backdrop: { image: 'shadow_figure', opacity: 0.14 },
-  scenes: [
-    {
-      text: 'Morning. The shadow has settled over the house.\nIt is not leaving.',
-      image: 'shadow_figure',
-      imageOpacity: 0.65,
-      delay: 0,
-      duration: 3000,
-    },
-    {
-      text: 'Some of your friends sleep. Some keep watch.\nFor once, they do not all choose the same thing.',
-      image: 'private_room',
-      imageOpacity: 1,
-      delay: 3200,
-      duration: 3500,
-    },
-    {
-      text: 'The letters still move.\nThe words still shift.',
-      image: 'kept_table',
-      imageOpacity: 1,
-      imageFraming: 'detail',
-      delay: 6900,
-      duration: 3000,
-    },
-    {
-      text: 'A chipped cup stays chipped.\nTomorrow, someone may mend it.',
-      image: 'kept_table',
-      imageOpacity: 1,
-      delay: 10100,
-      duration: 3000,
-    },
-    {
-      text: 'The pattern continues.\nSo does the work of living beside it.',
-      image: 'outward_road',
-      imageOpacity: 1,
-      delay: 13300,
-      duration: 3000,
-    },
-  ],
-};
-
-
-/** After remembers the enacted boundary without inventing one for legacy saves. */
 export function buildPostRevelationEvent(context?: FinalArrivalContext): PhaseTransitionEvent {
-  if (!context?.boundary) return POST_REVELATION_EVENT;
-  const scenes = POST_REVELATION_EVENT.scenes.map(scene => ({ ...scene }));
-  scenes[1].text = context.boundary === 'remember'
-    ? 'The private room stays closed.\nNobody inside the house has to give every thought away.'
-    : 'The road out stays open.\nSomeone walks it at first light, and nothing turns them back.';
-  scenes[3].text = context.boundary === 'remember'
-    ? context.keptRecord
-      ? 'The old page and its correction lie side by side.\nBoth stay. Nobody is told which one to believe.'
-      : 'Behind the private door, I AM AFRAID is written again.\nThis time it stays written.'
-    : 'Warmth waits at the door when someone returns.\nIt reaches no further than they ask.';
-  const image = context.boundary === 'remember' ? 'private_room' : 'outward_road';
-  scenes[1].image = image;
-  scenes[1].imageOpacity = 1;
-  scenes[3].image = context.boundary === 'remember' ? 'kept_table' : 'private_room';
-  scenes[3].imageOpacity = 1;
-  return { ...POST_REVELATION_EVENT, scenes, backdrop: { image, opacity: 0.62 } };
+  const boundary = context?.boundary ?? null;
+  const scenes: PhaseScene[] = [
+    { text: 'Morning. It is still here.\nIt lies curled around the house like fog that will not lift, its eyes closed.', image: 'morning_house', imageOpacity: 1, delay: 0, duration: 3500 },
+    boundary === 'remember'
+      ? { text: context?.keptRecord
+          ? 'The private room is still shut.\nBehind the door, I AM AFRAID is still on the page. Nobody has corrected it.'
+          : 'The private room is still shut.\nWhatever anyone thinks in there stays their own.', image: 'morning_door', imageOpacity: 1, delay: 0, duration: 3500 }
+      : boundary === 'release'
+        ? { text: 'Someone walks down the road at first light. Nothing stops them.\nLater, they walk back. That was their choice too.', image: 'morning_road', imageOpacity: 1, delay: 0, duration: 3500 }
+        : { text: 'The front door opens.\nThe road outside is still there.', image: 'morning_road', imageOpacity: 1, delay: 0, duration: 3000 },
+    { text: 'In the kitchen, somebody burns the toast. For a moment everyone waits to see if it will fix itself.\nIt does not.', image: 'morning_kitchen', imageOpacity: 1, delay: 0, duration: 3500 },
+    { text: 'Some of your friends are angry. Some are relieved. Some have not said anything yet.\nFor once, nobody tells them they should all feel the same.', image: 'morning_table', imageOpacity: 1, delay: 0, duration: 4000 },
+    { text: 'The letters still move. The words still shift. The house still wants your words.\nThe difference is that now you know who is listening.', image: 'morning_window', imageOpacity: 1, delay: 0, duration: 4000 },
+  ];
+  return {
+    readAtOwnPace: true,
+    phase: 4,
+    title: 'The Morning After',
+    bgColor: '#0A0510',
+    textColor: '#8A7A9A',
+    accentColor: '#4A3060',
+    particles: { count: 10, color: '#4A3060', direction: 'drift', speed: 5, size: 4, opacity: 0.15 },
+    vignette: true,
+    scenes: timeScenes(scenes),
+  };
 }
+
+/** The legacy, context-free Morning After. */
+export const POST_REVELATION_EVENT: PhaseTransitionEvent = buildPostRevelationEvent();
 
 // ============================================================================
 // NEW CYCLE (NG+) CEREMONY

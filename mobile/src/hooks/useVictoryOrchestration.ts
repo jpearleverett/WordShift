@@ -241,8 +241,10 @@ export interface ProcessVictoryParams {
    * post-house-completion dwell window (App computes it from the dwell count).
    * Surfaced through the ambient micro-beat overlay, but only when no keyed
    * micro-beat fires on the same win — one narrative voice per victory.
+   * A VIGIL line (a resident, phase 4) is delivered as that resident's
+   * whisper instead, replacing the random whisper roll for this win.
    */
-  dwellLine?: string | null;
+  dwellLine?: string | { animalType: string; animalName: string; text: string } | null;
   /**
    * Whether this win is on the bespoke FINAL board. Suppresses the horror
    * audio/haptic cues (glitch, whisper) so the finale's silent-victory contract
@@ -483,7 +485,7 @@ export function useVictoryOrchestration(): [
         beat = null;
       }
       if (gen !== generationRef.current) return;
-      if (!beat && dwellLine) {
+      if (!beat && typeof dwellLine === 'string' && dwellLine) {
         beat = { type: 'ambient_whisper', text: dwellLine, durationMs: DWELL_LINE_DURATION_MS };
       }
       if (beat) {
@@ -558,7 +560,19 @@ export function useVictoryOrchestration(): [
     // exactly one narrative voice (the silence, then the Arrival), so the
     // roll itself is suppressed there — never just its sound cue, or a
     // chatty ghost overlay races the climax cinematic.
-    if (!onboarding && !suppressCeremonyCues && Math.random() < getWhisperChance(phase)) {
+    const vigil = dwellLine && typeof dwellLine === 'object' ? dwellLine : null;
+    if (vigil && !onboarding && !suppressCeremonyCues) {
+      // The vigil always speaks: it is the story's last stretch, not ambience.
+      addTimeout(() => {
+        revealWhenFree(() => {
+          if (gen !== generationRef.current) return;
+          setWhisper({ animalName: vigil.animalName, text: vigil.text, animalType: vigil.animalType });
+          setShowWhisper(true);
+          playUiSound('whisper'); hapticLight();
+          recordWhisper({ animalType: vigil.animalType, animalName: vigil.animalName, text: vigil.text, phase, type: 'whisper' }).catch(() => {});
+        }, gen);
+      }, WHISPER_DELAY_MS);
+    } else if (!onboarding && !suppressCeremonyCues && Math.random() < getWhisperChance(phase)) {
       addTimeout(async () => {
         try {
           if (gen !== generationRef.current) return;

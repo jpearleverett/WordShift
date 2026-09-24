@@ -73,10 +73,15 @@ Android only, and runs `scripts/tools/checkOtaConfig.mjs` before publishing: the
 check stops the job unless the runtime is `<version>-<channel>`, the ad mode matches
 the channel (live only on production) and `creatorCode` is empty. The CLI prints a
 link to the run on expo.dev; its logs show the check and the published group. Then
-verify and confirm delivery with steps 3 and 4 below. Sentry source maps upload
-automatically when `SENTRY_AUTH_TOKEN` is an EAS environment variable in the
-`production` environment; if it is missing, the job logs the failure and still
-publishes. `otaWorkflow.test.ts` pins the workflow's channel wiring.
+verify and confirm delivery with steps 3 and 4 below. The job then uploads the
+update's Sentry source maps (`upload_sentry_sourcemaps: true`), so a crash on an
+updated build shows real file names and lines. The upload needs `SENTRY_AUTH_TOKEN`
+as an EAS environment variable in the `production` environment and reads the
+org/project from the `@sentry/react-native/expo` plugin entry in `app.json` (the
+workflow also sets `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_URL` as a fallback). The
+update is published before the upload runs, so a red job with a Sentry error means
+the update is live but its stack traces will be unreadable: fix the token and
+re-upload with the manual command in step 2 below. `otaWorkflow.test.ts` pins the workflow's channel wiring and the source-map upload.
 
 ## Production hotfix runbook
 

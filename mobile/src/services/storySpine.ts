@@ -1,6 +1,7 @@
 import AsyncStorage from './persistenceStorage';
 import { AnimalType, DialoguePhase } from '../types/homeWorld';
 import { ANIMAL_INFO } from './dialogue/animalDialogueBase';
+import { reportError } from './errorReporting';
 
 export type StoryBoundary = 'remember' | 'release';
 export type StorySpeaker = AnimalType | 'narrator' | 'player';
@@ -60,9 +61,19 @@ export interface StoryState {
   /** Read-only transcripts from the ten most recent earlier cycles. */
   previousCycles?: StoryCycleArchive[];
   worldInspected?: boolean;
+  /** The one-time closing card after the morning-after reply has been seen. */
+  epilogueSeen?: boolean;
 }
 
 export const STORY_STORAGE_KEY = 'wordshift_story_spine';
+/**
+ * Where an unreadable story record is set aside. A malformed record, or one
+ * written by a newer build and restored onto this one, used to be replaced by
+ * an empty story on the next write, silently erasing every memory, choice and
+ * the CLOSED/CLOSER boundary. The story still has to open, so the raw text is
+ * kept here for support before a fresh record takes its place.
+ */
+export const STORY_QUARANTINE_KEY = 'wordshift_story_spine_quarantine';
 export const STORY_COPY = {
   journalTitle: 'Things We Kept',
   journalSubtitle: 'Conversations, choices, and the words that changed the house.',
@@ -155,15 +166,27 @@ function validState(value: unknown): value is StoryState {
           memories: archive.memories, previousCycles: undefined }))));
 }
 
+/** A valid record, or a fresh one after the unreadable raw text is set aside. */
+async function readStoredState(stored: string | null, context: StoryContext): Promise<StoryState> {
+  if (!stored) return fresh(context);
+  let parsed: unknown;
+  try { parsed = JSON.parse(stored); } catch { parsed = null; }
+  if (validState(parsed)) return parsed;
+  // Never overwrite an earlier quarantine with the same text on every read.
+  if (await AsyncStorage.getItem(STORY_QUARANTINE_KEY) !== stored) {
+    await AsyncStorage.setItem(STORY_QUARANTINE_KEY, stored);
+    reportError(new Error('Unreadable story record set aside'), { source: 'story_quarantine' });
+  }
+  return fresh(context);
+}
+
 export async function loadStoryState(context: StoryContext): Promise<StoryState> {
   await writes.catch(() => {});
   if (!cache) {
     const readGeneration = generation;
     const stored = await AsyncStorage.getItem(STORY_STORAGE_KEY);
     if (readGeneration !== generation) return loadStoryState(context);
-    let parsed: unknown;
-    try { parsed = stored ? JSON.parse(stored) : null; } catch { parsed = null; }
-    cache = validState(parsed) ? parsed : fresh(context);
+    cache = await readStoredState(stored, context);
   }
   if (cache.cycle !== context.cycleCount) cache = fresh(context, cache);
   return JSON.parse(JSON.stringify(cache)) as StoryState;
@@ -175,10 +198,7 @@ async function mutate(context: StoryContext, change: (state: StoryState) => void
     // Do not call loadStoryState here: it awaits this same write queue.
     let state = cache;
     if (!state) {
-      const raw = await AsyncStorage.getItem(STORY_STORAGE_KEY);
-      let parsed: unknown;
-      try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = null; }
-      state = validState(parsed) ? parsed : fresh(context);
+      state = await readStoredState(await AsyncStorage.getItem(STORY_STORAGE_KEY), context);
     }
     if (state.cycle !== context.cycleCount) state = fresh(context, state);
     const next = JSON.parse(JSON.stringify(state)) as StoryState;
@@ -313,7 +333,7 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
     ]);
     case 'supper': return scene('Before it goes cold', [
       ...(cup ? [narrator(`Ember puts ${cupName} down where you sit. ${cup === 'flower' ? "She has been at the cocoa recipe again." : "She remembered you asked for tea."}`, 'supper-01')] : []),
-      ...(has('pangolin') ? [say('pangolin', "Supper. Now. The empty place at the table can wait. The rest of us have stomachs.", 'supper-02'), narrator("She sets aside the covered dish she'd kept for the empty place, and serves everyone from the ordinary pot.", 'supper-03')] : [ember("I spent the whole afternoon keeping a place warm for someone who hasn't come. Your drink went cold while I did it. That's ridiculous of me, friend.", 'supper-04'), narrator(`She moves the empty cup aside and fills ${cup ? cupName : 'yours'} with fresh ${cup ? drink : 'tea'}.`, 'supper-05')]),
+      ...(has('pangolin') ? [say('pangolin', "Supper. Now. The empty place at the table can wait. The rest of us have stomachs.", 'supper-02'), narrator("She sets aside the covered dish she had kept for the empty place, and serves everyone from the ordinary pot.", 'supper-03')] : [ember("I spent the whole afternoon keeping a place warm for someone who hasn't come. Your drink went cold while I did it. That's ridiculous of me, friend.", 'supper-04'), narrator(`She moves the empty cup aside and fills ${cup ? cupName : 'yours'} with fresh ${cup ? drink : 'tea'}.`, 'supper-05')]),
       ...(has('rabbit') ? [say('rabbit', 'Is it safe?', 'supper-06'), ...(has('pangolin') ? [say('pangolin', "It's soup. I made it myself. Ask me about the house after you've eaten.", 'supper-07')] : [ember("The tea is safe. I can't promise you anything else tonight.", 'supper-08')])] : [narrator("For a while it just sounds like an ordinary supper, not a house holding its breath.", 'supper-09')]),
       ...(witness === 'share' ? [narrator('The dated account lies between the dishes, its row of initials visible.', 'supper-10'), ember("You asked us to tell everyone. If anyone has seen something else, this is a good place to say it.", 'supper-11')]
         : witness === 'private' ? [narrator('The folded account is still in your pocket. Ember glances toward you, then leaves it for you to bring up.', 'supper-12')] : []),
@@ -565,39 +585,51 @@ function getPreparationArtId(text: string): string {
 }
 
 /**
- * Keep the resident in view while the narrator or player takes a turn.
- *
- * Residents the narrator can name, as word-boundary patterns. A narration page
- * carries no speaker, so when one OPENS a scene there is no portrait yet to
- * hold over: the old fallback took "the first animal who speaks anywhere in
- * this scene", which put Panko's face beside the supper scene's opening line,
- * `Ember sets your flower cup at your place.` The line's own text is the only
- * signal that page carries, so it is read before reaching for the scene.
+ * Who is drawn beside a page. The portrait belongs to THIS page only:
+ *  - a resident's own line shows that resident, speaking;
+ *  - a narration page shows the resident the line NAMES (captioned in muted
+ *    ink as "who is on screen"), or nobody when it names no one;
+ *  - the player is never drawn.
+ * It used to walk back to whoever spoke last and keep that face up through
+ * the narration, so at supper "Ember glances toward you" ran under Panko's
+ * face with Panko's name beside it. A page now never borrows a face.
  */
 const NAMED_RESIDENTS: readonly (readonly [RegExp, AnimalType])[] =
   (Object.keys(ANIMAL_INFO) as AnimalType[]).map(
     type => [new RegExp(`\\b${ANIMAL_INFO[type].name}\\b`), type] as const,
   );
 
+/** The resident named EARLIEST in the text, matched as a whole word. */
 function residentNamedIn(text: string): AnimalType | null {
-  for (const [pattern, type] of NAMED_RESIDENTS) if (pattern.test(text)) return type;
-  return null;
+  let best: { index: number; type: AnimalType } | null = null;
+  for (const [pattern, type] of NAMED_RESIDENTS) {
+    const match = pattern.exec(text);
+    if (match && (!best || match.index < best.index)) best = { index: match.index, type };
+  }
+  return best?.type ?? null;
 }
 
-export function getStoryPortraitSpeaker(memory: StoryMemory, page: number): AnimalType {
+const isAnimalSpeaker = (speaker: StorySpeaker): speaker is AnimalType => speaker !== 'narrator' && speaker !== 'player';
+
+export function getStoryPortraitSpeaker(memory: StoryMemory, page: number): AnimalType | null {
   const pages = getStoryPages(memory);
-  const isAnimal = (speaker: StorySpeaker): speaker is AnimalType => speaker !== 'narrator' && speaker !== 'player';
-  const at = Math.min(page, pages.length - 1);
-  // Whoever is already in view STAYS in view while the narrator describes the
-  // room -- continuity is the point, so a narrated beat never swaps the face.
-  for (let index = at; index >= 0; index -= 1) {
-    if (isAnimal(pages[index].speaker)) return pages[index].speaker as AnimalType;
+  const line = pages[Math.min(page, pages.length - 1)];
+  if (!line) return null;
+  if (isAnimalSpeaker(line.speaker)) return line.speaker;
+  if (line.speaker === 'player') return null;
+  return residentNamedIn(line.text);
+}
+
+/** The one resident a whole scene is filed under in the journal. */
+export function getStorySceneResident(memory: StoryMemory): AnimalType {
+  const pages = getStoryPages(memory);
+  const speaker = pages.find(line => isAnimalSpeaker(line.speaker))?.speaker;
+  if (speaker && isAnimalSpeaker(speaker)) return speaker;
+  for (const line of pages) {
+    const named = residentNamedIn(line.text);
+    if (named) return named;
   }
-  // Nobody has spoken yet. Show the resident this page is actually about,
-  // then whoever speaks first, then Ember (a narrator-only transcript).
-  const named = at >= 0 ? residentNamedIn(pages[at].text) : null;
-  if (named) return named;
-  return pages.find(line => isAnimal(line.speaker))?.speaker as AnimalType ?? 'fox';
+  return 'fox';
 }
 
 /** Preparations leave traces, but only the final word grants a boundary. */
@@ -670,6 +702,18 @@ export function getStoryWorldKeepsake(state: StoryState, context: StoryContext):
 }
 export async function inspectStoryWorld(context: StoryContext): Promise<StoryState> {
   return mutate(context, state => { if (getStoryWorldKeepsake(state, context)) state.worldInspected = true; });
+}
+
+/**
+ * The closing card is owed once per cycle, after the player gives their reply
+ * the morning after the Arrival. A new cycle's fresh state owes it again.
+ */
+export function isEpilogueOwed(state: StoryState, context: StoryContext): boolean {
+  return (context.phase >= 5 || context.postRevelation === true) &&
+    state.memories.reply?.completed === true && state.epilogueSeen !== true;
+}
+export async function markEpilogueSeen(context: StoryContext): Promise<StoryState> {
+  return mutate(context, state => { state.epilogueSeen = true; });
 }
 
 /** Commit inherited boundaries as part of the cycle reset, before cloud sync. */

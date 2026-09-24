@@ -121,16 +121,19 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     arrived: "That robe itched. I expected an ancient secret to come with better lining. Taking the lining out has improved my sleeves considerably. The secret is taking longer to put right.",
   },
   fx_4_21: {
-    arrived: "I asked whether warmth that made someone stay could also let them go. We have a limit to keep now. I still ask that question when I set out the cups, because wanting company is when I'm most likely to forget it.",
+    arrived: "I asked whether warmth that made someone stay could also let them go. We've drawn a line since then, and we keep it. I still ask that question when I set out the cups, because wanting company is when I'm most likely to forget the line.",
   },
   fx_4_24: {
-    arrived: "I decided whatever came would have to go through this fox before it reached anybody sheltering here. The arrival doesn't retire that responsibility. I can promise it to you now. Hold me to it while the guest is here.",
+    arrived: "I decided whatever came would have to go through this fox before it reached anybody sheltering here. It came, and that job didn't end. I can promise it to you now. Hold me to it while the guest is here.",
   },
   fx_4_27: {
     arrived: "Before that moment came, I wanted to stand close enough to hear what you actually said. I still do. Tell me where you want me, friend. I won't choose the distance for you.",
   },
   fx_4_28: {
     arrived: "I still don't know what something that old calls kindness. We've had to tell it what we mean by the word. I want to keep checking the meaning, even on evenings when the fire makes everything feel easy.",
+  },
+  fx_4_30: {
+    arrived: "Remember the circle I kept drawing in soot, with a notch at the top? That midnight I saw it over the roof, and it opened. It was a door all along. I drew it eleven times and never asked what would come through. I know now.",
   },
 
   // Panko: keep the recipe's history without preparing a second arrival.
@@ -252,7 +255,7 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     arrived: "Before that supper, I put out bread and made the rest wait until someone explained what I was cooking toward. Bread was a thing I could offer honestly. It still is. Have some while we talk.",
   },
   pg_4_30: {
-    arrived: "The guest came through. This spoon is still my grandmother's spoon. Every time the split catches my thumb, I know precisely which part of its history I am holding.",
+    arrived: "Our guest has arrived, and this spoon is still my grandmother's spoon. Every time the split catches my thumb, I know exactly which part of its history I'm holding.",
   },
 
   // Archimedes: preserve each investigation, correction and scholarly joke.
@@ -272,7 +275,7 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     revealed: "I began a log: date, hour, the book's text beside the previous night's. The changes were corrections, steady ones, working toward a final copy I hadn't seen. I was recording the method before I understood what else it might correct.",
   },
   ow_1_12: {
-    revealed: "The book answered a question I'd carried for years about a friend I lost when I was young. The answer was kind. That is still difficult to set beside the other evidence. A comforting answer doesn't tell me what the author has decided comfort permits.",
+    revealed: "The book answered a question I'd carried for years about a friend I lost when I was young. The answer was kind. I still find that hard to square with everything else I've learned. A kind answer doesn't tell me how much its author will let us change.",
   },
   ow_1_13: {
     shadows: "When the study first grew warm along the inner wall, I moved my favorite books and blamed the season. A warm room full of paper should have worried me. Blaming the season spared me a question, though it did nothing useful for the books.",
@@ -314,45 +317,45 @@ export const EARLY_CONVERSATION_ADAPTATIONS: Record<
     arrived: "When I first found the list near the back of the book, every word on it matched my log of yours, in order. I dated that comparison. A record of what we knew beforehand is quite different from a book taking credit afterward.",
   },
   ow_2_17: {
-    arrived: "The list ran beyond the words you'd brought, and I withheld the later ones because a prediction can become an instruction. Each morning the next word's ink grew darker. I kept checking it, as though careful observation meant I wasn't helping it along.",
+    arrived: "The list ran past the words you'd brought. I kept the later ones from you, because a prediction can turn into an instruction. Each morning the next word's ink grew darker. I kept checking it, as if watching carefully meant I wasn't helping it along.",
   },
   ow_2_18: {
     arrived: "I once stood by the top shelf for an hour, meaning to hide the book, and couldn't do it. I needed to know how it ended. The book had found an excellent weakness to use. I leave that hour in my account, unflattering as it is.",
   },
   ow_2_20: {
-    arrived: "An entry for the record: the book described the arrival before it happened, and I was one of its readers. That belongs beside what it got wrong. Neither erasing the prediction nor letting it excuse my part would be an honest account.",
+    arrived: "An entry for the record: the book described the arrival before it happened, and I was one of its readers. That goes beside what it got wrong. An honest account doesn't erase the prediction, and it doesn't let the prediction excuse my part.",
   },
   ow_2_21: {
     revealed: "Each word you made turned another page, and I wanted more. The book felt like my only window. Now that you're here, I'd like to read it with you instead of letting it read us on its own. You can take the chair without bringing another word for the book.",
   },
   ow_3_1: {
-    arrived: "The last chapter called what would happen to us preservation. It was frustratingly short on what got preserved. We have seen some of the answer now. I keep those observations beside the chapter, where the book's omissions can be read as well.",
+    arrived: "The last chapter called what would happen to us preservation. It never said what would be preserved. We've seen some of the answer now. I keep my notes on it beside the chapter, so anyone can see what the book left out.",
   },
   ow_3_2: {
-    revealed: "At first I couldn't bring myself to repeat the last chapter. Nobody forbade me. A sentence in your head keeps its own hours, and this one read itself back when the lamp burned low, in that patient hand's words and my own voice. Keeping it quiet didn't make it harmless.",
+    revealed: "At first I couldn't bring myself to repeat the last chapter. Nobody forbade me. But the sentence stayed in my head, and when the lamp burned low it read itself back to me, in the book's words and my own voice. Keeping it quiet didn't make it harmless.",
   },
   ow_3_5: {
-    revealed: "I kept the ending from Ember, who might already know, and Panko, who carries hard news by baking. I told myself it was better heavy than contagious. That was how I made leaving everyone else uninformed sound like taking care of them.",
+    revealed: "I kept the ending from Ember, who might already know, and from Panko, who handles hard news by baking. I told myself bad news was better carried alone than passed around. That's how I made keeping everyone in the dark sound like taking care of them.",
   },
   ow_3_6: {
     arrived: "The book said the arrival would come from above. I'd written pit in the margin. I crossed it out, and you can still read it. The sky settled that particular argument. A reader should be able to see that I didn't have the right answer first.",
   },
   ow_3_10: {
-    arrived: "I spent four nights looking for a second edition, an older copy, anything with a different ending. I found none. One book, apparently never copied. I thought it needed to be right only once. I pay more attention now to what happens beyond its last page.",
+    arrived: "I spent four nights looking for a second edition, an older copy, anything with a different ending. I found none. One book, apparently never copied. I thought a book like that only had to be right once. Now I pay more attention to what happens after its last page.",
   },
   ow_3_11: {
-    arrived: "Before the arrival, dread felt like fear that had skipped ahead to the last page. It sat beside me, politely waiting for the other pages to catch up. I mistook that certainty for knowledge. Living beyond a last page has corrected me on that point.",
+    arrived: "Before the arrival, dread felt like fear that had skipped ahead to the last page. It sat beside me, politely waiting for the other pages to catch up. I mistook that certainty for knowledge. Living past the last page has cured me of that.",
   },
   ow_3_12: {
-    arrived: "Ember knew the words kept something alive; I had diagrams that showed how. Her fire and my pages didn't tell us what the guest would do. Its arrival gave us observations. We still have to distinguish those from our guesses about what comes next.",
+    arrived: "Ember knew the words kept something alive. I had diagrams that showed how. Neither her fire nor my pages told us what the guest would do. Now it's here, and we can watch what it does. We still have to keep what we see apart from what we guess comes next.",
   },
   ow_3_21: {
-    arrived: "The study's warmth felt bodily before the arrival, without any fire underneath it or fuel I could measure. I described it as the temperature of something waiting. The waiting ended. The warmth remains, and my description has had to change.",
+    arrived: "Before the arrival, the study was warm like a body, with no fire under it and no fuel I could measure. I called it the temperature of something waiting. The waiting's over. The warmth is still here, so my description has had to change.",
   },
   ow_3_30: {
     arrived: "Before the arrival I kept a lamp by the window for anyone who found the sky beginning to look like a page. Whatever came down would find itself thoroughly footnoted, I decided. The lamp is still there. Come and sit. The account needs company as much as it needs footnotes.",
   },
   ow_4_18: {
-    arrived: "Being kept sounded merciful. We have seen some of what it stops us doing, and established a limit. I want the record to keep both facts. A comforting word is a poor substitute for checking what we can still change.",
+    arrived: "Being kept sounded merciful. Now we've seen some of what it stops us doing, and we've set a limit. I want the record to keep both facts. A comforting word is no substitute for checking what we can still change.",
   },
 };

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StoryPortrait } from './StoryPortrait';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { getStorySpeakerName } from '../services/storyArchive';
+import { ARRIVAL_ART, ENTITY_FIGURE, ENTITY_FIGURE_ASPECT } from './arrivalArt';
 import { STORY_ART } from './storyArt';
 
 
@@ -34,15 +35,18 @@ export const SKIP_BORDER_COLOR = '#B9B0CC';
 
 // ---------------------------------------------------------------------------
 // In-engine cinematic art: the REAL game assets (never emoji). The entity is
-// the same soft shadow_figure.png HouseWorld renders behind the house; the
-// house is the roof art the player raised room by room.
+// the smoke demon HouseWorld renders behind the house from phase 3 (its
+// entity_back + entity_eyes layers, head and arms); the house is the roof art
+// the player raised room by room. The Arrival and the Morning After have one
+// painting per beat (arrivalArt.ts).
 // ---------------------------------------------------------------------------
 const SCENE_IMAGE_SOURCES: Record<SceneImage, ReturnType<typeof require>> = {
   private_room: STORY_ART.private,
   outward_road_night: STORY_ART.roadNight,
   outward_road: STORY_ART.road,
   kept_table: STORY_ART.table,
-  shadow_figure: require('../../assets/environment/shadow_figure.png'),
+  shadow_figure: ENTITY_FIGURE,
+  ...ARRIVAL_ART,
   house: require('../../assets/environment/roof.png'),
   // Registered ceremony emblems remain available for authored special scenes.
   ceremony_curious: require('../../assets/ui/spots/ceremony_curious.png'),
@@ -51,7 +55,8 @@ const SCENE_IMAGE_SOURCES: Record<SceneImage, ReturnType<typeof require>> = {
 };
 const SCENE_IMAGE_ASPECT: Record<SceneImage, number> = {
   private_room: 1.5, outward_road_night: 1.5, outward_road: 1.5, kept_table: 1.5,
-  shadow_figure: 0.5, house: 792 / 283,
+  shadow_figure: ENTITY_FIGURE_ASPECT, house: 792 / 283,
+  ...Object.fromEntries(Object.keys(ARRIVAL_ART).map(key => [key, 1.5])) as Record<keyof typeof ARRIVAL_ART, number>,
   ceremony_curious: 1, ceremony_deeper: 1, ceremony_shadows: 1,
 };
 
@@ -804,7 +809,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const eventIsVisible = visibleEvent === event;
   const activeScene = eventIsVisible ? event.scenes[activeSceneIndex] : undefined;
   const isIllustration = (key: SceneImage) =>
-    key === 'private_room' || key === 'outward_road' || key === 'outward_road_night' || key === 'kept_table';
+    key === 'private_room' || key === 'outward_road' || key === 'outward_road_night' || key === 'kept_table' || key in ARRIVAL_ART;
   const lastScene = activeSceneIndex === event.scenes.length - 1;
   const contentWidth = Math.min(width - 32, 640);
   const availableHeight = Math.max(0, height - insets.top - insets.bottom);

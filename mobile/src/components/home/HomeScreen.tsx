@@ -90,7 +90,7 @@ import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AUTO_COLLECT_PUZZLE_LIMIT, FULL_HOUSE_PHASE, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { AmberInline } from '../AmberInline';
-import { getChallengeIntroLines, getHouseCompletionText, getJournalIntroLines, getJournalSpotlightSteps, getDailyChallengeIntroLines, getGatedRoomIntroLines, getOfferingIntroLines, getHarvestHomeIntroLines, getHarvestNudgeLine, getUnbrokenWeaveIntroLines, getKeeperRecordLines, getReservedBuiltItselfLine, getHomeAmbientLine, getFoxPitNudgeLines, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt, getHouseUpgradesPointerLabel, getFullHouseIntroLines } from '../../services/phaseNarrative';
+import { getChallengeIntroLines, getHouseCompletionText, getJournalIntroLines, getJournalSpotlightSteps, getDailyChallengeIntroLines, getGatedRoomIntroLines, getOfferingIntroLines, getHarvestHomeIntroLines, getHarvestNudgeLine, getUnbrokenWeaveIntroLines, getKeeperRecordLines, getReservedBuiltItselfLine, getHomeAmbientLine, getFoxPitNudgeLines, getGoalSuggestion, getEventAmbientLine, getNextFriendPrompt, getHouseUpgradesPointerLabel, getFullHouseIntroLines, getFinaleEvePlayLabel, getFinaleEveLine } from '../../services/phaseNarrative';
 import { getStrongestDreadWord } from '../../services/localGenerator';
 import {
   ROOMS,
@@ -395,6 +395,16 @@ function getPlayDockColors(phase: number): {
     shadow: CandyColors.green.shadow, glossOpacity: 0.28,
   };
 }
+
+/** The ember door to the final board: deep crimson glass, a banked-fire rim. */
+const FINALE_EVE_DOCK_COLORS: ReturnType<typeof getPlayDockColors> = {
+  ...getPlayDockColors(4),
+  body: 'rgba(122, 22, 44, 0.92)',
+  rim: 'rgba(214, 92, 72, 0.55)',
+  topEdge: 'rgba(255, 186, 150, 0.55)',
+  bottomEdge: '#3A0A16',
+  shadow: '#3A0A16',
+};
 
 /**
  * Cottage pixel bevel button that accepts arbitrary children (needed where
@@ -1826,7 +1836,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // dialogue changes, exactly as before.
       let line: string | null = null;
       preferGoalSuggestionSession = !preferGoalSuggestionSession;
-      if (preferGoalSuggestionSession) {
+      // The eve of the last arrangement: the house says one thing only.
+      if (progress.finaleArmed === true && progress.finalPuzzleCompleted !== true && progress.currentPhase === 4) {
+        line = getFinaleEveLine(true);
+      } else if (preferGoalSuggestionSession) {
         try {
           const inputs = ambientInputsRef.current;
           const dailyUnlocked = isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase);
@@ -2445,7 +2458,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   })();
 
   // Phase-aware material for the PLAY dock (candy green → ember → mauve).
-  const playDockColors = getPlayDockColors(progress.currentPhase);
+  // The eve of the last arrangement: the dock is the door to the final board,
+  // so it says so, in ember, instead of an ordinary PLAY.
+  const finaleEve = progress.finaleArmed === true && progress.finalPuzzleCompleted !== true && progress.currentPhase === 4;
+  const playDockColors = finaleEve ? FINALE_EVE_DOCK_COLORS : getPlayDockColors(progress.currentPhase);
   const currentJournalSpotlightStep = journalSpotlightStepMeta[
     Math.max(0, Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1))
   ];
@@ -2753,7 +2769,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
             bounceScale={0.9}
             phase={progress.currentPhase}
-            accessibilityLabel="Play puzzle"
+            accessibilityLabel={finaleEve ? 'Begin the last arrangement' : 'Play puzzle'}
             accessibilityRole="button"
           >
             {/* Inner top gloss — the candy-tile glass sheen (see LetterTile's
@@ -2763,7 +2779,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               style={[styles.playButtonGloss, { backgroundColor: `rgba(255, 255, 255, ${playDockColors.glossOpacity})` }]}
               pointerEvents="none"
             />
-            <Text style={styles.playButtonText}>PLAY</Text>
+            <Text style={[styles.playButtonText, finaleEve && styles.playButtonTextEve]} numberOfLines={1}>{finaleEve ? getFinaleEvePlayLabel().toUpperCase() : 'PLAY'}</Text>
           </JuicyButton>
         </Animated.View>
       )}
@@ -4672,6 +4688,11 @@ const createStyles = (SCREEN_WIDTH: number, SCREEN_HEIGHT: number, fontScale: nu
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 2,
+  },
+  // Longer label on the eve; slightly tighter so it fits one line at 320dp.
+  playButtonTextEve: {
+    fontSize: 17,
+    letterSpacing: 1.2,
   },
 
   // Words Offered Counter (persistent on home screen)

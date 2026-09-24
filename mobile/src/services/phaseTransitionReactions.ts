@@ -39,9 +39,9 @@ export function getPhaseTransitionReaction(
   } else if (phase === 3 && speaker === 'rabbit') {
     text = "Oh. You felt that too. The soil warmed under both my paws, all at once. I'm keeping my seed tin with me tonight. Would you walk back to the garden with me?";
   } else if (phase === 5 && speaker === 'fox' && context?.boundary === 'remember') {
-    text = "It is here, and the private door stayed shut. I will not ask what you keep behind it. I will sit out here with you, if you want the company.";
+    text = "It's here, and the private door stayed shut. I won't ask what you keep behind it. I'll sit out here with you, if you want the company.";
   } else if (phase === 5 && speaker === 'fox' && context?.boundary === 'release') {
-    text = "It is here, and the road is still open. If you want some air, take it. There will be a place by the hearth when you choose to come back.";
+    text = "It's here, and the road's still open. If you want some air, take it. There'll be a place by the hearth whenever you choose to come back.";
   }
   return { speaker, text };
 }

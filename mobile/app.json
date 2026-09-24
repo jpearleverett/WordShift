@@ -23,6 +23,7 @@
       "assets/sounds/**",
       "assets/story/optimized/**",
       "assets/story/pages/**",
+      "assets/story/arrival/**",
       "assets/ui/**",
       "assets/*.png"
     ],
@@ -77,7 +78,7 @@
         }
       ],
       [
-        "@sentry/react-native",
+        "@sentry/react-native/expo",
         {
           "organization": "iridescent-games-9n",
           "project": "wordshift",

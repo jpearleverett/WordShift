@@ -1277,6 +1277,7 @@ export async function getPendingCeremonies(): Promise<PendingCeremony[]> {
 
 /** Call only after the final page; a stale callback cannot dismiss a different scene. */
 export async function acknowledgeCeremony(id: string): Promise<void> {
+  let reachedPhase = null as { phase: DialoguePhase; puzzlesSolved: number } | null;
   try {
     await runStorageTransaction('ceremony_complete', async () => {
       const progress = await loadFreshCeremonyProgress();
@@ -1297,6 +1298,21 @@ export async function acknowledgeCeremony(id: string): Promise<void> {
         progress.pendingCeremonies = [reaction,
           ...progress.pendingCeremonies.filter(entry => entry.id !== reaction.id)];
       }
+      // The Morning After follows the Arrival directly. It used to wait for
+      // the player to win one more ordinary board, which left the story
+      // hanging on a routine puzzle at its most important moment. Finishing
+      // (or skipping) the Arrival now moves the house into its aftermath in
+      // the same durable write, ahead of anything else queued.
+      if (completed.kind === 'arrival' && progress.postRevelation !== true) {
+        const morning: PendingCeremony = {
+          id: ceremonyId(completed.cycle, 'post_arrival', 5), kind: 'post_arrival', phase: 5, cycle: completed.cycle,
+        };
+        progress.pendingCeremonies = [morning, ...progress.pendingCeremonies.filter(entry => entry.id !== morning.id)];
+        progress.postRevelation = true;
+        progress.currentPhase = effectivePhaseFor(progress);
+        progress.pendingPhaseTransition = null;
+        reachedPhase = { phase: progress.currentPhase, puzzlesSolved: progress.puzzlesSolved };
+      }
       if (completed.kind === 'house') progress.houseCompletionCelebrated = true;
       if (completed.kind === 'new_cycle') progress.cycleOpeningSeen = completed.cycle;
       await saveProgress();
@@ -1304,6 +1320,8 @@ export async function acknowledgeCeremony(id: string): Promise<void> {
   } finally {
     invalidateProgressCache();
   }
+  const reached = reachedPhase as { phase: DialoguePhase; puzzlesSolved: number } | null;
+  if (reached) await logPhaseReached(reached.phase, reached.puzzlesSolved).catch(() => {});
 }
 
 /** The house ceremony is held in the queue until the reveal has been confirmed. */

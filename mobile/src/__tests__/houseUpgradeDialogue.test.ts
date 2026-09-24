@@ -52,10 +52,12 @@ describe('house upgrade gift manuscript', () => {
       // A pending gift delivered after Arrival must not retain an approach
       // prediction or claim a uniformly happy ending for the resident.
       expect(versions[3]).not.toMatch(/(?:something|it|the presence) (?:is coming|will arrive)|nearly ready to speak|soon (?:it|the presence) will|nothing to fear|everything is (?:fine|all right)/i);
-      // The revealed register has its own authored receipts, rather than a
-      // new ending attached to the early phase's contracted speech.
+      // The revealed register has its own authored receipts. Since the
+      // 2026-09-24 plain-speech pass they are contracted like every other
+      // resident line (the owner found the uncontracted register "awkwardly
+      // formal" and hard to follow), so none may slip back to the stiff form.
       for (const phase of [4, 5] as DialoguePhase[]) {
-        expect(spoken(offer, phase)).not.toMatch(/\b(?:I'm|I'll|I've|I'd|it's|that's|there's|we're|we've|we'll|isn't|doesn't|don't|can't|won't|didn't|wasn't|hadn't|you've|you'll|you're|I'd|needn't)\b/i);
+        expect(spoken(offer, phase)).not.toMatch(/\b(?:I am|I will|I have|I would|it is|that is|there is|do not|does not|did not|cannot|will not|is not|was not)\b(?![.!?])/);
       }
     }
   });
@@ -101,7 +103,7 @@ describe('house upgrade gift manuscript', () => {
     const before = getHouseUpgradeGiftDialogue(pendingGift, 3);
     const after = getHouseUpgradeGiftDialogue(pendingGift, 5);
     expect(after).not.toEqual(before);
-    expect(after.join(' ')).toContain('presence has arrived');
+    expect(after.join(' ')).toContain('lives in the house now');
     before[0] = 'Presentation changed its local page';
     expect(getHouseUpgradeGiftDialogue(pendingGift, 3)[0]).not.toBe(before[0]);
   });

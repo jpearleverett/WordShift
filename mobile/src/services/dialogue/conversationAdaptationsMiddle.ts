@@ -156,10 +156,10 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     arrived: "I hoped it would come and stay. It has done both. Ask what I understood about the consequences, and you'll get a much shorter answer. A fulfilled wish still isn't the same thing as a prediction I had evidence for.",
   },
   sl_4_1: {
-    arrived: "Now we know what drank from the cup. I told you plainly that something would. I left out that I had spent years setting the table for it.",
+    arrived: "Now we know what drank from the cup. I told you plainly that something would. I left out that I'd spent years setting the table for it.",
   },
   sl_4_3: {
-    arrived: "All three Geralds slept through the arrival. They declined to attend what I had spent years treating as my one moment of significance. The household administration was remarkably unimpressed.",
+    arrived: "All three Geralds slept through the arrival. They declined to attend what I'd spent years treating as my one moment of significance. The household administration was remarkably unimpressed.",
   },
 
   ff_0_19: {
@@ -317,6 +317,18 @@ export const MIDDLE_CONVERSATION_ADAPTATIONS: Record<string, {
     arrived: "The coffee will be warm and the chair free when you come back. Before the arrival I kept promising to preserve one ordinary room to the end of the schedule. We have gone past that end. I can offer the chair now without turning it into a final safeguard.",
   },
   cp_4_5: {
-    arrived: "The old calendar stopped at the arrival. On the blank sheet beside it I had written one entry: breakfast. We ate it. The sheet is full of our own dates now, and I keep both pages together.",
+    arrived: "The old calendar stopped at the arrival. On the blank sheet beside it I'd written one entry: breakfast. We ate it. The sheet's full of our own dates now, and I keep both pages together.",
+  },
+  cp_4_28: {
+    arrived: "Your folder had one empty field at the back. The schedule said it'd be filled that midnight, and it was: one word, in your hand. It isn't my field. I've left the pen beside it anyway, uncapped.",
+  },
+  ff_4_27: {
+    arrived: "Before that midnight, the pause between its breaths kept shrinking. Room for a whole poem, then three words, then one. The last word was yours. I heard you choose it.",
+  },
+  ff_4_29: {
+    arrived: "There was one sound I'd never heard: the seam from my dream, opening. I heard it that midnight. It was quieter than canvas tearing. Somehow that frightened me more.",
+  },
+  ff_4_30: {
+    arrived: "I promised you'd hear it from me first when the pause ran out. Now I'm keeping the other half of that promise. Every evening I listen for the small sounds. So far they're all still here.",
   },
 };

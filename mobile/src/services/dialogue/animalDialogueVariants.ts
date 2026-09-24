@@ -23,7 +23,7 @@ const VARIANT_DIALOGUE_LEADS: Record<AnimalType, { light: string; dark: string }
   axolotl: { light: "Oh, the words found a new way to move! The tank rippled when it happened. GLOW mostly watched the spoon.", dark: "The water took a different route this time. I want to understand this part while I can still see it." },
   fennec_fox: { light: "There's a new rhythm in the words. I heard it from the camp. Let's find out what makes it.", dark: "Those moves made a different sound. The rules explain part of what I heard." },
   capybara: { light: "New procedure. Here's the short version.", dark: "A revised procedure. The instructions are still here whenever you want them." },
-  sloth: { light: "A different pace. I noticed, even from the hammock.", dark: "The route has changed. You are still allowed to take your time with it." },
+  sloth: { light: "A different pace. I noticed, even from the hammock.", dark: "The route's changed. You can still take your time with it." },
   wombat: { light: "Different plan. Let's have a look at how the pieces fit together.", dark: "The load shifted differently that time. Let me take you through the part I can account for." },
   rabbit: { light: "New instructions. Good. I like knowing what's changed before I try it.", dark: "I wrote the new rules down. Knowing them helps me more than being told not to worry." },
   red_panda: { light: "A new way to lay the words out. Let's start with the practical part.", dark: "I noticed the change. I will let the instructions explain it before I offer my own reading." },
