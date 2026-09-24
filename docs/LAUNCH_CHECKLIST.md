@@ -59,10 +59,12 @@ verify the latest binary, backend deployment or public release.
   (then force-stop, relaunch and Restore: no second credit), portrait lock on
   an Android 16 tablet or foldable if one is available, and one deliberate
   Sentry event arriving symbolicated under the `production` environment.
-- [ ] **Owner production build, 2026-09-24 (1.4.5 / 110).** The owner built
-  the production profile and reported that everything works. It is superseded
-  by 1.4.6 / 111 (new native patches and the reworked ending), so the
-  production-profile checks above move to the 1.4.6 build.
+- [x] **Owner production build, 2026-09-24 (1.4.5 / 110).** The owner built
+  the production profile and reported that everything works. Superseded by
+  1.4.6 / 111 (new native patches and the reworked ending).
+- [x] **Owner device test of the 1.4.6 / 111 build (2026-09-24).** The owner
+  built 1.4.6 and reported it working on their phone. This is the build to
+  promote.
 - [ ] **Repeat gameplay interruption checks on the signed build.** Try rapid
   Next/Home/Collect taps around mode unlocks; later animals' introduction visits
   and choices; every phase ceremony; Back, background and force-close during
@@ -93,7 +95,7 @@ verify the latest binary, backend deployment or public release.
 - [ ] **Story pilot (recommended).** Run the unfamiliar-reader
   [story playtest protocol](STORY_PLAYTEST_PROTOCOL.md), including a Phase-3
   late recruit; no completed report exists yet.
-- [ ] **Store products for the new purchases (owner).** Create and activate in
+- [x] **Store products for the new purchases (owner, done 2026-09-24).** Created and activated in
   Play Console, then import into RevenueCat:
   `com.wordshift.season_premium` (one-time product, CONSUMABLE; suggested
   $2.99; RevenueCat product type Consumable, attached to no entitlement) and
@@ -103,7 +105,9 @@ verify the latest binary, backend deployment or public release.
   purchase simply do not appear (no live price, no sale).
 - [ ] **AdMob mediation (owner).** The build carries the AppLovin and Unity Ads
   adapters (`plugins/withAdMediation.js`); they do nothing until mediation
-  groups exist. Steps are in [monetization setup](MONETIZATION_SETUP.md#admob-mediation-applovin-and-unity-ads).
+  groups exist. PARTIAL, 2026-09-24: the owner created the mediation groups
+  except AppLovin's, which AppLovin only allows once the app is live on the
+  production track. Add it right after the production launch. Steps are in [monetization setup](MONETIZATION_SETUP.md#admob-mediation-applovin-and-unity-ads).
 - [ ] **Ad and consent matrix.** Keep `adsUseTestIds: true` through internal and
   closed testing: with the channel-derived flag that means running this matrix
   on an `internal-testing`-profile build (its channel keeps Google test units,
@@ -153,14 +157,16 @@ verify the latest binary, backend deployment or public release.
   in New York County, New York, keeping the consumer-protection carve-out for
   players elsewhere. "Changes" is now section 11 and the terms are effective
   September 22, 2026.
+- [x] **Sentry alert rules (2026-09-24).** The owner added and checked the
+  alerts (new issue, crash-free sessions under 99%, error spike).
+- [x] **Supabase plan tier and disk/usage alerts (2026-09-24).** Confirmed by
+  the owner (the events table shares the disk with saves).
 - [ ] **Remaining backend evidence.** From an operator connection: actual event
   rows from the signed build, a **Daily rank posted end to end by a signed
   build** (the one part of the rate-limit migration a key-only probe cannot
-  prove), two-device conflict handling, verified support recovery/deletion, the
-  project plan tier plus disk/usage alerts (the events table shares the disk
-  with saves), **Sentry alert rules** (new issue, crash-free sessions under 99%,
-  error spike; still to confirm) and a symbolicated event from the exact signed
-  release. Follow [backend setup](BACKEND_SETUP.md).
+  prove), two-device conflict handling, verified support recovery/deletion and a
+  symbolicated event from the exact signed release. Follow
+  [backend setup](BACKEND_SETUP.md).
 - [x] **Review the current store package.** Done by the owner on 2026-09-15.
   Use the reviewed launch package in
   `mobile/assets/Play_store/launch-2026-09/`, its claims ledger and

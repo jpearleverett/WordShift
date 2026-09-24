@@ -9,7 +9,8 @@ fixes, OTA source-map upload, story-record quarantine, and the 16 SDK-57
 patch updates (`npx expo install --fix`; `expo-doctor` 21/21). The patches
 change native modules, so this is a new binary: app **1.4.6**, Android code
 **111**, runtime `1.4.6-<channel>`. Typecheck, lint and the in-band suite
-(244 suites, 5,490 tests) pass. Not yet device-tested.
+(244 suites, 5,490 tests) and all 46 browser journeys pass. The owner built 1.4.6 and
+reported it working on their phone on 2026-09-24; it is the build to promote.
 
 ## September 22 launch-readiness follow-up (1.4.5 / 110)
 
