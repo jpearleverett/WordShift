@@ -133,7 +133,8 @@ export const STORY_ART_CATALOG = [
       "witness"
     ],
     "samples": [
-      "I would like to fold that page away, friend. I can hear myself reaching for another comforting explanation."
+      "I would like to fold that page away, friend. I can hear myself reaching for another comforting explanation.",
+      "Part of me wants to fold that page up and forget it, friend. I can hear myself hunting for a comfortable explanation."
     ]
   },
   {
@@ -143,7 +144,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "But you were there too. Shall we tell the household what we saw, or keep the account between us while we look into it?",
-      "But you were there too. Do we tell the household what we saw, or keep the account between us while we look into it?"
+      "But you were there too. Do we tell the household what we saw, or keep the account between us while we look into it?",
+      "But you saw it too. Should we tell everyone, or keep this between us while we work out what it means?"
     ]
   },
   {
@@ -207,7 +209,8 @@ export const STORY_ART_CATALOG = [
       "supper"
     ],
     "samples": [
-      "She sets the covered dish aside on the floor and serves everyone from the ordinary pot."
+      "She sets the covered dish aside on the floor and serves everyone from the ordinary pot.",
+      "She sets aside the covered dish she'd kept for the empty place, and serves everyone from the ordinary pot."
     ]
   },
   {
@@ -263,7 +266,8 @@ export const STORY_ART_CATALOG = [
       "supper"
     ],
     "samples": [
-      "For a while the room sounds like an ordinary supper, not like a room listening for something."
+      "For a while the room sounds like an ordinary supper, not like a room listening for something.",
+      "For a while it just sounds like an ordinary supper, not a house holding its breath."
     ]
   },
   {
@@ -299,7 +303,8 @@ export const STORY_ART_CATALOG = [
       "supper"
     ],
     "samples": [
-      "Under the table, the low hum below the floor slips out of rhythm. Nobody hurries to set it right."
+      "Under the table, the low hum below the floor slips out of rhythm. Nobody hurries to set it right.",
+      "The low hum under the floor stumbles out of rhythm. For once, nobody hurries to fix it."
     ]
   },
   {
@@ -308,7 +313,8 @@ export const STORY_ART_CATALOG = [
       "plan"
     ],
     "samples": [
-      "I always read this line on the old plan as a brace. Look which way it points."
+      "I always read this line on the old plan as a brace. Look which way it points.",
+      "I always took this line on the old plan for a brace. Look which way it points."
     ]
   },
   {
@@ -371,7 +377,8 @@ export const STORY_ART_CATALOG = [
       "plan"
     ],
     "samples": [
-      "A line goes through the reassuring word. Nobody writes a new one under it. It is the first answer anyone has crossed out."
+      "A line goes through the reassuring word. Nobody writes a new one under it. It is the first answer anyone has crossed out.",
+      "Someone crosses out SAFE and does not write anything in its place. It is the first answer anyone here has crossed out."
     ]
   },
   {
@@ -407,7 +414,8 @@ export const STORY_ART_CATALOG = [
       "shelter"
     ],
     "samples": [
-      "Neither a lamp nor a latch can promise to stop what is below the house. They are things the people here can do for one another now."
+      "Neither a lamp nor a latch can promise to stop what is below the house. They are things the people here can do for one another now.",
+      "A lamp and a latch will not stop what lives under the house. But they are something the people here can do for each other tonight."
     ]
   },
   {
@@ -623,7 +631,8 @@ export const STORY_ART_CATALOG = [
       "record"
     ],
     "samples": [
-      "I have ink."
+      "I have ink.",
+      "I've got ink."
     ]
   },
   {
@@ -677,7 +686,8 @@ export const STORY_ART_CATALOG = [
       "seeds"
     ],
     "samples": [
-      "I packed seeds. I have not decided to leave. I packed them so that leaving stays something I can still choose."
+      "I packed seeds. I have not decided to leave. I packed them so that leaving stays something I can still choose.",
+      "I packed seeds. I haven't decided to leave. I just want leaving to stay something I can choose."
     ]
   },
   {
@@ -695,7 +705,8 @@ export const STORY_ART_CATALOG = [
       "seeds"
     ],
     "samples": [
-      "Will you keep this between us, or help me tell Ember? I can live with either answer. I cannot live with everyone deciding for me again."
+      "Will you keep this between us, or help me tell Ember? I can live with either answer. I cannot live with everyone deciding for me again.",
+      "Will you keep this between us, or help me tell Ember? I can live with either. What I can't live with is everyone deciding for me again."
     ]
   },
   {
@@ -704,7 +715,8 @@ export const STORY_ART_CATALOG = [
       "seeds"
     ],
     "samples": [
-      "I used to tell you that you could always leave. I have never walked that road past the trees myself."
+      "I used to tell you that you could always leave. I have never walked that road past the trees myself.",
+      "I used to tell you that you could always leave. I've never walked that road past the trees myself."
     ]
   },
   {
@@ -749,7 +761,8 @@ export const STORY_ART_CATALOG = [
       "seeds"
     ],
     "samples": [
-      "I have learned to wait at your PLEASE KNOCK sign. I want the gate to mean something you can decide, too."
+      "I have learned to wait at your PLEASE KNOCK sign. I want the gate to mean something you can decide, too.",
+      "I've learned to wait at your PLEASE KNOCK sign. I want the gate to be your decision too."
     ]
   },
   {
@@ -758,7 +771,8 @@ export const STORY_ART_CATALOG = [
       "seeds"
     ],
     "samples": [
-      "Thank you. A secret is a little room with its own door, and I am the one who opens it."
+      "Thank you. A secret is a little room with its own door, and I am the one who opens it.",
+      "Thank you. A secret's like a little room with its own door, and I'm the one who opens it."
     ]
   },
   {
@@ -767,7 +781,8 @@ export const STORY_ART_CATALOG = [
       "seeds"
     ],
     "samples": [
-      "Then the stone at the gate stays between us. I will not speak for you."
+      "Then the stone at the gate stays between us. I will not speak for you.",
+      "Then the stone at the gate stays between us. I won't speak for you."
     ]
   },
   {
@@ -776,7 +791,8 @@ export const STORY_ART_CATALOG = [
       "seeds"
     ],
     "samples": [
-      "I will help. And I will ask you first before I tell anyone else."
+      "I will help. And I will ask you first before I tell anyone else.",
+      "I'll help. And I'll ask you before I tell anyone else."
     ]
   },
   {
@@ -785,7 +801,8 @@ export const STORY_ART_CATALOG = [
       "seeds"
     ],
     "samples": [
-      "Asking first. That would have been a good rule from the very beginning."
+      "Asking first. That would have been a good rule from the very beginning.",
+      "Asking first. That would've been a good rule from the start."
     ]
   },
   {
@@ -821,7 +838,8 @@ export const STORY_ART_CATALOG = [
       "promise"
     ],
     "samples": [
-      "I knew enough to tell you. And I did not tell you."
+      "I knew enough to tell you. And I did not tell you.",
+      "I knew enough to tell you. And I didn't."
     ]
   },
   {
@@ -839,7 +857,8 @@ export const STORY_ART_CATALOG = [
       "promise"
     ],
     "samples": [
-      "I wanted it to come. I called my waiting patience. That word made it easier to watch everyone else wait without knowing why."
+      "I wanted it to come. I called my waiting patience. That word made it easier to watch everyone else wait without knowing why.",
+      "I wanted it to come. I called my waiting 'patience'. That word made it easier to watch everyone else wait without knowing what for."
     ]
   },
   {
@@ -848,7 +867,8 @@ export const STORY_ART_CATALOG = [
       "promise"
     ],
     "samples": [
-      "The love in this house was real, friend. It does not excuse what I kept from you."
+      "The love in this house was real, friend. It does not excuse what I kept from you.",
+      "The love in this house was real, friend. It doesn't excuse what I kept from you."
     ]
   },
   {
@@ -866,7 +886,8 @@ export const STORY_ART_CATALOG = [
       "promise"
     ],
     "samples": [
-      "I filled that lamp again. Doing the thing you asked does not make up for the thing I kept from you."
+      "I filled that lamp again. Doing the thing you asked does not make up for the thing I kept from you.",
+      "I filled that lamp again. Doing what you asked doesn't make up for what I kept from you."
     ]
   },
   {
@@ -885,7 +906,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "You asked us to wait for permission. I should have understood that before we put up the sign.",
-      "You asked us to wait until we were let in. I should have kept that rule long before anyone had to write it on a sign."
+      "You asked us to wait until we were let in. I should have kept that rule long before anyone had to write it on a sign.",
+      "You asked us to wait until we were let in. I should've kept that rule long before anyone had to write it on a sign."
     ]
   },
   {
@@ -894,7 +916,8 @@ export const STORY_ART_CATALOG = [
       "promise"
     ],
     "samples": [
-      "I will tell you the rest. And when I do not know something, I will say so."
+      "I will tell you the rest. And when I do not know something, I will say so.",
+      "I'll tell you the rest. And when I don't know something, I'll say so."
     ]
   },
   {
@@ -903,7 +926,8 @@ export const STORY_ART_CATALOG = [
       "promise"
     ],
     "samples": [
-      "All right. I will keep my distance. Your place in this house does not depend on forgiving me."
+      "All right. I will keep my distance. Your place in this house does not depend on forgiving me.",
+      "All right. I'll keep my distance. You don't have to forgive me to belong here."
     ]
   },
   {
@@ -924,7 +948,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "PLUM died. I let him drift down to the bottom of the tank. I should have told someone before I did that.",
-      "PLUM died. I laid him on the gravel and told nobody. I did not want anyone to say something kind yet. This morning the gravel was empty."
+      "PLUM died. I laid him on the gravel and told nobody. I did not want anyone to say something kind yet. This morning the gravel was empty.",
+      "PLUM died. I laid him on the gravel and didn't tell anyone. I wasn't ready for people to be kind about it. This morning, he was gone."
     ]
   },
   {
@@ -933,7 +958,8 @@ export const STORY_ART_CATALOG = [
       "returned"
     ],
     "samples": [
-      "Something with PLUM's worried face swims a full circle of the tank. Then it swims the same circle again, exactly."
+      "Something with PLUM's worried face swims a full circle of the tank. Then it swims the same circle again, exactly.",
+      "A fish with PLUM's worried face is swimming laps of the tank. Every lap is exactly the same as the last."
     ]
   },
   {
@@ -942,7 +968,8 @@ export const STORY_ART_CATALOG = [
       "returned"
     ],
     "samples": [
-      "The same bite out of his fin. The same little face."
+      "The same bite out of his fin. The same little face.",
+      "Same nick in his fin. Same little face."
     ]
   },
   {
@@ -951,7 +978,8 @@ export const STORY_ART_CATALOG = [
       "returned"
     ],
     "samples": [
-      "Axel laughs once. PLUM always stopped for that. This fish keeps swimming."
+      "Axel laughs once. PLUM always stopped for that. This fish keeps swimming.",
+      "Axel laughs, just once. PLUM always stopped swimming when he laughed. This fish does not stop."
     ]
   },
   {
@@ -960,7 +988,8 @@ export const STORY_ART_CATALOG = [
       "returned"
     ],
     "samples": [
-      "Let me have tonight. I am not ready to work this out."
+      "Let me have tonight. I am not ready to work this out.",
+      "Can I just have tonight? I'm not ready to think about what this means."
     ]
   },
   {
@@ -969,7 +998,8 @@ export const STORY_ART_CATALOG = [
       "returned"
     ],
     "samples": [
-      "It kept the part of PLUM it could understand, friend. The shape of him. We will have to show it what it left out."
+      "It kept the part of PLUM it could understand, friend. The shape of him. We will have to show it what it left out.",
+      "It brought back the part of PLUM it could understand, friend. His shape. We'll have to show it what it left out."
     ]
   },
   {
@@ -1008,7 +1038,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "The shape is perfect. The chip is gone, and so is the memory of breaking it.",
-      "The shape is perfect. And I cannot remember who was sitting with me the day I dropped it. I used to."
+      "The shape is perfect. And I cannot remember who was sitting with me the day I dropped it. I used to.",
+      "It's perfect now. And I can't remember who was sitting with me the day I dropped it. I used to."
     ]
   },
   {
@@ -1018,7 +1049,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "The work stops. The last arrangement has not been made yet.",
-      "The household gathers at the long table. One arrangement is left, and everyone knows it."
+      "The household gathers at the long table. One arrangement is left, and everyone knows it.",
+      "Everyone gathers at the long table. There is one arrangement left, and they all know it."
     ]
   },
   {
@@ -1047,7 +1079,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "I moved my cushion out of the middle of the mat. There are other places to sit. I should have moved it sooner.",
-      "I sat at the center, where every stalk points, and called that understanding. I have moved my mat. I was far more certain than I had any right to be."
+      "I sat at the center, where every stalk points, and called that understanding. I have moved my mat. I was far more certain than I had any right to be.",
+      "I sat in the middle, where every stalk points, and called that understanding. I've moved my mat. I was far more certain than I had any right to be."
     ]
   },
   {
@@ -1065,7 +1098,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "I'll hang a door you can open from either side. You try the latch yourself before I call the job finished."
+      "I'll hang a door you can open from either side. You try the latch yourself before I call the job finished.",
+      "I'll hang a door you can open from either side. And you'll test the latch yourself before I call the job done."
     ]
   },
   {
@@ -1075,7 +1109,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "Two words will fit at the end, friend. CLOSED keeps one room it cannot enter. A thought you have in there stays yours, uncorrected.",
-      "Two words will fit at the end, friend. Either one lets it in to live with us. CLOSED keeps one room it can never enter. A thought you have in there stays yours, uncorrected."
+      "Two words will fit at the end, friend. Either one lets it in to live with us. CLOSED keeps one room it can never enter. A thought you have in there stays yours, uncorrected.",
+      "Two words fit at the end, friend, and either one lets it in to live with us. CLOSED keeps one room it can never enter. Whatever you think in there stays yours, and nothing corrects it."
     ]
   },
   {
@@ -1085,7 +1120,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "CLOSER lets it come and live with us, and keeps a road that leads away. Anyone who stays must be able to leave.",
-      "CLOSER keeps one road out that it can never close. Anyone who stays must be able to leave."
+      "CLOSER keeps one road out that it can never close. Anyone who stays must be able to leave.",
+      "CLOSER keeps one road out that it can never close. Anyone who stays can always leave."
     ]
   },
   {
@@ -1113,7 +1149,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "We marked the road because you asked us to. CLOSER can keep that way out open. You may still choose CLOSED, friend; putting out a lamp did not choose your last word.",
-      "We marked the road because you asked. CLOSER would keep that road open for good. You can still choose CLOSED, friend. A lamp by the gate did not choose your last word for you."
+      "We marked the road because you asked. CLOSER would keep that road open for good. You can still choose CLOSED, friend. A lamp by the gate did not choose your last word for you.",
+      "We marked the road because you asked. CLOSER would keep it open for good. But you can still choose CLOSED, friend. A lamp by the gate doesn't decide your last word."
     ]
   },
   {
@@ -1123,7 +1160,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "We fitted the latch because you asked us to. CLOSED can make that room private from the presence too. You may still choose CLOSER; fitting a latch did not choose your last word.",
-      "We fitted the latch because you asked. CLOSED would shut that room to it as well as to us. You can still choose CLOSER, friend. A latch did not choose your last word for you."
+      "We fitted the latch because you asked. CLOSED would shut that room to it as well as to us. You can still choose CLOSER, friend. A latch did not choose your last word for you.",
+      "We fitted the latch because you asked. CLOSED would shut that room to it, and to us. But you can still choose CLOSER, friend. A latch doesn't decide your last word."
     ]
   },
   {
@@ -1152,7 +1190,9 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "I made cocoa. There is also toast, if you are willing to scrape it.",
-      "I made tea. There is also toast, if you are willing to scrape it."
+      "I made tea. There is also toast, if you are willing to scrape it.",
+      "I made cocoa. There's toast too, if you don't mind scraping it.",
+      "I made tea. There's toast too, if you don't mind scraping it."
     ]
   },
   {
@@ -1161,7 +1201,8 @@ export const STORY_ART_CATALOG = [
       "after"
     ],
     "samples": [
-      "A hinge is squeaking. Ordinary squeak, nothing stranger. I've got the right oil for this one."
+      "A hinge is squeaking. Ordinary squeak, nothing stranger. I've got the right oil for this one.",
+      "A hinge is squeaking. Just an ordinary squeak. I've got the right oil for that."
     ]
   },
   {
@@ -1246,7 +1287,8 @@ export const STORY_ART_CATALOG = [
       "after"
     ],
     "samples": [
-      "I walked out until I could not see the house. Then I came back. Coming back was my own decision."
+      "I walked out until I could not see the house. Then I came back. Coming back was my own decision.",
+      "I walked until I couldn't see the house. Then I came back. Coming back was my choice."
     ]
   },
   {
@@ -1274,7 +1316,8 @@ export const STORY_ART_CATALOG = [
       "after"
     ],
     "samples": [
-      "One small thing left exactly where we put it. I am watching to see whether it stays there."
+      "One small thing left exactly where we put it. I am watching to see whether it stays there.",
+      "One small thing, left exactly where we put it. I'm watching to see if it stays."
     ]
   },
   {
@@ -1283,7 +1326,8 @@ export const STORY_ART_CATALOG = [
       "after"
     ],
     "samples": [
-      "I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me."
+      "I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me.",
+      "I'm still not ready to say what I think about the fish. Thanks for not finishing that thought for me."
     ]
   },
   {
@@ -1313,7 +1357,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "We have talked a great deal, friend. I would like to listen now.",
-      "I have done most of the talking, friend. It is your turn. I am listening."
+      "I have done most of the talking, friend. It is your turn. I am listening.",
+      "I've done most of the talking, friend. Your turn. I'm listening."
     ]
   },
   {
@@ -1322,7 +1367,8 @@ export const STORY_ART_CATALOG = [
       "reply"
     ],
     "samples": [
-      "Yes. I will not rush you out of that anger. I did not tell you the whole truth when it mattered."
+      "Yes. I will not rush you out of that anger. I did not tell you the whole truth when it mattered.",
+      "I know. I won't rush you out of it. I didn't tell you the whole truth when it mattered."
     ]
   },
   {
@@ -1340,7 +1386,8 @@ export const STORY_ART_CATALOG = [
       "reply"
     ],
     "samples": [
-      "So do I. This time I am saying it as a wish, not as a promise I cannot keep."
+      "So do I. This time I am saying it as a wish, not as a promise I cannot keep.",
+      "So do I. This time I'm saying it as a wish, not a promise I can't keep."
     ]
   },
   {
@@ -1358,7 +1405,8 @@ export const STORY_ART_CATALOG = [
       "reply"
     ],
     "samples": [
-      "Then that is where we begin. Not knowing is allowed. Nobody gets to finish that sentence for you."
+      "Then that is where we begin. Not knowing is allowed. Nobody gets to finish that sentence for you.",
+      "Then that's where we start. Not knowing is allowed. Nobody gets to finish that sentence for you."
     ]
   },
   {
@@ -1467,7 +1515,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "I will stand beside you, friend. You asked me to."
+      "I will stand beside you, friend. You asked me to.",
+      "I'll stand beside you, friend. You asked me to."
     ]
   },
   {
@@ -1485,7 +1534,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "I will stay by the hearth, friend. You can have as much room as you need."
+      "I will stay by the hearth, friend. You can have as much room as you need.",
+      "I'll stay by the hearth, friend. You can have as much room as you need."
     ]
   },
   {
@@ -1530,7 +1580,8 @@ export const STORY_ART_CATALOG = [
       "council"
     ],
     "samples": [
-      "There is one thing I am keeping to myself. I am not going to say what it is. That should be allowed."
+      "There is one thing I am keeping to myself. I am not going to say what it is. That should be allowed.",
+      "There's one thing I'm keeping to myself, and I'm not going to say what it is. That should be allowed."
     ]
   },
   {

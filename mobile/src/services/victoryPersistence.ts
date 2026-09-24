@@ -383,6 +383,7 @@ async function computeVictory(input: VictoryInput): Promise<VictoryData> {
         challengeBonus: amberResult.challengeBonus,
         blind,
         undoLimited,
+        maxStack,
         surpriseBonus: amberResult.surpriseBonus,
         currentStreak: amberResult.currentStreak,
         milestoneBonus: amberResult.milestoneBonus,

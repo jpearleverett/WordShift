@@ -10,16 +10,16 @@ const EMBER_REACTIONS: Record<Exclude<DialoguePhase, 0>, string> = {
   1: "That cup warmed before I touched the kettle. You saw it too, didn't you? Come sit by me a moment. I'd like to work out what happened.",
   2: "The fire has gone quiet, and the room is still getting warmer. I've opened the door a little. Tell me if you feel it too.",
   3: "You felt that weight in the house. I did too. I owe you more than another cup of tea. When you're ready, come and ask me what I know.",
-  4: "Now you know what the words were feeding. I knew some of it when I asked you to help build this home, and I kept it to myself. I am wearing the robe. It has not made me sure of anything.",
-  5: "It is here, and it is staying. I keep listening for it to tidy something. So far it has only listened back. Sit with me, if you like.",
+  4: "Now you know what the words were feeding. I knew some of it when I asked you to help build this home, and I kept it to myself. I'm wearing the robe. It hasn't made me sure of anything.",
+  5: "It's here, and it's staying. I keep waiting for it to tidy something. So far it's only listened back. Sit with me, if you like.",
 };
 
 const OTHER_REACTIONS: Record<Exclude<DialoguePhase, 0>, string> = {
   1: "Did you feel the room change just then? I'd like to sit here with you a moment and see what happens next.",
   2: "The whole house went quiet just then. I can still hear you beside me. Stay a moment, if you'd like.",
   3: "That weight in the air reached my room too. I don't know what comes next. I would rather say that to you than pretend I do.",
-  4: "The house feels different now. I put on this robe, but I still have questions. You can ask yours too.",
-  5: "It is here. I heard a cup set down just now, an ordinary little sound. I think I will stay close to the ordinary things for a while.",
+  4: "The house feels different now. I've put on this robe, but I've still got questions. You can ask yours too.",
+  5: "It's here. I just heard a cup being set down, an ordinary little sound. I think I'll stay close to ordinary things for a while.",
 };
 
 /** A separate event response; never borrows or consumes an unread conversation line. */

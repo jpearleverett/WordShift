@@ -235,7 +235,8 @@
     "speaker": "fox",
     "text": "\"I would like to fold that page away, friend. I can hear myself reaching for another comforting explanation.\"",
     "samples": [
-      "I would like to fold that page away, friend. I can hear myself reaching for another comforting explanation."
+      "I would like to fold that page away, friend. I can hear myself reaching for another comforting explanation.",
+      "Part of me wants to fold that page up and forget it, friend. I can hear myself hunting for a comfortable explanation."
     ],
     "speakers": [
       "fox",
@@ -253,7 +254,8 @@
     "text": "\"But you were there too. Shall we tell the household what we saw, or keep the account between us while we look into it?\"",
     "samples": [
       "But you were there too. Shall we tell the household what we saw, or keep the account between us while we look into it?",
-      "But you were there too. Do we tell the household what we saw, or keep the account between us while we look into it?"
+      "But you were there too. Do we tell the household what we saw, or keep the account between us while we look into it?",
+      "But you saw it too. Should we tell everyone, or keep this between us while we work out what it means?"
     ],
     "speakers": [
       "fox",
@@ -369,7 +371,8 @@
     "speaker": "narrator",
     "text": "\"She sets the covered dish aside on the floor and serves everyone from the ordinary pot.\"",
     "samples": [
-      "She sets the covered dish aside on the floor and serves everyone from the ordinary pot."
+      "She sets the covered dish aside on the floor and serves everyone from the ordinary pot.",
+      "She sets aside the covered dish she'd kept for the empty place, and serves everyone from the ordinary pot."
     ],
     "speakers": [
       "narrator"
@@ -469,7 +472,8 @@
     "speaker": "narrator",
     "text": "\"For a while the room sounds like an ordinary supper, not like a room listening for something.\"",
     "samples": [
-      "For a while the room sounds like an ordinary supper, not like a room listening for something."
+      "For a while the room sounds like an ordinary supper, not like a room listening for something.",
+      "For a while it just sounds like an ordinary supper, not a house holding its breath."
     ],
     "speakers": [
       "narrator"
@@ -534,7 +538,8 @@
     "speaker": "narrator",
     "text": "\"Under the table, the low hum below the floor slips out of rhythm. Nobody hurries to set it right.\"",
     "samples": [
-      "Under the table, the low hum below the floor slips out of rhythm. Nobody hurries to set it right."
+      "Under the table, the low hum below the floor slips out of rhythm. Nobody hurries to set it right.",
+      "The low hum under the floor stumbles out of rhythm. For once, nobody hurries to fix it."
     ],
     "speakers": [
       "narrator"
@@ -550,7 +555,8 @@
     "speaker": "wombat",
     "text": "\"I always read this line on the old plan as a brace. Look which way it points.\"",
     "samples": [
-      "I always read this line on the old plan as a brace. Look which way it points."
+      "I always read this line on the old plan as a brace. Look which way it points.",
+      "I always took this line on the old plan for a brace. Look which way it points."
     ],
     "speakers": [
       "wombat"
@@ -663,7 +669,8 @@
     "speaker": "narrator",
     "text": "\"A line goes through the reassuring word. Nobody writes a new one under it. It is the first answer anyone has crossed out.\"",
     "samples": [
-      "A line goes through the reassuring word. Nobody writes a new one under it. It is the first answer anyone has crossed out."
+      "A line goes through the reassuring word. Nobody writes a new one under it. It is the first answer anyone has crossed out.",
+      "Someone crosses out SAFE and does not write anything in its place. It is the first answer anyone here has crossed out."
     ],
     "speakers": [
       "narrator"
@@ -728,7 +735,8 @@
     "speaker": "narrator",
     "text": "'Neither a lamp nor a latch can promise to stop what is below the house. They are things the people here can do for one another now.'",
     "samples": [
-      "Neither a lamp nor a latch can promise to stop what is below the house. They are things the people here can do for one another now."
+      "Neither a lamp nor a latch can promise to stop what is below the house. They are things the people here can do for one another now.",
+      "A lamp and a latch will not stop what lives under the house. But they are something the people here can do for each other tonight."
     ],
     "speakers": [
       "narrator"
@@ -1112,7 +1120,8 @@
     "speaker": "capybara",
     "text": "'I have ink.'",
     "samples": [
-      "I have ink."
+      "I have ink.",
+      "I've got ink."
     ],
     "speakers": [
       "capybara"
@@ -1210,7 +1219,8 @@
     "speaker": "rabbit",
     "text": "\"I packed seeds. I have not decided to leave. I packed them so that leaving stays something I can still choose.\"",
     "samples": [
-      "I packed seeds. I have not decided to leave. I packed them so that leaving stays something I can still choose."
+      "I packed seeds. I have not decided to leave. I packed them so that leaving stays something I can still choose.",
+      "I packed seeds. I haven't decided to leave. I just want leaving to stay something I can choose."
     ],
     "speakers": [
       "rabbit"
@@ -1242,7 +1252,8 @@
     "speaker": "rabbit",
     "text": "\"Will you keep this between us, or help me tell Ember? I can live with either answer. I cannot live with everyone deciding for me again.\"",
     "samples": [
-      "Will you keep this between us, or help me tell Ember? I can live with either answer. I cannot live with everyone deciding for me again."
+      "Will you keep this between us, or help me tell Ember? I can live with either answer. I cannot live with everyone deciding for me again.",
+      "Will you keep this between us, or help me tell Ember? I can live with either. What I can't live with is everyone deciding for me again."
     ],
     "speakers": [
       "rabbit"
@@ -1258,7 +1269,8 @@
     "speaker": "fox",
     "text": "\"I used to tell you that you could always leave. I have never walked that road past the trees myself.\"",
     "samples": [
-      "I used to tell you that you could always leave. I have never walked that road past the trees myself."
+      "I used to tell you that you could always leave. I have never walked that road past the trees myself.",
+      "I used to tell you that you could always leave. I've never walked that road past the trees myself."
     ],
     "speakers": [
       "fox",
@@ -1339,7 +1351,8 @@
     "speaker": "fox",
     "text": "\"I have learned to wait at your PLEASE KNOCK sign. I want the gate to mean something you can decide, too.\"",
     "samples": [
-      "I have learned to wait at your PLEASE KNOCK sign. I want the gate to mean something you can decide, too."
+      "I have learned to wait at your PLEASE KNOCK sign. I want the gate to mean something you can decide, too.",
+      "I've learned to wait at your PLEASE KNOCK sign. I want the gate to be your decision too."
     ],
     "speakers": [
       "fox",
@@ -1356,7 +1369,8 @@
     "speaker": "rabbit",
     "text": "\"Thank you. A secret is a little room with its own door, and I am the one who opens it.\"",
     "samples": [
-      "Thank you. A secret is a little room with its own door, and I am the one who opens it."
+      "Thank you. A secret is a little room with its own door, and I am the one who opens it.",
+      "Thank you. A secret's like a little room with its own door, and I'm the one who opens it."
     ],
     "speakers": [
       "rabbit"
@@ -1372,7 +1386,8 @@
     "speaker": "fox",
     "text": "\"Then the stone at the gate stays between us. I will not speak for you.\"",
     "samples": [
-      "Then the stone at the gate stays between us. I will not speak for you."
+      "Then the stone at the gate stays between us. I will not speak for you.",
+      "Then the stone at the gate stays between us. I won't speak for you."
     ],
     "speakers": [
       "fox",
@@ -1389,7 +1404,8 @@
     "speaker": "fox",
     "text": "\"I will help. And I will ask you first before I tell anyone else.\"",
     "samples": [
-      "I will help. And I will ask you first before I tell anyone else."
+      "I will help. And I will ask you first before I tell anyone else.",
+      "I'll help. And I'll ask you before I tell anyone else."
     ],
     "speakers": [
       "fox",
@@ -1406,7 +1422,8 @@
     "speaker": "rabbit",
     "text": "\"Asking first. That would have been a good rule from the very beginning.\"",
     "samples": [
-      "Asking first. That would have been a good rule from the very beginning."
+      "Asking first. That would have been a good rule from the very beginning.",
+      "Asking first. That would've been a good rule from the start."
     ],
     "speakers": [
       "rabbit"
@@ -1471,7 +1488,8 @@
     "speaker": "fox",
     "text": "\"I knew enough to tell you. And I did not tell you.\"",
     "samples": [
-      "I knew enough to tell you. And I did not tell you."
+      "I knew enough to tell you. And I did not tell you.",
+      "I knew enough to tell you. And I didn't."
     ],
     "speakers": [
       "fox",
@@ -1505,7 +1523,8 @@
     "speaker": "sloth",
     "text": "\"I wanted it to come. I called my waiting patience. That word made it easier to watch everyone else wait without knowing why.\"",
     "samples": [
-      "I wanted it to come. I called my waiting patience. That word made it easier to watch everyone else wait without knowing why."
+      "I wanted it to come. I called my waiting patience. That word made it easier to watch everyone else wait without knowing why.",
+      "I wanted it to come. I called my waiting 'patience'. That word made it easier to watch everyone else wait without knowing what for."
     ],
     "speakers": [
       "sloth"
@@ -1521,7 +1540,8 @@
     "speaker": "fox",
     "text": "\"The love in this house was real, friend. It does not excuse what I kept from you.\"",
     "samples": [
-      "The love in this house was real, friend. It does not excuse what I kept from you."
+      "The love in this house was real, friend. It does not excuse what I kept from you.",
+      "The love in this house was real, friend. It doesn't excuse what I kept from you."
     ],
     "speakers": [
       "fox",
@@ -1554,7 +1574,8 @@
     "speaker": "fox",
     "text": "\"I filled that lamp again. Doing the thing you asked does not make up for the thing I kept from you.\"",
     "samples": [
-      "I filled that lamp again. Doing the thing you asked does not make up for the thing I kept from you."
+      "I filled that lamp again. Doing the thing you asked does not make up for the thing I kept from you.",
+      "I filled that lamp again. Doing what you asked doesn't make up for what I kept from you."
     ],
     "speakers": [
       "fox",
@@ -1588,7 +1609,8 @@
     "text": "\"You asked us to wait for permission. I should have understood that before we put up the sign.\"",
     "samples": [
       "You asked us to wait for permission. I should have understood that before we put up the sign.",
-      "You asked us to wait until we were let in. I should have kept that rule long before anyone had to write it on a sign."
+      "You asked us to wait until we were let in. I should have kept that rule long before anyone had to write it on a sign.",
+      "You asked us to wait until we were let in. I should've kept that rule long before anyone had to write it on a sign."
     ],
     "speakers": [
       "fox",
@@ -1605,7 +1627,8 @@
     "speaker": "fox",
     "text": "\"I will tell you the rest. And when I do not know something, I will say so.\"",
     "samples": [
-      "I will tell you the rest. And when I do not know something, I will say so."
+      "I will tell you the rest. And when I do not know something, I will say so.",
+      "I'll tell you the rest. And when I don't know something, I'll say so."
     ],
     "speakers": [
       "fox",
@@ -1622,7 +1645,8 @@
     "speaker": "fox",
     "text": "\"All right. I will keep my distance. Your place in this house does not depend on forgiving me.\"",
     "samples": [
-      "All right. I will keep my distance. Your place in this house does not depend on forgiving me."
+      "All right. I will keep my distance. Your place in this house does not depend on forgiving me.",
+      "All right. I'll keep my distance. You don't have to forgive me to belong here."
     ],
     "speakers": [
       "fox",
@@ -1658,7 +1682,8 @@
     "text": "\"PLUM died. I let him drift down to the bottom of the tank. I should have told someone before I did that.\"",
     "samples": [
       "PLUM died. I let him drift down to the bottom of the tank. I should have told someone before I did that.",
-      "PLUM died. I laid him on the gravel and told nobody. I did not want anyone to say something kind yet. This morning the gravel was empty."
+      "PLUM died. I laid him on the gravel and told nobody. I did not want anyone to say something kind yet. This morning the gravel was empty.",
+      "PLUM died. I laid him on the gravel and didn't tell anyone. I wasn't ready for people to be kind about it. This morning, he was gone."
     ],
     "speakers": [
       "axolotl"
@@ -1674,7 +1699,8 @@
     "speaker": "narrator",
     "text": "\"Something with PLUM's worried face swims a full circle of the tank. Then it swims the same circle again, exactly.\"",
     "samples": [
-      "Something with PLUM's worried face swims a full circle of the tank. Then it swims the same circle again, exactly."
+      "Something with PLUM's worried face swims a full circle of the tank. Then it swims the same circle again, exactly.",
+      "A fish with PLUM's worried face is swimming laps of the tank. Every lap is exactly the same as the last."
     ],
     "speakers": [
       "narrator"
@@ -1690,7 +1716,8 @@
     "speaker": "axolotl",
     "text": "\"The same bite out of his fin. The same little face.\"",
     "samples": [
-      "The same bite out of his fin. The same little face."
+      "The same bite out of his fin. The same little face.",
+      "Same nick in his fin. Same little face."
     ],
     "speakers": [
       "axolotl"
@@ -1706,7 +1733,8 @@
     "speaker": "narrator",
     "text": "\"Axel laughs once. PLUM always stopped for that. This fish keeps swimming.\"",
     "samples": [
-      "Axel laughs once. PLUM always stopped for that. This fish keeps swimming."
+      "Axel laughs once. PLUM always stopped for that. This fish keeps swimming.",
+      "Axel laughs, just once. PLUM always stopped swimming when he laughed. This fish does not stop."
     ],
     "speakers": [
       "narrator"
@@ -1722,7 +1750,8 @@
     "speaker": "axolotl",
     "text": "\"Let me have tonight. I am not ready to work this out.\"",
     "samples": [
-      "Let me have tonight. I am not ready to work this out."
+      "Let me have tonight. I am not ready to work this out.",
+      "Can I just have tonight? I'm not ready to think about what this means."
     ],
     "speakers": [
       "axolotl"
@@ -1738,7 +1767,8 @@
     "speaker": "fox",
     "text": "\"It kept the part of PLUM it could understand, friend. The shape of him. We will have to show it what it left out.\"",
     "samples": [
-      "It kept the part of PLUM it could understand, friend. The shape of him. We will have to show it what it left out."
+      "It kept the part of PLUM it could understand, friend. The shape of him. We will have to show it what it left out.",
+      "It brought back the part of PLUM it could understand, friend. His shape. We'll have to show it what it left out."
     ],
     "speakers": [
       "fox",
@@ -1807,7 +1837,8 @@
     "text": "\"The shape is perfect. The chip is gone, and so is the memory of breaking it.\"",
     "samples": [
       "The shape is perfect. The chip is gone, and so is the memory of breaking it.",
-      "The shape is perfect. And I cannot remember who was sitting with me the day I dropped it. I used to."
+      "The shape is perfect. And I cannot remember who was sitting with me the day I dropped it. I used to.",
+      "It's perfect now. And I can't remember who was sitting with me the day I dropped it. I used to."
     ],
     "speakers": [
       "fox",
@@ -1825,7 +1856,8 @@
     "text": "\"The work stops. The last arrangement has not been made yet.\"",
     "samples": [
       "The work stops. The last arrangement has not been made yet.",
-      "The household gathers at the long table. One arrangement is left, and everyone knows it."
+      "The household gathers at the long table. One arrangement is left, and everyone knows it.",
+      "Everyone gathers at the long table. There is one arrangement left, and they all know it."
     ],
     "speakers": [
       "narrator"
@@ -1876,7 +1908,8 @@
     "text": "\"I moved my cushion out of the middle of the mat. There are other places to sit. I should have moved it sooner.\"",
     "samples": [
       "I moved my cushion out of the middle of the mat. There are other places to sit. I should have moved it sooner.",
-      "I sat at the center, where every stalk points, and called that understanding. I have moved my mat. I was far more certain than I had any right to be."
+      "I sat at the center, where every stalk points, and called that understanding. I have moved my mat. I was far more certain than I had any right to be.",
+      "I sat in the middle, where every stalk points, and called that understanding. I've moved my mat. I was far more certain than I had any right to be."
     ],
     "speakers": [
       "red_panda"
@@ -1908,7 +1941,8 @@
     "speaker": "wombat",
     "text": "\"I'll hang a door you can open from either side. You try the latch yourself before I call the job finished.\"",
     "samples": [
-      "I'll hang a door you can open from either side. You try the latch yourself before I call the job finished."
+      "I'll hang a door you can open from either side. You try the latch yourself before I call the job finished.",
+      "I'll hang a door you can open from either side. And you'll test the latch yourself before I call the job done."
     ],
     "speakers": [
       "wombat"
@@ -1925,7 +1959,8 @@
     "text": "\"Two words will fit at the end, friend. CLOSED keeps one room it cannot enter. A thought you have in there stays yours, uncorrected.\"",
     "samples": [
       "Two words will fit at the end, friend. CLOSED keeps one room it cannot enter. A thought you have in there stays yours, uncorrected.",
-      "Two words will fit at the end, friend. Either one lets it in to live with us. CLOSED keeps one room it can never enter. A thought you have in there stays yours, uncorrected."
+      "Two words will fit at the end, friend. Either one lets it in to live with us. CLOSED keeps one room it can never enter. A thought you have in there stays yours, uncorrected.",
+      "Two words fit at the end, friend, and either one lets it in to live with us. CLOSED keeps one room it can never enter. Whatever you think in there stays yours, and nothing corrects it."
     ],
     "speakers": [
       "fox",
@@ -1943,7 +1978,8 @@
     "text": "\"CLOSER lets it come and live with us, and keeps a road that leads away. Anyone who stays must be able to leave.\"",
     "samples": [
       "CLOSER lets it come and live with us, and keeps a road that leads away. Anyone who stays must be able to leave.",
-      "CLOSER keeps one road out that it can never close. Anyone who stays must be able to leave."
+      "CLOSER keeps one road out that it can never close. Anyone who stays must be able to leave.",
+      "CLOSER keeps one road out that it can never close. Anyone who stays can always leave."
     ],
     "speakers": [
       "fox",
@@ -1993,7 +2029,8 @@
     "text": "\"We marked the road because you asked us to. CLOSER can keep that way out open. You may still choose CLOSED, friend; putting out a lamp did not choose your last word.\"",
     "samples": [
       "We marked the road because you asked us to. CLOSER can keep that way out open. You may still choose CLOSED, friend; putting out a lamp did not choose your last word.",
-      "We marked the road because you asked. CLOSER would keep that road open for good. You can still choose CLOSED, friend. A lamp by the gate did not choose your last word for you."
+      "We marked the road because you asked. CLOSER would keep that road open for good. You can still choose CLOSED, friend. A lamp by the gate did not choose your last word for you.",
+      "We marked the road because you asked. CLOSER would keep it open for good. But you can still choose CLOSED, friend. A lamp by the gate doesn't decide your last word."
     ],
     "speakers": [
       "fox",
@@ -2011,7 +2048,8 @@
     "text": "\"We fitted the latch because you asked us to. CLOSED can make that room private from the presence too. You may still choose CLOSER; fitting a latch did not choose your last word.\"",
     "samples": [
       "We fitted the latch because you asked us to. CLOSED can make that room private from the presence too. You may still choose CLOSER; fitting a latch did not choose your last word.",
-      "We fitted the latch because you asked. CLOSED would shut that room to it as well as to us. You can still choose CLOSER, friend. A latch did not choose your last word for you."
+      "We fitted the latch because you asked. CLOSED would shut that room to it as well as to us. You can still choose CLOSER, friend. A latch did not choose your last word for you.",
+      "We fitted the latch because you asked. CLOSED would shut that room to it, and to us. But you can still choose CLOSER, friend. A latch doesn't decide your last word."
     ],
     "speakers": [
       "fox",
@@ -2062,7 +2100,9 @@
     "text": "`I made ${drink}. There is also toast, if you are willing to scrape it.`",
     "samples": [
       "I made cocoa. There is also toast, if you are willing to scrape it.",
-      "I made tea. There is also toast, if you are willing to scrape it."
+      "I made tea. There is also toast, if you are willing to scrape it.",
+      "I made cocoa. There's toast too, if you don't mind scraping it.",
+      "I made tea. There's toast too, if you don't mind scraping it."
     ],
     "speakers": [
       "narrator",
@@ -2079,7 +2119,8 @@
     "speaker": "wombat",
     "text": "\"A hinge is squeaking. Ordinary squeak, nothing stranger. I've got the right oil for this one.\"",
     "samples": [
-      "A hinge is squeaking. Ordinary squeak, nothing stranger. I've got the right oil for this one."
+      "A hinge is squeaking. Ordinary squeak, nothing stranger. I've got the right oil for this one.",
+      "A hinge is squeaking. Just an ordinary squeak. I've got the right oil for that."
     ],
     "speakers": [
       "wombat"
@@ -2228,7 +2269,8 @@
     "speaker": "rabbit",
     "text": "\"I walked out until I could not see the house. Then I came back. Coming back was my own decision.\"",
     "samples": [
-      "I walked out until I could not see the house. Then I came back. Coming back was my own decision."
+      "I walked out until I could not see the house. Then I came back. Coming back was my own decision.",
+      "I walked until I couldn't see the house. Then I came back. Coming back was my choice."
     ],
     "speakers": [
       "rabbit"
@@ -2278,7 +2320,8 @@
     "speaker": "fox",
     "text": "\"One small thing left exactly where we put it. I am watching to see whether it stays there.\"",
     "samples": [
-      "One small thing left exactly where we put it. I am watching to see whether it stays there."
+      "One small thing left exactly where we put it. I am watching to see whether it stays there.",
+      "One small thing, left exactly where we put it. I'm watching to see if it stays."
     ],
     "speakers": [
       "narrator",
@@ -2295,7 +2338,8 @@
     "speaker": "axolotl",
     "text": "\"I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me.\"",
     "samples": [
-      "I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me."
+      "I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me.",
+      "I'm still not ready to say what I think about the fish. Thanks for not finishing that thought for me."
     ],
     "speakers": [
       "axolotl"
@@ -2347,7 +2391,8 @@
     "text": "\"We have talked a great deal, friend. I would like to listen now.\"",
     "samples": [
       "We have talked a great deal, friend. I would like to listen now.",
-      "I have done most of the talking, friend. It is your turn. I am listening."
+      "I have done most of the talking, friend. It is your turn. I am listening.",
+      "I've done most of the talking, friend. Your turn. I'm listening."
     ],
     "speakers": [
       "fox",
@@ -2364,7 +2409,8 @@
     "speaker": "fox",
     "text": "\"Yes. I will not rush you out of that anger. I did not tell you the whole truth when it mattered.\"",
     "samples": [
-      "Yes. I will not rush you out of that anger. I did not tell you the whole truth when it mattered."
+      "Yes. I will not rush you out of that anger. I did not tell you the whole truth when it mattered.",
+      "I know. I won't rush you out of it. I didn't tell you the whole truth when it mattered."
     ],
     "speakers": [
       "fox",
@@ -2397,7 +2443,8 @@
     "speaker": "fox",
     "text": "\"So do I. This time I am saying it as a wish, not as a promise I cannot keep.\"",
     "samples": [
-      "So do I. This time I am saying it as a wish, not as a promise I cannot keep."
+      "So do I. This time I am saying it as a wish, not as a promise I cannot keep.",
+      "So do I. This time I'm saying it as a wish, not a promise I can't keep."
     ],
     "speakers": [
       "fox",
@@ -2430,7 +2477,8 @@
     "speaker": "fox",
     "text": "\"Then that is where we begin. Not knowing is allowed. Nobody gets to finish that sentence for you.\"",
     "samples": [
-      "Then that is where we begin. Not knowing is allowed. Nobody gets to finish that sentence for you."
+      "Then that is where we begin. Not knowing is allowed. Nobody gets to finish that sentence for you.",
+      "Then that's where we start. Not knowing is allowed. Nobody gets to finish that sentence for you."
     ],
     "speakers": [
       "fox",
@@ -2627,7 +2675,8 @@
     "text": "I will stand beside you, friend. You asked me to.",
     "speaker": "fox",
     "samples": [
-      "I will stand beside you, friend. You asked me to."
+      "I will stand beside you, friend. You asked me to.",
+      "I'll stand beside you, friend. You asked me to."
     ],
     "speakers": [
       "fox",
@@ -2660,7 +2709,8 @@
     "text": "I will stay by the hearth, friend. You can have as much room as you need.",
     "speaker": "fox",
     "samples": [
-      "I will stay by the hearth, friend. You can have as much room as you need."
+      "I will stay by the hearth, friend. You can have as much room as you need.",
+      "I'll stay by the hearth, friend. You can have as much room as you need."
     ],
     "speakers": [
       "fox",
@@ -2741,7 +2791,8 @@
     "text": "There is one thing I am keeping to myself. I am not going to say what it is. That should be allowed.",
     "speaker": "rabbit",
     "samples": [
-      "There is one thing I am keeping to myself. I am not going to say what it is. That should be allowed."
+      "There is one thing I am keeping to myself. I am not going to say what it is. That should be allowed.",
+      "There's one thing I'm keeping to myself, and I'm not going to say what it is. That should be allowed."
     ],
     "speakers": [
       "rabbit"

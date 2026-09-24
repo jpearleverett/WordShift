@@ -1273,14 +1273,20 @@ const entityLook = (phase: number) => SHADOW_FIGURE_LOOK[Math.min(Math.max(phase
 
 type EntityOpacity = Animated.AnimatedInterpolation<number> | number;
 
-/** One layer of the entity. */
+/**
+ * One layer of the entity. It never takes a touch: the claws lie over the top
+ * room, and without pointerEvents="none" they swallowed taps meant for its
+ * resident (Moss could not be talked to from the reveal on).
+ */
 const EntityPiece: React.FC<{ body: number; style: object; opacity: EntityOpacity; tint?: string }> = ({ body, style, opacity, tint }) => (
-  <Animated.Image
-    source={body}
-    resizeMode="stretch"
-    fadeDuration={0}
-    style={[{ position: 'absolute' }, style, tint ? { tintColor: tint } : null, { opacity }]}
-  />
+  <View pointerEvents="none" style={[{ position: 'absolute' }, style]}>
+    <Animated.Image
+      source={body}
+      resizeMode="stretch"
+      fadeDuration={0}
+      style={[styles.entityFill, tint ? { tintColor: tint } : null, { opacity }]}
+    />
+  </View>
 );
 
 function useEntityOpacities(phase: number, visible: boolean) {
