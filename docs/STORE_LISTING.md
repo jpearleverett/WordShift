@@ -93,7 +93,7 @@ They've been waiting.
 
 - **Content-rating questionnaires:** disclose the actual horror/fear themes and app capabilities in each store's current questionnaire. Google uses IARC to assign regional ratings; a draft ESRB/PEGI label is not an issued rating. [Google content ratings](https://support.google.com/googleplay/android-developer/answer/9898843?hl=en)
 - **Apple:** the current system includes 13+, 16+ and 18+; the old 12+ label below the July artwork is historical. Complete the current App Store Connect questions and inspect the calculated regional rating. The game's intended 13+ audience is a separate product choice. [Apple's current rating definitions](https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions)
-- **Contains ads:** Yes (Google AdMob — interstitial, opt-in rewarded, and menu banners). Declare it in the Play "Ads" question. `app-ads.txt` is live at the domain root (`https://jpearleverett.github.io/app-ads.txt`, pub-6575205005908086).
+- **Contains ads:** Yes (Google AdMob — interstitial, opt-in rewarded, and menu banners). Declare it in the Play "Ads" question. `app-ads.txt` is served from `docs/app-ads.txt` at `https://wordshift.iridescent-games.com/app-ads.txt` (the old copy at `https://jpearleverett.github.io/app-ads.txt` stays until the Play website field changes, pub-6575205005908086).
 - **Contains in-app purchases:** Yes — 10 configured product IDs: amber packs, hint packs, one-time starter bundle, Remove Ads, Patron's Key, cosmetic bundle, and the **Supporter auto-renewing subscription**. The owner has confirmed Supporter is configured; verify existing products and localized prices in the signed release rather than recreating them. See [monetization setup](MONETIZATION_SETUP.md).
 - **Target audience:** the product is intended for ages 13+. Complete the store's audience and content questions accurately for the actual release.
 
@@ -111,9 +111,9 @@ Backend features are LIVE (Supabase + Sentry + AdMob + Google Play Billing), so 
 
 Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from branch, `/docs`). Use these URLs in the store consoles and in-app Settings (all three are also wired into `mobile/src/constants/links.ts`):
 
-- Privacy policy URL (required, both stores): `https://jpearleverett.github.io/WordShift/privacy-policy/`
-- Terms of Service URL: `https://jpearleverett.github.io/WordShift/terms/`
-- Data deletion URL (Play Data Safety — account/data deletion): `https://jpearleverett.github.io/WordShift/data-deletion/`
+- Privacy policy URL (required, both stores): `https://wordshift.iridescent-games.com/privacy-policy/`
+- Terms of Service URL: `https://wordshift.iridescent-games.com/terms/`
+- Data deletion URL (Play Data Safety — account/data deletion): `https://wordshift.iridescent-games.com/data-deletion/`
 
 ## Asset checklist
 

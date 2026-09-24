@@ -344,7 +344,7 @@ an OTA. Everything below uses bidding, which needs no waterfall tuning.
 5. **app-ads.txt.** Each network shows its own `app-ads.txt` line(s) in its
    dashboard (AppLovin: Account, then app-ads.txt; Unity: Monetization
    settings). Append them, unedited, to the `app-ads.txt` served at
-   `https://jpearleverett.github.io/app-ads.txt`, keeping the Google line.
+   `https://wordshift.iridescent-games.com/app-ads.txt` (source: `docs/app-ads.txt`), keeping the Google line.
    Unauthorised inventory is paid less or not at all.
 6. **Play Console, Data safety.** AppLovin and Unity collect the same kinds of
    data as AdMob (device advertising ID, approximate location, app

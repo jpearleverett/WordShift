@@ -10,9 +10,9 @@
  * listing entries together.
  */
 export const EXTERNAL_LINKS = {
-  privacyPolicy: 'https://jpearleverett.github.io/WordShift/privacy-policy/',
-  termsOfService: 'https://jpearleverett.github.io/WordShift/terms/',
-  dataDeletion: 'https://jpearleverett.github.io/WordShift/data-deletion/',
+  privacyPolicy: 'https://wordshift.iridescent-games.com/privacy-policy/',
+  termsOfService: 'https://wordshift.iridescent-games.com/terms/',
+  dataDeletion: 'https://wordshift.iridescent-games.com/data-deletion/',
   supportEmail: 'info@iridescent-games.com',
 } as const;
 
@@ -25,7 +25,7 @@ export const PLAY_STORE_URL =
   'https://play.google.com/store/apps/details?id=com.wordshift.app';
 
 /** Public web landing page (GitHub Pages root, same host as the legal docs). */
-export const WEB_LANDING_URL = 'https://jpearleverett.github.io/WordShift/';
+export const WEB_LANDING_URL = 'https://wordshift.iridescent-games.com/';
 
 export function getSupportMailto(appVersion: string, supportId?: string): string {
   const subject = encodeURIComponent(`WordShift Support (v${appVersion})`);
