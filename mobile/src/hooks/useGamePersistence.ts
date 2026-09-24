@@ -74,6 +74,9 @@ export interface VictoryData {
   /** True when the undo-limit ("Challenge") constraint was also on. With `blind`
    *  this marks the stacked maximal trial, which the modal labels distinctly. */
   undoLimited?: boolean;
+  /** The full stack: EXPERT, a non-standard style and all four modifiers. The
+   *  modal names its trial line after it, as the setup menu's emblem does. */
+  maxStack?: boolean;
   /** Variable-ratio "lucky" surprise bonus (0 when none); reward-only, never phase progress */
   surpriseBonus: number;
   currentStreak: number;

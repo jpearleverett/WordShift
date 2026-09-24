@@ -62,6 +62,9 @@ export interface VictoryData {
   blind?: boolean;
   /** Undo-limit ("Challenge") also active — with `blind`, the maximal trial. */
   undoLimited?: boolean;
+  /** EXPERT + a style + all four modifiers: the trial line takes the setup
+   *  menu's name for the full stack. */
+  maxStack?: boolean;
   surpriseBonus?: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
@@ -1154,7 +1157,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {challengeBonusAmber > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                              {victoryData.blind
+                              {victoryData.maxStack
+                                // The full stack: the name the setup menu's
+                                // emblem gives the same loadout.
+                                ? (phase >= 3 ? 'The Full Arrangement' : 'The Full Stack')
+                                : victoryData.blind
                                 ? (victoryData.undoLimited
                                     // Both constraints rode this board: name the
                                     // stacked tier so the higher rate is legible.
