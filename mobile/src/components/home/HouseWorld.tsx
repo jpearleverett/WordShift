@@ -76,7 +76,9 @@ const WALL_IMG = require('../../../assets/environment/wall.png');
 const EDGE_SHADOW_IMG = require('../../../assets/environment/wall_edge_shadow.png');
 const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png');
 const HOUSE_SHADOW_IMG = require('../../../assets/environment/house_shadow.png');
-const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
+const ENTITY_BACK_IMG = require('../../../assets/environment/entity_back.png');
+const ENTITY_FRONT_IMG = require('../../../assets/environment/entity_front.png');
+const ENTITY_EYES_IMG = require('../../../assets/environment/entity_eyes.png');
 const SHADOW_HALO_IMG = require('../../../assets/environment/shadow_halo.png');
 
 
@@ -1239,142 +1241,153 @@ const sigilOverlayStyles = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * ShadowFigure — the towering presence behind the house.
- * Invisible until Phase 3. Faint silhouette at Phase 3. Full presence at
- * Phase 4 — looming above the roofline, crimson eyes. Settled at Phase 5.
+ * ShadowFigure — the entity, standing behind the house and holding it.
+ * Invisible until Phase 3.
  *
- * Layers behind the house rooms but in front of the sky (negative zIndex
- * inside houseContainer). Very slow opacity "breathing" (~8s cycle); static
- * under reducedMotion / simplified animations.
+ * One generated picture (scripts/tools/processEntityArt.mjs): a horned head of
+ * smoke with burning eyes and a fanged grin rises over the roof, and its long
+ * smoke arms come down to claws that clutch the walls' top corners. What lies behind the
+ * house is drawn here; the claws over the walls are ShadowHands, in front.
+ * It is smoke rather than cloth: its soft edges are translucent over the sky.
+ *
+ * Slow opacity breathing (~8s; slower once settled at Phase 5); the eyes pulse
+ * at Phase 4. Static under reducedMotion / simplified animations.
  */
-const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
-  const [breatheAnim] = useState(() => new Animated.Value(0));
-  const [eyeAnim] = useState(() => new Animated.Value(0));
-  const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
-  const visible = phase >= 3;
-  const look = SHADOW_FIGURE_LOOK[Math.min(Math.max(phase, 3), 5) as 3 | 4 | 5];
-
-  // The settled entity (phase 5) breathes SLOWER than the looming one —
-  // sleeping, not watching. Only the durations change; reduced motion stays
-  // fully static exactly as before.
-  const breathHalfMs = phase >= 5 ? 7000 : 4000;
+function useEntityBreath(visible: boolean, isStatic: boolean, halfMs: number) {
+  const [anim] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!visible || isStatic) return;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(breatheAnim, {
-          toValue: 1,
-          duration: breathHalfMs,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(breatheAnim, {
-          toValue: 0,
-          duration: breathHalfMs,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
+        Animated.timing(anim, { toValue: 1, duration: halfMs, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: halfMs, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [visible, isStatic, breatheAnim, breathHalfMs]);
+  }, [visible, isStatic, anim, halfMs]);
+  return anim;
+}
 
-  // The eyes pulse on their own slower clock, only while it watches (phase 4).
+const entityLook = (phase: number) => SHADOW_FIGURE_LOOK[Math.min(Math.max(phase, 3), 5) as 3 | 4 | 5];
+
+type EntityOpacity = Animated.AnimatedInterpolation<number> | number;
+
+/** One layer of the entity. */
+const EntityPiece: React.FC<{ body: number; style: object; opacity: EntityOpacity; tint?: string }> = ({ body, style, opacity, tint }) => (
+  <Animated.Image
+    source={body}
+    resizeMode="stretch"
+    fadeDuration={0}
+    style={[{ position: 'absolute' }, style, tint ? { tintColor: tint } : null, { opacity }]}
+  />
+);
+
+function useEntityOpacities(phase: number, visible: boolean) {
+  const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+  const look = entityLook(phase);
+  // The settled entity (phase 5) breathes SLOWER than the looming one.
+  const breath = useEntityBreath(visible, isStatic, phase >= 5 ? 7000 : 4000);
+  const opacity: EntityOpacity = isStatic
+    ? look.figure
+    : breath.interpolate({ inputRange: [0, 1], outputRange: [look.figure - 0.06, Math.min(1, look.figure + 0.04)] });
+  return { look, isStatic, opacity };
+}
+
+const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
+  const visible = phase >= 3;
+  const { look, isStatic, opacity } = useEntityOpacities(phase, visible);
   const eyesPulse = visible && !isStatic && look.eyePulse;
-  useEffect(() => {
-    if (!eyesPulse) return;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(eyeAnim, { toValue: 1, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(eyeAnim, { toValue: 0, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [eyesPulse, eyeAnim]);
-
+  const eyeAnim = useEntityBreath(eyesPulse, !eyesPulse, 2600);
   if (!visible) return null;
 
-  const height = phase >= 4 ? ROOM_WIDTH * 2 : ROOF_WIDTH * 1.6;
-  const width = height * SHADOW_FIGURE_ASPECT;
-
-  const opacity = isStatic
-    ? look.figure
-    : breatheAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [look.figure - 0.05, look.figure + 0.05],
-      });
-  const eyeOpacity = eyesPulse
-    ? eyeAnim.interpolate({ inputRange: [0, 1], outputRange: [look.eyes * 0.55, look.eyes] })
+  const eyeOpacity: EntityOpacity = eyesPulse
+    ? eyeAnim.interpolate({ inputRange: [0, 1], outputRange: [look.eyes * 0.6, look.eyes] })
     : look.eyes;
-
-  // A near-black figure over a near-black sky cannot be seen, so it stands in
-  // front of a soft backlight in the phase's colour: the halo is what gives
-  // the silhouette an edge. One tinted radial-gradient image stretched to an
-  // oval (stacked Views banded into visible rings; no shadowRadius on Android).
-  const haloW = width * SHADOW_HALO_WIDTH;
-  const haloH = height * SHADOW_HALO_HEIGHT;
-  const halo = (
-    <Image
-      source={SHADOW_HALO_IMG}
-      resizeMode="stretch"
-      fadeDuration={0}
-      style={{
-        position: 'absolute',
-        left: width / 2 - haloW / 2,
-        top: height * SHADOW_HALO_CENTER_Y - haloH / 2,
-        width: haloW,
-        height: haloH,
-        tintColor: look.halo,
-        opacity: look.haloOpacity,
-      }}
-    />
-  );
-  const eye = (fx: number, key: string) => {
-    const core = width * SHADOW_EYE_CORE;
-    const glow = width * SHADOW_EYE_GLOW;
-    const cx = width * fx;
-    const cy = height * SHADOW_EYE_Y;
-    return (
-      <React.Fragment key={key}>
-        <View style={{ position: 'absolute', left: cx - glow / 2, top: cy - glow / 2, width: glow, height: glow, borderRadius: glow / 2, backgroundColor: look.eyeGlow, opacity: 0.45 }} />
-        <View style={{ position: 'absolute', left: cx - core / 2, top: cy - core / 2, width: core, height: core, borderRadius: core / 2, backgroundColor: look.eyeCore }} />
-      </React.Fragment>
-    );
-  };
+  const haloW = ENTITY_BACK.width * SHADOW_HALO_WIDTH;
+  const haloH = ENTITY_BACK.height * SHADOW_HALO_HEIGHT;
 
   return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        // The head and shoulders rise above the roofline (low enough that the
-        // eyes clear the header when the roof is in view); the base dissolves
-        // behind the house.
-        top: -height * SHADOW_FIGURE_RISE,
-        alignSelf: 'center',
-        width,
-        height,
-        zIndex: -3, // Behind ground (-2) and trees (-1), in front of the sky
-        transform: [{ translateX: 14 }], // Slight off-center for composition
-      }}
-    >
-      {halo}
-      <Animated.Image
-        source={SHADOW_FIGURE_IMG}
-        resizeMode="contain"
-        resizeMethod="resize"
+    <View pointerEvents="none" style={styles.entityLayer}>
+      {/* A soft backlight behind the hood. */}
+      <Image
+        source={SHADOW_HALO_IMG}
+        resizeMode="stretch"
         fadeDuration={0}
-        style={{ position: 'absolute', left: 0, top: 0, width, height, opacity }}
+        style={{
+          position: 'absolute',
+          top: ENTITY_BACK.top + ENTITY_BACK.height * SHADOW_HALO_CENTER_Y - haloH / 2,
+          left: '50%',
+          marginLeft: -haloW / 2,
+          width: haloW,
+          height: haloH,
+          tintColor: look.halo,
+          opacity: look.haloOpacity,
+        }}
+      />
+      {/* Its body, fog down both sides of the house. */}
+      {[-1, 1].map((side) => (
+        <Image
+          key={side}
+          source={SHADOW_HALO_IMG}
+          resizeMode="stretch"
+          fadeDuration={0}
+          style={{
+            position: 'absolute',
+            top: ENTITY_BACK.top + ENTITY_BACK.height * 0.5,
+            left: '50%',
+            marginLeft: side * ENTITY_FOG.centerX - ENTITY_FOG.width / 2,
+            width: ENTITY_FOG.width,
+            height: ENTITY_FOG.height,
+            tintColor: look.fog,
+            opacity: look.fogOpacity,
+          }}
+        />
+      ))}
+      {/* Everything of it that lies behind the house. */}
+      <EntityPiece
+        tint={look.tint}
+        body={ENTITY_BACK_IMG}
+        style={{ top: ENTITY_BACK.top, left: '50%', marginLeft: ENTITY_BACK.left, width: ENTITY_BACK.width, height: ENTITY_BACK.height }}
+        opacity={opacity}
       />
       {look.eyes > 0 && (
-        <Animated.View style={{ position: 'absolute', left: 0, top: 0, width, height, opacity: eyeOpacity }}>
-          {eye(SHADOW_EYE_LEFT_X, 'l')}
-          {eye(SHADOW_EYE_RIGHT_X, 'r')}
-        </Animated.View>
+        <Animated.Image
+          source={ENTITY_EYES_IMG}
+          resizeMode="stretch"
+          fadeDuration={0}
+          style={{
+            position: 'absolute',
+            top: ENTITY_EYES.top,
+            left: '50%',
+            marginLeft: ENTITY_EYES.left,
+            width: ENTITY_EYES.width,
+            height: ENTITY_EYES.height,
+            tintColor: look.eyeCore,
+            opacity: eyeOpacity,
+          }}
+        />
       )}
     </View>
+  );
+};
+
+/**
+ * Its fingers, curled round the walls' top corners in front of the house
+ * (Phase 4+). At Phase 3 the hands hang faintly behind the house, not yet
+ * holding it.
+ */
+const ShadowHands: React.FC<{ phase: number }> = ({ phase }) => {
+  const visible = phase >= 4;
+  const { opacity } = useEntityOpacities(phase, visible);
+  if (!visible) return null;
+  return (
+    <EntityPiece
+      tint={entityLook(phase).tint}
+      body={ENTITY_FRONT_IMG}
+      style={{ top: ENTITY_FRONT.top, left: '50%', marginLeft: ENTITY_FRONT.left, width: ENTITY_FRONT.width, height: ENTITY_FRONT.height }}
+      opacity={opacity}
+    />
   );
 };
 
@@ -1658,34 +1671,42 @@ const PIT_MARGIN_TOP = 0;
 // Net flow height the pit adds below the foundation — used by the pan bounds,
 // the contact shadow seat, and the house-vs-art geometry notes below.
 const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 140
-const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
-// How far the figure rises above the house container's top, as a share of
-// its height (was 0.55, which parked the eyes behind the header even with the
-// roof in view).
-const SHADOW_FIGURE_RISE = 0.4;
-// Eye centres measured from shadow_figure.png (600x1200): x 273.7 / 325.7,
-// y 210.8. The eye layer redraws them brighter over the baked 66-pixel eyes.
-const SHADOW_EYE_LEFT_X = 273.7 / 600;
-const SHADOW_EYE_RIGHT_X = 325.7 / 600;
-const SHADOW_EYE_Y = 210.8 / 1200;
-const SHADOW_EYE_CORE = 0.024;
-const SHADOW_EYE_GLOW = 0.075;
-// Backlight halo: an oval around the head and shoulders.
-const SHADOW_HALO_WIDTH = 1.25;
-const SHADOW_HALO_HEIGHT = 0.62;
+// The entity's geometry, in dp, from scripts/tools/processEntityArt.mjs. The
+// art is one generated picture of the figure holding a stand-in of this house,
+// split along the stand-in's walls into what lies behind the house (the back
+// layer: hood, shoulders, arms, palms) and in front of it (the fingers over
+// the walls). x runs from the house's centre line; y from the roof's top edge,
+// shifted so the stand-in's eaves meet the real house body's top.
+const ENTITY_ART_EAVES = 53.3;
+const ENTITY_BODY_TOP = ROOF_RENDER_HEIGHT - 6; // the roof's marginBottom
+const ENTITY_SHIFT_Y = ENTITY_BODY_TOP - ENTITY_ART_EAVES;
+const ENTITY_BACK = { left: -265.7, top: -302.9 + ENTITY_SHIFT_Y, width: 517.5, height: 777 };
+const ENTITY_FRONT = { left: -133.7, top: 51.1 + ENTITY_SHIFT_Y, width: 268.5, height: 142.5 };
+// The eyes' hot cores, a second glow over the painted eyes.
+const ENTITY_EYES = { left: -54.2, top: -197.9 + ENTITY_SHIFT_Y, width: 97.5, height: 76.5 };
+// Its body goes on down the house's sides as fog: a tall soft column each side.
+const ENTITY_FOG = { centerX: 150, width: 230, height: 1500 };
+// Extra pan room above the roof (Phase 3+), so the hood's tip clears the
+// header when the player scrolls all the way up. The roof's top rests about
+// 100dp below the scene's top at full pan; the hood rises -ENTITY_BACK.top.
+const ENTITY_PAN_HEADROOM = Math.max(0, -ENTITY_BACK.top - 100);
+// Backlight halo: an oval behind the hood.
+const SHADOW_HALO_WIDTH = 0.66;
+const SHADOW_HALO_HEIGHT = 0.85;
 const SHADOW_HALO_CENTER_Y = 0.3;
 /**
- * Per-phase look. Phase 3: a faint violet backlight, no eyes yet (the eyes are
- * the reveal). Phase 4: crimson backlight, the figure near-solid, eyes lit and
- * pulsing. Phase 5: settled mauve, the eyes dim and still.
+ * Per-phase look. Phase 3: only a shadow, one dark tint with no colour and no
+ * glow, a shape in the night behind the house. Phase 4, the reveal: its own
+ * colours, crimson cracks and fangs, the eyes blazing and pulsing. Phase 5:
+ * settled into a muted mauve silhouette, the eyes a dim, still ember.
  */
 const SHADOW_FIGURE_LOOK: Record<3 | 4 | 5, {
-  figure: number; halo: string; haloOpacity: number;
-  eyes: number; eyeCore: string; eyeGlow: string; eyePulse: boolean;
+  figure: number; tint?: string; halo: string; haloOpacity: number; fog: string; fogOpacity: number;
+  eyes: number; eyeCore: string; eyePulse: boolean;
 }> = {
-  3: { figure: 0.55, halo: '#6B55A8', haloOpacity: 0.6, eyes: 0, eyeCore: '#FF3B3B', eyeGlow: '#C0122B', eyePulse: false },
-  4: { figure: 0.9, halo: '#A3203A', haloOpacity: 0.85, eyes: 1, eyeCore: '#FF4A3D', eyeGlow: '#D0142E', eyePulse: true },
-  5: { figure: 0.65, halo: '#6E5A86', haloOpacity: 0.55, eyes: 0.45, eyeCore: '#E0707A', eyeGlow: '#8E3A55', eyePulse: false },
+  3: { figure: 0.62, tint: '#1E1834', halo: '#6B55A8', haloOpacity: 0.32, fog: '#141024', fogOpacity: 0.45, eyes: 0, eyeCore: '#FF3B3B', eyePulse: false },
+  4: { figure: 0.97, halo: '#A3203A', haloOpacity: 0.45, fog: '#1C0612', fogOpacity: 0.6, eyes: 0.9, eyeCore: '#FF5A3D', eyePulse: true },
+  5: { figure: 0.78, tint: '#2A2236', halo: '#6E5A86', haloOpacity: 0.3, fog: '#231C30', fogOpacity: 0.5, eyes: 0.5, eyeCore: '#C9788A', eyePulse: false },
 };
 
 // Baseline gap between the pit entrance and the container bottom (before the
@@ -1750,6 +1771,8 @@ export const getRoomCenterFromBottom = (
  * Every primitive below is a direct child of the same pan plane as the sky.
  * There is no overflowing raster wrapper, native raster cache, animation or
  * scroll listener. The lowest primitive ends above the art's flat top seam.
+ * The night banks stay faint: the entity's hood stands in this air from
+ * Phase 3, and a dense flat pill behind it read as a UI panel.
  */
 const UPPER_SKY_LIGHT: Record<number, {
   cloud: string; haze: string; star: string; cloudOpacity: number; hazeOpacity: number;
@@ -1757,9 +1780,9 @@ const UPPER_SKY_LIGHT: Record<number, {
   0: { cloud: '#CCE9F7', haze: '#F6F4D5', star: '#FFFFFF', cloudOpacity: 0.13, hazeOpacity: 0.09 },
   1: { cloud: '#D3D4EA', haze: '#FAD8B1', star: '#FFF5DA', cloudOpacity: 0.15, hazeOpacity: 0.1 },
   2: { cloud: '#362D59', haze: '#E3AEC6', star: '#F8DAC2', cloudOpacity: 0.24, hazeOpacity: 0.14 },
-  3: { cloud: '#131D37', haze: '#59667F', star: '#C9D8E8', cloudOpacity: 0.42, hazeOpacity: 0.13 },
-  4: { cloud: '#211632', haze: '#6D4A68', star: '#ADACC5', cloudOpacity: 0.42, hazeOpacity: 0.12 },
-  5: { cloud: '#30283F', haze: '#BB9A98', star: '#F1D8A7', cloudOpacity: 0.32, hazeOpacity: 0.13 },
+  3: { cloud: '#131D37', haze: '#59667F', star: '#C9D8E8', cloudOpacity: 0.06, hazeOpacity: 0.13 },
+  4: { cloud: '#211632', haze: '#6D4A68', star: '#ADACC5', cloudOpacity: 0.06, hazeOpacity: 0.12 },
+  5: { cloud: '#30283F', haze: '#BB9A98', star: '#F1D8A7', cloudOpacity: 0.06, hazeOpacity: 0.13 },
 };
 
 const UpperSkyAtmosphere: React.FC<{
@@ -2065,10 +2088,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(function HouseWo
     const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
       min: 0,
-      // Allow panning up to see the roof + small padding.
-      max: Math.max(0, overflow + 50),
+      // Allow panning up to see the roof + small padding, and from Phase 3
+      // the entity's hood over it.
+      max: Math.max(0, overflow + 50 + (currentPhase >= 3 ? ENTITY_PAN_HEADROOM : 0)),
     };
-  }, [numRows, houseHeight, onPitPress, houseBottomMargin, containerHeight, SCREEN_HEIGHT]);
+  }, [numRows, houseHeight, onPitPress, houseBottomMargin, containerHeight, SCREEN_HEIGHT, currentPhase]);
 
   // Reach above the roof end of the complete pan range, including a small
   // overscroll allowance. Short houses still use only the painted sky.
@@ -2839,6 +2863,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(function HouseWo
                   {storyKeepsake && onInspectStory && <StoryWorldObject keepsake={storyKeepsake} onPress={onInspectStory} />}
                 </View>
 
+                {/* Its fingers round the walls' top corners, in front of the house. */}
+                <ShadowHands phase={currentPhase} />
+
                 {/* The Offering Pit's mouth in the front yard, a stone path
                     connecting it to the house */}
                 {onPitPress && (
@@ -2963,6 +2990,24 @@ const styles = StyleSheet.create({
   // site overrides it with houseBottomMargin (baseline + dock clearance when
   // the pit entrance is shown). These margins ARE part of the house-vs-art
   // seat math — see the SKY_BOX_HEIGHT geometry notes before nudging them.
+  // The entity layer spans the house container, behind the house (the ground
+  // is -2 and trees -1), in front of the sky.
+  entityLayer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: -3,
+  },
+  entityFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
+
   houseContainer: {
     alignItems: 'center',
     marginTop: 50,
