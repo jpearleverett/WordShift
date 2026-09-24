@@ -4,7 +4,7 @@ theme: jekyll-theme-minimal
 
 # This directory is BOTH the GitHub Pages source and the repo's internal docs
 # folder, so anything left un-excluded is served publicly at
-# https://jpearleverett.github.io/WordShift/<NAME>. Only four pages are meant
+# https://wordshift.iridescent-games.com/<NAME>. Only four pages are meant
 # to be public: index (/), privacy-policy/, terms/, data-deletion/ — the three
 # legal URLs are wired into the app (src/constants/links.ts) and the store
 # listing, so never exclude or rename them.

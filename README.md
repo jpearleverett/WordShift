@@ -57,7 +57,7 @@ Always use `npm test` for repository checks. CI (`.github/workflows/ci.yml`) che
 - [docs/BACKEND_SETUP.md](./docs/BACKEND_SETUP.md) — Supabase / Sentry provisioning (cloud save, leaderboard, analytics, crash reporting)
 - [docs/MONETIZATION_SETUP.md](./docs/MONETIZATION_SETUP.md) — RevenueCat (IAP) + AdMob (ads) store/product setup
 - [docs/OTA_UPDATES.md](./docs/OTA_UPDATES.md) — over-the-air JS/asset updates via EAS Update
-- Legal, live via GitHub Pages: [Privacy Policy](https://jpearleverett.github.io/WordShift/privacy-policy/) · [Terms of Service](https://jpearleverett.github.io/WordShift/terms/) · [Data Deletion](https://jpearleverett.github.io/WordShift/data-deletion/) (sources in [docs/](./docs/))
+- Legal, live via GitHub Pages at wordshift.iridescent-games.com: [Privacy Policy](https://wordshift.iridescent-games.com/privacy-policy/) · [Terms of Service](https://wordshift.iridescent-games.com/terms/) · [Data Deletion](https://wordshift.iridescent-games.com/data-deletion/) (sources in [docs/](./docs/))
 
 ## Content rating
 
