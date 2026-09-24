@@ -3,7 +3,7 @@
     "name": "WordShift",
     "slug": "wordshift",
     "scheme": "wordshift",
-    "version": "1.4.5",
+    "version": "1.4.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -52,7 +52,7 @@
         "backgroundColor": "#F3E2BF"
       },
       "package": "com.wordshift.app",
-      "versionCode": 110,
+      "versionCode": 111,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",

@@ -67,8 +67,9 @@ plus `entity_figure.png`, the in-game entity's head and arms used for the
 house-completion glimpse and the New Cycle backdrop. Generated with RunPod
 Seedream v4 edit, using a story page as the style reference and the in-game
 entity layers as the creature reference; prompts, references and the chosen
-candidate for every file are in `../raw/ARRIVAL_ART_PROMPTS.json`. `reply-01`
-and `reply-02` in `pages/` were replaced from the same batch.
+candidate for every file are in `../raw/ARRIVAL_ART_PROMPTS.json`. All nine
+`reply-*` pages in `pages/` were replaced as well (the old set was nine
+near-identical empty living rooms); their prompts are in the same file.
 
 The illustrations remain visible on compact screens and in later phases. The
 card scrolls when necessary. No generic teacup fallback or image-height gate is

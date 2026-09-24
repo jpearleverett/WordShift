@@ -14,11 +14,12 @@ verify the latest binary, backend deployment or public release.
 
 - [x] **Production access granted.** The owner completed the 12-tester/14-day
   closed test and confirmed access on 2026-08-31.
-- [ ] **Identify the exact release artifact.** Source configures app **1.4.5**,
-  Android **110** (raised on 2026-09-22 for the production candidate, which
-  carries new native configuration: the `android:appCategory="game"` manifest
-  flag, the Sentry Android Gradle plugin and Metro debug IDs; codes 102-109
-  were the owner's internal-testing builds of 1.3.x-1.4.4),
+- [ ] **Identify the exact release artifact.** Source configures app **1.4.6**,
+  Android **111** (raised on 2026-09-24: the SDK-57 patch updates change native
+  modules, so the owner's device-tested 1.4.5 / 110 build is superseded; 110
+  carried the `android:appCategory="game"` manifest flag, the Sentry Android
+  Gradle plugin and Metro debug IDs; codes 102-109 were the owner's
+  internal-testing builds of 1.3.x-1.4.4),
   with local version management and no automatic increment. Compare the next code with Play Console
   before uploading, and raise it again for each further upload: the internal-testing
   and production candidates are separate uploads and cannot share a code. Record commit, EAS build ID, version/code,
@@ -58,6 +59,10 @@ verify the latest binary, backend deployment or public release.
   (then force-stop, relaunch and Restore: no second credit), portrait lock on
   an Android 16 tablet or foldable if one is available, and one deliberate
   Sentry event arriving symbolicated under the `production` environment.
+- [ ] **Owner production build, 2026-09-24 (1.4.5 / 110).** The owner built
+  the production profile and reported that everything works. It is superseded
+  by 1.4.6 / 111 (new native patches and the reworked ending), so the
+  production-profile checks above move to the 1.4.6 build.
 - [ ] **Repeat gameplay interruption checks on the signed build.** Try rapid
   Next/Home/Collect taps around mode unlocks; later animals' introduction visits
   and choices; every phase ceremony; Back, background and force-close during
@@ -212,7 +217,7 @@ verify the latest binary, backend deployment or public release.
   upload, keep `creatorCode` empty, run
   `WORDSHIFT_PRODUCTION_CUT=1 npm test -- --no-coverage --testPathPattern=productionConfig`,
   and confirm `WORDSHIFT_RELEASE_CHANNEL=production npx expo config --type public`
-  shows `adsUseTestIds: false` and runtime `<app version>-production` (1.4.5-production today). Follow
+  shows `adsUseTestIds: false` and runtime `<app version>-production` (1.4.6-production today). Follow
   [OTA instructions](OTA_UPDATES.md) for compatible updates.
   The Play release notes for this build must carry the legal line: "Privacy
   Policy updated (effective September 22, 2026) and Terms updated (effective

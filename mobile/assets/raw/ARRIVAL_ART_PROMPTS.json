@@ -140,11 +140,68 @@
       ]
     },
     "reply-02": {
-      "candidate": "morning_table_b",
-      "prompt": "Chapter illustration in exactly the style of the FIRST reference image, morning light. The long cottage table after a sleepless night: chairs pulled out at different angles, one pushed far back, one tucked in neatly, half-finished breakfasts, a cup left full. It feels like everyone reacted differently. A faint mauve haze outside the window.",
+      "candidate": "reply-02_a",
+      "prompt": "Story page illustration in exactly the style of the reference image, morning. Two chairs face each other across a small wooden table; one chair is empty and angled toward the viewer, as if waiting for an answer. A teapot and two cups between them. A faint pale mauve haze curls at the window. Waiting, listening.",
       "refs": [
-        "ref_day.png"
-      ]
+        "ref_reply.png"
+      ],
+      "note": "story page, 960x540 cover crop"
+    },
+    "reply-03": {
+      "candidate": "reply-03_a",
+      "prompt": "Story page illustration in exactly the style of the reference image, afternoon. A chair shoved back hard from the table, a cup knocked on its side with tea spilled across the wood, a crumpled napkin. Tense, raw, unresolved.",
+      "refs": [
+        "ref_reply.png"
+      ],
+      "note": "story page, 960x540 cover crop"
+    },
+    "reply-04": {
+      "candidate": "reply-03_b",
+      "prompt": "Story page illustration in exactly the style of the reference image, afternoon. A chair shoved back hard from the table, a cup knocked on its side with tea spilled across the wood, a crumpled napkin. Tense, raw, unresolved.",
+      "refs": [
+        "ref_reply.png"
+      ],
+      "note": "story page, 960x540 cover crop (the spilled cup, left as it fell)"
+    },
+    "reply-05": {
+      "candidate": "reply-05_a",
+      "prompt": "Story page illustration in exactly the style of the reference image, bright morning. A sunny cottage windowsill with small clay pots of new green seedlings, the window swung open onto a garden, a trowel and a seed packet with no writing. Hope, beginning.",
+      "refs": [
+        "ref_reply.png"
+      ],
+      "note": "story page, 960x540 cover crop"
+    },
+    "reply-06": {
+      "candidate": "reply-06_b",
+      "prompt": "Story page illustration in exactly the style of the reference image, morning. Chairs pulled up around the kitchen table in a loose uneven cluster, not a neat circle, a fresh loaf, a jar of jam, several cups. Room for everyone, arranged by no one.",
+      "refs": [
+        "ref_reply.png"
+      ],
+      "note": "story page, 960x540 cover crop"
+    },
+    "reply-07": {
+      "candidate": "reply-07_a",
+      "prompt": "Story page illustration in exactly the style of the reference image, soft grey daylight. An open notebook on a desk with a blank page, a pen resting across it, a cooling cup. Waiting to be written.",
+      "refs": [
+        "ref_reply.png"
+      ],
+      "note": "story page, 960x540 cover crop"
+    },
+    "reply-08": {
+      "candidate": "reply-08_a",
+      "prompt": "Story page illustration in exactly the style of the reference image, dusk. A quiet cottage room with a single lamp lit, a chair turned toward a window, the last light fading outside, a clock on the wall. Silence allowed to last.",
+      "refs": [
+        "ref_reply.png"
+      ],
+      "note": "story page, 960x540 cover crop"
+    },
+    "reply-09": {
+      "candidate": "reply-09_a",
+      "prompt": "Story page illustration in exactly the style of the reference image, evening. Two armchairs by a low fire with a clear, deliberate gap between them; in the gap a small side table holding one cup. Two blankets, one on each chair. Company with space.",
+      "refs": [
+        "ref_reply.png"
+      ],
+      "note": "story page, 960x540 cover crop"
     }
   }
 }
