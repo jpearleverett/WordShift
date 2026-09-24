@@ -111,6 +111,11 @@ describe('the entity is one generated picture, split along the house walls', () 
     expect(flat).toContain('source={ENTITY_FRONT_IMG}'.replace('source=', 'body='));
   });
 
+  it('never takes a touch: the claws lie over the top room and its resident', () => {
+    const piece = src.slice(src.indexOf('const EntityPiece'), src.indexOf('function useEntityOpacities'));
+    expect(piece).toContain('<View pointerEvents="none"');
+  });
+
   it('gives the pan room to show the hood from Phase 3', () => {
     expect(flat).toContain('(currentPhase >= 3 ? ENTITY_PAN_HEADROOM : 0)');
   });

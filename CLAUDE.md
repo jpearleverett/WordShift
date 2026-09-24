@@ -178,15 +178,7 @@ Three rules now govern every scene pool, pinned by `sceneDialogueRegister.test.t
    joined the liturgy. This covers `speaker: 'player'` lines and every option
    `label`.
 
-Residents are **0%** from the reveal on: not "few", zero. The shipped phase-4
-house corpus is 0 contractions against 312 expanded forms, and phase-5
-post-revelation plus Tending is 0 against 248, so a spine that contracts while
-Ember speaks liturgy at her own door in the same session is worse than either
-choice made consistently. Phases 0-3 sit at 82% of all sites, which is 100% of
-the CONTRACTIBLE ones: the remainder are stranded positive auxiliaries ("safer
-than it is."), quoted written text ("I am afraid", whose own sentence counts
-three words) and "this is" / "on it is", which have no spoken contraction.
-Stranded NEGATIVES are legal and are the preferred fix ("It isn't.").
+**Residents keep contracting after the reveal in the SCENES (2026-09-24).** The scenes' zero-contraction turn at phase 4 was retired on the owner's second report that the phase-4 and phase-5 scenes read as "awkwardly formal" and "genuinely hard to understand" (the "What came back" PLUM scene). The story spine and the phase-reaction lines now contract at every phase (`sceneDialogueRegister.test.ts` requires over 75% after the reveal), and the reveal is carried by what the residents say, not by grammar. Narration still never contracts and the player still always does. The HOUSE corpus (regular visits, `animalDialogueBase.ts`) still keeps its phase-4/5 expanded register; changing it is a separate, much larger pass. Phases 0-3 sit at 82% of all sites, which is 100% of the contractible ones: the remainder are stranded positive auxiliaries ("safer than it is."), quoted written text ("I am afraid", whose own sentence counts three words) and "this is" / "on it is", which have no spoken contraction. Stranded NEGATIVES are legal and are the preferred fix ("It isn't."). Saved scenes keep the text they were opened with (the scene is frozen into the save), so a rewrite reaches a player only on a scene not yet opened.
 
 ### Dialogue and Scene Review (2026-09-22)
 

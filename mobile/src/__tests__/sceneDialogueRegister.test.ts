@@ -91,14 +91,15 @@ describe('the story spine speaks in its delivered band', () => {
     expect(rate).toBeGreaterThan(0.75);
   });
 
-  it('holds the residents at ZERO contractions from the reveal on', () => {
-    // Not "few". The house corpus is absolute here, and a spine that contracts
-    // while Ember speaks liturgy at her own door in the same session is worse
-    // than either choice made consistently.
-    const offenders = lines
-      .filter(l => l.kind === 'spoken' && l.phase >= 4)
-      .flatMap(l => (l.text.match(CONTRACTED) || []).map(hit => `${hit} :: ${l.text.slice(0, 80)}`));
-    expect(offenders).toEqual([]);
+  it('keeps the residents contracting after the reveal too', () => {
+    // The zero-contraction turn at the reveal was retired on the owner's
+    // report (2026-09-24) that the phase-4 and phase-5 scenes read as
+    // "awkwardly formal" and "genuinely hard to understand". Scenes are the
+    // one place the story is read closely, so they speak plainly at every
+    // phase; the reveal is carried by what the residents say, not by grammar.
+    const text = lines.filter(l => l.kind === 'spoken' && l.phase >= 4).map(l => l.text).join(' | ');
+    const contracted = count(text, CONTRACTED);
+    expect(contracted / (contracted + count(text, EXPANDED))).toBeGreaterThan(0.75);
   });
 
   it('never contracts narration, at any phase', () => {
@@ -140,7 +141,7 @@ describe('the phase-3 choice scenes', () => {
   });
 });
 
-describe('the phase-reaction lines follow the same turn', () => {
+describe('the phase-reaction lines speak like the scenes', () => {
   const src = read('services/phaseTransitionReactions.ts');
   // Each table is keyed by the phase the reaction answers.
   const byPhase = (table: string) => {
@@ -155,13 +156,10 @@ describe('the phase-reaction lines follow the same turn', () => {
   };
 
   for (const table of ['EMBER_REACTIONS', 'OTHER_REACTIONS']) {
-    it(`${table} contracts through phase 3 and stops at the reveal`, () => {
+    it(`${table} speaks plainly, with contractions, at every phase`, () => {
       const rows = byPhase(table);
       expect(rows.size).toBe(5);
-      for (const [phase, text] of rows) {
-        if (phase <= 3) expect(count(text, CONTRACTED)).toBeGreaterThan(0);
-        else expect(text.match(CONTRACTED) || []).toEqual([]);
-      }
+      for (const [, text] of rows) expect(count(text, CONTRACTED)).toBeGreaterThan(0);
     });
   }
 });

@@ -299,8 +299,8 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
     ], `The word ${word} appeared twice, once before you formed it.`);
     case 'witness': return scene('Who gets to know', [
       narrator('You write down what happened at the rim: the same word, already there before you offered it. You put the date beneath it.', 'witness-01'),
-      ember("I'd like to fold that page away, friend. I can hear myself reaching for another comforting explanation.", 'witness-02'),
-      ember("But you were there too. Do we tell the household what we saw, or keep the account between us while we look into it?", 'witness-03'),
+      ember("Part of me wants to fold that page up and forget it, friend. I can hear myself hunting for a comfortable explanation.", 'witness-02'),
+      ember("But you saw it too. Should we tell everyone, or keep this between us while we work out what it means?", 'witness-03'),
     ], 'You decided who would hear the first account of the word that appeared twice.', [
       { id: 'share', label: 'Tell the household what we saw.', response: [
         narrator('You bring the account to the shared table. Those who read it add their initials beneath the date.', 'witness-04'),
@@ -313,23 +313,23 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
     ]);
     case 'supper': return scene('Before it goes cold', [
       ...(cup ? [narrator(`Ember puts ${cupName} down where you sit. ${cup === 'flower' ? "She has been at the cocoa recipe again." : "She remembered you asked for tea."}`, 'supper-01')] : []),
-      ...(has('pangolin') ? [say('pangolin', "Supper. Now. The empty place at the table can wait. The rest of us have stomachs.", 'supper-02'), narrator("She puts the covered dish on the floor, out of the way, and serves everyone from the ordinary pot.", 'supper-03')] : [ember("I spent the whole afternoon keeping a place warm for someone who hasn't come. Your drink went cold while I did it. That's ridiculous of me, friend.", 'supper-04'), narrator(`She moves the empty cup aside and fills ${cup ? cupName : 'yours'} with fresh ${cup ? drink : 'tea'}.`, 'supper-05')]),
-      ...(has('rabbit') ? [say('rabbit', 'Is it safe?', 'supper-06'), ...(has('pangolin') ? [say('pangolin', "It's soup. I made it myself. Ask me about the house after you've eaten.", 'supper-07')] : [ember("The tea is safe. I can't promise you anything else tonight.", 'supper-08')])] : [narrator("For a while it sounds like an ordinary supper in here, and not like a house holding still to listen.", 'supper-09')]),
+      ...(has('pangolin') ? [say('pangolin', "Supper. Now. The empty place at the table can wait. The rest of us have stomachs.", 'supper-02'), narrator("She sets aside the covered dish she'd kept for the empty place, and serves everyone from the ordinary pot.", 'supper-03')] : [ember("I spent the whole afternoon keeping a place warm for someone who hasn't come. Your drink went cold while I did it. That's ridiculous of me, friend.", 'supper-04'), narrator(`She moves the empty cup aside and fills ${cup ? cupName : 'yours'} with fresh ${cup ? drink : 'tea'}.`, 'supper-05')]),
+      ...(has('rabbit') ? [say('rabbit', 'Is it safe?', 'supper-06'), ...(has('pangolin') ? [say('pangolin', "It's soup. I made it myself. Ask me about the house after you've eaten.", 'supper-07')] : [ember("The tea is safe. I can't promise you anything else tonight.", 'supper-08')])] : [narrator("For a while it just sounds like an ordinary supper, not a house holding its breath.", 'supper-09')]),
       ...(witness === 'share' ? [narrator('The dated account lies between the dishes, its row of initials visible.', 'supper-10'), ember("You asked us to tell everyone. If anyone has seen something else, this is a good place to say it.", 'supper-11')]
         : witness === 'private' ? [narrator('The folded account is still in your pocket. Ember glances toward you, then leaves it for you to bring up.', 'supper-12')] : []),
-      narrator("The low hum under the floor slips out of rhythm. Nobody at the table hurries to set it right.", 'supper-13'),
+      narrator("The low hum under the floor stumbles out of rhythm. For once, nobody hurries to fix it.", 'supper-13'),
     ], "Someone stopped the preparations for an evening and looked after the people who were already here.");
     case 'plan': return scene('Which way the door faces', [
-      ...(has('wombat') ? [say('wombat', "I always read this line on the old plan as a brace. Look which way it points.", 'plan-01'), narrator("Warren turns a drawing of the foundations so the doorway faces you.", 'plan-02')] : [narrator("A loose plan lies under the oldest hearthstone. Its arrows point in toward the house, not away from it.", 'plan-03')]),
+      ...(has('wombat') ? [say('wombat', "I always took this line on the old plan for a brace. Look which way it points.", 'plan-01'), narrator("Warren turns a drawing of the foundations so the doorway faces you.", 'plan-02')] : [narrator("A loose plan lies under the oldest hearthstone. Its arrows point in toward the house, not away from it.", 'plan-03')]),
       ...(has('tarsier') ? [say('tarsier', "My watch keeps the house in sight all night. Nobody ever told me who I'm watching for.", 'plan-04')] : [ember("All that work to keep something out. Or maybe, friend, that's only what we wanted the drawing to mean.", 'plan-05')]),
       ...(has('owl') ? [say('owl', "I wrote \"defense\" beside this mark in the old book. The book never used that word. I did.", 'plan-06')] : [narrator("Someone has written SAFE in the margin. The handwriting is much newer than the plan.", 'plan-07')]),
-      narrator("A line goes through the reassuring word. Nobody writes a new one under it. It is the first answer anyone has crossed out.", 'plan-08'),
+      narrator("Someone crosses out SAFE and does not write anything in its place. It is the first answer anyone here has crossed out.", 'plan-08'),
     ], "Every mark on the old plan points inward, at the house. We were the ones who called that safe.");
     case 'shelter': return scene('Something we can do', [
       narrator('The arrows on the old plan all point inward. Beside the drawing, you set a lamp and a small latch.', 'shelter-01'),
       has('wombat') ? say('wombat', "I can mark the road beyond the gate. Or fit this latch to a door we already have, and ask everyone to knock. Which should I start with?", 'shelter-02')
         : ember("We could mark the road beyond the gate, friend. Or put this latch on a door we already have, and ask everyone to knock. Which would help you tonight?", 'shelter-03'),
-      narrator('Neither a lamp nor a latch can promise to stop what is below the house. They are things the people here can do for one another now.', 'shelter-04'),
+      narrator('A lamp and a latch will not stop what lives under the house. But they are something the people here can do for each other tonight.', 'shelter-04'),
     ], 'You chose a practical precaution for the household: an outward path or a door people must knock on.', [
       { id: 'road', label: 'Mark the road out.', response: [
         narrator('You set the lamp by the gate. Together, you place pale stones along the outward path, as far as the trees.', 'shelter-05'),
@@ -359,60 +359,60 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
       ...(witness === 'share' ? [ember("We'll bring this to the shared table, beside the dated account. You asked us to compare what we saw. We need to keep doing that.", 'record-06')]
         : witness === 'private' ? [narrator('You unfold the dated account beside the ledger. For now, you and Ember compare the pages in private.', 'record-07'), ember("Keeping the paper is one thing. Remembering what was on it is another. I'll remember with you.", 'record-08')] : []),
     ], "The house corrected an uncomfortable truth without asking the one who wrote it.", [
-      { id: 'keep', label: 'Keep the original words.', response: [has('capybara') ? say('capybara', 'I have ink.', 'record-09') : ember('Then we\'ll need another pen.', 'record-10'), narrator("The original sentence is copied onto a loose page and kept away from the ledger.", 'record-11')] },
+      { id: 'keep', label: 'Keep the original words.', response: [has('capybara') ? say('capybara', "I've got ink.", 'record-09') : ember('Then we\'ll need another pen.', 'record-10'), narrator("The original sentence is copied onto a loose page and kept away from the ledger.", 'record-11')] },
       { id: 'correct', label: 'Leave the page as it is. Remember what happened.', response: [has('capybara') ? say('capybara', "I can leave the house's version on the page. I won't put my name to it.", 'record-12') : ember("We can leave the page alone. We don't have to believe what it says.", 'record-13'), narrator("You remember both sentences. The house kept only one.", 'record-14')] },
     ]);
     case 'seeds': return scene('A way out', [
-      ...(has('rabbit') ? [say('rabbit', "I packed seeds. I have not decided to leave. I packed them so that leaving stays something I can still choose.", 'seeds-01'), narrator("Thyme sets a small tin down beside the garden gate.", 'seeds-02'), say('rabbit', "Will you keep this between us, or help me tell Ember? I can live with either answer. I cannot live with everyone deciding for me again.", 'seeds-03')] : [ember("I used to tell you that you could always leave. I have never walked that road past the trees myself.", 'seeds-04'), narrator("By the gate, you set a small stone on the path that leads away. A mark you can come back and check.", 'seeds-05')]),
+      ...(has('rabbit') ? [say('rabbit', "I packed seeds. I haven't decided to leave. I just want leaving to stay something I can choose.", 'seeds-01'), narrator("Thyme sets a small tin down beside the garden gate.", 'seeds-02'), say('rabbit', "Will you keep this between us, or help me tell Ember? I can live with either. What I can't live with is everyone deciding for me again.", 'seeds-03')] : [ember("I used to tell you that you could always leave. I've never walked that road past the trees myself.", 'seeds-04'), narrator("By the gate, you set a small stone on the path that leads away. A mark you can come back and check.", 'seeds-05')]),
       ...(shelter === 'road' ? [has('rabbit') ? say('rabbit', "I saw the lamp you put here, and the pale stones. Someone had thought about leaving before I packed. That helped.", 'seeds-06')
         : narrator('The lamp you chose is still filled. You clear fallen leaves from the pale stones along the outward path.', 'seeds-07')]
         : shelter === 'room' ? [has('rabbit') ? say('rabbit', "People really wait at that PLEASE KNOCK sign you put up. I want that same say over this tin.", 'seeds-08')
-          : ember("I have learned to wait at your PLEASE KNOCK sign. I want the gate to mean something you can decide, too.", 'seeds-09')] : []),
+          : ember("I've learned to wait at your PLEASE KNOCK sign. I want the gate to be your decision too.", 'seeds-09')] : []),
     ], "Leaving must stay a decision, even in a house that loves you.", [
-      { id: 'confidence', label: 'Keep this between us.', response: [has('rabbit') ? say('rabbit', "Thank you. A secret is a little room with its own door, and I am the one who opens it.", 'seeds-10') : ember("Then the stone at the gate stays between us. I will not speak for you.", 'seeds-11')] },
-      { id: 'share', label: "Ask for help keeping the way out open.", response: [ember("I will help. And I will ask you first before I tell anyone else.", 'seeds-12'), has('rabbit') ? say('rabbit', "Asking first. That would have been a good rule from the very beginning.", 'seeds-13') : narrator("The stone stays on the outward side of the gate, pointing away from the house.", 'seeds-14')] },
+      { id: 'confidence', label: 'Keep this between us.', response: [has('rabbit') ? say('rabbit', "Thank you. A secret's like a little room with its own door, and I'm the one who opens it.", 'seeds-10') : ember("Then the stone at the gate stays between us. I won't speak for you.", 'seeds-11')] },
+      { id: 'share', label: "Ask for help keeping the way out open.", response: [ember("I'll help. And I'll ask you before I tell anyone else.", 'seeds-12'), has('rabbit') ? say('rabbit', "Asking first. That would've been a good rule from the start.", 'seeds-13') : narrator("The stone stays on the outward side of the gate, pointing away from the house.", 'seeds-14')] },
     ]);
     case 'promise': return scene('Enough to tell you', [
       ember("I told you I was keeping you safe. That was the promise.", 'promise-01'),
       say('player', 'Did you know what the words were for?', 'promise-02'),
-      ember("I knew enough to tell you. And I did not tell you.", 'promise-03'),
+      ember("I knew enough to tell you. And I didn't.", 'promise-03'),
       ember("I knew I was inviting something in. I thought a house full of people who loved each other would teach it to be gentle.", 'promise-04'),
-      ...(has('sloth') ? [say('sloth', "I wanted it to come. I called my waiting patience. That word made it easier to watch everyone else wait without knowing why.", 'promise-05')] : []),
-      ember("The love in this house was real, friend. It does not excuse what I kept from you.", 'promise-06'),
-      ...(shelter === 'road' ? [narrator('Through the window, the lamp you chose is lit by the gate.', 'promise-07'), ember("I filled that lamp again. Doing the thing you asked does not make up for the thing I kept from you.", 'promise-08')]
-        : shelter === 'room' ? [narrator('The conversation began with a knock. Ember waited until you opened the latched door.', 'promise-09'), ember("You asked us to wait until we were let in. I should have kept that rule long before anyone had to write it on a sign.", 'promise-10')] : []),
+      ...(has('sloth') ? [say('sloth', "I wanted it to come. I called my waiting 'patience'. That word made it easier to watch everyone else wait without knowing what for.", 'promise-05')] : []),
+      ember("The love in this house was real, friend. It doesn't excuse what I kept from you.", 'promise-06'),
+      ...(shelter === 'road' ? [narrator('Through the window, the lamp you chose is lit by the gate.', 'promise-07'), ember("I filled that lamp again. Doing what you asked doesn't make up for what I kept from you.", 'promise-08')]
+        : shelter === 'room' ? [narrator('The conversation began with a knock. Ember waited until you opened the latched door.', 'promise-09'), ember("You asked us to wait until we were let in. I should've kept that rule long before anyone had to write it on a sign.", 'promise-10')] : []),
     ], "Ember admitted what she had hidden. Love did not cancel what she owed.", [
-      { id: 'beside', label: 'Stay beside me. Tell me the rest.', response: [ember("I will tell you the rest. And when I do not know something, I will say so.", 'promise-11')] },
-      { id: 'apart', label: 'I need some distance from you.', response: [ember("All right. I will keep my distance. Your place in this house does not depend on forgiving me.", 'promise-12'), narrator(`She moves her chair. ${cup ? cupName[0].toUpperCase() + cupName.slice(1) : 'The cup'} stays within your reach.`, 'promise-13')] },
+      { id: 'beside', label: 'Stay beside me. Tell me the rest.', response: [ember("I'll tell you the rest. And when I don't know something, I'll say so.", 'promise-11')] },
+      { id: 'apart', label: 'I need some distance from you.', response: [ember("All right. I'll keep my distance. You don't have to forgive me to belong here.", 'promise-12'), narrator(`She moves her chair. ${cup ? cupName[0].toUpperCase() + cupName.slice(1) : 'The cup'} stays within your reach.`, 'promise-13')] },
     ]);
     case 'returned': return scene('What came back', has('axolotl') && [state.memories.plum, state.memories.plum_recruited].some(memory => memory?.completed && memory.scene.lines.some(line => line.speaker === 'axolotl')) ? [
-      say('axolotl', "PLUM died. I laid him on the gravel and told nobody. I did not want anyone to say something kind yet. This morning the gravel was empty.", 'returned-01'),
-      narrator("Something with PLUM's worried face swims a full circle of the tank. Then it swims the same circle again, exactly.", 'returned-02'),
-      say('axolotl', "The same bite out of his fin. The same little face.", 'returned-03'),
-      narrator("Axel laughs once. PLUM always stopped for that. This fish keeps swimming.", 'returned-04'),
-      say('axolotl', "Let me have tonight. I am not ready to work this out.", 'returned-05'),
-      ember("It kept the part of PLUM it could understand, friend. The shape of him. We will have to show it what it left out.", 'returned-06'),
+      say('axolotl', "PLUM died. I laid him on the gravel and didn't tell anyone. I wasn't ready for people to be kind about it. This morning, he was gone.", 'returned-01'),
+      narrator("A fish with PLUM's worried face is swimming laps of the tank. Every lap is exactly the same as the last.", 'returned-02'),
+      say('axolotl', "Same nick in his fin. Same little face.", 'returned-03'),
+      narrator("Axel laughs, just once. PLUM always stopped swimming when he laughed. This fish does not stop.", 'returned-04'),
+      say('axolotl', "Can I just have tonight? I'm not ready to think about what this means.", 'returned-05'),
+      ember("It brought back the part of PLUM it could understand, friend. His shape. We'll have to show it what it left out.", 'returned-06'),
     ] : [
       narrator("The old chipped cup sits by the hearth. This morning its handle is smooth and whole.", 'returned-07'),
       ember("Something mended it in the night, friend. I never asked it to.", 'returned-08'),
       narrator("She turns the cup over in her paws, looking for the chip.", 'returned-09'),
-      ember("The shape is perfect. And I cannot remember who was sitting with me the day I dropped it. I used to.", 'returned-10'),
+      ember("It's perfect now. And I can't remember who was sitting with me the day I dropped it. I used to.", 'returned-10'),
     ], "The house can keep the shape of a thing perfectly, and lose the history that made you love it.");
     case 'council': return scene('Terms of a welcome', [
-      narrator("The household gathers at the long table. One arrangement is left, and everyone knows it.", 'council-01'),
+      narrator("Everyone gathers at the long table. There is one arrangement left, and they all know it.", 'council-01'),
       ...(!state.memories.record?.completed ? [narrator("A page that said I AM AFRAID now says EVERYTHING IS WELL. The house calls that kindness: keep the sentence, take away the discomfort.", 'council-02')] : []),
       ember("What lives under this house learned how to keep us exactly as we are, friend. Nobody ever taught it where to stop.", 'council-03'),
-      ...(has('red_panda') ? [say('red_panda', "I sat at the center, where every stalk points, and called that understanding. I have moved my mat. I was far more certain than I had any right to be.", 'council-04')] : []),
-      ...(has('rabbit') ? [say('rabbit', privateSeeds ? "There is one thing I am keeping to myself. I am not going to say what it is. That should be allowed." : "I want a way out. Even on the days when I choose to stay.", privateSeeds ? 'council-05-private' : 'council-05-road')] : [narrator("The path beyond the gate leads away from the house, and back to it.", 'council-06')]),
-      ...(has('wombat') ? [say('wombat', "I will hang a door you can open from either side. You try the latch yourself before I call the job finished.", 'council-07')] : []),
-      ember("Two words will fit at the end, friend. Either one lets it in to live with us. CLOSED keeps one room it can never enter. A thought you have in there stays yours, uncorrected.", 'council-08'),
-      ember("CLOSER keeps one road out that it can never close. Anyone who stays must be able to leave.", 'council-09'),
+      ...(has('red_panda') ? [say('red_panda', "I sat in the middle, where every stalk points, and called that understanding. I've moved my mat. I was far more certain than I had any right to be.", 'council-04')] : []),
+      ...(has('rabbit') ? [say('rabbit', privateSeeds ? "There's one thing I'm keeping to myself, and I'm not going to say what it is. That should be allowed." : "I want a way out. Even on the days when I choose to stay.", privateSeeds ? 'council-05-private' : 'council-05-road')] : [narrator("The path beyond the gate leads away from the house, and back to it.", 'council-06')]),
+      ...(has('wombat') ? [say('wombat', "I'll hang a door you can open from either side. And you'll test the latch yourself before I call the job done.", 'council-07')] : []),
+      ember("Two words fit at the end, friend, and either one lets it in to live with us. CLOSED keeps one room it can never enter. Whatever you think in there stays yours, and nothing corrects it.", 'council-08'),
+      ember("CLOSER keeps one road out that it can never close. Anyone who stays can always leave.", 'council-09'),
       ...(witness === 'share' ? [narrator('The dated account is laid on the table again. The people who put their initials on it are asked what they remember.', 'council-10')]
         : witness === 'private' ? [narrator('Your folded account stays with you. What the household has learned since does not give anyone permission to open it.', 'council-11')] : []),
-      ...(shelter === 'road' ? [ember("We marked the road because you asked. CLOSER would keep that road open for good. You can still choose CLOSED, friend. A lamp by the gate did not choose your last word for you.", 'council-12')]
-        : shelter === 'room' ? [ember("We fitted the latch because you asked. CLOSED would shut that room to it as well as to us. You can still choose CLOSER, friend. A latch did not choose your last word for you.", 'council-13')] : []),
+      ...(shelter === 'road' ? [ember("We marked the road because you asked. CLOSER would keep it open for good. But you can still choose CLOSED, friend. A lamp by the gate doesn't decide your last word.", 'council-12')]
+        : shelter === 'room' ? [ember("We fitted the latch because you asked. CLOSED would shut that room to it, and to us. But you can still choose CLOSER, friend. A latch doesn't decide your last word.", 'council-13')] : []),
       narrator("The last arrangement ends at CLOSE. Give it the D, and it reads CLOSED. Give it the R, and it reads CLOSER. Neither is the greater offering.", 'council-14'),
-      ember(beside ? "I will stand beside you, friend. You asked me to." : "I will stay by the hearth, friend. You can have as much room as you need.", beside ? 'council-15-beside' : 'council-15-apart'),
+      ember(beside ? "I'll stand beside you, friend. You asked me to." : "I'll stay by the hearth, friend. You can have as much room as you need.", beside ? 'council-15-beside' : 'council-15-apart'),
     ], "A welcome can come with terms: one private room, or a road that lets you leave.");
     case 'after':
       // Readers who heard the complete terms have already seen the boundary
@@ -421,8 +421,8 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
       if (state.boundary && state.memories.council?.completed && !state.arrivedBeforeRevision) {
         return scene('An ordinary morning', [
           narrator(state.boundary === 'remember' ? "The private door is still closed. In the kitchen, a pan has started smoking." : "Someone walked out through the gate and came back with mud on their feet. Someone else fetches a cloth.", state.boundary === 'remember' ? 'after-01-private' : 'after-01-road'),
-          has('pangolin') ? say('pangolin', "Breakfast. I burned one side and saved the other. You can call it a disaster or a rescue, whichever you prefer.", 'after-02') : ember(`I made ${drink}. There is also toast, if you are willing to scrape it.`, 'after-03'),
-          ...(has('wombat') ? [say('wombat', "A hinge is squeaking. Ordinary squeak, nothing stranger. I have the right oil for this one.", 'after-04')] : []),
+          has('pangolin') ? say('pangolin', "Breakfast. I burned one side and saved the other. You can call it a disaster or a rescue, whichever you prefer.", 'after-02') : ember(`I made ${drink}. There's toast too, if you don't mind scraping it.`, 'after-03'),
+          ...(has('wombat') ? [say('wombat', "A hinge is squeaking. Just an ordinary squeak. I've got the right oil for that.", 'after-04')] : []),
           ...(has('axolotl') && state.memories.returned?.scene.lines.some(line => line.speaker === 'axolotl')
             ? [say('axolotl', 'I told a funny story about PLUM. Then I felt sad again. Could we have breakfast anyway?', 'after-05')] : []),
           ...getStoryPreparationAftermath(state).map(text => narrator(text, getPreparationArtId(text))),
@@ -436,19 +436,19 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
         has('capybara') ? say('capybara', kept ? "I filed the original page in that room. Not one letter has been corrected since." : "I wrote those words again, inside that room. This time the ink stayed.", 'after-10') : ember("The warmth stopped at that door. I waited a long time to be certain.", 'after-11'),
       ] : state.boundary === 'release' ? [
         narrator("A small stone still sits at the gate, marking the way out. The path runs past the last tree and does not turn back.", 'after-12'),
-        has('rabbit') ? say('rabbit', "I walked out until I could not see the house. Then I came back. Coming back was my own decision.", 'after-13') : ember("I followed the path past the trees. Coming back felt different, knowing I could have kept walking.", 'after-14'),
-      ] : [narrator("Someone leaves a cup a little crooked at the edge of the table. The house used to straighten a stray cup by morning. This one is still crooked.", 'after-15'), ember("One small thing left exactly where we put it. I am watching to see whether it stays there.", 'after-16')]),
-      ...(has('axolotl') && state.memories.returned?.scene.lines.some(line => line.speaker === 'axolotl') ? [say('axolotl', "I am still not ready to say what I think about the fish. Thank you for not finishing that thought for me.", 'after-17')] : []),
+        has('rabbit') ? say('rabbit', "I walked until I couldn't see the house. Then I came back. Coming back was my choice.", 'after-13') : ember("I followed the path past the trees. Coming back felt different, knowing I could have kept walking.", 'after-14'),
+      ] : [narrator("Someone leaves a cup a little crooked at the edge of the table. The house used to straighten a stray cup by morning. This one is still crooked.", 'after-15'), ember("One small thing, left exactly where we put it. I'm watching to see if it stays.", 'after-16')]),
+      ...(has('axolotl') && state.memories.returned?.scene.lines.some(line => line.speaker === 'axolotl') ? [say('axolotl', "I'm still not ready to say what I think about the fish. Thanks for not finishing that thought for me.", 'after-17')] : []),
       ...getStoryPreparationAftermath(state).map(text => narrator(text, getPreparationArtId(text))),
       ember("Feel however you feel about this morning, friend. Nobody here gets to correct it.", 'after-18'),
     ], state.boundary === 'remember' ? "Behind a private door, one thought stays uncorrected." : state.boundary === 'release' ? "The road out works. Coming back is a choice." : "A cup was left out of place on purpose, to see whether the house would put it back.");
     case 'reply': return scene('Your answer', [
       ...(cup ? [narrator(`${cupName[0].toUpperCase() + cupName.slice(1)} waits beside the chair you chose. Nobody has moved it.`, 'reply-01')] : []),
-      ember("I have done most of the talking, friend. It is your turn. I am listening.", 'reply-02'),
+      ember("I've done most of the talking, friend. Your turn. I'm listening.", 'reply-02'),
     ], 'Your answer belongs to you.', [
-      { id: 'angry', label: 'I\'m still angry.', response: [ember("Yes. I will not rush you out of that anger. I did not tell you the whole truth when it mattered.", 'reply-03'), narrator("She lets your answer stand. Nothing corrects it.", 'reply-04')] },
-      { id: 'hopeful', label: 'I want to see what we can make of this.', response: [ember("So do I. This time I am saying it as a wish, not as a promise I cannot keep.", 'reply-05'), narrator("Chairs are pulled up to the table. Nobody arranges them into a circle.", 'reply-06')] },
-      { id: 'uncertain', label: 'I don\'t know yet.', response: [ember("Then that is where we begin. Not knowing is allowed. Nobody gets to finish that sentence for you.", 'reply-07'), narrator("For once the silence is allowed to last. Nobody hurries to fill it.", 'reply-08')] },
+      { id: 'angry', label: 'I\'m still angry.', response: [ember("I know. I won't rush you out of it. I didn't tell you the whole truth when it mattered.", 'reply-03'), narrator("She lets your answer stand. Nothing corrects it.", 'reply-04')] },
+      { id: 'hopeful', label: 'I want to see what we can make of this.', response: [ember("So do I. This time I'm saying it as a wish, not a promise I can't keep.", 'reply-05'), narrator("Chairs are pulled up to the table. Nobody arranges them into a circle.", 'reply-06')] },
+      { id: 'uncertain', label: 'I don\'t know yet.', response: [ember("Then that's where we start. Not knowing is allowed. Nobody gets to finish that sentence for you.", 'reply-07'), narrator("For once the silence is allowed to last. Nobody hurries to fill it.", 'reply-08')] },
       { id: 'quiet', label: 'Sit quietly with me.', response: [narrator("You left a gap between the chairs. She sits on her side of it. Nobody asks you to call this peace.", 'reply-09')] },
     ]);
     case 'old_mark': return scene('Something remained', [
@@ -467,8 +467,16 @@ export async function openStoryScene(context: StoryContext, requestedId?: StoryS
   if (!id) return null;
   const existing = state.memories[id];
   if (existing && !existing.completed) {
-    if (existing.deferredAtPuzzle === undefined) return { memory: existing, state };
-    const resumed = await mutate(context, draft => { delete draft.memories[id]?.deferredAtPuzzle; });
+    // An unfinished scene reopens in the CURRENT wording: a rewrite must reach
+    // the player who stopped halfway through it.
+    const reworded = refreshSceneWording(existing.scene, buildStoryScene(id, context, state));
+    if (existing.deferredAtPuzzle === undefined && !reworded) return { memory: existing, state };
+    const resumed = await mutate(context, draft => {
+      const memory = draft.memories[id];
+      if (!memory) return;
+      delete memory.deferredAtPuzzle;
+      if (reworded) refreshSceneWording(memory.scene, buildStoryScene(id, context, state));
+    });
     return { memory: resumed.memories[id]!, state: resumed };
   }
   const scene = buildStoryScene(id, context, state);
@@ -481,6 +489,25 @@ export async function openStoryScene(context: StoryContext, requestedId?: StoryS
     draft.memories[id] ??= { scene, page: 0, completed: false, presentationPhase: phase as DialoguePhase };
   });
   return { memory: next.memories[id]!, state: next };
+}
+
+/**
+ * Copies the current text of every line that has the same art id in a freshly
+ * built scene into the saved one, in place. The saved scene keeps its own lines,
+ * order and page count (the save's page pointer indexes them), so only wording
+ * changes. Returns whether anything changed.
+ */
+export function refreshSceneWording(saved: StoryScene, fresh: StoryScene): boolean {
+  const current = new Map<string, string>();
+  for (const line of [...fresh.lines, ...(fresh.options ?? []).flatMap(option => option.response)]) {
+    if (line.artId) current.set(line.artId, line.text);
+  }
+  let changed = false;
+  for (const line of [...saved.lines, ...(saved.options ?? []).flatMap(option => option.response)]) {
+    const text = line.artId ? current.get(line.artId) : undefined;
+    if (text !== undefined && text !== line.text) { line.text = text; changed = true; }
+  }
+  return changed;
 }
 
 export function getStoryPages(memory: StoryMemory): StoryLine[] {
