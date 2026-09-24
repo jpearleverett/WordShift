@@ -81,7 +81,7 @@ const ENTITY_HEAD_RIM_IMG = require('../../../assets/environment/entity_head_rim
 const ENTITY_ARM_IMG = require('../../../assets/environment/entity_arm.png');
 const ENTITY_ARM_RIM_IMG = require('../../../assets/environment/entity_arm_rim.png');
 const ENTITY_HAND_IMG = require('../../../assets/environment/entity_hand.png');
-const ENTITY_HAND_RIM_IMG = require('../../../assets/environment/entity_hand_rim.png');
+const ENTITY_EYES_IMG = require('../../../assets/environment/entity_eyes.png');
 const SHADOW_HALO_IMG = require('../../../assets/environment/shadow_halo.png');
 
 
@@ -1244,19 +1244,18 @@ const sigilOverlayStyles = StyleSheet.create({
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * ShadowFigure — the entity, holding the house. Invisible until Phase 3.
+ * ShadowFigure — the entity, standing behind the house and holding it.
+ * Invisible until Phase 3.
  *
- * A hooded head and shoulders rise over the roof, both arms run down the sides
- * of the house behind it, and (from Phase 4) its hands grip the foundation
- * (ShadowHands, rendered in front of the stone). So it is on screen at every
- * pan position, not only with the roof in view. Each piece is a dark body plus
- * a white rim image tinted per phase: a near-black silhouette over the
- * near-black late skies only reads by its backlit edge. Art is drawn by
- * scripts/tools/generateShadowEntity.mjs; the ENTITY_* dp below are tied to
- * the joins it draws.
+ * Pixel art at the house's own density (scripts/tools/generateShadowEntity.mjs;
+ * assets/raw/ENTITY_ART_BRIEF.md asks for painted replacements). A deep hood
+ * and shoulders rise over the roof. From Phase 4, when the house always has
+ * all thirteen rooms, its long sleeved arms hang down both sides of the house
+ * to the hands that grip the foundation (ShadowHands, in front of the stone).
+ * Each piece carries a separate backlit rim image, tinted per phase.
  *
- * Slow opacity "breathing" (~8s cycle; slower once settled at Phase 5); the
- * eyes pulse at Phase 4. Static under reducedMotion / simplified animations.
+ * Slow opacity breathing (~8s; slower once settled at Phase 5); the eyes pulse
+ * at Phase 4. Static under reducedMotion / simplified animations.
  */
 function useEntityBreath(visible: boolean, isStatic: boolean, halfMs: number) {
   const [anim] = useState(() => new Animated.Value(0));
@@ -1276,143 +1275,148 @@ function useEntityBreath(visible: boolean, isStatic: boolean, halfMs: number) {
 
 const entityLook = (phase: number) => SHADOW_FIGURE_LOOK[Math.min(Math.max(phase, 3), 5) as 3 | 4 | 5];
 
-/** One piece: dark body with its tinted rim over it. */
+type EntityOpacity = Animated.AnimatedInterpolation<number> | number;
+
+/** One piece: its body with the tinted rim over it. */
 const EntityPiece: React.FC<{
-  body: number; rim: number; style: object; mirror?: boolean;
-  opacity: Animated.AnimatedInterpolation<number> | number;
-  rimOpacity: Animated.AnimatedInterpolation<number> | number;
-  rimColor: string;
+  body: number; rim?: number; style: object; mirror?: boolean;
+  opacity: EntityOpacity; rimOpacity: EntityOpacity; rimColor: string;
 }> = ({ body, rim, style, mirror, opacity, rimOpacity, rimColor }) => {
   const flip = mirror ? { transform: [{ scaleX: -1 }] } : null;
   return (
     <View pointerEvents="none" style={[{ position: 'absolute' }, style, flip]}>
-      <Animated.Image source={body} resizeMode="stretch" fadeDuration={0} style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity }]} />
-      <Animated.Image source={rim} resizeMode="stretch" fadeDuration={0} style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', tintColor: rimColor, opacity: rimOpacity }]} />
+      <Animated.Image source={body} resizeMode="stretch" fadeDuration={0} style={[styles.entityFill, { opacity }]} />
+      {rim !== undefined && (
+        <Animated.Image source={rim} resizeMode="stretch" fadeDuration={0} style={[styles.entityFill, { tintColor: rimColor, opacity: rimOpacity }]} />
+      )}
     </View>
   );
 };
 
-const ShadowFigure: React.FC<{ phase: number; armBottom: number }> = ({ phase, armBottom }) => {
+function useEntityOpacities(phase: number, visible: boolean) {
   const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
-  const visible = phase >= 3;
   const look = entityLook(phase);
-  // The settled entity (phase 5) breathes SLOWER than the looming one:
-  // sleeping, not watching.
-  const breatheAnim = useEntityBreath(visible, isStatic, phase >= 5 ? 7000 : 4000);
+  // The settled entity (phase 5) breathes SLOWER than the looming one.
+  const breath = useEntityBreath(visible, isStatic, phase >= 5 ? 7000 : 4000);
+  const opacity: EntityOpacity = isStatic
+    ? look.figure
+    : breath.interpolate({ inputRange: [0, 1], outputRange: [look.figure - 0.05, Math.min(1, look.figure + 0.05)] });
+  const rimOpacity: EntityOpacity = isStatic
+    ? look.rimOpacity
+    : breath.interpolate({ inputRange: [0, 1], outputRange: [look.rimOpacity * 0.7, look.rimOpacity] });
+  return { look, isStatic, opacity, rimOpacity };
+}
+
+const ShadowFigure: React.FC<{ phase: number; groundBottom: number }> = ({ phase, groundBottom }) => {
+  const visible = phase >= 3;
+  const { look, isStatic, opacity, rimOpacity } = useEntityOpacities(phase, visible);
   const eyesPulse = visible && !isStatic && look.eyePulse;
   const eyeAnim = useEntityBreath(eyesPulse, !eyesPulse, 2600);
-
   if (!visible) return null;
 
-  const opacity = isStatic
-    ? look.figure
-    : breatheAnim.interpolate({ inputRange: [0, 1], outputRange: [look.figure - 0.05, look.figure + 0.05] });
-  const rimOpacity = isStatic
-    ? look.rimOpacity
-    : breatheAnim.interpolate({ inputRange: [0, 1], outputRange: [look.rimOpacity * 0.7, look.rimOpacity] });
-  // The arms run the whole height of the house: a full-strength rim down both
-  // screen edges read as a neon frame, so theirs is quieter than the head's.
-  const armRimOpacity = isStatic
-    ? look.rimOpacity * ENTITY_ARM_RIM_SHARE
-    : breatheAnim.interpolate({ inputRange: [0, 1], outputRange: [look.rimOpacity * ENTITY_ARM_RIM_SHARE * 0.7, look.rimOpacity * ENTITY_ARM_RIM_SHARE] });
-  const eyeOpacity = eyesPulse
-    ? eyeAnim.interpolate({ inputRange: [0, 1], outputRange: [look.eyes * 0.55, look.eyes] })
+  const eyeOpacity: EntityOpacity = eyesPulse
+    ? eyeAnim.interpolate({ inputRange: [0, 1], outputRange: [look.eyes * 0.6, look.eyes] })
     : look.eyes;
-
   const W = ENTITY_HEAD_WIDTH;
   const H = ENTITY_HEAD_HEIGHT;
   const haloW = W * SHADOW_HALO_WIDTH;
   const haloH = H * SHADOW_HALO_HEIGHT;
-  const eye = (fx: number, key: string) => {
-    const core = W * SHADOW_EYE_CORE;
-    const glow = W * SHADOW_EYE_GLOW;
-    const cx = W * fx;
-    const cy = H * SHADOW_EYE_Y;
-    return (
-      <React.Fragment key={key}>
-        <View style={{ position: 'absolute', left: cx - glow / 2, top: cy - glow / 2, width: glow, height: glow, borderRadius: glow / 2, backgroundColor: look.eyeGlow, opacity: 0.45 }} />
-        <View style={{ position: 'absolute', left: cx - core / 2, top: cy - core / 2, width: core, height: core, borderRadius: core / 2, backgroundColor: look.eyeCore }} />
-      </React.Fragment>
-    );
-  };
-  const armTop = ENTITY_HEAD_TOP + H - 6;
+  const robeLeft = { left: '50%', marginLeft: -W / 2, width: W };
 
   return (
     <View pointerEvents="none" style={styles.entityLayer}>
-      {/* Head and shoulders over the roof, in front of a soft backlight. */}
-      <View style={{ position: 'absolute', top: ENTITY_HEAD_TOP, left: '50%', marginLeft: -W / 2, width: W, height: H }}>
-        <Image
-          source={SHADOW_HALO_IMG}
-          resizeMode="stretch"
-          fadeDuration={0}
-          style={{
-            position: 'absolute',
-            left: W / 2 - haloW / 2,
-            top: H * SHADOW_HALO_CENTER_Y - haloH / 2,
-            width: haloW,
-            height: haloH,
-            tintColor: look.halo,
-            opacity: look.haloOpacity,
-          }}
-        />
-        <EntityPiece body={ENTITY_HEAD_IMG} rim={ENTITY_HEAD_RIM_IMG} style={{ left: 0, top: 0, width: W, height: H }} opacity={opacity} rimOpacity={rimOpacity} rimColor={look.rim} />
-        {look.eyes > 0 && (
-          <Animated.View style={{ position: 'absolute', left: 0, top: 0, width: W, height: H, opacity: eyeOpacity }}>
-            {eye(SHADOW_EYE_LEFT_X, 'l')}
-            {eye(SHADOW_EYE_RIGHT_X, 'r')}
-          </Animated.View>
-        )}
-      </View>
-      {/* Both arms, down the sides of the house to the hands. */}
-      {[-1, 1].map((side) => (
+      {/* A soft backlight behind the hood. */}
+      <Image
+        source={SHADOW_HALO_IMG}
+        resizeMode="stretch"
+        fadeDuration={0}
+        style={{
+          position: 'absolute',
+          top: ENTITY_HEAD_TOP + H * SHADOW_HALO_CENTER_Y - haloH / 2,
+          left: '50%',
+          marginLeft: -haloW / 2,
+          width: haloW,
+          height: haloH,
+          tintColor: look.halo,
+          opacity: look.haloOpacity,
+        }}
+      />
+      {/* From Phase 4 (the house then always has all thirteen rooms), both
+          arms hang down the sides of the house to the hands. */}
+      {phase >= 4 && [-1, 1].map((side) => (
         <EntityPiece
           key={side}
           body={ENTITY_ARM_IMG}
           rim={ENTITY_ARM_RIM_IMG}
-          style={{ top: armTop, bottom: armBottom, left: '50%', marginLeft: side * ENTITY_ARM_OFFSET - ENTITY_ARM_WIDTH / 2, width: ENTITY_ARM_WIDTH }}
+          mirror={side === 1}
+          style={{
+            top: ENTITY_ARM_TOP,
+            bottom: groundBottom + FOUNDATION_RENDER_HEIGHT + ENTITY_HAND_STONE_TOP - 3 - ENTITY_CUFF_BELOW_ARM_BOTTOM,
+            left: '50%',
+            width: ENTITY_ARM_WIDTH,
+            marginLeft: side === -1 ? ENTITY_ARM_LEFT : -ENTITY_ARM_LEFT - ENTITY_ARM_WIDTH,
+          }}
           opacity={opacity}
-          rimOpacity={armRimOpacity}
+          rimOpacity={rimOpacity}
           rimColor={look.rim}
         />
       ))}
+      {/* Hood and shoulders over the roof. */}
+      <EntityPiece
+        body={ENTITY_HEAD_IMG}
+        rim={ENTITY_HEAD_RIM_IMG}
+        style={{ ...robeLeft, top: ENTITY_HEAD_TOP, height: H }}
+        opacity={opacity}
+        rimOpacity={rimOpacity}
+        rimColor={look.rim}
+      />
+      {look.eyes > 0 && (
+        <Animated.Image
+          source={ENTITY_EYES_IMG}
+          resizeMode="stretch"
+          fadeDuration={0}
+          style={{
+            position: 'absolute',
+            top: ENTITY_HEAD_TOP + ENTITY_EYES_TOP,
+            left: '50%',
+            marginLeft: -W / 2 + ENTITY_EYES_LEFT,
+            width: ENTITY_EYES_WIDTH,
+            height: ENTITY_EYES_HEIGHT,
+            tintColor: look.eyeCore,
+            opacity: eyeOpacity,
+          }}
+        />
+      )}
     </View>
   );
 };
 
 /**
- * The hands gripping the foundation corners, in front of the stone (Phase 4+;
- * at Phase 3 the arms still fade out before they reach the house's feet).
+ * The hands, gripping the foundation corners in front of the stone (Phase 4+;
+ * at Phase 3 the empty cuffs hang at the house's feet).
  */
-const ShadowHands: React.FC<{ phase: number; bottom: number }> = ({ phase, bottom }) => {
-  const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+const ShadowHands: React.FC<{ phase: number; groundBottom: number }> = ({ phase, groundBottom }) => {
   const visible = phase >= 4;
-  const look = entityLook(phase);
-  const breatheAnim = useEntityBreath(visible, isStatic, phase >= 5 ? 7000 : 4000);
+  const { look, opacity, rimOpacity } = useEntityOpacities(phase, visible);
   if (!visible) return null;
-  const opacity = isStatic
-    ? look.figure
-    : breatheAnim.interpolate({ inputRange: [0, 1], outputRange: [look.figure - 0.05, look.figure + 0.05] });
-  const rimOpacity = isStatic
-    ? look.rimOpacity
-    : breatheAnim.interpolate({ inputRange: [0, 1], outputRange: [look.rimOpacity * 0.7, look.rimOpacity] });
+  const bottom = groundBottom + FOUNDATION_RENDER_HEIGHT + ENTITY_HAND_STONE_TOP - ENTITY_HAND_HEIGHT;
   return (
     <>
       {[-1, 1].map((side) => (
         <EntityPiece
           key={side}
           body={ENTITY_HAND_IMG}
-          rim={ENTITY_HAND_RIM_IMG}
           mirror={side === 1}
-          // The art is a LEFT hand with its wrist centred ENTITY_HAND_WRIST_X
-          // in from its left edge; the right hand is the same image mirrored.
+          // A LEFT hand, its wrist centred ENTITY_HAND_WRIST_X in from its left
+          // edge, under the cuff; the right hand is the same image mirrored.
           style={{
             bottom,
             width: ENTITY_HAND_WIDTH,
             height: ENTITY_HAND_HEIGHT,
             left: '50%',
             marginLeft: side === -1
-              ? -ENTITY_ARM_OFFSET - ENTITY_HAND_WRIST_X
-              : ENTITY_ARM_OFFSET + ENTITY_HAND_WRIST_X - ENTITY_HAND_WIDTH,
+              ? ENTITY_CUFF_X - ENTITY_HAND_WRIST_X
+              : -ENTITY_CUFF_X + ENTITY_HAND_WRIST_X - ENTITY_HAND_WIDTH,
           }}
           opacity={opacity}
           rimOpacity={rimOpacity}
@@ -1703,39 +1707,40 @@ const PIT_MARGIN_TOP = 0;
 // Net flow height the pit adds below the foundation — used by the pan bounds,
 // the contact shadow seat, and the house-vs-art geometry notes below.
 const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 140
-// The entity's geometry (art from scripts/tools/generateShadowEntity.mjs).
-// Head: 1200x900 art at 404dp wide (0.337 dp/px). Its arm columns leave the
-// bottom edge with their outer edge 556 px (187dp) from centre, which is where
-// the 40dp-wide arm strips pick them up, centred ENTITY_ARM_OFFSET out: just
-// outside the 282dp foundation, inside a phone's side margins.
-const ENTITY_HEAD_WIDTH = 404;
-const ENTITY_HEAD_HEIGHT = ENTITY_HEAD_WIDTH * (900 / 1200);
-// The hood's collar (art y 560) sits a little below the roof's top edge.
-const ENTITY_HEAD_TOP = -170;
-const ENTITY_ARM_OFFSET = 167;
-const ENTITY_ARM_WIDTH = 50;
-const ENTITY_ARM_RIM_SHARE = 0.45; // arm.png 200 px wide, the limb 160 px of it
-// Hand: 720x600 art at 144x120dp; the wrist is centred 150 px (30dp) in from
-// the left edge and its first finger lies 125 px (25dp) down, so the hand's
-// top sits ENTITY_HAND_ABOVE_FOUNDATION above the stone to hook the fingers
-// over its top edge. The arm runs ENTITY_ARM_INTO_HAND down behind the palm so
-// the wrist has no seam.
-const ENTITY_HAND_WIDTH = 144;
-const ENTITY_HAND_HEIGHT = 120;
-const ENTITY_HAND_WRIST_X = 30;
-const ENTITY_HAND_ABOVE_FOUNDATION = 29;
-const ENTITY_ARM_INTO_HAND = 30;
-// Eye centres in the head art (1200x900): the face void is centred at
-// (604, 350); the eyes sit a little above its middle.
-const SHADOW_EYE_LEFT_X = 574 / 1200;
-const SHADOW_EYE_RIGHT_X = 634 / 1200;
-const SHADOW_EYE_Y = 330 / 900;
-const SHADOW_EYE_CORE = 0.016;
-const SHADOW_EYE_GLOW = 0.042;
+// The entity's geometry. The art is pixel art at the house's own density
+// (one art pixel = ENTITY_ART_DP), drawn by scripts/tools/generateShadowEntity.mjs;
+// every figure below is an art-pixel measurement from that script times it.
+const ENTITY_ART_DP = 1.5;
+// Head: 264x200 art; its last rows fade over the tops of the arms.
+const ENTITY_HEAD_WIDTH = 264 * ENTITY_ART_DP;
+const ENTITY_HEAD_HEIGHT = 200 * ENTITY_ART_DP;
+// The hood's collar (art y 132) sits just below the roof's top edge.
+const ENTITY_HEAD_TOP = -176;
+// The arms start 14 art rows above the head's bottom, under its fade.
+const ENTITY_ARM_TOP = ENTITY_HEAD_TOP + 186 * ENTITY_ART_DP;
+// Arm: 64 art wide, its left edge 200dp left of the centre line; drawn for the
+// full thirteen-room house and stretched to the real height. Its cuff (centre
+// art x 27) ends 14 art rows above the image's bottom.
+const ENTITY_ARM_WIDTH = 64 * ENTITY_ART_DP;
+const ENTITY_ARM_LEFT = -200;
+const ENTITY_CUFF_X = ENTITY_ARM_LEFT + 27 * ENTITY_ART_DP;
+const ENTITY_CUFF_BELOW_ARM_BOTTOM = 14 * ENTITY_ART_DP;
+// Hand: 80x64 art, wrist centred 14 art px in, the stone's top edge 27 art
+// rows down; its top tucks 2 art rows under the cuff.
+const ENTITY_HAND_WIDTH = 80 * ENTITY_ART_DP;
+const ENTITY_HAND_HEIGHT = 64 * ENTITY_ART_DP;
+const ENTITY_HAND_WRIST_X = 14 * ENTITY_ART_DP;
+const ENTITY_HAND_STONE_TOP = 27 * ENTITY_ART_DP;
+// The eyes image (40x14 art, eye centres 22 art px apart) in the face void,
+// whose centre is head art (135, 80).
+const ENTITY_EYES_WIDTH = 40 * ENTITY_ART_DP;
+const ENTITY_EYES_HEIGHT = 14 * ENTITY_ART_DP;
+const ENTITY_EYES_LEFT = (135 - 20) * ENTITY_ART_DP;
+const ENTITY_EYES_TOP = (80 - 7) * ENTITY_ART_DP;
 // Backlight halo: an oval behind the hood.
-const SHADOW_HALO_WIDTH = 0.95;
-const SHADOW_HALO_HEIGHT = 1.05;
-const SHADOW_HALO_CENTER_Y = 0.4;
+const SHADOW_HALO_WIDTH = 0.66;
+const SHADOW_HALO_HEIGHT = 0.85;
+const SHADOW_HALO_CENTER_Y = 0.3;
 /**
  * Per-phase look. Phase 3: a faint violet backlight, no eyes yet (the eyes are
  * the reveal). Phase 4: crimson backlight, the figure near-solid, eyes lit and
@@ -2706,7 +2711,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(function HouseWo
                 {/* The unnamed entity - invisible until Phase 3, then looming behind the house */}
                 <ShadowFigure
                   phase={currentPhase}
-                  armBottom={(onPitPress ? PIT_FLOW_HEIGHT : 0) + FOUNDATION_RENDER_HEIGHT + ENTITY_HAND_ABOVE_FOUNDATION - ENTITY_ARM_INTO_HAND}
+                  groundBottom={onPitPress ? PIT_FLOW_HEIGHT : 0}
                 />
 
                 {/* Contact shadow: a soft feathered blob under the foundation
@@ -2907,7 +2912,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(function HouseWo
                 {/* Its hands on the foundation, in front of the stone. */}
                 <ShadowHands
                   phase={currentPhase}
-                  bottom={(onPitPress ? PIT_FLOW_HEIGHT : 0) + FOUNDATION_RENDER_HEIGHT + ENTITY_HAND_ABOVE_FOUNDATION - ENTITY_HAND_HEIGHT}
+                  groundBottom={onPitPress ? PIT_FLOW_HEIGHT : 0}
                 />
 
                 {/* The Offering Pit's mouth in the front yard, a stone path
@@ -3043,6 +3048,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: -3,
+  },
+  entityFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
   },
 
   houseContainer: {

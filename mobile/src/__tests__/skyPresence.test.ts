@@ -48,10 +48,10 @@ describe('the shadow figure reads against the night sky', () => {
     expect(alphaAt(0, 0)).toBe(0);
   });
 
-  it('draws the eyes on their own layer at the head art coordinates', () => {
-    expect(src).toContain('const SHADOW_EYE_LEFT_X = 574 / 1200;');
-    expect(src).toContain('const SHADOW_EYE_RIGHT_X = 634 / 1200;');
-    expect(src).toContain('const SHADOW_EYE_Y = 330 / 900;');
+  it('draws the eyes as their own tinted image in the face void', () => {
+    expect(src).toContain('const ENTITY_EYES_LEFT = (135 - 20) * ENTITY_ART_DP;');
+    expect(src).toContain('const ENTITY_EYES_TOP = (80 - 7) * ENTITY_ART_DP;');
+    expect(flat).toContain('tintColor: look.eyeCore');
   });
 
   it('keeps the phase ladder: violet with no eyes, crimson with lit eyes, settled mauve', () => {
@@ -59,42 +59,35 @@ describe('the shadow figure reads against the night sky', () => {
     expect(look).toMatch(/3: \{[^}]*eyes: 0,/);
     expect(look).toMatch(/4: \{[^}]*eyes: 1,[^}]*eyePulse: true/);
     expect(look).toMatch(/5: \{[^}]*eyePulse: false/);
-    // Still invisible before Phase 3; the hands only close on the house at 4.
+    // Invisible before Phase 3; the arms and hands only from Phase 4, when the
+    // house always has all thirteen rooms and so its full height.
     expect(flat).toContain('const visible = phase >= 3;');
     expect(flat).toContain('const visible = phase >= 4;');
+    expect(flat).toContain('{phase >= 4 && [-1, 1].map((side) => (');
   });
 });
 
-describe('the entity holds the house, so it is on screen at every pan position', () => {
+describe('the entity is pixel art at the house density, and holds the house', () => {
   const ENV = path.join(__dirname, '../../assets/environment');
-  it('ships a body and a rim image for the head, the arm and the hand', () => {
-    for (const piece of ['entity_head', 'entity_arm', 'entity_hand']) {
-      for (const file of [piece, `${piece}_rim`]) {
-        expect(src).toContain(`require('../../../assets/environment/${file}.png')`);
-        expect(fs.existsSync(path.join(ENV, `${file}.png`))).toBe(true);
-      }
+  const read = (f: string) => PNG.sync.read(fs.readFileSync(path.join(ENV, `${f}.png`)));
+  it('ships every piece the scene requires', () => {
+    for (const f of ['entity_head', 'entity_head_rim', 'entity_arm', 'entity_arm_rim', 'entity_hand', 'entity_eyes']) {
+      expect(src).toContain(`require('../../../assets/environment/${f}.png')`);
+      expect(fs.existsSync(path.join(ENV, `${f}.png`))).toBe(true);
     }
   });
 
-  it('runs the arms from the shoulders down to the hands, and grips the foundation', () => {
-    expect(flat).toContain('style={{ top: armTop, bottom: armBottom,');
-    expect(flat).toContain('armBottom={(onPitPress ? PIT_FLOW_HEIGHT : 0) + FOUNDATION_RENDER_HEIGHT + ENTITY_HAND_ABOVE_FOUNDATION - ENTITY_ARM_INTO_HAND}');
-    // The hands render AFTER the foundation, so they lie in front of the stone.
-    expect(src.indexOf('<ShadowHands')).toBeGreaterThan(src.indexOf('<View style={styles.foundationWrap}>'));
-    expect(src.indexOf('<ShadowFigure')).toBeLessThan(src.indexOf('<View style={styles.foundationWrap}>'));
+  it('draws one art pixel as 1.5dp, three image pixels to the art pixel', () => {
+    expect(src).toContain('const ENTITY_ART_DP = 1.5;');
+    expect([read('entity_head').width, read('entity_head').height]).toEqual([264 * 3, 200 * 3]);
+    expect([read('entity_arm').width, read('entity_arm').height]).toEqual([64 * 3, 1200 * 3]);
+    expect([read('entity_hand').width, read('entity_hand').height]).toEqual([80 * 3, 64 * 3]);
+    // Under the 4096px texture limit some Android GPUs still have.
+    expect(read('entity_arm').height).toBeLessThanOrEqual(4096);
   });
 
-  it('keeps the joins the generator draws', () => {
-    const head = PNG.sync.read(fs.readFileSync(path.join(ENV, 'entity_head.png')));
-    const arm = PNG.sync.read(fs.readFileSync(path.join(ENV, 'entity_arm.png')));
-    expect([head.width, head.height]).toEqual([1200, 900]);
-    expect([arm.width, arm.height]).toEqual([200, 1000]);
-    // The head's arm column leaves the bottom edge ~556 px out from centre,
-    // which is where the arm strip (ENTITY_ARM_OFFSET + half its limb) picks it up.
-    const row = head.height - 1;
-    let outer = 0;
-    for (let x = 600; x < head.width; x++) if (head.data[(row * head.width + x) * 4 + 3] > 128) outer = x;
-    const scale = 404 / 1200;
-    expect(Math.abs((outer - 600) * scale - (167 + 20))).toBeLessThan(6);
+  it('puts the hands in front of the stone and the rest behind the house', () => {
+    expect(src.indexOf('<ShadowHands')).toBeGreaterThan(src.indexOf('<View style={styles.foundationWrap}>'));
+    expect(src.indexOf('<ShadowFigure')).toBeLessThan(src.indexOf('<View style={styles.foundationWrap}>'));
   });
 });
