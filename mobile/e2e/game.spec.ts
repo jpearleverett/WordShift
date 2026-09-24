@@ -623,7 +623,9 @@ for (const [letter, finalWord, boundary] of [['D', 'CLOSED', 'remember'], ['R', 
       );
     }, { timeout: 20_000 }).toBe(true);
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Play puzzle', exact: true }).click();
+    // The eve: with the finale armed, the dock is the door to the last
+    // arrangement, not an ordinary Play.
+    await page.getByRole('button', { name: 'Begin the last arrangement', exact: true }).click();
     const later = page.getByText('Come back to this', { exact: true });
     await expect(later).toBeVisible();
     await later.click();
