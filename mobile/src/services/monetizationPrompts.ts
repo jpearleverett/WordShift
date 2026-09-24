@@ -384,12 +384,17 @@ export function resolveMomentOffer(moment: MomentOfferMoment, owned: OfferOwners
 export async function consumeMomentOffer(
   moment: MomentOfferMoment,
   owned: OfferOwnership = getOfferOwnershipSync(),
+  canSell?: (target: MomentOfferTarget) => Promise<boolean>,
 ): Promise<MomentOfferTarget | null> {
   const state = await load();
   const shown = Array.isArray(state.momentOffersShown) ? state.momentOffersShown : [];
   if (shown.includes(moment)) return null;
   if (moment === 'second_purchase' && !owned.anyPurchase) return null;
   const target = resolveMomentOffer(moment, owned);
+  // A card for a product the store cannot sell right now (billing down, or the
+  // product not created yet) would be a dead end. Keep the moment unspent so
+  // it can still be offered once the product is live.
+  if (target && canSell && !(await canSell(target).catch(() => false))) return null;
   state.momentOffersShown = [...shown, moment];
   await save();
   return target;

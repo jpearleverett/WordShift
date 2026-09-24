@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   StoryContext, StorySceneId, advanceStoryPage, beginStoryCycle, buildStoryScene,
   chooseStoryOption, clearStoryState, getStoryPages, invalidateStoryCache,
-  loadStoryState, openStoryScene, recordStoryBoundary, selectStoryScene, STORY_STORAGE_KEY,
+  loadStoryState, openStoryScene, recordStoryBoundary, selectStoryScene, STORY_STORAGE_KEY, STORY_QUARANTINE_KEY,
   getStoryWorldKeepsake, inspectStoryWorld, getStoryPresentationPhase,
 } from '../services/storySpine';
 
@@ -91,9 +91,11 @@ test('the arrival interval cannot schedule a stale council after the entity arri
 });
 
 test.each(['invalid json', JSON.stringify({version: 1, cycle: 0, memories: {cup: {bad: true}}, boundary: null})])(
-  'malformed memory data can recover safely: %s', async raw => {
+  'malformed memory data is set aside, then the story opens: %s', async raw => {
     await AsyncStorage.setItem(STORY_STORAGE_KEY, raw); invalidateStoryCache();
     expect((await openStoryScene(context()))?.memory.scene.id).toBe('cup');
+    // The fresh record overwrites the key, so the old text must survive here.
+    expect(await AsyncStorage.getItem(STORY_QUARANTINE_KEY)).toBe(raw);
   });
 
 test('a legacy post-arrival save in a later cycle enters After before a bright-day echo', async () => {

@@ -38,10 +38,20 @@ jobs:
       # The uploaded archive carries no .git folder, and eas update otherwise
       # stops to offer 'git init', which fails with no terminal attached.
       EAS_NO_VCS: '1'
+      # The Sentry upload (below) reads org/project from the plugin entry
+      # '@sentry/react-native/expo' in app.json; these are its fallback.
+      SENTRY_ORG: iridescent-games-9n
+      SENTRY_PROJECT: wordshift
+      SENTRY_URL: https://sentry.io/
     params:
       channel: ${{ inputs.channel }}
       platform: android
       message: ${{ inputs.message }}
+      # Upload this update's source maps so Sentry can read its stack traces
+      # (Metro stamps each bundle with a debug ID). Needs SENTRY_AUTH_TOKEN in
+      # the production EAS environment. true = a failed upload fails the job
+      # instead of passing silently; the update itself is already published.
+      upload_sentry_sourcemaps: true
     hooks:
       before_update:
         - name: Check the runtime and ad mode match the channel

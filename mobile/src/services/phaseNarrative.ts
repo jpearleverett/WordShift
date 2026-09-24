@@ -291,8 +291,8 @@ export function getUnbrokenWeaveRankUpLine(
 export function getUnbrokenWeaveIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 5) {
     return [
-      "There is one thread in this house nobody has pulled yet. It is yours, if you want it.",
-      "It is called the Unbroken Weave. Each letter may cross the chain only once. Finish a chain that way, and the house keeps a mark of it.",
+      "There's one thread in this house nobody's pulled yet. It's yours, if you want it.",
+      "It's called the Unbroken Weave. Each letter can cross the chain only once. Finish a chain that way, and the house keeps a mark of it.",
       "It waits in the setup, where you pick your board. The weave remembers how far you carry it.",
     ];
   }
@@ -1416,9 +1416,9 @@ export function getJourneyAtmosphereText(phase: number): string {
 export function getDailyChallengeIntroLines(phase: number): string[] {
   if (phase >= 4) {
     return [
-      "A new path opened this morning. One arrangement each day, and it is the same one for everyone.",
-      "It is called the Daily Challenge. The words are harder and the pattern is tighter. Come every day and the offering stays steady.",
-      "When you are ready, it is waiting above the house. One a day helps hold this whole house together.",
+      "A new path opened this morning. One arrangement each day, and it's the same one for everyone.",
+      "It's called the Daily Challenge. The words are harder and the pattern's tighter. Come every day and the offering stays steady.",
+      "When you're ready, it's waiting above the house. One a day helps hold this whole house together.",
     ];
   }
   if (phase >= 3) {
@@ -1845,16 +1845,16 @@ export function getSpeedRescueResumeMessage(phase: number): string {
 export function getExpertUnlockIntroLines(phase: number): string[] {
   if (phase >= 5) {
     return [
-      'There is a new rung in the setup. Expert. Six-letter words, and chains as long as the house can hold.',
-      'It is the hardest arrangement there is. The house would rather you kept to the easy ones.',
-      'That is as good a reason to try it as any.',
+      "There's a new rung in the setup. Expert. Six-letter words, and chains as long as the house can hold.",
+      "It's the hardest arrangement there is. The house would rather you kept to the easy ones.",
+      "That's as good a reason to try it as any.",
     ];
   }
   if (phase >= 4) {
     return [
-      'There is a new rung in the setup. Expert. Six-letter words, and chains as long as the house can hold.',
-      'It is the hardest arrangement there is. Fewer moves fit, and every word must be reached for.',
-      'Take it when you are ready. It will wait.',
+      "There's a new rung in the setup. Expert. Six-letter words, and chains as long as the house can hold.",
+      "It's the hardest arrangement there is. Fewer moves fit, and you have to reach for every word.",
+      "Take it when you're ready. It'll wait.",
     ];
   }
   if (phase >= 2) {
@@ -3128,6 +3128,120 @@ export function getDwellLine(dwellCount: number, phase: number, houseComplete: b
   return lines[idx];
 }
 
+// ============================================================================
+// THE VIGIL: the last nights before the final arrangement. After the reveal,
+// with every room built, each of the eight dwell wins hands the victory to ONE
+// resident, in this order, for a single line about getting ready. The house
+// used to narrate these wins itself, which read as the story idling; now the
+// people the player is about to decide for say goodbye to ordinary life one
+// at a time. A resident not yet living here is skipped (the solve-floor
+// route can arrive with rooms unbuilt), and the house narration remains the
+// fallback. Phase 4 only: a new cycle's dwell keeps its serene house lines.
+// ============================================================================
+
+export interface VigilLine { animalType: string; animalName: string; text: string }
+
+const VIGIL_LINES: VigilLine[] = [
+  { animalType: 'pangolin', animalName: 'Panko', text: "I'm cooking for tomorrow. I don't know how many are coming, so I'm making far too much. That's what you do." },
+  { animalType: 'wombat', animalName: 'Warren', text: "I've checked every beam in this house twice. They'll hold. I just wish I knew what they're holding up for." },
+  { animalType: 'axolotl', animalName: 'Axel', text: "The water's gone completely still. Not calm. Still, like it's holding its breath with the rest of us." },
+  { animalType: 'rabbit', animalName: 'Thyme', text: "I've packed and unpacked my seed tin four times today. It's fine. I'm fine. Is the gate still where it was?" },
+  { animalType: 'capybara', animalName: 'Chill', text: "I've started a fresh page in the ledger. I'm going to write down what happens next exactly as it happens. Nobody's correcting this one." },
+  { animalType: 'tarsier', animalName: 'Vesper', text: "There's a line in the sky I can't stop watching. It wasn't there last night. It's perfectly straight, like a seam." },
+  { animalType: 'aye_aye', animalName: 'Tock', text: "She's never rung, not once. Tomorrow night I might have to ring her. I keep climbing up to check the rope." },
+  { animalType: 'fox', animalName: 'Ember', text: "Every room's full. Everyone's here. I asked for this, friend, and tonight I'd give a lot for one more ordinary week." },
+];
+
+// While the finale waits for its solve floor after the eighth night, the rest
+// of the household takes a turn, in rotation.
+const POST_CAP_VIGIL_LINES: VigilLine[] = [
+  { animalType: 'kakapo', animalName: 'Moss', text: "I've been saving one breath my whole life. I think I'm going to need it soon." },
+  { animalType: 'owl', animalName: 'Archimedes', text: "I've read the last page of the old book a dozen times now. It stops halfway through a sentence." },
+  { animalType: 'sloth', animalName: 'Sloane', text: "I wanted this. I'm finding out that wanting something and being ready for it aren't the same thing." },
+  { animalType: 'fennec_fox', animalName: 'Fennick', text: "Listen. Under the floor. It's gone quiet down there. It's never quiet down there." },
+  { animalType: 'red_panda', animalName: 'Bamboo', text: "I used to sit still to understand things. Tonight I'm just sitting still. It turns out that's harder." },
+];
+
+/** The dwell win's resident, or null when that resident doesn't live here yet. */
+export function getVigilLine(dwellCount: number, unlockedAnimals: readonly string[]): VigilLine | null {
+  const line = VIGIL_LINES[Math.max(1, Math.min(dwellCount, VIGIL_LINES.length)) - 1];
+  return unlockedAnimals.includes(line.animalType) ? line : null;
+}
+
+/** A rotating resident for the wins between the eighth night and the finale. */
+export function getPostCapVigilLine(completedTotal: number, unlockedAnimals: readonly string[]): VigilLine | null {
+  const present = POST_CAP_VIGIL_LINES.filter(line => unlockedAnimals.includes(line.animalType));
+  return present.length ? present[Math.abs(completedTotal) % present.length] : null;
+}
+
+// ============================================================================
+// THE EVE: the finale is armed. The house's own door to the last arrangement
+// replaces the ordinary PLAY dock, so the player chooses to walk to the table
+// instead of stumbling onto the final board from a routine tap.
+// ============================================================================
+
+export function getFinaleEvePlayLabel(): string {
+  return 'The last arrangement';
+}
+
+export function getFinaleEveLine(councilHeard: boolean): string {
+  return councilHeard
+    ? 'Everyone is at the long table. Your place is set.'
+    : 'Everyone is gathering at the long table. They want to talk before the last arrangement.';
+}
+
+/** The completion coda on the final board's win: the word itself, then silence. */
+export function getFinalWordCoda(finalWord: string | null | undefined, houseComplete: boolean): { title: string; text: string } {
+  const word = (finalWord ?? '').toUpperCase();
+  if (word === 'CLOSED' || word === 'CLOSER') {
+    return {
+      title: word,
+      text: word === 'CLOSED'
+        ? 'One room it can never enter. The last letter settles, and the whole house holds its breath.'
+        : 'One road out it can never close. The last letter settles, and the whole house holds its breath.',
+    };
+  }
+  return houseComplete
+    ? { title: 'THE LAST ARRANGEMENT', text: 'The last letter settles, and the whole house holds its breath.' }
+    : { title: 'THE LAST ARRANGEMENT', text: 'There are rooms still unbuilt. The last letter settles anyway, and the house holds its breath.' };
+}
+
+// ============================================================================
+// THE EPILOGUE CARD: shown once, after the player gives their reply the
+// morning after. It closes the story of the arrival without closing the game.
+// Outside the house's own voice, like a title card, so it never has a
+// resident speak about being in a game.
+// ============================================================================
+
+export interface EpilogueCopy { eyebrow: string; title: string; lines: string[]; closing: string; button: string }
+
+export function getEpilogueCopy(input: {
+  boundary: 'remember' | 'release' | null;
+  puzzlesSolved: number;
+  daysSinceArrival: number;
+  residents: number;
+}): EpilogueCopy {
+  const word = input.boundary === 'remember' ? 'CLOSED' : input.boundary === 'release' ? 'CLOSER' : null;
+  const days = Math.max(1, Math.round(input.daysSinceArrival));
+  const lines = [
+    ...(word ? [`Your last word: ${word}`] : []),
+    `Arrangements you finished: ${input.puzzlesSolved.toLocaleString('en-US')}`,
+    `Friends who live here: ${input.residents}`,
+    `You first came in ${days === 1 ? 'one day' : `${days} days`} ago.`,
+  ];
+  return {
+    eyebrow: 'WORDSHIFT',
+    title: 'The story of the arrival is over',
+    lines,
+    closing: input.boundary === 'remember'
+      ? 'One room in the house belongs to no one but the people inside it. The house, and everyone in it, is still here.'
+      : input.boundary === 'release'
+        ? 'The road out stays open, and coming back is a choice. The house, and everyone in it, is still here.'
+        : 'The house, and everyone in it, is still here.',
+    button: 'Go home',
+  };
+}
+
 /** A deterministic post-cap voice for victories while the finale waits to arm. */
 export function getPostCapDwellLine(completedTotal: number, phase: number): string {
   const lines = phase >= 5 ? POST_CAP_DWELL_LINES_SERENE : POST_CAP_DWELL_LINES;
@@ -3170,8 +3284,8 @@ export function getNextFriendPrompt(_phase: number, name: string): string {
 // ============================================================================
 
 export function getDialogueCaughtUpLine(phase: number): string {
-  if (phase >= 5) return 'There is nothing new to tell tonight. Sit with me a while, or go on. Both are fine.';
-  if (phase >= 4) return 'That is everything I have for now. Bring the house another arrangement or two, and I will have more to tell you.';
+  if (phase >= 5) return "There's nothing new to tell tonight. Sit with me a while, or go on. Both are fine.";
+  if (phase >= 4) return "That's everything I've got for now. Bring the house another arrangement or two, and I'll have more to tell you.";
   if (phase >= 2) return "I've said what I can for now. Bring a few more words to the house and I'll have more for you.";
   return "That's everything I've got for now. Go find a few more words and come back. I'll have more to say by then.";
 }
@@ -3417,7 +3531,7 @@ export function getDialogueRevealSkipHint(phase: number): string {
 // ============================================================================
 
 export function getArrivalResumeFramingLine(animalName: string): string {
-  return `${animalName} settles in. "I never finished telling you some of this before that night. I will tell it the way I saw it then."`;
+  return `${animalName} settles in. "I never finished telling you some of this before that night. I'll tell it the way I saw it then."`;
 }
 
 // ============================================================================
@@ -3460,7 +3574,7 @@ export function getSwiftVictoriesToggledMessage(phase: number, enabled: boolean)
 
 export function getFinalBoardStartMessage(phase: number): string {
   if (phase >= 5) return 'One more arrangement. A place for another decision.';
-  return 'The last arrangement. Take your time. It has waited this long.';
+  return 'The last arrangement. Everyone is watching the board. Take your time.';
 }
 
 /**
@@ -4709,16 +4823,16 @@ export function getOfferingIntroLines(phase: number): string[] {
   if (phase >= 5) {
     return [
       "The offering bowl is still there, if you ever want to leave amber in it.",
-      "The house remembers an offering. But your welcome at my hearth does not depend on one. It already belongs to you.",
+      "The house remembers an offering. But your welcome at my hearth doesn't depend on one. It's already yours.",
       "Sometimes the house asks for an offering and gives a little amber back. It says how much before you give.",
-      "You may also leave the bowl alone. I will put the kettle on either way.",
+      "You can leave the bowl alone too. I'll put the kettle on either way.",
     ];
   }
   return [
-    "There is a hollow at the heart of this house. When I let a little amber fall in, it does not come back.",
+    "There's a hollow at the heart of this house. When I let a little amber fall in, it doesn't come back.",
     "You can offer amber there too. The house keeps a record of what is given, and sometimes it answers.",
     "Sometimes the house asks for an offering and gives a little amber back. It says how much before you give.",
-    "You may leave the hollow alone. Being welcome here does not depend on what you give.",
+    "You can leave the hollow alone. You're welcome here whatever you give.",
   ];
 }
 
@@ -4728,7 +4842,7 @@ export function getOfferingIntroLines(phase: number): string[] {
 export function getChallengeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 5) {
     return [
-      "There is always further down, friend. Some paths through the arrangement are harder than others.",
+      "There's always further down, friend. Some paths through the arrangement are harder than others.",
       "Challenge Mode takes away your hints and leaves you an undo or two. Take it for yourself, not for the house.",
       "It waits in the setup, where you pick your board. Some evenings I want a thing to be hard on purpose. Maybe you will too.",
     ];
@@ -4823,8 +4937,8 @@ export function getMandatoryHarvestCTA(phase: DialoguePhase): string {
 export function getMandatoryHarvestPitIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 3) {
     return [
-      "Your words are waiting above the pit. They will not offer themselves.",
-      "The house does not carry them down for you anymore. What you form, you bring here. What you bring, you give.",
+      "Your words are waiting above the pit. They won't offer themselves.",
+      "The house doesn't carry them down for you anymore. What you form, you bring here. What you bring, you give.",
       "Tap each word and let the pit take it. The amber returns to you, as it always does.",
     ];
   }
@@ -4878,7 +4992,7 @@ export function getColdOpenSkipAccessibilityLabel(): string {
 export function getHarvestHomeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 3) {
     return [
-      "The house no longer carries your words down for you. They are waiting in the pit, and they are heavy.",
+      "The house doesn't carry your words down for you anymore. They're waiting in the pit, and they're heavy.",
       "Follow the path below the house. Offer them yourself. Then we can go on.",
     ];
   }
@@ -5647,8 +5761,8 @@ export function getSeasonPassCopy(phase: DialoguePhase): SeasonPassCopy {
 export function getModifierStackingIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 4) {
     return [
-      "The clock is yours now. It is called Speed Shift. It does not change the arrangement at all. It only refuses to wait.",
-      "And it does not replace anything. Lay it over the reverse. Lay it over the doubled. Lay it over whatever you were already going to offer.",
+      "The clock is yours now. It's called Speed Shift. It doesn't change the arrangement at all. It just won't wait.",
+      "And it doesn't replace anything. Lay it over the reverse. Lay it over the doubled. Lay it over whatever you were already going to offer.",
       "They stack, all of them. Every layer you add is one more thing the pattern gets to watch you carry.",
     ];
   }
@@ -5686,8 +5800,8 @@ export function getBlindIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 4) {
     return [
       "The last of the guidance goes now, friend. No ghosts beneath the letters. Nothing to tell you what a move would make.",
-      "It is called the Blind Offering. Every move your hands can make will be accepted. Nothing is weighed until the final letter lands, and then the whole chain is weighed at once.",
-      "So take it back as often as you need. Undo costs nothing here, and there is no limit on it. Walk the chain backward until you find where it stopped being true.",
+      "It's called the Blind Offering. Every move your hands can make is accepted. Nothing's weighed until the last letter lands, and then the whole chain is weighed at once.",
+      "So take moves back as often as you need. Undo costs nothing here, and there's no limit. Walk the chain backward until you find where it stopped being true.",
       "The arrangement pays double for an offering made in the dark. Of course it does.",
     ];
   }
@@ -5716,8 +5830,8 @@ export function getBlindIntroLines(phase: DialoguePhase): string[] {
 export function getLexiconIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 4) {
     return [
-      "There are older pages in this house. Words it has not needed in a long time.",
-      "Lexicon opens them. The rules do not change. Only the words do, and the harder the board, the stranger they get.",
+      "There are older pages in this house. Words it hasn't needed in a long time.",
+      "Lexicon opens them. The rules don't change. Only the words do, and the harder the board, the stranger they get.",
       "It goes on top of anything else, like the rest of them. The arrangement pays more for the difficult words. Of course it would.",
     ];
   }

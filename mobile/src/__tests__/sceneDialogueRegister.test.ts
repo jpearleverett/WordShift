@@ -3,15 +3,12 @@
  * style preference.
  *
  * The 2026-09-02 Dialogue Readability Pass repaired the house corpus
- * (animalDialogueBase.ts) and gave the story its one grammatical device: the
- * residents speak in contractions through phase 3 and audibly STOP at the
- * reveal. Measured on that corpus: 83/90/87/88% contracted at phases 0-3, and
- * exactly 0 contractions across 312 expanded forms at phase 4, the same at
- * phase 5. The pass never reached the scene pools, so the story spine, the
- * phase-3 choice scenes and the phase-reaction lines sat in the OLD flat
- * register (the owner's report: "weirdly formal with no contractions and
- * really hard to understand"), and phaseTransitionReactions was contracting at
- * phases 4-5, where the device says it must not.
+ * (animalDialogueBase.ts) and briefly made the reveal a GRAMMATICAL device:
+ * residents contracted through phase 3 and stopped at phase 4. The owner
+ * rejected that twice as "awkwardly formal" and "genuinely hard to
+ * understand", so on 2026-09-24 residents contract at every phase, in the
+ * scenes, the phase reactions and the house corpus alike. The reveal is now
+ * carried by what the residents say, never by grammar.
  *
  * Three rules, each enforced below:
  *   1. A line's band is set by the phase its scene is DELIVERED at, never by
@@ -21,15 +18,15 @@
  *      baseline the residents' turn is measured against. Contract narration
  *      at 0-3 and stop at 4 and the reader cannot tell whether the residents
  *      changed or the book did, and the device exists only in the diff.
- *   3. The PLAYER contracts at every phase, 4 and 5 included. The player never
- *      joined the liturgy.
+ *   3. The PLAYER and the RESIDENTS contract at every phase, 4 and 5
+ *      included.
  */
 import * as fs from 'fs';
 import * as path from 'path';
 
 const read = (file: string) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 
-const CONTRACTED = /\b(?:[A-Za-z]+n't|I'm|I've|I'll|I'd|you're|you've|you'll|you'd|we're|we've|we'll|we'd|they're|they've|they'll|it's|that's|there's|what's|he's|she's|let's)\b/gi;
+const CONTRACTED = /\b(?:[A-Za-z]+n't|I'm|I've|I'll|I'd|you're|you've|you'll|you'd|we're|we've|we'll|we'd|they're|they've|they'll|they'd|it's|it'll|that's|that'll|there's|what's|who's|here's|he's|she's|he'd|she'd|he'll|she'll|let's)\b/gi;
 const EXPANDED = /\b(?:I am|I have|I will|I would|you are|you have|you will|you would|we are|we have|we will|we would|they are|they will|it is|it will|that is|there is|what is|he is|she is|let us|do not|does not|did not|is not|are not|was not|were not|have not|has not|had not|will not|would not|could not|should not|cannot|must not)\b/gi;
 const count = (text: string, re: RegExp) => (text.match(re) || []).length;
 
@@ -162,4 +159,33 @@ describe('the phase-reaction lines speak like the scenes', () => {
       for (const [, text] of rows) expect(count(text, CONTRACTED)).toBeGreaterThan(0);
     });
   }
+});
+
+// The house corpus (regular visits, the post-Arrival pool and Tending) used to
+// keep a zero-contraction register at phases 4-5 as a device. The owner found
+// it "awkwardly formal" and hard to follow, so on 2026-09-24 it was brought
+// into plain speech like the scenes. Possession ("I have the call") and quoted
+// words (I AM AFRAID) still count as expanded, so the bar is a rate, not zero.
+describe('the house corpus speaks plainly after the reveal', () => {
+  const { getDialoguesForAnimal, ANIMAL_INFO } = require('../services/dialogue/animalDialogueBase');
+  const { POST_REVELATION_DIALOGUES } = require('../services/dialogue/animalDialogueIntro');
+  const { TENDING_DIALOGUES } = require('../services/dialogue/animalDialogueTending');
+  const rate = (lines: string[]) => {
+    const text = lines.join(' ');
+    const contracted = count(text, CONTRACTED);
+    return contracted / Math.max(1, contracted + count(text, EXPANDED));
+  };
+  const animals = Object.keys(ANIMAL_INFO);
+
+  it('contracts the phase-4 visits', () => {
+    const lines = animals.flatMap(animal => getDialoguesForAnimal(animal, 4))
+      .filter((line: { phase: number }) => line.phase === 4).map((line: { text: string }) => line.text);
+    expect(lines.length).toBe(13 * 30);
+    expect(rate(lines)).toBeGreaterThan(0.85);
+  });
+
+  it('contracts the post-Arrival pool and the Tending lines', () => {
+    expect(rate(Object.values(POST_REVELATION_DIALOGUES).flat() as string[])).toBeGreaterThan(0.85);
+    expect(rate(Object.values(TENDING_DIALOGUES).flat() as string[])).toBeGreaterThan(0.85);
+  });
 });

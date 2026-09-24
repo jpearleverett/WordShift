@@ -3,7 +3,7 @@
 Reviewed against main `6f96ebb` on 2026-09-13; production publish, verification and
 rollback runbook added 2026-09-14. See [current build](CURRENT_BUILD.md),
 [build and upload guide](BUILD_AND_UPLOAD.md) and [release gates](LAUNCH_CHECKLIST.md).
-The repository currently configures app **1.4.5**, Android code **110** and iOS build
+The repository currently configures app **1.4.6**, Android code **111** and iOS build
 **3**; this is source configuration, not confirmation of an uploaded artifact. Every
 app-version bump moves every resolved runtime below with it: an update published
 against an older runtime (for example `1.4.4-*`) reaches only installs of that
@@ -15,16 +15,16 @@ overriding the base JSON's `appVersion` policy. With the current configuration:
 
 | Build profile | Update channel | Resolved runtime | Artifact/use |
 |---|---|---|---|
-| internal-testing | internal-testing | `1.4.5-internal-testing` | Signed Play internal-test AAB |
-| production | production | `1.4.5-production` | Separately validated public-release binary |
-| preview | preview | `1.4.5-preview` | Preview APK |
-| development | development | `1.4.5-development` | Development client |
+| internal-testing | internal-testing | `1.4.6-internal-testing` | Signed Play internal-test AAB |
+| production | production | `1.4.6-production` | Separately validated public-release binary |
+| preview | preview | `1.4.6-preview` | Preview APK |
+| development | development | `1.4.6-development` | Development client |
 
 Each EAS Build profile sets `WORDSHIFT_RELEASE_CHANNEL`. Local config evaluation
 falls back to `internal-testing` when it is unset. Always set it explicitly when
 publishing updates; the environment variable and `--channel` must agree. A bare
 `eas update --channel production` from a shell without the variable publishes the
-`1.4.5-internal-testing` runtime into the production channel: no production
+`1.4.6-internal-testing` runtime into the production channel: no production
 install ever receives it, while the console reports a successful publish.
 
 `app.config.js` also derives `extra.adsUseTestIds` from the channel: the production
@@ -73,10 +73,15 @@ Android only, and runs `scripts/tools/checkOtaConfig.mjs` before publishing: the
 check stops the job unless the runtime is `<version>-<channel>`, the ad mode matches
 the channel (live only on production) and `creatorCode` is empty. The CLI prints a
 link to the run on expo.dev; its logs show the check and the published group. Then
-verify and confirm delivery with steps 3 and 4 below. Sentry source maps upload
-automatically when `SENTRY_AUTH_TOKEN` is an EAS environment variable in the
-`production` environment; if it is missing, the job logs the failure and still
-publishes. `otaWorkflow.test.ts` pins the workflow's channel wiring.
+verify and confirm delivery with steps 3 and 4 below. The job then uploads the
+update's Sentry source maps (`upload_sentry_sourcemaps: true`), so a crash on an
+updated build shows real file names and lines. The upload needs `SENTRY_AUTH_TOKEN`
+as an EAS environment variable in the `production` environment and reads the
+org/project from the `@sentry/react-native/expo` plugin entry in `app.json` (the
+workflow also sets `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_URL` as a fallback). The
+update is published before the upload runs, so a red job with a Sentry error means
+the update is live but its stack traces will be unreadable: fix the token and
+re-upload with the manual command in step 2 below. `otaWorkflow.test.ts` pins the workflow's channel wiring and the source-map upload.
 
 ## Production hotfix runbook
 
@@ -84,7 +89,7 @@ Only JavaScript/asset changes ship this way; anything native needs a new binary
 (above). Every command runs from `mobile/` on the reviewed commit.
 
 1. **Resolve and check the production configuration.** The first command must print
-   `runtimeVersion: '1.4.5-production'`, `adsUseTestIds: false` and an empty
+   `runtimeVersion: '1.4.6-production'`, `adsUseTestIds: false` and an empty
    `creatorCode`; the second is the one-command release gate.
 
    ```bash
@@ -105,7 +110,7 @@ Only JavaScript/asset changes ship this way; anything native needs a new binary
    ```
 
 3. **Verify what was published.** The newest group in the list must carry runtime
-   `1.4.5-production` (an `-internal-testing` runtime here means step 2 ran without
+   `1.4.6-production` (an `-internal-testing` runtime here means step 2 ran without
    the variable; republish correctly, then roll the wrong group back if it is the
    newest). Record the group ID from this output.
 
@@ -128,7 +133,7 @@ it back. Two options, both delivered on the players' next launch:
   state; the embedded bundle is the reviewed release itself):
 
   ```bash
-  npx eas-cli@latest update:roll-back-to-embedded --channel production --runtime-version 1.4.5-production --message "Roll back: <reason>"
+  npx eas-cli@latest update:roll-back-to-embedded --channel production --runtime-version 1.4.6-production --message "Roll back: <reason>"
   ```
 
 - **Republish a known-good earlier group** (when a previous OTA fix must stay live

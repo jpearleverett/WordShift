@@ -383,56 +383,56 @@ export function getPhase4ChoiceCallback(
 
   const callbacks: Record<string, Record<PlayerChoice, string>> = {
   "fox": {
-    "ask": "You asked what I knew. I have written it all down, leaving out the comforting parts I used to add. I knew the words fed something under this house. I did not know that keeping us safe would mean keeping us unchanged. I should have told you the first part.",
-    "refuse": "You asked for time. You have visited since, and I have not taken that for forgiveness. When you want to talk, I will answer. Until then, I can put the kettle on without making it an argument."
+    "ask": "You asked what I knew. I've written it all down, without the comforting parts I used to add. I knew the words fed something under this house. I didn't know that keeping us safe would mean keeping us unchanged. I should have told you the first part.",
+    "refuse": "You asked for time. You've visited since, and I haven't taken that for forgiveness. When you want to talk, I'll answer. Until then, I can put the kettle on without making it an argument."
   },
   "owl": {
-    "ask": "You asked for the line that changed. There are three versions of it now. I no longer call the oldest one the truest. Being old does not make a page correct.",
-    "refuse": "You asked me to leave your words out. I have. My comparison has an empty column where they would go. That gap offends my sense of order, which is an excellent reason to leave it empty."
+    "ask": "You asked for the line that changed. There are three versions of it now. I've stopped calling the oldest one the truest. Being old doesn't make a page correct.",
+    "refuse": "You asked me to leave your words out. I have. My comparison has an empty column where they'd go. That gap offends my sense of order, which is an excellent reason to leave it empty."
   },
   "pangolin": {
-    "ask": "You asked me to put the pear aside. It has not spoiled. It has not ripened either. I keep checking the saucer, and I have stopped letting myself call that good news.",
-    "refuse": "You did not want to test the pear. So I kept it out of supper. I will not put something I cannot explain in a friend's bowl, just to satisfy my curiosity."
+    "ask": "You asked me to put the pear aside. It hasn't spoiled. It hasn't ripened either. I keep checking the saucer, and I've stopped calling that good news.",
+    "refuse": "You didn't want to test the pear, so I kept it out of supper. I won't put something I can't explain in a friend's bowl just to satisfy my curiosity."
   },
   "axolotl": {
     "ask": "You asked me to try a different shape. I drew a crooked one on paper, and I keep the paper outside the tank. The water still makes circles. The paper still keeps the crooked one.",
-    "refuse": "You wanted a quiet visit. I gave you one. Now I am learning the difference between letting the water be still and not being able to stir it."
+    "refuse": "You wanted a quiet visit. I gave you one. Now I'm learning there's a difference between letting the water be still and not being able to stir it."
   },
   "capybara": {
     "ask": "You asked me to copy the objection. One copy has faded to nothing. The other is still legible. I check the blank sheet anyway. I know what used to be written there.",
-    "refuse": "You asked me to keep the objection private. The folder has stayed closed. I can tell you this much without opening it. I have not withdrawn it."
+    "refuse": "You asked me to keep the objection private. The folder's stayed closed. I can tell you this much without opening it: I haven't withdrawn it."
   },
   "fennec_fox": {
-    "ask": "We listened for your sleeve against the chair. I have kept a list of small sounds ever since. A beetle, a spoon, an impatient foot. The great note does not get to decide which of them matter.",
-    "refuse": "You asked me to stop listening. I did. For the first minute I was angry with you, and that frightened me. By the second minute I understood that I was only tired. I needed the rest."
+    "ask": "We listened for your sleeve against the chair. I've kept a list of small sounds ever since. A beetle, a spoon, an impatient foot. The great note doesn't get to decide which of them matter.",
+    "refuse": "You asked me to stop listening. I did. For the first minute I was angry with you, and that frightened me. By the second minute I knew I was only tired. I needed the rest."
   },
   "sloth": {
-    "ask": "You asked what I actually knew. I have been sorting it into two piles on the branch: what I know, and what I want. The want pile is taller. I still cannot tell you whether it will be kind.",
-    "refuse": "You asked me not to promise kindness. I have kept the smaller promise instead. I am here. That much I can tell you without guessing at the future."
+    "ask": "You asked what I actually knew. I've been sorting it into two piles on the branch: what I know, and what I want. The want pile is taller. I still can't tell you whether it'll be kind.",
+    "refuse": "You asked me not to promise kindness. So I've kept the smaller promise instead. I'm here. That much I can tell you without guessing at the future."
   },
   "wombat": {
-    "ask": "You asked where my work ended. I have chalked that line through every drawing. I can answer for my braces. What my braces hold up is a different question, and I have stopped confusing the two.",
-    "refuse": "You wanted to stay above ground. The stairs are sound, and my drawings are up here with you. Staying out of the tunnels is not the same as trusting what is down there."
+    "ask": "You asked where my work ended. I've chalked that line through every drawing. I can answer for my braces. What they hold up is a different question, and I've stopped mixing the two up.",
+    "refuse": "You wanted to stay above ground. The stairs are sound, and my drawings are up here with you. Staying out of the tunnels isn't the same as trusting what's down there."
   },
   "rabbit": {
     "ask": "You offered to check the way out with me. The stones beyond the gate are still where I marked them. I walk that far every morning. Staying feels different when I know I can come back.",
-    "refuse": "You kept my map private. Nobody came to talk me out of keeping it. I did not know how much I needed that until a whole evening passed quietly."
+    "refuse": "You kept my map private. Nobody came to talk me out of keeping it. I didn't know how much I needed that until a whole evening passed quietly."
   },
   "red_panda": {
-    "ask": "You asked whether this was peace. Your question has interrupted several very comfortable sittings. I am keeping the question. Being comfortable is not an answer.",
-    "refuse": "You asked for a place outside the circle. I cannot grant you one, because the pattern never made me the one who grants things. I can stand beside the gap and insist that it stays a gap."
+    "ask": "You asked whether this was peace. Your question has broken up several very comfortable sittings. I'm keeping the question. Being comfortable isn't an answer.",
+    "refuse": "You asked for a place outside the circle. I can't grant you one. The pattern in the smoke never made me the one who grants things. But I can stand beside the gap and insist it stays a gap."
   },
   "tarsier": {
     "ask": "You asked me to look at something nearby. I can still find the chip in the rail, even with the dark pulling at me. I touch it every watch. Looking should include the right to look somewhere else.",
-    "refuse": "You left the far watch to me, so I have kept it out of our visits. A watcher is allowed to ask for company. She also has to be able to hear a no."
+    "refuse": "You left the far watch to me, so I've kept it out of our visits. A watcher can ask for company. She also has to be able to hear a no."
   },
   "aye_aye": {
-    "ask": "You asked me to wait for an answer. I am waiting. The bell has a note ready, and that is her business. Whether my hand rings it is still my own choice.",
-    "refuse": "You asked for quiet. The rope stays on the rail. She hums by herself some nights. I no longer take that hum as a decision made for me."
+    "ask": "You asked me to wait for an answer. I'm waiting. The bell's got a note ready, and that's her business. Whether my hand rings it is still my own choice.",
+    "refuse": "You asked for quiet. The rope stays on the rail. She hums by herself some nights. I don't take that hum as a decision made for me anymore."
   },
   "kakapo": {
-    "ask": "You asked me to keep one seed. It sits in the tin, dry and small. The green ones in the bed have still not opened. For a while, keeping and growing looked the same. They do not now.",
-    "refuse": "You left the experiment to me. I have kept the notes in my own name. A friend who walks through a garden has not agreed to everything grown in it."
+    "ask": "You asked me to keep one seed. It's in the tin, dry and small. The green ones in the bed still haven't opened. For a while, keeping and growing looked the same. They don't look the same now.",
+    "refuse": "You left the experiment to me. I've kept the notes in my own name. A friend who walks through a garden hasn't agreed to everything grown in it."
   }
 };
 
@@ -520,36 +520,36 @@ export function getPhase5ChoiceCallback(
 
   const callbacks: Record<string, Record<PlayerChoice, string>> = {
   "fox": {
-    "ask": "You asked me for the truth, and you still get the parts I am only working out now. The fire wanted to stay exactly as warm as it was yesterday. I let it go cold for an hour. I needed to know I could.",
-    "refuse": "You needed time, and that still stands. I have learned to leave a cup empty. It is not a debt, and it is not a promise that you will come back."
+    "ask": "You asked me for the truth, so you still get the parts I'm only working out now. The fire wanted to stay exactly as warm as it was yesterday. I let it go cold for an hour. I needed to know I could.",
+    "refuse": "You needed time, and that still stands. I've learned to leave a cup empty. It isn't a debt, and it isn't a promise that you'll come back."
   },
   "owl": {
-    "ask": "You asked me to compare the two accounts. I kept the crossings-out, still legible. A record that remembers its own mistakes has something the great book never had.",
-    "refuse": "You asked to stay outside my comparison. Your column is still empty. I have stopped calling that a gap in my notes. It is where you decided to stop."
+    "ask": "You asked me to compare the two accounts. I kept the crossings-out where you can still read them. A record that remembers its own mistakes has something the great book never had.",
+    "refuse": "You asked to stay outside my comparison. Your column is still empty. I've stopped calling that a gap in my notes. It's where you decided to stop."
   },
   "pangolin": {
     "ask": "The pear on our saucer finally softened. I used the good half and composted the rest. It was an ordinary decision, and I had missed making those.",
-    "refuse": "You left the pear experiment to me. I still label anything I cannot account for, and I say so before I serve it. That should not have needed learning."
+    "refuse": "You left the pear experiment to me. I still label anything I can't account for, and I say so before I serve it. I shouldn't have needed to learn that."
   },
   "axolotl": {
     "ask": "You asked for a different shape. Yesterday I made a terrible square bubble. It wobbled into nothing before I could show anyone. I was delighted.",
-    "refuse": "You asked me to let the water settle. I can still do that. I can also splash it now. A quiet visit feels different when it is something I choose."
+    "refuse": "You asked me to let the water settle. I can still do that. I can also splash it now. A quiet visit feels different when it's something I choose."
   },
   "capybara": {
-    "ask": "You asked me to copy the objection. It still says nobody authorized the word permanent. Underneath it I have filed my answer: then we should ask. Four words of ink, a large revision.",
-    "refuse": "You left the objection with me, and I have kept it. Some things I can carry on my own. I do not need to make you a witness to them."
+    "ask": "You asked me to copy the objection. It still says nobody authorized the word permanent. Underneath it I've filed my answer: then we should ask. Four words of ink. A big revision.",
+    "refuse": "You left the objection with me, and I've kept it. Some things I can carry on my own. I don't need to make you a witness to them."
   },
   "fennec_fox": {
     "ask": "You helped me find a small sound inside the large one. I still practice. This morning I heard two friends disagree over breakfast. Neither voice disappeared.",
-    "refuse": "You told me to stop for a while. I still take that rest. The watch is mine to pick up, so it must also be mine to put down."
+    "refuse": "You told me to stop for a while. I still take that rest. The watch is mine to pick up, so it's mine to put down too."
   },
   "sloth": {
-    "ask": "You asked for what I knew. Here is something new. A thing can arrive and still have to learn how to be here. I have started including myself in that.",
-    "refuse": "You would not take a promise about the future. Good. We had tea this afternoon. I can promise that I enjoyed it. Tomorrow can do its own work."
+    "ask": "You asked for what I knew. Here's something new. A thing can arrive and still have to learn how to be here. I've started including myself in that.",
+    "refuse": "You wouldn't take a promise about the future. Good. We had tea this afternoon. I can promise I enjoyed it. Tomorrow can do its own work."
   },
   "wombat": {
-    "ask": "You asked for the join, and I still check it. The old arch carries the weight. My bracing leaves it room to move, because stone that cannot move at all will crack.",
-    "refuse": "You stayed above ground. I kept the stairs clear. Stairs are for coming up as much as going down, and I will keep them that way."
+    "ask": "You asked for the join, and I still check it. The old arch carries the weight. My bracing leaves it room to move, because stone that can't move at all will crack.",
+    "refuse": "You stayed above ground. I kept the stairs clear. Stairs are for coming up as much as going down, and I'll keep them that way."
   },
   "rabbit": {
     "ask": "You asked to check the path. I walked it yesterday, past the rosemary gate and a little further. Then I came back, because I wanted my own bed.",
@@ -560,16 +560,16 @@ export function getPhase5ChoiceCallback(
     "refuse": "You asked to stay outside my circle. I leave the gap open now. When the smoke closes it, I open it again. A practice should be some use to somebody besides the one practicing."
   },
   "tarsier": {
-    "ask": "You brought my eyes back to the rail. The chip is still there. I have stopped polishing that spot. I want one mark the house has not smoothed away.",
-    "refuse": "You asked me to keep the distance to myself. I did. I have things I could tell you now, if you ever want them. I will wait until you ask."
+    "ask": "You brought my eyes back to the rail. The chip's still there. I've stopped polishing that spot. I want one mark the house hasn't smoothed away.",
+    "refuse": "You asked me to keep the distance to myself. I did. I've got things I could tell you now, if you ever want them. I'll wait until you ask."
   },
   "aye_aye": {
-    "ask": "You asked me to wait for an answer. I keep that rule for the small knocks too. I leave a gap after each knock, so whoever is behind the door has room to decide.",
+    "ask": "You asked me to wait for an answer. I keep that rule for the small knocks too. I leave a gap after each knock, so whoever's behind the door has room to decide.",
     "refuse": "You asked me to leave her quiet. I remember. A beautiful sound is still not a kindness if nobody asked for it."
   },
   "kakapo": {
-    "ask": "You asked me to save a seed. It is still in the tin. I may plant it next season, or give it to someone. What matters is that it still has a next season.",
-    "refuse": "You did not join the experiment. You can still come for tea. I have plenty to tell you about the beans, and none of it requires a theory of the sky."
+    "ask": "You asked me to save a seed. It's still in the tin. I might plant it next season, or give it to someone. What matters is that it still has a next season.",
+    "refuse": "You didn't join the experiment. You can still come for tea. I've got plenty to tell you about the beans, and none of it needs a theory of the sky."
   }
 };
 

@@ -1,5 +1,17 @@
 # Current build and documentation
 
+## September 24: 1.4.6 / 111
+
+The owner built and device-tested the 1.4.5 / 110 production candidate. Since
+then: the reworked ending (vigil, eve dock, Arrival and Morning After art, the
+closing card), plain speech for the phase 4-5 house corpus, story portrait
+fixes, OTA source-map upload, story-record quarantine, and the 16 SDK-57
+patch updates (`npx expo install --fix`; `expo-doctor` 21/21). The patches
+change native modules, so this is a new binary: app **1.4.6**, Android code
+**111**, runtime `1.4.6-<channel>`. Typecheck, lint and the in-band suite
+(244 suites, 5,490 tests) and all 46 browser journeys pass. The owner built 1.4.6 and
+reported it working on their phone on 2026-09-24; it is the build to promote.
+
 ## September 22 launch-readiness follow-up (1.4.5 / 110)
 
 Branch `claude/wonderful-wright-wg49h9` carries the [2026-09-22 launch readiness review](LAUNCH_READINESS_REVIEW_2026-09-22.md) and its fixes. App version **1.4.5**, Android code **110**; the build needs a new native binary because it adds the `android:appCategory="game"` manifest flag, the Sentry Android Gradle plugin (R8 mapping upload) and Metro debug IDs, so its OTA runtime is `1.4.5-<channel>`. The owner's device pass on the 1.4.4 internal build (2026-09-22) found purchases, onboarding, cloud backup and restore after Reset All, ads and notifications working. What remains before promotion is listed in the review's Resolution section and in the [launch checklist](LAUNCH_CHECKLIST.md); the Supabase files 9-11, the AdMob content-rating ceiling, Google Play RTDN to RevenueCat and the terms' governing-law clause (New York) were all completed on 2026-09-22. Still open: Sentry alert rules and the production-profile device checks.
@@ -40,16 +52,16 @@ Updated **September 14, 2026** for the in-band CI exit-code fix on top of `main`
 
 ## Build identity
 
-Current source is app **1.4.5**, Android version code **110** (see the September 22 section above; 1.3.9 / 104 was the September 19-20 identity). The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
+Current source is app **1.4.6**, Android version code **111** (see the September 24 section above; 1.4.5 / 110 was the September 22-24 candidate; 1.3.9 / 104 was the September 19-20 identity). The earlier CI audit and its historical totals below remain tied to `6f96ebb`; they are not evidence for a new native build.
 
 | Setting | Checked-in value | Source |
 |---|---|---|
-| App version | `1.4.5` | `mobile/app.json` |
-| Android package / version code | `com.wordshift.app` / `110` | `mobile/app.json` |
+| App version | `1.4.6` | `mobile/app.json` |
+| Android package / version code | `com.wordshift.app` / `111` | `mobile/app.json` |
 | iOS bundle / build number | `com.wordshift.app` / `3` | `mobile/app.json` |
 | Expo / React Native | SDK 57; lockfile resolves Expo `57.0.20`, RN `0.86.3` | `mobile/package-lock.json` |
 | Version management | Local; increase Android version code for each new Play upload | `mobile/eas.json` |
-| Resolved OTA runtime | `1.4.5-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
+| Resolved OTA runtime | `1.4.6-<release-channel>` | `mobile/app.config.js` overrides the static runtime policy |
 | Android release optimization | R8 minification, resource shrinking, optimized ProGuard defaults and optimized resource shrinking enabled; PNG crunch disabled | `mobile/app.json`, `mobile/plugins/withAndroidOptimization.js` |
 
 `mobile/package.json` still has npm package version `1.3.1`; that field is tooling metadata, not the Expo app version or Android version code. Do not infer the installed app version from it. The current React Native Gradle plugin resolves AGP 8.12.0; the optimization configuration does not require an AGP 9 migration.

@@ -30,8 +30,8 @@ test('the phase-five response respects the actual final boundary and remains neu
   const release = getPhaseTransitionReaction(5, ['fox'], { boundary: 'release' })!;
   const legacy = getPhaseTransitionReaction(5, ['fox'])!;
   expect(remember.text).toContain('private door stayed shut');
-  expect(release.text).toContain('road is still open');
-  expect(legacy.text).not.toMatch(/private door|road is still open/);
+  expect(release.text).toContain("road's still open");
+  expect(legacy.text).not.toMatch(/private door|road's still open/);
   expect(getPhaseTransitionReaction(2, ['fox'], { boundary: 'release' }))
     .toEqual(getPhaseTransitionReaction(2, ['fox']));
 });

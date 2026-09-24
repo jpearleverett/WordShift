@@ -74,7 +74,9 @@ describe('whisper roll placement', () => {
     // single gate; a whisper the player never saw must not fill the archive.
     expect(HOOK_SRC).toMatch(/!onboarding && !suppressCeremonyCues && Math\.random\(\) < getWhisperChance\(phase\)/);
     const gateIdx = HOOK_SRC.indexOf('Math.random() < getWhisperChance(phase)');
-    const recordIdx = HOOK_SRC.indexOf('recordWhisper({');
+    // The last recordWhisper is the rolled whisper's; the vigil branch above
+    // the gate records a line that is always shown.
+    const recordIdx = HOOK_SRC.lastIndexOf('recordWhisper({');
     expect(gateIdx).toBeGreaterThan(-1);
     expect(recordIdx).toBeGreaterThan(gateIdx);
   });

@@ -145,7 +145,7 @@ describe('dialogueChoices', () => {
       expect(choice.options.refuse).toMatch(/rather not join/i);
       expect(choice.responses.refuse).toMatch(/without putting your name/i);
       expect(getPhase4ChoiceCallback('kakapo', 'refuse')).toMatch(/my own name/i);
-      expect(getPhase5ChoiceCallback('kakapo', 'refuse')).toMatch(/did not join/i);
+      expect(getPhase5ChoiceCallback('kakapo', 'refuse')).toMatch(/didn't join/i);
       expect(choice.responses.refuse + ' ' + choice.convergence).not.toMatch(/I promise|proper hour|gently/i);
     });
   });

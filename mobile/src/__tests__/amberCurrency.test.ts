@@ -1210,8 +1210,15 @@ describe('post-revelation phase pinning (Phase 5)', () => {
     const arrival = (await getPendingCeremonies()).find(entry => entry.kind === 'arrival')!;
     await acknowledgeCeremony(arrival.id);
     expect(await hasArrivalBeenPresented()).toBe(true);
-    // Presentation only: the durable post-revelation pin still waits for the next win.
-    expect((await getFullProgress()).postRevelation).not.toBe(true);
+    // The Morning After follows the Arrival directly: acknowledging it pins
+    // post-revelation and queues post_arrival ahead of anything else.
+    const after = await getFullProgress();
+    expect(after.postRevelation).toBe(true);
+    expect(after.currentPhase).toBe(5);
+    expect((await getPendingCeremonies())[0]?.kind).toBe('post_arrival');
+    // Acknowledging again is a no-op (the entry is gone), never a second morning.
+    await acknowledgeCeremony(arrival.id);
+    expect((await getPendingCeremonies()).filter(entry => entry.kind === 'post_arrival')).toHaveLength(1);
   });
 
   test('armFinale is a no-op once the final puzzle is completed', async () => {

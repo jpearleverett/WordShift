@@ -82,13 +82,13 @@ export const LATE_CONVERSATION_ADAPTATIONS: Record<
     arrived: "Light still comes through the roof gap. I can look up without turning it into another instruction to welcome what has already entered our house. Looking is enough work for the moment.",
   },
   rp_4_5: {
-    arrived: "The presence has arrived. I think it means us well. I no longer assume that meaning well and doing well are the same thing.",
+    arrived: "The presence is here now, in the house. I think it means us well. I've stopped assuming that meaning well and doing well are the same thing.",
   },
   rp_4_19: {
-    arrived: "The light keeps changing how the smoke looks above the roof. I watched the sky open, and I still cannot make the smoke give me a clear account of what came through it.",
+    arrived: "The light keeps changing how the smoke looks above the roof. I watched the sky open, and I still can't get the smoke to show me plainly what came through.",
   },
   rp_4_28: {
-    arrived: "Whatever has come into this house, I will not give it a kind face that I invented.",
+    arrived: "Whatever's come into this house, I won't give it a kind face I made up.",
   },
   wb_0_10: {
     revealed: "The soil is warm near that wall. I first put it down to the hearth. Measuring it took care of that explanation. I still take the temperature; knowing the heat belongs to this business doesn't tell a fellow where every bit of it travels.",
@@ -162,11 +162,14 @@ export const LATE_CONVERSATION_ADAPTATIONS: Record<
   wb_3_26: {
     arrived: "I put my paw flat on the sealed stone. I know how it was fitted. I've learned some of what the fitting made possible. There are still grooves back there I haven't traced to their ends.",
   },
+  wb_4_12: {
+    arrived: "There's a mark in the middle of the old plan I always took for a drain. Before that midnight I lined the plan up with the house, and it sat right over the pit. I'd called it a drain. Drains carry things down. We all know now what came up.",
+  },
   wb_4_14: {
     arrived: "I left a wedge by the passage when we were deciding what to keep open. It's still there. A finished decision doesn't mean a fellow throws away his tools.",
   },
   'tarsier:intro:4': {
-    arrived: "These older charts show the dark patch above the ridge, before the sky opened. I marked what I couldn't account for. I can show you those marks without pretending that seeing the arrival answered everything about them.",
+    arrived: "These older charts show the dark patch above the ridge, before the sky opened. I marked what I couldn't account for. I can show you those marks. Seeing the arrival didn't explain all of them.",
   },
   tr_0_18: {
     arrived: "The darker patch above the ridge is on this earlier chart. I marked its edges instead of naming it. Those were useful marks when the sky began to open.",
@@ -262,19 +265,19 @@ export const LATE_CONVERSATION_ADAPTATIONS: Record<
     arrived: "By the time everyone learned what the words were feeding, I had known for a long while, from up here. Knowing first only meant I was alone with it longer.",
   },
   tr_4_3: {
-    arrived: "The seam above the ridge opened and closed that midnight. I have marked where it was on the chart. Seeing something come through told me neither where it began nor what waits on the other side.",
+    arrived: "The seam above the ridge opened and closed that midnight. I've marked where it was on the chart. Watching something come through didn't tell me where it started, or what's waiting on the other side.",
   },
   tr_4_4: {
-    arrived: "Before that midnight, the crooked chalk mark I left on the porch was straightened overnight. My hand did not do it. The warmth still puts things back the way they were. So I leave a new crooked mark every week, to see how long it lasts.",
+    arrived: "Before that midnight, the crooked chalk mark I left on the porch was straightened overnight. My hand didn't do it. The warmth still puts things back the way they were. So I leave a new crooked mark every week, to see how long it lasts.",
   },
   tr_4_6: {
-    arrived: "I wanted to see it arrive, and I did. I wanted that long before I knew what it would do to a chalk mark. I am not proud of the wish. I am not sorry I was there to see.",
+    arrived: "I wanted to see it arrive, and I did. I wanted that long before I knew what it would do to a chalk mark. I'm not proud of the wish. I'm not sorry I was there to see.",
   },
   tr_4_28: {
-    arrived: "I have not named what came through the sky. A name would make it too easy to think I recognize everything about it.",
+    arrived: "I haven't named what came through the sky. A name would make it too easy to think I recognize everything about it.",
   },
   tr_4_30: {
-    arrived: "The sky changed while I watched it. I would like someone beside me now, telling me what I missed down here.",
+    arrived: "The sky changed while I watched it. I'd like someone beside me now, telling me what I missed down here.",
   },
   rb_1_2: {
     revealed: "When I first repotted the leaning plants, every root had curled toward the house. I told myself roots just followed water. I kept that explanation for days, turning it over as carefully as the pots, hoping it would fit if I tried it another way.",
@@ -349,8 +352,8 @@ export const LATE_CONVERSATION_ADAPTATIONS: Record<
     arrived: "Just before the arrival, I felt its nearness in the soil, like a storm in my teeth before the first cloud. The birds had gone quiet. The bees kept their new dance even at night. I wrote down each of those things. Being frightened didn't make my observations less real.",
   },
   rb_4_7: {
-    revealed: "Bamboo called what is coming gentle. Ask a seed cracking out of its shell how gentle that feels. They listen longer now when I say so. I would like that to last.",
-    arrived: "Before it came, Bamboo called the arrival gentle. Ask a seed cracking out of its shell how gentle that feels. They listen longer when I say that now. I would like the listening to stay.",
+    revealed: "Bamboo called what's coming gentle. Ask a seed cracking out of its shell how gentle that feels. They listen longer now when I say so. I'd like that to last.",
+    arrived: "Before it came, Bamboo called the arrival gentle. Ask a seed cracking out of its shell how gentle that feels. They listen longer when I say that now. I'd like the listening to stay.",
   },
   'aye_aye:intro:2': {
     arrived: "The bell is mine to look after now. That midnight has already come and gone. I'd like to understand what she heard, as well as the voice she has to offer. A keeper still has plenty to ask her.",
@@ -413,25 +416,25 @@ export const LATE_CONVERSATION_ADAPTATIONS: Record<
     arrived: "Before the arrival I expected an hour that would ask for the bell. I wanted to make the decision when my hand reached the rope, and wanted company without requiring it. I remember both wants. The second matters on ordinary evenings too.",
   },
   ay_4_1: {
-    arrived: "I loosened the rope to make her ready for that midnight. Readiness was never the pull itself. I still check the rope without making a ceremony of the checking.",
+    arrived: "I loosened the rope so she'd be ready that midnight. Being ready was never the same as pulling. I still check the rope, but I don't make a ceremony of it.",
   },
   ay_4_2: {
-    arrived: "The bell had kept sixty years of silence before I came up here. We had little time together before her first ring. I think we were both entitled to nerves, however clearly the note came out.",
+    arrived: "The bell had kept quiet for sixty years before I came up here. We didn't get long together before her first ring. I think we were both allowed to be nervous, however clear the note came out.",
   },
   ay_4_10: {
-    arrived: "The rope wore thin under my thumb while I waited for an answer. My hands wanted work sooner than my mind could finish deciding. I can feel the worn place still. It reminds me how long a hand can wait without being empty.",
+    arrived: "The rope wore thin under my thumb while I waited for an answer. My hands wanted work before my mind had decided anything. I can still feel the worn place. It reminds me how long a hand can wait without being empty.",
   },
   ay_4_18: {
     arrived: "Before that midnight, half the house climbed my stairs to tell me to ring her loud, and the other half to tell me never to ring her at all. In the end my hand did neither. The stairs have been quieter since.",
   },
   ay_4_23: {
-    arrived: "I wanted the arrival. I also wanted it to wait for our answer. It is here now, and our answers still matter. Tok. A conversation does not end because the guest has crossed the threshold.",
+    arrived: "I wanted the arrival. I also wanted it to wait for our answer. It's here now, and our answers still matter. Tok. A conversation doesn't end just because the guest came through the door.",
   },
   ay_4_25: {
     arrived: "Before that midnight, the cold water I kept by the rope was warm every morning, and nobody had asked for that. I poured it out each time. Most mornings now it stays as cold as I leave it. I still check.",
   },
   ay_4_29: {
-    arrived: "Here, on the rope, where my fur is braided in. My hand rested here that midnight, and then I took it away. Until somebody pulls, it is only rope.",
+    arrived: "Here, on the rope, where my fur is braided in. My hand rested here that midnight, and then I took it away. Until somebody pulls, it's only rope.",
   },
   ay_4_30: {
     arrived: "I saved her first voice for the meeting, and then I did not pull. Your words went first. She answered once, on her own. I have never been prouder of a rope I did not use.",
@@ -488,24 +491,24 @@ export const LATE_CONVERSATION_ADAPTATIONS: Record<
     revealed: "A length of green cloth came up with the supplies. I laid it beside my ordinary work apron and wondered what occasion could need it. I know which occasion it was meant for now. The apron still has a claim on most of my days.",
   },
   kk_4_4: {
-    arrived: "Something still answers when I hum at the beds. The great call I gave that midnight was something else. I keep the difference. A gardener ought to be able to hum without starting the whole ceremony again.",
+    arrived: "Something still answers when I hum at the beds. The great call I gave that midnight was something else. I keep the two apart. A gardener ought to be able to hum without starting the whole ceremony again.",
   },
   kk_4_8: {
-    arrived: "I still feel the warmth below the roots, and Vesper still checks the sky above the roof. Both ends are covered. The middle is where we all live, so that is where I keep my attention now.",
+    arrived: "I still feel the warmth below the roots, and Vesper still checks the sky above the roof. Both ends are covered. The middle is where we all live, so that's where I keep my attention now.",
   },
   kk_4_14: {
-    arrived: "Thyme keeps some seeds back. Even with the presence here, that part of her garden remains hers to plant when she chooses. Good.",
+    arrived: "Thyme keeps some seeds back. Even with the presence here, that part of her garden is still hers to plant when she chooses. Good.",
   },
   kk_4_16: {
-    arrived: "After the great call I wanted water, and company that would not ask for an encore. Reasonable wants. They still are, on a smaller singing day.",
+    arrived: "After the great call I wanted water, and company that wouldn't ask for an encore. Reasonable wants. They still are, now that I sing less.",
   },
   kk_4_17: {
     revealed: "My old calling places stood empty for years. I brought their sadness with me to this new bowl on the roof. I should be honest about which part of the emptiness was already mine.",
   },
   kk_4_18: {
-    arrived: "I heard an answer. Whether ninety years of waiting were worth it is mine to decide, and I have not decided. I am listening to what it gave me, and to what I still miss.",
+    arrived: "I heard an answer. Whether ninety years of waiting were worth it is mine to decide, and I haven't decided. I'm listening to what it gave me, and to what I still miss.",
   },
   kk_4_30: {
-    arrived: "When it came, I stood in the bowl and answered once, in my own voice. Not a welcome for the whole house. One answer. I am glad it was mine, and glad it was not the last thing my voice will do.",
+    arrived: "When it came, I stood in the bowl and answered once, in my own voice. Not a welcome for the whole house. One answer. I'm glad it was mine, and glad it wasn't the last thing my voice will do.",
   },
 };

@@ -9,7 +9,7 @@ const RESET_DEVICE_KEYS = new Set([
   'wordshift_ad_pacing', 'wordshift_monet_prompts', 'wordshift_share_prompts',
   'wordshift_review_prompt', 'wordshift_cloud_sync_status',
   'wordshift_preview_graduation_seen_v2', 'wordshift_pending_victory', 'wordshift_victory_receipt',
-  'wordshift_pending_victory_quarantine',
+  'wordshift_pending_victory_quarantine', 'wordshift_story_spine_quarantine',
   // The post-Arrival recollection lead-in belongs to one playthrough: a reset
   // or a new cycle reaches the Arrival again and must frame resumed lines again.
   'wordshift_arrival_resume_framing_seen',

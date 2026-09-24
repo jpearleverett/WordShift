@@ -300,7 +300,6 @@ test('Back revisits the previous passage and invalidates callbacks from an earli
 });
 
 test.each([
-  ['After', POST_REVELATION_EVENT],
   ['Again', NEW_CYCLE_EVENT],
 ] as const)('%s keeps its settled presence above opaque room and road paintings', (_title, event) => {
   const harness = mount(event);
@@ -327,7 +326,9 @@ test.each([
 });
 
 test('a personalized environmental backdrop remains behind the foreground scene', () => {
-  const event = buildPostRevelationEvent({ boundary: 'remember' });
+  // The Morning After paints its presence into the art, so the layering is
+  // pinned on an event that still carries an environmental backdrop.
+  const event = { ...buildPostRevelationEvent({ boundary: 'remember' }), backdrop: { image: 'private_room' as const, opacity: 0.62 } };
   const harness = mount(event);
   try {
     const art = byId(harness.render(), 'phase-transition-art');

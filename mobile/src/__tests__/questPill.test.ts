@@ -380,7 +380,7 @@ describe('header wiring (source scan of the one-row header)', () => {
     // The dock's JSX block carries the primary action + a11y contract.
     const dockBlock = src.slice(dockStart, dockStart + 1500);
     expect(dockBlock).toContain('onPlayPuzzle');
-    expect(dockBlock).toContain('accessibilityLabel="Play puzzle"');
+    expect(dockBlock).toContain("accessibilityLabel={finaleEve ? 'Begin the last arrangement' : 'Play puzzle'}");
     expect(dockBlock).toContain('accessibilityRole="button"');
     // The old in-header flexible PLAY wrapper is gone.
     expect(src).not.toContain('playButtonWrap');

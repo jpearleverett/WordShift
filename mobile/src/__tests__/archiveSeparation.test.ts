@@ -64,7 +64,11 @@ describe('the gallery records only what the journal cannot show', () => {
     // cut of this separation deleted the dialogue-advance recorder outright,
     // which was right for base lines and wrong for everything else that same
     // branch serves: see the late-pool suite below.
-    expect(kinds.length).toBe(6);
+    //
+    // Count raised 6 -> 7 by the vigil (2026-09-24): on the eight nights
+    // before the final board a resident always speaks, as a whisper, so that
+    // branch records its own line. It is a whisper, never a base line.
+    expect(kinds.length).toBe(7);
     // Anything else (notably the legacy 'dialogue' kind the base lines used)
     // would be a second copy of the journal, and would be hidden on sight.
     expect(kinds.filter(entry => !['whisper', 'choice', 'keepsake', 'passage'].includes(entry.kind))).toEqual([]);

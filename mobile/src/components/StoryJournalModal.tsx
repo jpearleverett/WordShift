@@ -3,7 +3,7 @@ import { AppText } from './ui/AppText';
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StoryContext, StoryMemory, StorySceneId, StoryState, STORY_COPY, canResumeStoryScene, loadStoryState, selectStoryScene, getStoryPortraitSpeaker, getStoryPresentationPhase } from '../services/storySpine';
+import { StoryContext, StoryMemory, StorySceneId, StoryState, STORY_COPY, canResumeStoryScene, loadStoryState, selectStoryScene, getStorySceneResident, getStoryPresentationPhase } from '../services/storySpine';
 import { StoryArchiveChapter, StoryArchiveHistory, loadStoryArchiveHistory, getStoryArchiveChapterLines, getStoryArchiveChapterSummary, getStoryArchiveChapters, getStorySpeakerName, getVisibleStoryMemoryLines } from '../services/storyArchive';
 import { getSettingsSync } from '../services/settings';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../theme/fonts';
@@ -58,7 +58,7 @@ const StoryJournalContents: React.FC<StoryJournalModalProps> = ({ visible, conte
   // for the stretch of the story the lines came from.
   const chapterTitle = (item: StoryArchiveChapter) => getStorySpeakerName(item.animal);
   const memoryCard = (memory: StoryMemory, summary: string, onPress: () => void) => {
-    const resident = getStoryPortraitSpeaker(memory, 0);
+    const resident = getStorySceneResident(memory);
     const speaker = context?.unlockedAnimals.includes(resident) ? resident : null;
     // A card names its resident or nobody; it never names "The house".
     const name = speaker ? getStorySpeakerName(speaker) : '';

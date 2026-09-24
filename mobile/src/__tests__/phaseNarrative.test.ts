@@ -1494,7 +1494,6 @@ describe('getJournalIntroLines', () => {
     for (const phase of [0, 1, 2, 3, 4, 5] as const) {
       const [memories, ledger, gallery, quests, open] = getJournalIntroLines(phase);
       expect(memories).toContain('Things We Kept');
-      // Phases 4-5 drop contractions (the register device); the phrase survives either way.
       expect(memories).toMatch(/conversations you(?:'ve| have) had/);
       expect(ledger).toContain('Word Ledger');
       expect(ledger).toContain('Journal');
@@ -2083,7 +2082,7 @@ describe('getSwiftVictoryHintMessage', () => {
 describe('getFinalBoardStartMessage', () => {
   test('is quiet and heavy, with no fourth wall', () => {
     const msg = getFinalBoardStartMessage(4);
-    expect(msg).toBe('The last arrangement. Take your time. It has waited this long.');
+    expect(msg).toBe('The last arrangement. Everyone is watching the board. Take your time.');
     expect(msg.toLowerCase()).not.toMatch(/game|level|screen/);
     expect(getFinalBoardStartMessage(5)).not.toBe(msg);
   });
@@ -2342,9 +2341,8 @@ describe('getDialogueCaughtUpLine (an exhausted animal never replays its last li
     }
   });
 
-  test('contractions belong to phases 0-3 only; the reveal register drops them', () => {
-    for (const phase of [0, 1, 2, 3]) expect(getDialogueCaughtUpLine(phase)).toMatch(CONTRACTION);
-    for (const phase of [4, 5]) expect(getDialogueCaughtUpLine(phase)).not.toMatch(CONTRACTION);
+  test('residents contract at every phase, the reveal included (2026-09-24)', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5]) expect(getDialogueCaughtUpLine(phase)).toMatch(CONTRACTION);
   });
 
   test('the line darkens with the descent', () => {
@@ -2606,8 +2604,9 @@ describe('launch-readiness copy surfaces', () => {
       expect(text).toMatch(/Expert/);
       expect(text).toMatch(/[Ss]ix-letter/);
       expect(text).not.toMatch(/puzzle|\bPhase\b|[–—‘’“”]/i);
-      // Residents drop contractions at the reveal.
-      if (p >= 4) expect(text).not.toMatch(CONTRACTION);
+      // Residents contract at every phase since 2026-09-24 (the dropped
+      // register at the reveal read as "awkwardly formal" to the owner).
+      expect(text).toMatch(CONTRACTION);
     }
   });
 
