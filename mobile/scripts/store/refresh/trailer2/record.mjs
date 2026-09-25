@@ -249,7 +249,10 @@ function wideRest(id, state, used) {
   return () => retake(id, () => withSession(state, { w: 1500, h: 2667, dsf: 1.44 }, async page => {
     await settleHome(page);
     const res = await residents(page);
-    return recordClip(page, id, { state, dsf: 1.44, fps: 30, used, probe: houseProbe(page), afterFrame: combine(noToast(page), noEmote(page)), meta: { residents: res } });
+    // Emote puffs are not screened here: in these whole-house views a room
+    // plaque is about 10 px tall, too small for a puff to garble anything
+    // legible (the phone-scale close-ups keep the check).
+    return recordClip(page, id, { state, dsf: 1.44, fps: 30, used, probe: houseProbe(page), afterFrame: noToast(page), meta: { residents: res } });
   }), 6);
 }
 CLIPS.K9 = wideRest('K9', 'B', 40);
