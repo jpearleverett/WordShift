@@ -1,0 +1,56 @@
+{
+ "clip": "K2",
+ "state": "I'",
+ "recordedAt": "2026-09-25T20:44:01.359Z",
+ "gitHead": "69f09105a19793d360dfbdb3c9e6c1daf095186b",
+ "gameSourceMatchesHead": true,
+ "method": "clock-stepped capture: Playwright fake clock paused, runFor(1000/60 ms) then a CDP Page.captureScreenshot (jpeg q95) of the CSS rectangle {\"x\":0,\"y\":0,\"w\":675,\"h\":1340} of a 675x1340 viewport at DPR 3.2 = 2160x4288; reducedMotion false; sound/music/haptics off in-game; page clock pinned to 2026-10-06",
+ "fps": 60,
+ "format": "jpeg",
+ "ext": "jpg",
+ "handle": 15,
+ "pinnedDay": "2026-10-06",
+ "frameSize": {
+  "width": 2160,
+  "height": 4288
+ },
+ "viewport": {
+  "width": 675,
+  "height": 1340
+ },
+ "window": {
+  "x": 0,
+  "y": 0,
+  "w": 675,
+  "h": 1340
+ },
+ "dsf": 3.2,
+ "frames": 270,
+ "firstFrame": -15,
+ "lastFrame": 254,
+ "framesDir": "clips/K2",
+ "fileIndex": "file f%05d.png = clip frame + handle",
+ "events": [
+  {
+   "frame": 120,
+   "action": "tap the empty Aquarium Room invite card",
+   "sfx": "ui_tap.wav"
+  },
+  {
+   "frame": 184,
+   "action": "press Invite for 100 amber"
+  },
+  {
+   "frame": 192,
+   "action": "release: Axel moves in",
+   "sfx": "unlock.wav"
+  }
+ ],
+ "screening": {
+  "glitch": [],
+  "grim": [],
+  "ok": true
+ },
+ "notes": [],
+ "probesOmitted": "Per-frame DOM probes (tile, label, pill, sheet and chrome boxes) stay with the frames in $TRAILER2_WORK/events; the edit reads them there."
+}

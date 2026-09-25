@@ -1,17 +1,18 @@
 /**
- * Edits trailer2 ("Such a Lovely House", cut 2) from the recorded clips: the
- * 9:16 Play cut and the 16:9 master, with the captions SRT.
+ * Edits trailer2 ("Such a Lovely House") from the recorded clips: the 9:16
+ * Play cut and the 16:9 master, with the captions SRT, into $TRAILER2_WORK/out.
+ * install.mjs then copies them into the campaign's video/ folder.
  *
  *   node scripts/store/refresh/trailer2/edit.mjs            # both cuts
  *   node scripts/store/refresh/trailer2/edit.mjs 9x16       # one cut
  *   node scripts/store/refresh/trailer2/edit.mjs --frames=0,130,600   # stills only
  *
- * Cut 2 answers a blind panel that preferred the first trailer to cut 1. The
- * board is shown whole, with its own check and cross previews, under a caption
- * that states the rule; each resident's line is their real dialogue sheet
- * (portrait, name, words) under a panel of their own room, never a strip of
- * text over a blurred copy of itself; music runs from the first frame to the
- * last; no board or dialogue crop clips a label.
+ * The cut answers five rounds of a blind panel (video/README.md). The board is
+ * shown whole, with its own check and cross previews, under a caption that
+ * states the rule; each resident's line is their real dialogue sheet
+ * (portrait, name, words) over their part of the house, dimmed as the game
+ * dims it, never a strip of text over a blurred copy of itself; music runs
+ * from the first frame to the last; no board or dialogue crop clips a label.
  *
  * Every picture is a real frame from $TRAILER2_WORK/clips (a crop, zoom, blur,
  * freeze or speed change of it), except the caption plaques and the end card's
@@ -144,12 +145,12 @@ const next = n => { const from = cursor; cursor += n; return [from, cursor - 1];
 
 // H1: the rule, then the win, on the whole board in one unbroken view. K1 is
 // 60 fps: half speed from the L in the hand (clip -6) to its drop (26) and over
-// the T's drag (42 to 66), each drag holding 0.4 s over its checked slot
+// the T's drag (42 to 66), each drag holding 0.6 s over its checked slot
 // (clips 23 and 62: the tile above PLANT, then above HEART) so the check reads;
 // real time between and after, through the victory card (stars at clips 79,
 // 90 and 103).
-const H1_MAP = [[0, -6, 1], [29, 23, 0], [41, 23, 1], [44, 26, 2], [52, 42, 1], [72, 62, 0], [84, 62, 1], [88, 66, 2]];
-const H1_BOARD = 88;
+const H1_MAP = [[0, -6, 1], [29, 23, 0], [47, 23, 1], [50, 26, 2], [58, 42, 1], [78, 62, 0], [96, 62, 1], [100, 66, 2]];
+const H1_BOARD = 100;
 const h1Clip = rel => { let seg = H1_MAP[0]; for (const m of H1_MAP) if (rel >= m[0]) seg = m; return seg[1] + (rel - seg[0]) * seg[2]; };
 {
   // The board ends on clip 65, the T over HEART's checked slot: from the drop
@@ -157,7 +158,7 @@ const h1Clip = rel => { let seg = H1_MAP[0]; for (const m of H1_MAP) if (rel >= 
   // straight to the settled card.
   const [from, to] = next(H1_BOARD);
   const src = h1Clip;
-  if (src(H1_BOARD) !== 66 || src(44) !== 26 || src(52) !== 42 || src(29) !== 23 || src(41) !== 23) fail('H1 speed map is off its marks');
+  if (src(H1_BOARD) !== 66 || src(50) !== 26 || src(58) !== 42 || src(29) !== 23 || src(47) !== 23) fail('H1 speed map is off its marks');
   if (src(to - from) !== 65) fail('H1 does not end on clip 65');
   shots.push({ id: 'H1', from, to, layers: [{ kind: 'frame', clip: 'K1', src, view: boardView('K1') }], meta: { clip: `K1 -6..${src(to - from)}` } });
 }
@@ -166,7 +167,7 @@ const h1Clip = rel => { let seg = H1_MAP[0]; for (const m of H1_MAP) if (rel >= 
 // not its half-drawn entrance.
 const CARD_CLIP = 122;
 {
-  const [from, to] = next(32);
+  const [from, to] = next(36);
   shots.push({ id: 'H1c', from, to, layers: [{ kind: 'frame', clip: 'K1', src: { start: CARD_CLIP, rate: 2 }, view: boardView('K1') }] });
 }
 // H2: the house (K2, 60 fps, at 0.75x), crop A pushing in to crop B at the
@@ -186,15 +187,16 @@ const CARD_CLIP = 122;
     { kind: 'frame', clip: 'K2', src: { start: 0, rate: h2rate }, view: [{ at: 0, ...css2src('K2', cropA) }, { at: 1, ...css2src('K2', cropB), ease: 'inOut' }] }] });
   // H3: the whole invite card ("A NEW FRIEND!", Axel, the Invite button),
   // pushing in, over a dark blur of the house around the empty
-  // aquarium (not of the card itself).
+  // aquarium (K2 clip 110, before K2's own dialog opens at 120, so the blur
+  // holds no copy of the card).
   // The card with its whole frame (CSS 28-404 x 120-640), under the caption.
   const card = { x: 18, y: 112, w: 396, h: 536 };
   const kv = 1.98;
-  // K2b clip 6..39: the card, up to the frame before the Invite tap (clip 40),
+  // K2b clip 6..33: the card, well before the Invite tap (clip 40),
   // after which it closes on Axel's first line.
-  const [f3, t3] = next(34);
+  const [f3, t3] = next(28);
   shots.push({ id: 'H3', from: f3, to: t3, layers: [
-    { kind: 'frame', clip: 'K2', src: { start: 150, rate: 0 }, view: css2src('K2', cropB), blur: 40, brightness: 0.45 },
+    { kind: 'frame', clip: 'K2', src: { start: 110, rate: 0 }, view: css2src('K2', cropB), blur: 40, brightness: 0.45 },
     { kind: 'frame', clip: 'K2b', src: { start: 6, rate: 1 }, outline: { px: 4, color: '#3B2416', shadowPx: 18 },
       view: [{ at: 0, ...css2src('K2b', card) }, { at: 1, ...css2src('K2b', zoomAbout(card, 1.04)), ease: 'inOut' }],
       place: { x: 540 - (card.w * kv) / 2, y: 332, w: card.w * kv, h: card.h * kv } }] });
@@ -217,7 +219,7 @@ for (const [sid, id, start] of [['H4a', 'K4', -12], ['H4b', 'K5', -10], ['H4c', 
   shots.push({ id: 'H5b', from: fb, to: tb, layers: [{ kind: 'frame', clip: 'K7a', src: { start: 21, rate: 1 }, view: v }] });
 }
 {
-  const [from, to] = next(84);
+  const [from, to] = next(72);
   // The backdrop is K7a's first frame: the build's confetti falls through every
   // later one. It is dimmed and softened like the others (blur 16, not 10), so
   // the room's state behind the sheet does not read.
@@ -270,12 +272,15 @@ const HOUSE_B = (() => { const cx = houseX('K10', 0), w = 640, h = w * 16 / 9; r
   // names her.
   shots.push(await cardShot('H8b', from, to, 'K12', rel => Math.min(fe12, s0 + rel), { clip: 'K12', f: 30, view: phoneView('K12', 22) }, { bottom: 745 }));
 }
-// END: the real sunset house, pushing in on its upper rooms.
+// END: the real sunset house, pushing in on its upper rooms (K10 from clip 30:
+// Fennick's emote puffs over the Desert Camp sign from clip 168).
+const END_SRC = 30;
 const END0 = cursor;
 {
   const [from, to] = next(TOTAL - cursor);
   shots.push({ id: 'END', from, to, layers: [
-    { kind: 'frame', clip: 'K10', src: { start: 45, rate: 1 }, view: [{ at: 0, ...css2src('K10', HOUSE_A) }, { at: 1, ...css2src('K10', HOUSE_B), ease: 'out' }] }] });
+    { kind: 'frame', clip: 'K10', src: { start: END_SRC, rate: 1 }, view: [{ at: 0, ...css2src('K10', HOUSE_A) }, { at: 1, ...css2src('K10', HOUSE_B), ease: 'out' }] }] });
+  for (let f = END_SRC; f <= END_SRC + (to - from); f++) if (P('K10')[f]?.emote?.length) fail(`END: K10 f${f} shows an emote over ${P('K10')[f].emote.join(', ')}`);
 }
 if (cursor !== TOTAL) fail(`timeline is ${cursor} frames, not ${TOTAL}`);
 // Nothing added below y 1440: a placed layer with an outline adds its outline
@@ -326,7 +331,7 @@ async function plaque(lines, skin = 'bright', size = 76) {
 // over the house and above the dialogue cards. Caption 1 leaves as the victory
 // card rises.
 const CAPTIONS = [
-  { id: 1, lines: ['One letter. Two real words.'], shot: 'H1', to: H1_BOARD + 1, top: 300 },
+  { id: 1, lines: ['One letter. Two real words.'], shot: 'H1', top: 300 },
   { id: 2, lines: ['Solve puzzles.', 'Build them a home.'], shot: 'H2', top: 120 },
   { id: 3, lines: ['13 friends to welcome.'], shot: 'H3', top: 120 },
   { id: 4, lines: ['Over 4,000 puzzles.'], shot: ['H4a', 'H4c'], top: 360 },
@@ -351,9 +356,10 @@ const endCss = `.e { font-family: 'Figtree-Bold'; font-size: 84px; color: #FFF3D
 const e1 = await renderHtml(`<div class="e">It's a lovely house.</div>`, endCss, { width: 1400 });
 const e2 = await renderHtml(`<div class="e">Isn't it?</div>`, endCss, { width: 1400 });
 const mark = await sharp(A('ui/wordmark.png')).resize(760, 190).png().toBuffer();
-// The gradient ends at y 820 (cy 300 + r 520); the image stops at 840 so
-// nothing added reaches the bottom clear zone.
-const vignette = await sharp(Buffer.from(`<svg width="${W}" height="840" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="g" cx="540" cy="300" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="0.38"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="840" fill="url(#g)"/></svg>`)).png().toBuffer();
+// An ellipse behind the wordmark and both lines (centre y 440, 640 x 400 px),
+// so the white type holds over the busy sunset trees; it ends by y 840, far
+// from the bottom clear zone.
+const vignette = await sharp(Buffer.from(`<svg width="${W}" height="840" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="g" cx="540" cy="440" r="1" gradientTransform="translate(540 440) scale(640 400) translate(-540 -440)" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="0.5"/><stop offset="0.7" stop-color="#000" stop-opacity="0.3"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="840" fill="url(#g)"/></svg>`)).png().toBuffer();
 captions.push({ id: 'vig', png: vignette, left: 0, top: 0, from: END0, to: TOTAL - 1, fadeIn: 12 });
 captions.push({ id: 'mark', png: mark, left: 540 - 380, top: 300 - 95, from: END0 + 4, to: TOTAL - 1, fadeIn: 10 });
 captions.push({ id: 'E1', png: e1.png, left: Math.round(540 - e1.width / 2), top: Math.round(510 - e1.height / 2), from: E1_AT, to: TOTAL - 1 });
@@ -374,7 +380,7 @@ const END16a = { x: cx10 - 600, y: ROOF_K10 - 500, w: 1200, h: 675 };
 const END16b = { x: cx10 - 750, y: ROOF_K10 - 500, w: 1500, h: 844 };
 assertClear('K9', range(0, 26), WIDE16, 'DAY 16:9');
 assertClear('K10', range(0, 163), WIDE16, 'DUSK 16:9');
-assertClear('K10', range(45, 163), END16b, 'END 16:9');
+assertClear('K10', range(END_SRC, END_SRC + 131), END16b, 'END 16:9');
 // Every other shot is remapped from its 9:16 layers. A layer with no place (a
 // blurred backdrop) fills the 16:9 frame. A full-frame phone view becomes a
 // sharp 608x1080 column 96 px from the right edge (mirroring the captions'
@@ -440,7 +446,7 @@ function remap16(s) {
 const shots16 = shots.map(s => {
   if (s.id === 'DAY') return { id: s.id, from: s.from, to: s.to, layers: [{ kind: 'frame', clip: 'K9', src: { start: 0, rate: 1 }, view: css2src('K9', WIDE16) }] };
   if (s.id === 'DUSK') return { id: s.id, from: s.from, to: s.to, layers: [{ kind: 'frame', clip: 'K10', src: { start: 0, rate: 1 }, view: css2src('K10', WIDE16) }] };
-  if (s.id === 'END') return { id: s.id, from: s.from, to: s.to, layers: [{ kind: 'frame', clip: 'K10', src: { start: 45, rate: 1 },
+  if (s.id === 'END') return { id: s.id, from: s.from, to: s.to, layers: [{ kind: 'frame', clip: 'K10', src: { start: END_SRC, rate: 1 },
     view: rel => css2src('K10', lerpRect(END16a, END16b, easeOut(Math.min(1, rel / 19)))) }] };
   return remap16(s);
 });
@@ -477,7 +483,7 @@ const add = (file, frame, gainDb = 0, why = '') => sfx.push({ file: SND(file), a
 // H1 (K1 at 60 fps; see H1_MAP): the L is in the hand at rel 0, PLANT at clip
 // 26, the T lifts at clip 42, HEART at clip 66; PERFECT! and the stars follow
 // at real time. clipToRel finds the first output frame showing a clip frame.
-const clipToRel = c => { for (let r = 0; r < 111; r++) if (h1Clip(r) >= c) return r; return fail(`clip ${c} is not in H1`); };
+const clipToRel = c => { for (let r = 0; r <= H1_BOARD; r++) if (h1Clip(r) >= c) return r; return fail(`clip ${c} is not in H1`); };
 add('letter_select.wav', 0, -8, 'the L in the hand');
 add('valid_move.wav', clipToRel(26), 0, 'PLANT');
 add('letter_select.wav', clipToRel(42), -6, 'the T lifts');
@@ -487,8 +493,8 @@ add('star_pop_3.wav', shotOf('H1c').from + 2, -6, 'its three stars');
 add('ui_tap.wav', shotOf('H3').from, -8, 'the invite');
 add('letter_select.wav', shotOf('H4a').from, -8, 'the W lifts');
 add('valid_move.wav', shotOf('H4a').from + 12, -2, 'SWING');
-add('valid_move_2.wav', shotOf('H4b').from + 10, -2, 'CLOVER');
-add('valid_move_3.wav', shotOf('H4c').from, 0, 'PICKLED');
+add('valid_move.wav', shotOf('H4b').from + 10, -2, 'CLOVER');
+add('valid_move.wav', shotOf('H4c').from, -2, 'PICKLED');
 add('unlock.wav', shotOf('H5b').from, 0, 'the Jungle Hammock is built');
 add('dialogue.wav', shotOf('H5c').from, -4, 'Sloane speaks');
 add('dialogue.wav', shotOf('H6b').from, -6, 'Panko speaks');

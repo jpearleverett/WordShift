@@ -188,97 +188,117 @@
   "trailer": {
     "title": "WordShift: Cozy Word Puzzle (Trailer)",
     "description": "Pick up a letter from one word and drop it into the next. Both words have to stay real, and the letter you move stays where you put it.\n\nWordShift is a cozy word puzzle game about one small move and a pixel-art house you build with the amber your puzzles earn. Add rooms, welcome 13 animal housemates, and get to know them one conversation at a time. They remember what you tell them.\n\nOver 4,000 word puzzles across five difficulty levels, a daily word puzzle with streaks, Reverse Shift, Double Shift and challenges that stack on any style.\n\nAll gameplay in this trailer is captured from WordShift. Contains ads and in-app purchases. The story develops unsettling themes and mild horror.\n\nWordShift on Google Play:\nhttps://play.google.com/store/apps/details?id=com.wordshift.app\n\n#wordgame #puzzlegame #cozygames",
-    "alt": "Trailer for WordShift: a letter moves from PLAY into PANT to make PAY and PLANT, animal residents chat in a pixel-art house, and the house glows at sunset",
+    "alt": "Trailer for WordShift: a letter moves from PLAY into PANT to make PAY and PLANT, animal residents talk in a pixel-art house, and the day turns to sunset",
     "captions": [
       {
-        "shot": "S1",
+        "shot": "H1 board",
         "frames": [
           0,
-          41
+          99
         ],
         "start": "00:00:00,000",
-        "end": "00:00:01,400",
-        "text": "Lift a letter."
+        "end": "00:00:03,333",
+        "text": "One letter. Two real words."
       },
       {
-        "shot": "S2",
+        "shot": "H2 house",
         "frames": [
-          42,
-          101
+          136,
+          215
         ],
-        "start": "00:00:01,400",
-        "end": "00:00:03,400",
-        "text": "Drop it in. Two real words."
+        "start": "00:00:04,533",
+        "end": "00:00:07,200",
+        "text": "Solve puzzles. Build them a home."
       },
       {
-        "shot": "S4",
+        "shot": "H3 invite",
         "frames": [
-          156,
-          239
+          216,
+          243
         ],
-        "start": "00:00:05,200",
-        "end": "00:00:08,000",
+        "start": "00:00:07,200",
+        "end": "00:00:08,133",
+        "text": "13 friends to welcome."
+      },
+      {
+        "shot": "H4 boards",
+        "frames": [
+          244,
+          333
+        ],
+        "start": "00:00:08,133",
+        "end": "00:00:11,133",
         "text": "Over 4,000 puzzles."
       },
       {
-        "shot": "S5",
+        "shot": "H5 build",
         "frames": [
-          240,
-          281
+          334,
+          379
         ],
-        "start": "00:00:08,000",
-        "end": "00:00:09,400",
-        "text": "Your wins build the house."
+        "start": "00:00:11,133",
+        "end": "00:00:12,667",
+        "text": "More rooms. More neighbors."
       },
       {
-        "shot": "S6-S7",
+        "shot": "H5 Sloane",
         "frames": [
-          282,
-          422
+          380,
+          451
         ],
-        "start": "00:00:09,400",
-        "end": "00:00:14,100",
-        "text": "Everyone has something to say."
+        "start": "00:00:12,667",
+        "end": "00:00:15,067",
+        "text": "Three moths. All named Gerald."
       },
       {
-        "shot": "S8",
+        "shot": "H6 Panko",
         "frames": [
-          423,
-          494
+          452,
+          583
         ],
-        "start": "00:00:14,100",
-        "end": "00:00:16,500",
-        "text": "Reverse. Double. Race the clock."
+        "start": "00:00:15,067",
+        "end": "00:00:19,467",
+        "text": "Who moved the spice jars?"
       },
       {
-        "shot": "S9",
+        "shot": "H7 day to dusk",
         "frames": [
-          495,
-          566
+          584,
+          676
         ],
-        "start": "00:00:16,500",
-        "end": "00:00:18,900",
-        "text": "Your answers stay with them."
+        "start": "00:00:19,467",
+        "end": "00:00:22,567",
+        "text": "Where did the day go?"
       },
       {
-        "shot": "S10",
+        "shot": "H8 Ember",
         "frames": [
-          567,
-          632
+          677,
+          766
         ],
-        "start": "00:00:18,900",
-        "end": "00:00:21,100",
-        "text": "Where do the words go?"
+        "start": "00:00:22,567",
+        "end": "00:00:25,567",
+        "text": "Ember is fond of you."
       },
       {
         "shot": "End card",
         "frames": [
-          846,
+          785,
+          830
+        ],
+        "start": "00:00:26,167",
+        "end": "00:00:27,700",
+        "text": "It's a lovely house."
+      },
+      {
+        "shot": "End card",
+        "frames": [
+          831,
           899
         ],
-        "start": "00:00:28,200",
+        "start": "00:00:27,700",
         "end": "00:00:30,000",
-        "text": "The house is very fond of you."
+        "text": "It's a lovely house. Isn't it?"
       }
     ],
     "youtube_settings": "Public or unlisted; monetization off; \"No, it's not made for kids\"; not age-restricted; embedding allowed; captions-en.srt as the caption track."

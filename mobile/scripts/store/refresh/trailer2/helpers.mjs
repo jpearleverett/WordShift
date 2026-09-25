@@ -1,7 +1,7 @@
 /**
  * Page helpers for trailer2. Every helper reads the DOM or drives real input;
- * none edits the page. Several are ports of ../recordTrailer.mjs helpers
- * (that script runs its clips on import, so they are copied, not imported).
+ * none edits the page. Several are ports of helpers from the first trailer's
+ * recorder (recordTrailer.mjs, retired 2026-09-25 and kept in git history).
  */
 import { expect, panHouse, finishStory, dismissIntros } from '../lib.mjs';
 import { RetakeError } from './capture.mjs';

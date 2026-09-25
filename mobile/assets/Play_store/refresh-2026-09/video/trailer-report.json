@@ -1,903 +1,464 @@
 {
- "builtAt": "2026-09-23T07:48:48.714Z",
+ "builtAt": "2026-09-25T23:33:51.748Z",
  "fps": 30,
  "frames": 900,
+ "marks": {
+  "kc": 76,
+  "fc8": 131,
+  "fe12": 85,
+  "fe12next": 86,
+  "i0": 192,
+  "END0": 767
+ },
  "shots": [
   {
-   "id": "S1",
-   "frames": [
-    0,
-    41
-   ],
-   "time": [
-    0,
-    1.4
-   ],
-   "source": "R1 0..41",
-   "caption": "Lift a letter."
+   "id": "H1",
+   "from": 0,
+   "to": 99,
+   "meta": {
+    "clip": "K1 -6..65"
+   },
+   "clips": [
+    "K1"
+   ]
   },
   {
-   "id": "S2",
-   "frames": [
-    42,
-    101
-   ],
-   "time": [
-    1.4,
-    3.4
-   ],
-   "source": "R1 42..101",
-   "caption": "Drop it in. Two real words."
+   "id": "H1c",
+   "from": 100,
+   "to": 135,
+   "meta": null,
+   "clips": [
+    "K1"
+   ]
   },
   {
-   "id": "S3",
-   "frames": [
-    102,
-    155
-   ],
-   "time": [
-    3.4,
-    5.2
-   ],
-   "source": "R1 102..155",
-   "caption": null
+   "id": "H2",
+   "from": 136,
+   "to": 215,
+   "meta": null,
+   "clips": [
+    "K2"
+   ]
   },
   {
-   "id": "S4",
-   "frames": [
-    156,
-    239
-   ],
-   "time": [
-    5.2,
-    8
-   ],
-   "source": "R2a 0..27, R2b 0..27, R2c 0..27",
-   "caption": "Over 4,000 puzzles."
+   "id": "H3",
+   "from": 216,
+   "to": 243,
+   "meta": null,
+   "clips": [
+    "K2",
+    "K2b"
+   ]
   },
   {
-   "id": "S5",
-   "frames": [
-    240,
-    281
-   ],
-   "time": [
-    8,
-    9.4
-   ],
-   "source": "R4 0..41",
-   "caption": "Your wins build the house."
+   "id": "H4a",
+   "from": 244,
+   "to": 273,
+   "meta": null,
+   "clips": [
+    "K4"
+   ]
   },
   {
-   "id": "S6",
-   "frames": [
-    282,
-    373
-   ],
-   "time": [
-    9.4,
-    12.47
-   ],
-   "source": "R3 0..91",
-   "caption": "Everyone has something to say."
+   "id": "H4b",
+   "from": 274,
+   "to": 303,
+   "meta": null,
+   "clips": [
+    "K5"
+   ]
   },
   {
-   "id": "S7",
-   "frames": [
-    374,
-    422
-   ],
-   "time": [
-    12.47,
-    14.1
-   ],
-   "source": "R5 5..53",
-   "caption": "Everyone has something to say."
+   "id": "H4c",
+   "from": 304,
+   "to": 333,
+   "meta": null,
+   "clips": [
+    "K6"
+   ]
   },
   {
-   "id": "S8",
-   "frames": [
-    423,
-    494
-   ],
-   "time": [
-    14.1,
-    16.5
-   ],
-   "source": "R6a 0..23, R6b 0..23, R6c 0..23",
-   "caption": "Reverse. Double. Race the clock."
+   "id": "H5a",
+   "from": 334,
+   "to": 347,
+   "meta": null,
+   "clips": [
+    "K7a"
+   ]
   },
   {
-   "id": "S9",
-   "frames": [
-    495,
-    566
-   ],
-   "time": [
-    16.5,
-    18.9
-   ],
-   "source": "R7 0..71",
-   "caption": "Your answers stay with them."
+   "id": "H5b",
+   "from": 348,
+   "to": 379,
+   "meta": null,
+   "clips": [
+    "K7a"
+   ]
   },
   {
-   "id": "S10",
-   "frames": [
-    567,
-    632
-   ],
-   "time": [
-    18.9,
-    21.1
-   ],
-   "source": "R8 0..65",
-   "caption": "Where do the words go?"
+   "id": "H5c",
+   "from": 380,
+   "to": 451,
+   "meta": {
+    "card": {
+     "k": 2.42,
+     "bottom": 768,
+     "tops": [
+      437,
+      437
+     ],
+     "highest": 479
+    }
+   },
+   "clips": [
+    "K7a",
+    "K7b"
+   ]
   },
   {
-   "id": "S11",
-   "frames": [
-    633,
-    749
-   ],
-   "time": [
-    21.1,
-    25
-   ],
-   "source": "R9 18..134",
-   "caption": null
+   "id": "H6a",
+   "from": 452,
+   "to": 493,
+   "meta": null,
+   "clips": [
+    "K8"
+   ]
   },
   {
-   "id": "S12",
-   "frames": [
-    750,
-    827
-   ],
-   "time": [
-    25,
-    27.6
-   ],
-   "source": "R10 0..77",
-   "caption": null
+   "id": "H6b",
+   "from": 494,
+   "to": 583,
+   "meta": {
+    "card": {
+     "k": 2.42,
+     "bottom": 768,
+     "tops": [
+      403,
+      498
+     ],
+     "highest": 438
+    }
+   },
+   "clips": [
+    "K8"
+   ]
+  },
+  {
+   "id": "DAY",
+   "from": 584,
+   "to": 601,
+   "meta": null,
+   "clips": [
+    "K9"
+   ]
+  },
+  {
+   "id": "DUSK",
+   "from": 602,
+   "to": 676,
+   "meta": null,
+   "clips": [
+    "K10"
+   ]
+  },
+  {
+   "id": "H8a",
+   "from": 677,
+   "to": 694,
+   "meta": null,
+   "clips": [
+    "K12"
+   ]
+  },
+  {
+   "id": "H8b",
+   "from": 695,
+   "to": 766,
+   "meta": {
+    "card": {
+     "k": 2.42,
+     "bottom": 745,
+     "tops": [
+      508,
+      510.20000000000005
+     ],
+     "highest": 593
+    }
+   },
+   "clips": [
+    "K12"
+   ]
   },
   {
    "id": "END",
-   "frames": [
-    828,
-    899
-   ],
-   "time": [
-    27.6,
-    30
-   ],
-   "source": "end card (not UI)",
-   "caption": "The house is very fond of you."
+   "from": 767,
+   "to": 899,
+   "meta": null,
+   "clips": [
+    "K10"
+   ]
   }
  ],
- "clips": {
-  "R1": {
-   "state": "A",
-   "recordedAt": "2026-09-23T06:36:46.904Z",
-   "frames": 215,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {
-    "boardAtStart": [
-     "PLAY",
-     "PANT",
-     "HEAR"
-    ],
-    "marks": {
-     "victoryCardHalfOpaque": 100,
-     "nextLevelFullyVisible": 124,
-     "row2FanBottomCss": 681.5848388671875
-    }
-   }
+ "captions": [
+  {
+   "id": 1,
+   "text": "One letter. Two real words.",
+   "from": 0,
+   "to": 99
   },
-  "R2a": {
-   "state": "H",
-   "recordedAt": "2026-09-23T03:28:17.787Z",
-   "frames": 58,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {
-    "difficulty": "Medium",
-    "boardAtStart": [
-     "HITS",
-     "MARS",
-     "CAVE",
-     "PATH"
-    ],
-    "chainWords": [
-     "HITS",
-     "MARS",
-     "CAVE",
-     "PATH",
-     "HIS",
-     "MARTS",
-     "MATS",
-     "CRAVE",
-     "RAVE",
-     "PATCH"
-    ]
-   }
+  {
+   "id": 2,
+   "text": "Solve puzzles. Build them a home.",
+   "from": 136,
+   "to": 215
   },
-  "R2b": {
-   "state": "H",
-   "recordedAt": "2026-09-23T03:29:32.762Z",
-   "frames": 58,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {
-    "difficulty": "Medium Plus",
-    "boardAtStart": [
-     "PALER",
-     "FAMED",
-     "TAPER",
-     "TAPED"
-    ],
-    "chainWords": [
-     "PALER",
-     "FAMED",
-     "TAPER",
-     "TAPED",
-     "PALE",
-     "FARMED",
-     "FARED",
-     "TAMPER",
-     "TAMER",
-     "TAPPED"
-    ]
-   }
+  {
+   "id": 3,
+   "text": "13 friends to welcome.",
+   "from": 216,
+   "to": 243
   },
-  "R2c": {
-   "state": "H",
-   "recordedAt": "2026-09-23T03:30:47.192Z",
-   "frames": 58,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {
-    "difficulty": "Expert",
-    "boardAtStart": [
-     "BALDER",
-     "MEANER",
-     "PLYING",
-     "SICKER",
-     "LINING"
-    ],
-    "chainWords": [
-     "BALDER",
-     "MEANER",
-     "PLYING",
-     "SICKER",
-     "LINING",
-     "BALER",
-     "MEANDER",
-     "MENDER",
-     "PLAYING",
-     "PAYING",
-     "SLICKER",
-     "SLICER",
-     "LINKING"
-    ]
-   }
+  {
+   "id": 4,
+   "text": "Over 4,000 puzzles.",
+   "from": 244,
+   "to": 333
   },
-  "R3": {
-   "state": "B",
-   "recordedAt": "2026-09-23T03:27:59.486Z",
-   "frames": 114,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {}
+  {
+   "id": 5,
+   "text": "More rooms. More neighbors.",
+   "from": 334,
+   "to": 379
   },
-  "R4": {
-   "state": "I",
-   "recordedAt": "2026-09-23T06:39:10.349Z",
-   "frames": 102,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {}
+  {
+   "id": 6,
+   "text": "Three moths. All named Gerald.",
+   "from": 380,
+   "to": 451
   },
-  "R5": {
-   "state": "J",
-   "recordedAt": "2026-09-23T04:42:07.104Z",
-   "frames": 130,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {}
+  {
+   "id": 7,
+   "text": "Who moved the spice jars?",
+   "from": 452,
+   "to": 583
   },
-  "R6a": {
-   "state": "H",
-   "recordedAt": "2026-09-23T03:21:41.468Z",
-   "frames": 54,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {
-    "boardAtStart": [
-     "FINE",
-     "GALS",
-     "BANS",
-     "BORE"
-    ],
-    "chainWords": [
-     "FINE",
-     "GALS",
-     "BANS",
-     "BORE",
-     "FIN",
-     "GALES",
-     "ALES",
-     "BANGS",
-     "BAGS",
-     "BORNE"
-    ]
-   }
+  {
+   "id": 8,
+   "text": "Where did the day go?",
+   "from": 584,
+   "to": 676
   },
-  "R6b": {
-   "state": "G",
-   "recordedAt": "2026-09-23T03:26:21.616Z",
-   "frames": 54,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {
-    "boardAtStart": [
-     "RIVET",
-     "SHADE",
-     "SPIRE",
-     "LAMAS"
-    ],
-    "chainWords": [
-     "RIVET",
-     "SHADE",
-     "SPIRE",
-     "LAMAS",
-     "IVET",
-     "SHADRE",
-     "SHDRE",
-     "ASPIRE",
-     "APIRE",
-     "SLAMAS"
-    ]
-   }
-  },
-  "R6c": {
-   "state": "G",
-   "recordedAt": "2026-09-23T03:25:21.695Z",
-   "frames": 54,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {
-    "boardAtStart": [
-     "LONG",
-     "GRID",
-     "LENS",
-     "BANK"
-    ],
-    "chainWords": [
-     "LONG",
-     "GRID",
-     "LENS",
-     "BANK",
-     "LOG",
-     "GRIND",
-     "GRIN",
-     "LENDS",
-     "ENDS",
-     "BLANK"
-    ],
-    "cosmetic": "Cathedral Glass (bought for 700 amber in the Tile Shop)",
-    "marks": {
-     "countdownTicksAtFrames": [
-      11,
-      -15
-     ]
-    }
-   }
-  },
-  "R7": {
-   "state": "A",
-   "recordedAt": "2026-09-23T07:48:48.191Z",
-   "frames": 102,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {}
-  },
-  "R8": {
-   "state": "F",
-   "recordedAt": "2026-09-23T07:26:39.384Z",
-   "frames": 96,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true,
-    "pitFlight": {
-     "visibleFrames": 44,
-     "movingFrames": 30,
-     "framesGrazingAnEdge": [],
-     "framesMoreThanAQuarterOffScreen": [],
-     "goneAtFrame": 52
-    }
-   },
-   "meta": {
-    "wordsAtStart": [
-     "HIS",
-     "CAMP",
-     "HERD",
-     "RELAY"
-    ],
-    "tapped": "CAMP"
-   }
-  },
-  "R9": {
-   "state": "D",
-   "recordedAt": "2026-09-23T06:48:39.260Z",
-   "frames": 165,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true,
-    "emoteOverPlaqueInUsedFrames": []
-   },
-   "meta": {
-    "line": "Something funny happened. I went to bed with the spice jars in one order and woke up to find them in another. I must have moved them in my sleep. I must have.",
-    "marks": {
-     "revealComplete": 74,
-     "usedFrom": 17,
-     "usedTo": 134,
-     "hold": 60
-    }
-   }
-  },
-  "R10": {
-   "state": "C",
-   "recordedAt": "2026-09-23T03:39:11.500Z",
-   "frames": 108,
-   "screening": {
-    "glitch": [],
-    "grim": [],
-    "ok": true
-   },
-   "meta": {}
+  {
+   "id": 9,
+   "text": "Ember is fond of you.",
+   "from": 677,
+   "to": 766
   }
- },
- "plaques": {
-  "9x16": {
-   "lift": {
-    "text": "Lift a letter.",
-    "size": 76,
-    "lines": [
-     "Lift a letter."
-    ],
-    "measuredWidth": 357,
-    "height": 179
-   },
-   "drop": {
-    "text": "Drop it in. Two real words.",
-    "size": 68,
-    "lines": [
-     "Drop it in. Two real words."
-    ],
-    "measuredWidth": 812,
-    "height": 170
-   },
-   "puzzles": {
-    "text": "Over 4,000 puzzles.",
-    "size": 76,
-    "lines": [
-     "Over 4,000 puzzles."
-    ],
-    "measuredWidth": 700,
-    "height": 179
-   },
-   "house": {
-    "text": "Your wins build the house.",
-    "size": 68,
-    "lines": [
-     "Your wins build the house."
-    ],
-    "measuredWidth": 813,
-    "height": 170
-   },
-   "friends": {
-    "text": "Everyone has something to say.",
-    "size": 76,
-    "lines": [
-     "Everyone has",
-     "something to say."
-    ],
-    "measuredWidth": 618,
-    "height": 324
-   },
-   "modes": {
-    "text": "Reverse. Double. Race the clock.",
-    "size": 76,
-    "lines": [
-     "Reverse. Double.",
-     "Race the clock."
-    ],
-    "measuredWidth": 581,
-    "height": 264
-   },
-   "answers": {
-    "text": "Your answers stay with them.",
-    "size": 76,
-    "lines": [
-     "Your answers",
-     "stay with them."
-    ],
-    "measuredWidth": 543,
-    "height": 264
-   },
-   "words": {
-    "text": "Where do the words go?",
-    "size": 76,
-    "lines": [
-     "Where do the words go?"
-    ],
-    "measuredWidth": 854,
-    "height": 179
-   }
+ ],
+ "cues": [
+  {
+   "from": 0,
+   "to": 100,
+   "text": "One letter. Two real words."
   },
-  "16x9": {
-   "lift": {
-    "text": "Lift a letter.",
-    "size": 72,
-    "lines": [
-     "Lift a letter."
-    ],
-    "measuredWidth": 338,
-    "height": 175
-   },
-   "drop": {
-    "text": "Drop it in. Two real words.",
-    "size": 64,
-    "lines": [
-     "Drop it in.",
-     "Two real words."
-    ],
-    "measuredWidth": 462,
-    "height": 237
-   },
-   "puzzles": {
-    "text": "Over 4,000 puzzles.",
-    "size": 72,
-    "lines": [
-     "Over 4,000",
-     "puzzles."
-    ],
-    "measuredWidth": 384,
-    "height": 255
-   },
-   "house": {
-    "text": "Your wins build the house.",
-    "size": 68,
-    "lines": [
-     "Your wins build",
-     "the house."
-    ],
-    "measuredWidth": 474,
-    "height": 246
-   },
-   "friends": {
-    "text": "Everyone has something to say.",
-    "size": 72,
-    "lines": [
-     "Everyone has",
-     "something",
-     "to say."
-    ],
-    "measuredWidth": 442,
-    "height": 336
-   },
-   "modes": {
-    "text": "Reverse. Double. Race the clock.",
-    "size": 68,
-    "lines": [
-     "Reverse.",
-     "Double.",
-     "Race the clock."
-    ],
-    "measuredWidth": 475,
-    "height": 322
-   },
-   "answers": {
-    "text": "Your answers stay with them.",
-    "size": 66,
-    "lines": [
-     "Your answers",
-     "stay with them."
-    ],
-    "measuredWidth": 472,
-    "height": 242
-   },
-   "words": {
-    "text": "Where do the words go?",
-    "size": 72,
-    "lines": [
-     "Where do the",
-     "words go?"
-    ],
-    "measuredWidth": 448,
-    "height": 255
-   }
+  {
+   "from": 136,
+   "to": 216,
+   "text": "Solve puzzles. Build them a home."
   },
-  "endLineMeasured": {
-   "9x16": 759,
-   "16x9": 712
+  {
+   "from": 216,
+   "to": 244,
+   "text": "13 friends to welcome."
+  },
+  {
+   "from": 244,
+   "to": 334,
+   "text": "Over 4,000 puzzles."
+  },
+  {
+   "from": 334,
+   "to": 380,
+   "text": "More rooms. More neighbors."
+  },
+  {
+   "from": 380,
+   "to": 452,
+   "text": "Three moths. All named Gerald."
+  },
+  {
+   "from": 452,
+   "to": 584,
+   "text": "Who moved the spice jars?"
+  },
+  {
+   "from": 584,
+   "to": 677,
+   "text": "Where did the day go?"
+  },
+  {
+   "from": 677,
+   "to": 767,
+   "text": "Ember is fond of you."
+  },
+  {
+   "from": 785,
+   "to": 831,
+   "text": "It's a lovely house."
+  },
+  {
+   "from": 831,
+   "to": 900,
+   "text": "It's a lovely house. Isn't it?"
   }
- },
- "sheetTopCss": {
-  "R5": 491,
-  "R9": 403
- },
+ ],
  "audio": {
   "beds": [
    {
-    "file": "assets/music/puzzle_phase0.mp3",
-    "startInFile": 2,
-    "at": 0,
-    "duration": 8.4,
-    "segmentLufs": -15.8,
-    "gainDb": -4.2
-   },
-   {
     "file": "assets/music/home_phase0.mp3",
-    "startInFile": 25,
-    "at": 7.6,
-    "duration": 17.4,
-    "segmentLufs": -15.3,
-    "gainDb": -4.7
+    "startInFile": 23.28,
+    "at": 0,
+    "duration": 20.216666666666665,
+    "segmentLufs": -15.1,
+    "gainDb": -4.9
    },
    {
     "file": "assets/music/home_phase2.mp3",
-    "startInFile": 71,
-    "at": 25.4,
-    "duration": 4.6,
-    "segmentLufs": -18.5,
-    "gainDb": -1.5
+    "startInFile": 66.22,
+    "at": 19.916666666666668,
+    "duration": 10.083333333333334,
+    "segmentLufs": -19.4,
+    "gainDb": -0.6
    }
   ],
   "sfx": [
    {
-    "frame": 7,
-    "time": 0.233,
-    "sfx": "letter_select.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R1 frame 7",
-    "action": "tap Letter L (row 0); the DROP fan opens over PANT"
+    "file": "assets/sounds/letter_select.wav",
+    "at": 0,
+    "gainDb": -8,
+    "trim": null,
+    "why": "the L in the hand"
    },
    {
-    "frame": 40,
-    "time": 1.333,
-    "sfx": "valid_move.wav",
+    "file": "assets/sounds/valid_move.wav",
+    "at": 1.667,
     "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R1 frame 40",
-    "action": "tap drop zone forming PLANT (row 1)"
+    "trim": null,
+    "why": "PLANT"
    },
    {
-    "frame": 75,
-    "time": 2.5,
-    "sfx": "letter_select.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R1 frame 75",
-    "action": "tap Letter T (row 1)"
-   },
-   {
-    "frame": 97,
-    "time": 3.233,
-    "sfx": "valid_move_2.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R1 frame 97",
-    "action": "tap drop zone forming HEART (row 2); the board is solved"
-   },
-   {
-    "frame": 100,
-    "time": 3.333,
-    "sfx": "perfect.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": 2.167,
-    "from": "R1 frame 100",
-    "action": "PERFECT! title"
-   },
-   {
-    "frame": 103,
-    "time": 3.433,
-    "sfx": "star_pop_1.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R1 frame 103",
-    "action": "star 1 pops in"
-   },
-   {
-    "frame": 109,
-    "time": 3.633,
-    "sfx": "star_pop_2.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R1 frame 109",
-    "action": "star 2 pops in"
-   },
-   {
-    "frame": 115,
-    "time": 3.833,
-    "sfx": "star_pop_3.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R1 frame 115",
-    "action": "star 3 pops in"
-   },
-   {
-    "frame": 165,
-    "time": 5.5,
-    "sfx": "valid_move.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R2a frame 9",
-    "action": "tap drop zone forming MARTS"
-   },
-   {
-    "frame": 193,
-    "time": 6.433,
-    "sfx": "valid_move.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R2b frame 9",
-    "action": "tap drop zone forming FARMED"
-   },
-   {
-    "frame": 220,
-    "time": 7.333,
-    "sfx": "letter_select.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R2c frame 8",
-    "action": "tap Letter D (row 0)"
-   },
-   {
-    "frame": 260,
-    "time": 8.667,
-    "sfx": "ui_tap.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R4 frame 20",
-    "action": "tap Invite animal to Aquarium Room for 100 amber"
-   },
-   {
-    "frame": 282,
-    "time": 9.4,
-    "sfx": "unlock.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R4 frame 42",
-    "action": "tap Invite for 100 amber; Axel moves in"
-   },
-   {
-    "frame": 374,
-    "time": 12.467,
-    "sfx": "dialogue.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R5 frame 3",
-    "action": "tap Axel the axolotl; his conversation opens"
-   },
-   {
-    "frame": 429,
-    "time": 14.3,
-    "sfx": "letter_select.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R6a frame 6",
-    "action": "tap Letter E (row 0)"
-   },
-   {
-    "frame": 453,
-    "time": 15.1,
-    "sfx": "letter_select.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R6b frame 6",
-    "action": "tap Letter R (row 0)"
-   },
-   {
-    "frame": 477,
-    "time": 15.9,
-    "sfx": "letter_select.wav",
-    "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R6c frame 6",
-    "action": "tap Letter N (row 0)"
-   },
-   {
-    "frame": 539,
-    "time": 17.967,
-    "sfx": "story_answer.wav",
+    "file": "assets/sounds/letter_select.wav",
+    "at": 1.933,
     "gainDb": -6,
-    "trimmedToSeconds": 1.233,
-    "from": "R7 frame 44",
-    "action": "release: The flower cup. Cocoa, please. is chosen"
+    "trim": null,
+    "why": "the T lifts"
    },
    {
-    "frame": 619,
-    "time": 20.633,
-    "sfx": "pit_devour.wav",
+    "file": "assets/sounds/valid_move_2.wav",
+    "at": 3.333,
     "gainDb": 0,
-    "trimmedToSeconds": null,
-    "from": "R8 frame 52",
-    "action": "CAMP reaches the pit; the pending amber drops"
+    "trim": null,
+    "why": "HEART"
+   },
+   {
+    "file": "assets/sounds/perfect.wav",
+    "at": 3.333,
+    "gainDb": -2,
+    "trim": null,
+    "why": "the victory card"
+   },
+   {
+    "file": "assets/sounds/star_pop_3.wav",
+    "at": 3.4,
+    "gainDb": -6,
+    "trim": null,
+    "why": "its three stars"
+   },
+   {
+    "file": "assets/sounds/ui_tap.wav",
+    "at": 7.2,
+    "gainDb": -8,
+    "trim": null,
+    "why": "the invite"
+   },
+   {
+    "file": "assets/sounds/letter_select.wav",
+    "at": 8.133,
+    "gainDb": -8,
+    "trim": null,
+    "why": "the W lifts"
+   },
+   {
+    "file": "assets/sounds/valid_move.wav",
+    "at": 8.533,
+    "gainDb": -2,
+    "trim": null,
+    "why": "SWING"
+   },
+   {
+    "file": "assets/sounds/valid_move.wav",
+    "at": 9.467,
+    "gainDb": -2,
+    "trim": null,
+    "why": "CLOVER"
+   },
+   {
+    "file": "assets/sounds/valid_move.wav",
+    "at": 10.133,
+    "gainDb": -2,
+    "trim": null,
+    "why": "PICKLED"
+   },
+   {
+    "file": "assets/sounds/unlock.wav",
+    "at": 11.6,
+    "gainDb": 0,
+    "trim": null,
+    "why": "the Jungle Hammock is built"
+   },
+   {
+    "file": "assets/sounds/dialogue.wav",
+    "at": 12.667,
+    "gainDb": -4,
+    "trim": null,
+    "why": "Sloane speaks"
+   },
+   {
+    "file": "assets/sounds/dialogue.wav",
+    "at": 16.467,
+    "gainDb": -6,
+    "trim": null,
+    "why": "Panko speaks"
+   },
+   {
+    "file": "assets/sounds/dialogue.wav",
+    "at": 23.167,
+    "gainDb": -6,
+    "trim": null,
+    "why": "Ember speaks"
    }
   ],
-  "rawIntegrated": -18.8,
-  "preLimiterCeilingDb": -6.3,
-  "loudnormPass1": {
-   "input_i": "-19.13",
-   "input_tp": "-6.14",
-   "input_lra": "4.00",
-   "input_thresh": "-29.27",
-   "output_i": "-14.68",
-   "output_tp": "-1.00",
-   "output_lra": "2.90",
-   "output_thresh": "-24.78",
-   "normalization_type": "dynamic",
-   "target_offset": "0.68"
-  },
-  "loudnormPass2Type": "Linear",
+  "rawIntegrated": -19.5,
+  "loudnormType": "Linear",
   "final": {
-   "integrated": -13.9,
-   "truePeak": -1,
-   "lra": 4.6
+   "integrated": -14,
+   "truePeak": -1.4,
+   "lra": 5.1
   }
  },
- "outputs": {
-  "trailer-9x16-1080x1920.mp4": {
-   "duration": "00:00:30.00",
-   "video": "h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1080x1920, 3433 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
-   "audio": "aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 338 kb/s (default)",
-   "faststart": true,
-   "bytes": 14179625
-  },
-  "trailer-16x9-1920x1080.mp4": {
-   "duration": "00:00:30.00",
-   "video": "h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1920x1080, 2345 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
-   "audio": "aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 338 kb/s (default)",
-   "faststart": true,
-   "bytes": 10100632
-  }
+ "out916": {
+  "duration": "00:00:30.00",
+  "video": "h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1080x1920, 4137 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
+  "audio": "aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 334 kb/s (default)"
+ },
+ "out169": {
+  "duration": "00:00:30.00",
+  "video": "h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1920x1080, 2493 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
+  "audio": "aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 334 kb/s (default)"
+ },
+ "poster": {
+  "file": "video/poster-9x16-1080x1920.png",
+  "frame": 33
  },
  "thumbnail": {
   "file": "video/youtube-thumbnail-1280x720.png",

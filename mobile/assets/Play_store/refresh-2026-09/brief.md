@@ -189,7 +189,7 @@ mobile/assets/Play_store/refresh-2026-09/
 
 - **Scripts** live in `mobile/scripts/store/refresh/`:
   - `lib.mjs`: a port of the harness below.
-  - `captureStills.mjs`, `buildStills.mjs`, `buildFeature.mjs`, `recordTrailer.mjs`, `editTrailer.mjs`.
+  - `captureStills.mjs`, `buildStills.mjs`, `buildFeature.mjs`, and the trailer in `trailer2/` (`record.mjs`, `edit.mjs`, `install.mjs`; `mobile/scripts/store/buildTrailer.mjs` runs all three).
   - Run them with `node` directly. Do not add or change npm scripts in `package.json`.
 - **Git:** work on a `feature/...` branch and open a pull request. Never push to `main`.
 - **Docs mirrors:** do not touch the files in `docs/` (`feature-graphic.png`, `store-icon-512.png`). They are updated only after the owner uploads.
@@ -503,181 +503,97 @@ Reference prototype for the art only: `.../scratchpad/store/final/fg_check.png`.
 
 ## 6. Trailer
 
+The trailer was replaced on 2026-09-25 by "Such a Lovely House" (trailer2), built by `mobile/scripts/store/refresh/trailer2/` from new recordings. The earlier cut (captions "Lift a letter." to "The house is very fond of you.", built by `recordTrailer.mjs` and `editTrailer.mjs`) and its two scripts remain in git history. Five rounds of a four-judge blind panel compared the two cuts, with A and B assigned at random and neutral file names. The first new cut lost 0-4. The revised cuts won 3-1, then 4-0 in each of the last three rounds. The fifth round judged the build before its last compliance fixes (listed in `video/README.md`, which records every round's scores and what each round changed).
+
 ### Deliverables
 
-- **Play preview video: the 9:16 cut**, `trailer-9x16-1080x1920.mp4`.
-- **YouTube, press and large screens: the 16:9 master**, `trailer-16x9-1920x1080.mp4`.
+- **Play preview video: the 9:16 cut**, `video/trailer-9x16-1080x1920.mp4`.
+- **YouTube, press and large screens: the 16:9 master**, `video/trailer-16x9-1920x1080.mp4`.
+- `video/captions-en.srt`, the burned-in captions cue for cue (and `trailer.captions` in `copy/listing-en-US.json`).
 
-Both are exactly **30.0 s = 900 frames at 30 fps**, H.264 High yuv420p with AAC-LC 48 kHz stereo at 384 kbps, and faststart. Both are built from the same recorded frames, the same captions and the same audio mix.
+Both cuts are exactly **30.0 s = 900 frames at 30 fps**, H.264 High yuv420p (BT.709) with AAC-LC 48 kHz stereo and faststart. Both use the same timeline, captions and audio mix. Every frame is a recorded frame of the game (a crop, a zoom, a speed change, two 0.6 s holds over the opening move's checked slots, and one freeze on Ember's finished line). The only additions are the caption plaques and, on the end card, the wordmark and two lines over the real sunset house. Gameplay is on screen from frame 0.
 
-**Timeline figures:**
-- Real UI fills 27.6 of the 30 s (92%).
-- Real gameplay is on screen from frame 0.
-- There is no title card. The only non-UI shot is the 2.4 s end card.
+### Recording method (`trailer2/capture.mjs`, `trailer2/record.mjs`, `trailer2/states2.mjs`)
 
-### Recording method (`recordTrailer.mjs`)
-
-**Clock-stepped capture (the proven Concept 2 method):**
-1. `launch({width:432, height:768, dsf:2.5, reducedMotion:false, clock:true})`. The clock is installed before `goto` and resumed after install.
-2. Stage the state with the clock flowing naturally.
-3. Before each clip: `const t = await page.evaluate(() => Date.now()); await page.clock.pauseAt(t + 100);`.
-4. Every frame: `await page.clock.runFor(1000/30); await page.screenshot(...)`. Frames are exactly 1080x1920.
-5. After the clip, `page.clock.resume()`.
-
-**Input** happens only between frames:
-- A tap is a `click()` on a locator.
-- A drag is `page.mouse.down()` followed by one `page.mouse.move` step per frame, then `up()`.
-
-**Event log:** write every action to `video/events/<clip>.json` as `{frame, action, sfx}`.
-
-**Handles:** record every clip 0.5 s longer than it is used, at both ends.
-
-**Fallback,** only if clock stepping fails for a clip (frozen animations or a stalled boot):
-- A CDP screencast: `--force-device-scale-factor=3`, `Emulation.setDeviceMetricsOverride({width:390,height:700,deviceScaleFactor:3,mobile:false})`, `Page.startScreencast({format:'jpeg',quality:92,maxWidth:1170,maxHeight:2100})`.
-- Keep the per-frame timestamps and retime to 30 fps with ffmpeg's concat demuxer.
-- Note the fallback in `video/events/<clip>.json`.
-
-**Screening every recorded frame:**
-- Reject the take and re-record if any of these texts is visible: `A LITTLE WARMER`, `THANK YOU`, `STILL WARM`, `ONE MORE CUP`, `THERE YOU ARE`, `SAVED FOR LATER` (the current `VICTORY_GLITCH_TEXTS`), or any micro-beat overlay.
-- Reject the take if a board shows a word that reads as grim or violent (for example SLAY, SLAYED, KILL, DEAD, GRAVE, TOMB, DOOM).
+- Chromium drives the Expo web build under Playwright with the page clock installed and pinned to 2026-10-06 17:30. That date sits outside every full-moon window, so no event badge or moon line appears. Each frame advances the clock one frame (30 or 60 fps) and is captured over CDP as JPEG q95 at the clip's device scale (DPR 5 for 432 CSS wide phone clips).
+- Each clip starts from a seeded save that agrees with its phase, solves, rooms and story gates (`states2.mjs`). Specific boards are served by the game's own bank selection in a throwaway session, then transplanted as the game-written autosave (`record.mjs serveBoard`).
+- Input happens between frames. A drag is one mouse step per frame. Per-frame DOM probes (tiles, labels, pills, dialogue blocks and sheets, the Next sign, the ambient line, the dock) are logged with the events to `$TRAILER2_WORK/events/<clip>.json`. `video/events/` keeps the events without the probes.
+- **Screening, retaken on failure:** any `VICTORY_GLITCH_TEXTS` string or micro-beat overlay; any phase-0 darkness-seed move message (`PHASE_0_SEED_MESSAGES`, for example "A little warmth."); a grim or awkward board word; an achievement toast; an emote over a used crop. The first K1 take showed a seed pill and was retaken.
 
 ### Clips
 
-"Frame n" means frame n of the clip after the lead-in handle.
-
-| Clip | State | Staging, then recorded actions | Used frames |
+| Clip | State | What it records | Used as |
 |---|---|---|---|
-| R1 opener | A | Play, `finishStory`, `dismissIntros`, RESTART, tap `Letter L` (row 0), then pause. Frame 0 shows L lifted with the fan open. Frame 15: tap `/forms PLANT, valid word$/` (row 1). Frame 51: tap `Letter T` (row 1). Frame 66: tap `/forms HEART, valid word$/` (row 2). Keep recording until 2.0 s after `Next level` is visible. | S1 and S2 = frames 0-101. S3 = 54 frames, starting at the first frame where the victory card is at least 50% opaque. If that frame is after 102, jump-cut to it. |
-| R2 boards | H | Three takes, each chosen from the setup menu before pausing: Medium, Medium+ and Expert. For Medium and Medium+: `playSolution({selectOnlyAt:0})` before pausing, then at frame 9 tap the solution slot, so the commit happens with a star burst. For Expert: frame 0 idle, frame 8 tap the first solution letter, so the fan opens. | 28 frames each (0-27) |
-| R3 day house | B | Bottom clamp (`panHouse(-300)` six times), then pause. Frames 6-60: drag from (8,300) to (8,660), one step per frame, revealing about three rooms above. Record until the momentum settles. | frames 0-83 |
-| R4 invite | I | Pan until the empty Aquarium Room is in the middle of the screen, then pause. Frame 6: tap `Invite animal to Aquarium Room for 100 amber`. Frame 42: tap `Invite for 100 amber`. | frames 0-71 |
-| R5 Axel | J | Pan until the `Axel the axolotl` button is within y 150-600, then pause. Frame 3: tap it. The line "Hello! I was following a bubble. Then we both forgot what we were doing." types out. | frames 0-71 |
-| R6a reverse | H | Setup menu at 432x1060: choose Reverse Shift, go back to 432x768, close the menu, pause. Frame 6: tap the first solution letter. | frames 0-23 |
-| R6b stack | G | Slot 05 staging, but finish at 432x768 at DPR 2.5, then pause. Frame 6: `playSolution({selectOnlyAt:0})`. The clock ticks. | frames 0-23 |
-| R6c glass | H | Utility menu, `Open Tile Shop`, `Buy Cathedral Glass for 700 amber` (a real amber purchase), Back, then Play (standard Medium), then pause. Frame 6: tap the first solution letter. Record this after R2 and R6a. | frames 0-23 |
-| R7 cup | A | Play, then Continue to page 3/3, then pause. Frame 15: tap `The flower cup. Cocoa, please.`. The response page shows Ember: "Brave. I mean about the cocoa. The flower is excellent company." | frames 0-71 |
-| R8 pit | F | Slot 06 staging, then wait 2500 ms at the pit, then pause. Frame 12: tap the fully visible floating word nearest the screen centre that overlaps nothing. It spirals into the pit. | frames 0-65 |
-| R9 Panko | D | Slot 04 panning, then pause. Frame 3: tap `Panko the pangolin`. Let the line type out until complete. | 72 frames ending 12 frames after the reveal completes. This may begin mid-sentence. |
-| R10 dusk | C | Bottom clamp, then drag the house down 120 CSS and pause. Frames 6-54: drag up 120 CSS, one step per frame, settling on the kitchen, the den and the well. Fire flicker and walking residents stay live. | frames 0-77 |
+| K1 | A' (phase 0, 6 solves) | The curated opener PLAY / PANT / HEAR at 60 fps: the L dragged into PANT (PLANT), the T into HEAR (HEART), the victory card | H1, H1c |
+| K2 | I' (phase 0) | The day house at 675x1340, pushing in to the empty aquarium's invite card | H2, H3 backdrop |
+| K2b | I' | The "A NEW FRIEND!" invite card for Axel | H3 |
+| K4, K5, K6 | H (phase 1, 38 solves) | EASY WHIP/SING, MED+ GLAZE/COVER, EXPERT FLAVOR/PICKED: one move each | H4 |
+| K7a, K7b | BUILD24 (phase 1) | The Jungle Hammock built; Sloane's introduction page | H5 |
+| K8 | D (phase 1) | Panko's kitchen, then her spice-jar line typing in | H6 |
+| K9, K10 | B (afternoon), E' (dusk, phase 2) | The whole house from one locked camera, the same seven rooms | DAY, DUSK, END |
+| K12 | P2N9E (phase 2) | Ember's den at dusk, then her line fx_2_17 typing in | H8 |
 
-### Edit timeline (`editTrailer.mjs`)
+### Edit timeline (`trailer2/edit.mjs`)
 
-Frames are 0-899.
-
-| Frames (time) | Shot | Source | Caption |
+| Frames (time) | Shot | Picture | Caption |
 |---|---|---|---|
-| 0-41 (0.00-1.40) | S1 hook | R1 | `Lift a letter.` |
-| 42-101 (1.40-3.40) | S2 | R1 | `Drop it in. Two new words.` |
-| 102-155 (3.40-5.20) | S3 victory | R1 | none |
-| 156-239 (5.20-8.00) | S4 montage | R2 Medium, then Medium+, then Expert, 28 frames each, hard cuts | `Over 4,000 puzzles.` |
-| 240-323 (8.00-10.80) | S5 house | R3 | `Every win grows the house.` |
-| 324-395 (10.80-13.20) | S6 invite | R4 | `Everyone has something to say.` (to frame 467) |
-| 396-467 (13.20-15.60) | S7 Axel | R5 | (carried over) |
-| 468-539 (15.60-18.00) | S8 montage | R6a, R6b, R6c, 24 frames each | `Reverse. Double. Race the clock.` |
-| 540-611 (18.00-20.40) | S9 cup | R7 | `Your answers stay with them.` |
-| 612-677 (20.40-22.60) | S10 pit | R8 | `Where do the words go?` |
-| 678-749 (22.60-25.00) | S11 Panko | R9 | none |
-| 750-827 (25.00-27.60) | S12 dusk | R10, hard cut in, silence first | none |
-| 828-899 (27.60-30.00) | End card | not UI | `The house is very fond of you.`, fading in over frames 846-858 |
-
-- **Caption timing:** captions are visible from the first frame of their shot and have no fade-in at a hard cut. They fade out over 6 frames only where the next shot has no caption.
-- **SRT:** `captions-en.srt` carries the same text and timings.
-- **YouTube thumbnail:** `youtube-thumbnail-1280x720.png` is the 16:9 master's frame 60, downscaled.
+| 0-99 (0.00-3.33) | H1 | The whole board (CSS 432x768 from y 60): the L in the hand over PANT's fan, held 0.6 s over the checked PLANT slot, dropped; the T dragged over HEAR, held 0.6 s over the checked HEART slot | `One letter. Two real words.` |
+| 100-135 (3.33-4.53) | H1c | Hard cut to the settled victory card: three stars, PERFECT!, FLAWLESS!, the word journey PAY, PLAN, HEART | none |
+| 136-215 (4.53-7.20) | H2 | The day house at 0.75x, pushing in to the aquarium's invite card | `Solve puzzles.` / `Build them a home.` |
+| 216-243 (7.20-8.13) | H3 | The whole invite card for Axel, pushing in, over a dim blur of the house; it ends before the Invite tap | `13 friends to welcome.` |
+| 244-333 (8.13-11.13) | H4 | Three whole boards, 1 s each: EASY and MED+ from the drag into the drop, EXPERT from its drop | `Over 4,000 puzzles.` |
+| 334-379 (11.13-12.67) | H5a, H5b | The Jungle Hammock built (a jump cut in one framing) | `More rooms. More neighbors.` |
+| 380-451 (12.67-15.07) | H5c | Sloane's introduction sheet over the dimmed house | `Three moths.` / `All named Gerald.` |
+| 452-493 (15.07-16.47) | H6a | Panko, Archimedes and Ember in their rooms | `Who moved the spice jars?` (to 583) |
+| 494-583 (16.47-19.47) | H6b | Panko's sheet: "I must have moved them in my sleep. I must have." types in | (carried) |
+| 584-601 (19.47-20.07) | DAY | The whole house in the afternoon | `Where did the day go?` (to 676) |
+| 602-676 (20.07-22.57) | DUSK | Hard cut to the same camera at sunset, pushing in on the upper house | (carried) |
+| 677-694 (22.57-23.17) | H8a | Ember by her fire at dusk | `Ember is fond of you.` (to 766) |
+| 695-766 (23.17-25.57) | H8b | Ember's sheet: "I am fond of you, whatever my fire is up to. I want you to know that." types in and holds (a freeze) before her next sentence | (carried) |
+| 767-899 (25.57-30.00) | END | The real sunset house (K10 from clip 30, before any emote), pushing in on its upper rooms; the wordmark fades in at 771 | `It's a lovely house.` from 785, `Isn't it?` from 831 |
 
 ### 9:16 cut layout (1080x1920)
 
-- **Frames:** full-bleed native frames.
-  - S1 and S2: a 1.25x zoom centred on the centre of the union of the `puzzle-row-0` and `puzzle-row-1` boxes, taken from R1 frame 0.
-- **S7 and S11 lift:** the dialogue sheet sits at the bottom of the screen, under Play's Install button. So:
-  - place the source rows at CSS y 192-768 (px 480-1920) at output y 0-1440;
-  - fill output y 1440-1920 with the source's bottom 480 px, Gaussian blur sigma 30, brightness x0.6.
-- **Caption plaque:**
-  - A rectangle at x 60-1020 from y 150, filled `#F3E2BF` at 92% opacity, with an 8 px `#6B4A2E` border and a 3 px `#3B2416` outer line.
-  - Text: Figtree-Bold 76 px, ink `#3B2416`, centred, with 36 px inner padding.
-  - Measured widths: "Lift a letter." 409, "Over 4,000 puzzles." 700, "Where do the words go?" 854.
-  - If a line is wider than 888 at 76 px, try 68 px. If it is still wider, wrap to two lines at 76 px. "Drop it in. Two new words." fits at 68. "Everyone has something to say.", "Reverse. Double. Race the clock." and "Your answers stay with them." wrap to two lines.
-  - The plaque height is the text plus 2 x 36.
-- **Bottom clear zone:** nothing added (captions, wordmark, end-card text) may sit below y 1440. That is the bottom 25%, reserved for the Install button.
-- **End card:**
-  - `mobile/assets/environment/sky_dusk.webp` resized to 1080 wide, cropped to the 1920 rows starting at y 170, blur sigma 22, brightness x0.75.
-  - `wordmark.png` 820x205, centred, top at y 560.
-  - `The house is very fond of you.` in EpundaSlab-Italic 64 px (measured 759 px), `#FFF6E0` with a 3,3 px `#3B2416` shadow, centred, baseline y 940.
+- **Boards:** the phone screen from CSS y 60, full width at 2.5x. The wordmark, the difficulty chip, every row with its PICK/DROP tag and the fan's check and cross labels all show. The caption plaque covers the move pill.
+- **Dialogue sheets:** each resident's real sheet (portrait, name, words), from its top edge (found per frame on the pixels, so a sheet that grows as it types keeps its border) to the bottom of the screen. Ember's sheet stops at CSS 745, above the screen edge that cuts her name. Sheets are at 2.42x with a 4 px `#3B2416` outline and a soft shadow, centred between the caption and the clear zone. They sit over the resident's part of the house, dimmed to 40% and lightly blurred, as the game dims it behind a sheet.
+- **Caption plaque:** the game's own card frame (`assets/ui/panels/<skin>/card_*`, bright skin, dusk skin for the two dusk captions), Figtree-Bold 76 px (68 px when a line is wider than 844 px), ink `#3B2416`, top at y 120, or at y 300 and 360 over the boards so it sits on the move pill.
+- **Bottom clear zone:** nothing added (plaques, outlines, shadows, the wordmark, end-card lines) reaches y 1440. The edit asserts it for every caption and every outlined layer.
+- **End card:** the wordmark (760x190, centred at y 300), an elliptical darkening behind the wordmark and both lines (50% at y 440, 640 x 400 px, gone by y 840), and "It's a lovely house." / "Isn't it?" in Figtree-Bold 84 px `#FFF3DC` with a 4 px `#3B2416` shadow, centred at y 510 and 620.
 
 ### 16:9 master layout (1920x1080)
 
-**Background:** the game's own sky art, cover-cropped to 1920x1080 from the band centred at 45% of the scaled image's height, blur sigma 22, brightness x0.88.
-- `sky_day.webp` for frames 0-467.
-- A 15-frame crossfade to `sky_afternoon.webp` at frame 468, used through frame 749.
-- A hard cut to `sky_dusk.webp` at frame 750, on the music cut, used through frame 899.
-
-**Phone column:** the frame scaled to 572x1016 at x 674, y 32, with a 28 px corner-radius mask and a drop shadow (0, 12 px, blur 40, `#3B2416` at 45%). There is no device frame.
-
-**Caption plaque:**
-- Parchment plaque centred in x 80-620 at y 540, with the same styling as the 9:16 plaque.
-- Text Figtree-Bold 72 px, inner width 476, up to 3 lines.
-
-**Right panel (x 1330-1840):** a resident's idle sprite at 420x420, bottom at y 960.
-- `assets/characters/fox/idle.png` for S3 to S5 and S9 to S10.
-- `axolotl/idle.png` for S6.
-- None elsewhere.
-- **Never** a `robed*.png` sprite.
-
-**Per-shot overrides:**
-- **S1 and S2:** no phone column. The R1 row-union crop is scaled to 1180 wide at x 680-1860, centred vertically.
-- **S7:** no column. The dialogue sheet crop (from the sheet's top edge to CSS 768) is scaled to 1000 wide at x 760-1760, centred vertically, with the caption plaque on the left.
-- **S11:** the same sheet treatment. The left panel shows `assets/characters/pangolin/idle.png` at 420x420 instead of a caption.
-
-**End card:**
-- `sky_dusk.webp`, blur sigma 22, brightness x0.75.
-- Wordmark 760x190, centred, top y 330.
-- Line: EpundaSlab-Italic 60 px (measured 712 px), `#FFF6E0` with a 3,3 px shadow, centred, baseline y 700.
+- **Background:** the game's own sky art, blurred and darkened: `sky_day` to frame 243, `sky_afternoon` from the boards, `sky_dusk` from the sunset.
+- **Boards and house close-ups:** the 9:16 picture as a 608x1080 column 96 px from the right edge, between two 6 px `#3B2416` rules.
+- **Cards and sheets:** the 9:16 layout scaled as one group (never above 1.2x) into the area the caption leaves free.
+- **Captions:** top-left at x 96, y 72, 68 px.
+- **DAY, DUSK and END:** native wide views of the recordings (1500x844 CSS from 260 above the roof; the end card pulls back from 1200 to 1500 wide), with the wordmark at (960, 210) and the lines at y 400 and 500.
 
 ### Audio
 
-**Music:** the game's own beds from `mobile/assets/music/`. The offsets below were measured with ebur128 on 2026-09-22.
+**Music:** the game's own beds from `mobile/assets/music/`, phases 0 to 2 only, with no silence anywhere.
 
-| Trailer time | Bed | Start in file | Fades |
+| Trailer time | Bed | Start in file | Level and fades |
 |---|---|---|---|
-| 0.00-8.40 | `puzzle_phase0.mp3` | 0:02.00 (already about -16 LUFS momentary) | fade in 0.15 s; crossfade out 7.60-8.40 |
-| 7.60-25.00 | `home_phase0.mp3` | 0:25.00 (about -13 to -15 momentary) | crossfade in 7.60-8.40; **hard cut to silence at 25.00** (15 ms ramp, no audible tail) |
-| 25.00-25.40 | silence | none | none |
-| 25.40-30.00 | `home_phase2.mp3` | 1:11.00 (a -33 dip that swells to about -15 by 1:14) | fade in 0.3 s; fade out 28.80-30.00 |
+| 0.00-20.22 | `home_phase0.mp3` | 0:23.28 | segment -20 LUFS; 0.3 s crossfade out on the sunset cut |
+| 19.92-30.00 | `home_phase2.mp3` | 1:06.22 | segment -20 LUFS; 0.3 s crossfade in; fade out over the last 1.2 s |
 
-**SFX:** from `mobile/assets/sounds/`, placed at the frames logged in the events files. Only the files listed below may be used.
+**SFX:** from `mobile/assets/sounds/`, only these files: `letter_select` (a letter lifts), `valid_move` (a first valid move, as the game plays it: PLANT, SWING, CLOVER, PICKLED), `valid_move_2` (HEART, the second move), `perfect` and `star_pop_3` (the victory card), `ui_tap` (the invite card), `unlock` (the Jungle Hammock built), `dialogue` (once as each sheet appears). Never a `_dark` or `_peace` variant, `glitch`, `arrival` or `phase_change*`. `video/trailer-report.json` lists every placement.
 
-| Action | File |
-|---|---|
-| Letter pick | `letter_select.wav` |
-| First, second and third consecutive valid commit | `valid_move.wav`, `valid_move_2.wav`, `valid_move_3.wav` |
-| Each star appearing | `star_pop_1.wav`, `star_pop_2.wav`, `star_pop_3.wav` |
-| PERFECT title | `perfect.wav` |
-| Button taps (invite, Continue, menu) | `ui_tap.wav` |
-| Invite completes | `unlock.wav` |
-| A dialogue opens (once, not per character) | `dialogue.wav` |
-| Story choice | `story_answer.wav` |
-| Pit word tapped | `pit_devour.wav` |
+**Mix:** peaks held, then a two-pass linear `loudnorm` to I=-14, TP=-1, LRA=11, 48 kHz stereo. Measured: -14.0 LUFS integrated, true peak -1.4 dBTP, LRA 5.1.
 
-Do not use any `_dark` or `_peace` variant, `glitch.wav`, `arrival.wav` or `phase_change*`.
-
-**Mix:**
-- The music bus sits at about -20 LUFS short-term under the SFX, with SFX at their file level.
-- Final two-pass `loudnorm` to I=-14, TP=-1, LRA=11.
-- 48 kHz stereo.
-- Listen through once and confirm the three music joins land cleanly. If a join lands mid-phrase, move that bed's start forward in 0.5 s steps, never more than 2.0 s.
-
-### Encode
+### Rebuild
 
 ```
-ffmpeg -framerate 30 -i frames-9x16/%05d.png -i mix.wav -map 0:v -map 1:a \
-  -c:v libx264 -preset slow -crf 16 -profile:v high -pix_fmt yuv420p -r 30 \
-  -maxrate 16M -bufsize 32M -c:a aac -b:a 384k -ar 48000 -ac 2 \
-  -movflags +faststart -t 30 trailer-9x16-1080x1920.mp4
+cd mobile
+npx expo start --web --port 8081                          # the web build the recorder drives
+TRAILER2_WORK=/tmp/t2work node scripts/store/refresh/trailer2/record.mjs K1 K2 K2b K4 K5 K6 K7 K8 K9 K10 K12
+TRAILER2_WORK=/tmp/t2work node scripts/store/refresh/trailer2/edit.mjs      # both cuts, the mix and the SRT
+TRAILER2_WORK=/tmp/t2work node scripts/store/refresh/trailer2/install.mjs   # into video/: cuts, SRT, report, poster, events, thumbnail
 ```
 
-Encode the 16:9 master the same way from `frames-16x9/`. Then confirm with `ffmpeg -i`:
-- duration 00:00:30.00;
-- 1080x1920 (or 1920x1080) at 30 fps;
-- H.264 High and AAC at 48000 Hz stereo.
+`node scripts/store/buildTrailer.mjs` runs the three steps (`--edit-only` skips recording; clip ids re-record only those).
+
+`edit.mjs --frames=0,300,600` writes stills only; `edit.mjs 9x16` or `16x9` builds one cut. The encode is libx264 `-preset slow -crf 16 -profile:v high -maxrate 16M -bufsize 32M`, BT.709 tagged, AAC 384k requested, `+faststart`.
 
 ### Upload (owner)
 
@@ -804,7 +720,7 @@ Write this to `alt-text.tsv`. If a final crop shows something different, rewrite
     - No composited house state that cannot happen in the game.
 17. The trailer:
     - The Play video is the 9:16 cut.
-    - Real UI fills at least 80% of it (it is 92%), and real gameplay shows from frame 0.
+    - Real UI fills at least 80% of it (every frame is a recorded frame of the game; the end card adds only the wordmark and two lines over the real sunset house), and real gameplay shows from frame 0.
     - Nothing added sits in the bottom 25% of the 9:16 frame.
     - Captions are burned in and also uploaded as SRT.
 18. The live campaign `launch-2026-09`, its scripts and the `docs/` mirrors are untouched.

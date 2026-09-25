@@ -1,6 +1,6 @@
 /**
  * Capture core for the second trailer (trailer2). The same discipline as
- * ../recordTrailer.mjs (brief section 10): only local progression is seeded,
+ * the first trailer's recorder (brief section 10): only local progression is seeded,
  * everything on screen is reached through real UI input, the DOM is never
  * edited, and every request that is not to localhost is aborted (lib.mjs).
  *
