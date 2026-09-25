@@ -167,6 +167,7 @@ jest.mock('../services/masteryRecords', () => ({
 jest.mock('../services/phaseNarrative', () => ({
   getJourneyAtmosphereText: jest.fn(() => 'Warm and bright'),
   getPaceTrendMessage: jest.fn(() => 'You are getting faster.'),
+  getDifficultyShortName: jest.requireActual('../services/phaseNarrative').getDifficultyShortName,
 }));
 
 // ---------------------------------------------------------------------------

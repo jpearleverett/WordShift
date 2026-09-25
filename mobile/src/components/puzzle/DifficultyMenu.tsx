@@ -32,6 +32,7 @@ import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts'
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import type { UnbrokenWeaveMastery } from '../../services/masteryRecords';
 import { FONT_SIZE } from '../../theme/typeScale';
+import { getDifficultyName, getDifficultyShortName } from '../../services/phaseNarrative';
 
 // The bare mode emoji in the variant/combo selector and the challenge/blind/
 // weave toggles now render as generated candy sprites (shared with the
@@ -187,7 +188,7 @@ export function normalizeDifficulty(value: unknown): Difficulty {
  */
 export function getDifficultyChipLabel(value: unknown): string {
   const difficulty = normalizeDifficulty(value);
-  return difficulty === 'MEDIUM_PLUS' ? 'MED+' : difficulty;
+  return getDifficultyShortName(difficulty);
 }
 
 interface DifficultyMenuProps {
@@ -622,7 +623,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         <Text style={[styles.sectionTitle, { color: t.muted }]}>DIFFICULTY</Text>
         {DIFFICULTY_LEVELS.map(d => {
           const locked = d === 'EXPERT' && expertLocked;
-          const label = d === 'MEDIUM_PLUS' ? 'Medium Plus' : d.charAt(0) + d.slice(1).toLowerCase();
+          const label = getDifficultyName(d);
           return (
             <TouchableOpacity
               key={d}
@@ -652,7 +653,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                     { color: locked ? t.muted : (currentDifficulty === d ? t.title : t.body) },
                   ]}
                 >
-                  {locked ? '🔒 ' : ''}{d === 'MEDIUM_PLUS' ? 'MED+' : d}
+                  {locked ? '🔒 ' : ''}{getDifficultyShortName(d)}
                 </Text>
                 {locked && expertUnlockHint ? (
                   <Text style={[styles.lockedHintText, { color: t.muted }]}>{expertUnlockHint}</Text>

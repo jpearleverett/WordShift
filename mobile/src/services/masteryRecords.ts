@@ -289,7 +289,7 @@ export function resolveUnbrokenWeaveMastery(input: {
   if (rank === 1 && (difficultyClears.length === DIFFICULTIES.length || input.everyDifficultyHeld === true)) {
     rank = 2;
     title = 'Fivefold Weave';
-    nextObjective = 'Complete a flawless HARD or EXPERT Unbroken Weave.';
+    nextObjective = 'Complete a flawless HARD or EXPERT Unbroken Weave: no hints, no slipped drops, no undos.';
   }
   if (rank === 2 && hardFlawless) {
     rank = 3;

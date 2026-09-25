@@ -26,6 +26,7 @@ import { recordOfferingFulfillment } from './offeringRequests';
 import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants, getUnlockedVariants } from './puzzleVariety';
 import { enqueueHarvestBatch, getPendingHarvestSummary, recoverPendingHarvestCredits } from './wordHarvest';
 import { recordResonantChoices, recordUnbrokenWeaveVictory } from './masteryRecords';
+import { getUnbrokenWeaveNotFlawlessLine } from './phaseNarrative';
 import { RESONANT_MOVE_AMBER, RESONANT_BOARD_CAP_AMBER , FINALE_ARM_MIN_PUZZLES } from '../constants/gameBalance';
 
 import type { VictoryData, AmberBreakdown } from '../hooks/useGamePersistence';
@@ -363,8 +364,13 @@ async function computeVictory(input: VictoryInput): Promise<VictoryData> {
       let weave: Partial<VictoryData> = {};
       if (input.unbrokenWeave) {
         const { mastery, rankedUp } = await recordUnbrokenWeaveVictory(difficulty, flawless);
+        // Ranks 2-4 wait on flawless wins; say what broke this one.
+        const flawlessObjective = mastery.rank >= 2 && mastery.nextObjective !== null;
         weave = { unbrokenWeaveRank: mastery.rank, unbrokenWeaveTitle: mastery.title,
-          unbrokenWeaveNextObjective: mastery.nextObjective, unbrokenWeaveRankedUp: rankedUp };
+          unbrokenWeaveNextObjective: mastery.nextObjective, unbrokenWeaveRankedUp: rankedUp,
+          unbrokenWeaveNotFlawless: flawlessObjective && !flawless
+            ? getUnbrokenWeaveNotFlawlessLine({ hintsUsed, invalidAttempts, undosUsed })
+            : null };
       }
       return {
         ...weave,

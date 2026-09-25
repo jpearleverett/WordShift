@@ -144,7 +144,7 @@ jest.mock('../services/masteryRecords', () => ({
   getUnbrokenWeaveMastery: jest.fn(async () => ({
     rank: 2,
     title: 'Fivefold Weave',
-    nextObjective: 'Complete a flawless HARD or EXPERT Unbroken Weave.',
+    nextObjective: 'Complete a flawless HARD or EXPERT Unbroken Weave: no hints, no slipped drops, no undos.',
     wins: 4,
     flawlessWins: 2,
     difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'],
@@ -239,7 +239,7 @@ describe('Unbroken Weave presentation surfaces', () => {
       unbrokenWeaveMastery: {
         rank: 2,
         title: 'Fivefold Weave',
-        nextObjective: 'Complete a flawless HARD or EXPERT Unbroken Weave.',
+        nextObjective: 'Complete a flawless HARD or EXPERT Unbroken Weave: no hints, no slipped drops, no undos.',
         wins: 4,
         flawlessWins: 2,
         difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'],
@@ -251,7 +251,7 @@ describe('Unbroken Weave presentation surfaces', () => {
     expect(text).toContain('UNBROKEN WEAVE');
     expect(text).toContain('Each letter may cross the chain only once.');
     expect(text).toMatch(/Rank\s+2\s*:\s*Fivefold Weave/);
-    expect(text).toContain('Complete a flawless HARD or EXPERT Unbroken Weave.');
+    expect(text).toContain('Complete a flawless HARD or EXPERT Unbroken Weave: no hints, no slipped drops, no undos.');
     expect(findByA11yLabel(tree, 'Unbroken Weave, off. Each letter may cross the chain only once.')).not.toBeNull();
   });
 
@@ -278,7 +278,7 @@ describe('Unbroken Weave presentation surfaces', () => {
     expect(findByProp(tree, 'label', 'MASTERY')).not.toBeNull();
     expect(text).toContain('Unbroken Weave');
     expect(text).toMatch(/Rank\s+2\s*:\s*Fivefold Weave/);
-    expect(text).toContain('Complete a flawless HARD or EXPERT Unbroken Weave.');
+    expect(text).toContain('Complete a flawless HARD or EXPERT Unbroken Weave: no hints, no slipped drops, no undos.');
   });
 
   test('Victory renders rank progress and a conditional rank-up line', () => {
@@ -367,5 +367,28 @@ describe('one-time quiet-home introduction', () => {
       expect(text).not.toMatch(/[—–]/);
       expect(text.toLowerCase()).not.toContain('phase 5');
     }
+  });
+});
+
+describe('why a weave win was not flawless', () => {
+  const { getUnbrokenWeaveNotFlawlessLine } = require('../services/phaseNarrative');
+  test('names exactly what broke it, and says what flawless means', () => {
+    expect(getUnbrokenWeaveNotFlawlessLine({ hintsUsed: 0, invalidAttempts: 0, undosUsed: 1 }))
+      .toBe('Not flawless this time: 1 undo. A flawless weave has no hints, no slipped drops and no undos.');
+    expect(getUnbrokenWeaveNotFlawlessLine({ hintsUsed: 0, invalidAttempts: 1, undosUsed: 2 }))
+      .toBe('Not flawless this time: 1 slipped drop and 2 undos. A flawless weave has no hints, no slipped drops and no undos.');
+    expect(getUnbrokenWeaveNotFlawlessLine({ hintsUsed: 1, invalidAttempts: 2, undosUsed: 3 }))
+      .toMatch(/^Not flawless this time: 1 hint, 2 slipped drops and 3 undos\./);
+    expect(getUnbrokenWeaveNotFlawlessLine({ hintsUsed: 0, invalidAttempts: 0, undosUsed: 0 })).toBeNull();
+  });
+
+  test('the victory carries the reason while the next rank waits on flawless wins, and both cards show it', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const persistence = fs.readFileSync(path.join(__dirname, '../services/victoryPersistence.ts'), 'utf8');
+    expect(persistence).toContain('const flawlessObjective = mastery.rank >= 2 && mastery.nextObjective !== null;');
+    expect(persistence).toContain('unbrokenWeaveNotFlawless: flawlessObjective && !flawless');
+    const modal = fs.readFileSync(path.join(__dirname, '../components/puzzle/VictoryModal.tsx'), 'utf8');
+    expect(modal.match(/\{victoryData\.unbrokenWeaveNotFlawless\}/g)).toHaveLength(2);
   });
 });

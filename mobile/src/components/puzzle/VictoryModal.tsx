@@ -14,7 +14,7 @@ import {
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
 import { getVictoryDoubleAmount } from '../../services/victoryDoubleAmount';
-import { getVictoryTitle, getVictoryFeedback, getPhaseChangeNarrative, getRitualEchoHeader, getRitualEchoFooter, getPitMandatoryText, getPitMandatoryCTA, getAutoCollectCaption, getMandatoryHarvestText, getMandatoryHarvestCTA, getNextStreakMilestoneText, getFlawlessHonorific, getUnbrokenWeaveRankUpLine, getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel, getResonanceBonusLabel, isSilentVictoryBeat, getSwiftVictoriesToggleLabel, getSwiftVictoriesToggledMessage } from '../../services/phaseNarrative';
+import { getVictoryTitle, getVictoryFeedback, getPhaseChangeNarrative, getRitualEchoHeader, getRitualEchoFooter, getPitMandatoryText, getPitMandatoryCTA, getAutoCollectCaption, getMandatoryHarvestText, getMandatoryHarvestCTA, getNextStreakMilestoneText, getFlawlessHonorific, getUnbrokenWeaveRankUpLine, getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel, getResonanceBonusLabel, isSilentVictoryBeat, getSwiftVictoriesToggleLabel, getSwiftVictoriesToggledMessage, getDifficultyName } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
 import { AMBER_REWARDS, AUTO_COLLECT_PUZZLE_LIMIT } from '../../constants/gameBalance';
@@ -105,6 +105,7 @@ export interface VictoryData {
   unbrokenWeaveTitle?: string;
   unbrokenWeaveNextObjective?: string | null;
   unbrokenWeaveRankedUp?: boolean;
+  unbrokenWeaveNotFlawless?: string | null;
 }
 
 interface VictoryModalProps {
@@ -574,6 +575,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     {victoryData.unbrokenWeaveNextObjective}
                   </Text>
                 )}
+                {victoryData.unbrokenWeaveNotFlawless && (
+                  <Text style={[styles.compactWeaveObjective, { color: phaseTheme.modalSecondaryTextColor }]}>
+                    {victoryData.unbrokenWeaveNotFlawless}
+                  </Text>
+                )}
               </View>
             )}
             <View
@@ -826,7 +832,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   backgroundColor: phaseTheme.victoryGlowColor,
                 }]}
                 accessible
-                accessibilityLabel={`Unbroken Weave rank ${victoryData.unbrokenWeaveRank}, ${victoryData.unbrokenWeaveTitle}`}
+                accessibilityLabel={[`Unbroken Weave rank ${victoryData.unbrokenWeaveRank}, ${victoryData.unbrokenWeaveTitle}`, victoryData.unbrokenWeaveNextObjective, victoryData.unbrokenWeaveNotFlawless].filter(Boolean).join('. ')}
               >
                 <Text style={[styles.weaveProgressTitle, { color: phaseTheme.victoryTitleColor }]}>
                   UNBROKEN WEAVE
@@ -842,6 +848,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 {victoryData.unbrokenWeaveNextObjective && (
                   <Text style={[styles.weaveProgressLine, { color: phaseTheme.modalSecondaryTextColor }]}>
                     {victoryData.unbrokenWeaveNextObjective}
+                  </Text>
+                )}
+                {victoryData.unbrokenWeaveNotFlawless && (
+                  <Text style={[styles.weaveProgressLine, { color: phaseTheme.modalSecondaryTextColor }]}>
+                    {victoryData.unbrokenWeaveNotFlawless}
                   </Text>
                 )}
               </View>
@@ -1140,7 +1151,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     ) : (
                       <>
                         <View style={styles.bonusRow}>
-                          <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
+                          <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{getDifficultyName(difficulty)}</Text>
                           <View style={styles.amberValueRow}>
                             <Image source={AMBER_ICON} style={styles.amberIcon} />
                             <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor }]}>{baseAmber}</Text>
@@ -1239,7 +1250,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {firstCompBonus > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                              First {difficulty} Clear
+                              First {getDifficultyName(difficulty)} Clear
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.green }]}>+{firstCompBonus}</Text>
                           </View>

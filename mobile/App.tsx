@@ -131,6 +131,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticSuccess, hapticWarning, hapticError, hapticSelection, hapticMoveCommit } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
+  getDifficultyName,
   getLoadingMessage,
   getRitualMicroEvent,
   isSilentVictoryBeat,
@@ -5766,7 +5767,7 @@ function MainApp() {
               if (opening) measureDifficultyChip();
               puzzleActions.setShowDifficultyMenu(opening);
             }}
-            accessibilityLabel={`Difficulty ${chipDifficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
+            accessibilityLabel={`Difficulty ${getDifficultyName(chipDifficulty)}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
             {/* The tier's wax-seal emblem (the same art the setup menu rows

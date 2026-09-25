@@ -5,7 +5,7 @@ import { getPhaseTheme } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { PIXEL_FONT_BOLD, BODY_FONT_BOLD, BODY_FONT_ITALIC } from '../../theme/fonts';
 import { PanelCard } from '../ui/PanelCard';
-import { getShareCardTagline } from '../../services/phaseNarrative';
+import { getShareCardTagline, getDifficultyShortName } from '../../services/phaseNarrative';
 import { pickShareIntrigueTagline } from '../../services/shareResults';
 import type { ShareableResult, MoveOutcome } from '../../services/shareResults';
 import { WEB_LANDING_URL } from '../../constants/links';
@@ -168,7 +168,7 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
 
   const decay = getShareDecay(phase);
   const spoilerSafe = !result.isDaily;
-  const diffLabel = result.difficulty === 'MEDIUM_PLUS' ? 'MED+' : result.difficulty;
+  const diffLabel = getDifficultyShortName(result.difficulty);
 
   return (
     <View

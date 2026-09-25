@@ -234,7 +234,7 @@ describe('difficulty chip fallback (blank-pill regression)', () => {
     // The tier mark is the generated wax-seal emblem keyed by the NORMALIZED
     // difficulty (an unset/legacy value would otherwise index a missing sprite).
     expect(APP_TSX).toMatch(/DIFFICULTY_ART\[chipDifficulty\]/);
-    expect(APP_TSX).toMatch(/Difficulty \$\{chipDifficulty\}/);
+    expect(APP_TSX).toMatch(/Difficulty \$\{getDifficultyName\(chipDifficulty\)\}/);
     // The raw value must no longer reach the chip Text directly.
     expect(APP_TSX).not.toMatch(/\{puzzle\.difficulty === 'MEDIUM_PLUS' \? 'MED\+' : puzzle\.difficulty\}/);
   });

@@ -166,7 +166,7 @@ describe('Unbroken Weave mastery', () => {
         hardFlawless: false,
       },
       rank: 2,
-      nextObjective: 'Complete a flawless HARD or EXPERT Unbroken Weave.',
+      nextObjective: 'Complete a flawless HARD or EXPERT Unbroken Weave: no hints, no slipped drops, no undos.',
     },
     {
       name: 'Seamless Dark',
