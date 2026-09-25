@@ -153,7 +153,8 @@ CLIPS.K11h = boardMoveClip('K11h', { state: 'P2N9', key: 'std_medium', target: '
 // ---------------------------------------------------------------- house clips
 
 const houseProbe = page => async () => ({ chrome: await homeChrome(page), den: await roomBox(page, 'Cozy Den'), emote: await emoteClashes(page) });
-const noEmote = page => async (f, p) => (p?.emote?.length ? `emote over ${p.emote.join(', ')}` : null);
+/** Emote puffs over a plaque fail a take only inside the frames the edit uses ([lo, hi]). */
+const noEmote = (page, lo = -Infinity, hi = Infinity) => async (f, p) => (f >= lo && f <= hi && p?.emote?.length ? `emote over ${p.emote.join(', ')}` : null);
 async function settleHome(page) {
   await page.waitForTimeout(3500);
   await dismissIntros(page);
@@ -203,7 +204,7 @@ const SLOANE = ['Three moths live in my fur.', 'I call all three Gerald.', 'They
 CLIPS.K7 = () => retake('K7', () => withSession('BUILD24', { w: 432, h: 768, dsf: 5 }, async page => {
   await settleHome(page);
   const card = page.getByRole('button', { name: 'Build Jungle Hammock for 200 amber', exact: true }).first();
-  await panUntil(page, async () => { const b = await card.boundingBox(); return b ? b.y + b.height / 2 : null; }, 450, 3);
+  await panUntil(page, async () => { const b = await card.boundingBox(); return b ? b.y + b.height / 2 : null; }, 450, 8);
   await page.waitForTimeout(1500);
   const a = {
     0: async () => { await card.click({ force: true }); return { action: 'tap the Jungle Hammock card', sfx: 'ui_tap.wav' }; },
@@ -238,7 +239,7 @@ CLIPS.K8 = () => retake('K8', () => withSession('D', { w: 432, h: 768, dsf: 5 },
       if (t && !PANKO.startsWith(t)) throw new RetakeError(`K8: the page reads "${t.slice(0, 60)}"`);
       if (complete === null && t === PANKO) complete = f;
       return complete !== null ? complete + 95 : null;
-    }, afterFrame: combine(noToast(page), noEmote(page)) });
+    }, afterFrame: combine(noToast(page), noEmote(page, 0, 59)) });
   out.marks = { revealComplete: complete };
   await writeFile(path.join(WORK, 'events', 'K8.json'), JSON.stringify(out, null, 1) + '\n');
   return out;
@@ -274,7 +275,7 @@ CLIPS.K12 = () => retake('K12', () => withSession('P2N9E', { w: 432, h: 768, dsf
       if (b?.blocks?.[0] && !EMBER1.startsWith(b.blocks[0].text) && !b.blocks[0].text.startsWith(EMBER1)) throw new RetakeError(`K12: the page reads "${b.text.slice(0, 60)}"`);
       if (full === null && b?.blocks?.[0]?.text === EMBER1) full = f;
       return full !== null ? full + 75 : null;
-    }, afterFrame: combine(noToast(page), noEmote(page)) });
+    }, afterFrame: combine(noToast(page), noEmote(page, 20, 39)) });
   out.marks = { block1Complete: full };
   await writeFile(path.join(WORK, 'events', 'K12.json'), JSON.stringify(out, null, 1) + '\n');
   return out;

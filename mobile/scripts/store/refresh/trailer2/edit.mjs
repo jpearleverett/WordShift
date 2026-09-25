@@ -98,41 +98,58 @@ function targetBlocks(id, f, sentences) {
 function liftStrip(id, frames, sentences, { useBlocksX = false } = {}) {
   const last = frames[frames.length - 1];
   const fin = targetBlocks(id, last, sentences) ?? fail(`${id}: no target blocks at ${last}`);
+  // The intro card has no bubble testid: frame it on the sentences themselves.
+  if (!fin.bubble) useBlocksX = true;
   const x0 = useBlocksX ? Math.min(...fin.hits.map(q => q.x)) - 14 : fin.bubble.x;
   const x1 = useBlocksX ? Math.max(...fin.hits.map(q => q.x + q.w)) + 14 : fin.bubble.x + fin.bubble.w;
-  const h = fin.hits[fin.hits.length - 1].y + fin.hits[fin.hits.length - 1].h - fin.hits[0].y + 20;
+  // Margins: 10 CSS around the target sentences, never reaching a neighbouring
+  // block (sentence blocks sit 7 apart).
+  const firstT = fin.hits[0], lastT = fin.hits[fin.hits.length - 1];
+  const others = fin.all.filter(q => !fin.hits.includes(q));
+  const above = others.filter(q => q.y + q.h <= firstT.y + 1).map(q => firstT.y - (q.y + q.h));
+  const below = others.filter(q => q.y >= lastT.y + lastT.h - 1).map(q => q.y - (lastT.y + lastT.h));
+  const mTop = Math.min(10, ...above.map(g => g - 2)), mBot = Math.min(10, ...below.map(g => g - 2));
+  const h = lastT.y + lastT.h - firstT.y + mTop + mBot;
   const font = fin.hits[0].fontPx;
-  // top per frame: first target block's top - 10; before it exists, its first known top
-  const firstKnown = frames.map(f => targetBlocks(id, f, sentences)).find(Boolean);
-  const raw = frames.map(f => (targetBlocks(id, f, sentences)?.hits[0].y ?? firstKnown.hits[0].y) - 10);
-  const smooth = raw.map((_, i) => { const w = raw.slice(Math.max(0, i - 2), i + 3); return w.reduce((a, b) => a + b, 0) / w.length; });
+  // Per frame the strip runs from the first target block's top to the last
+  // one's bottom: the sheet springs as it rises and the text grows as it types,
+  // so the strip tracks both edges exactly (a lagging average would let a
+  // neighbouring sentence in). Every frame must already carry a target block.
+  const tops = [], bots = [];
+  frames.forEach(f => {
+    const t = targetBlocks(id, f, sentences) ?? fail(`${id} f${f}: no target block yet`);
+    const l = t.hits[t.hits.length - 1];
+    tops.push(t.hits[0].y - mTop); bots.push(l.y + l.h + mBot);
+  });
   // assert: no other block inside the strip on any frame
   frames.forEach((f, i) => {
     const b = P(id)[f]?.blocks; if (!b) return;
     for (const q of b.blocks) {
       const isTarget = sentences.some(s => s.startsWith(q.text));
-      const inside = q.y < smooth[i] + h - 2 && q.y + q.h > smooth[i] + 2;
+      const inside = q.y < bots[i] - 2 && q.y + q.h > tops[i] + 2;
       if (inside && !isTarget) fail(`${id} f${f}: block "${q.text}" inside the strip`);
     }
   });
   const k = Math.min(68 / font, 1040 / (x1 - x0));
-  return { x0, x1, h, k, tops: smooth, frames, font };
+  return { x0, x1, h, k, tops, bots, frames, font };
 }
 function liftShot(from, to, id, frames, sentences, opts = {}) {
   const st = liftStrip(id, frames, sentences, opts);
   const w = (st.x1 - st.x0) * st.k, hh = st.h * st.k;
-  const place = { x: 540 - w / 2, y: 640 - hh / 2, w, h: hh };
+  const idx = t => Math.max(0, Math.min(st.frames.length - 1, t));
+  const bottomY = 640 + hh / 2;
+  const hAt = rel => st.bots[idx(rel)] - st.tops[idx(rel)];
+  const place = (_k, t) => { const hi = hAt(t - from) * st.k; return { x: 540 - w / 2, y: bottomY - hi, w, h: hi }; };
   const vp = K[id].ev.viewport;
   const bw = 276 * (vp.width / 432), bh = bw * 16 / 9;
   const back = css2src(id, { x: (st.x0 + st.x1) / 2 - bw / 2 < 0 ? 0 : Math.min(vp.width - bw, (st.x0 + st.x1) / 2 - bw / 2), y: vp.height - bh, w: bw, h: bh });
-  const idx = t => Math.max(0, Math.min(st.frames.length - 1, t));
   const push = opts.push ?? 1.0;
   return { from, to, layers: [
     { kind: 'frame', clip: id, src: rel => st.frames[idx(rel)], view: back, blur: 14, brightness: 0.62 },
     { kind: 'frame', clip: id, src: rel => st.frames[idx(rel)], outline: { px: 4, color: '#3B2416', shadowPx: 18 },
       view: rel => {
         const u = (to - from) ? rel / (to - from) : 0, z = 1 + (push - 1) * easeIO(u);
-        const r = { x: st.x0, y: st.tops[idx(rel)], w: st.x1 - st.x0, h: st.h };
+        const r = { x: st.x0, y: st.tops[idx(rel)], w: st.x1 - st.x0, h: hAt(rel) };
         const c = { x: r.x + r.w / 2, y: r.y + r.h / 2 };
         return css2src(id, { x: c.x - r.w / z / 2, y: c.y - r.h / z / 2, w: r.w / z, h: r.h / z });
       }, place },
@@ -191,15 +208,20 @@ const c0 = 8;
   shots.push({ id: 'S1d', from: 32, to: 35, layers: [
     { kind: 'frame', clip: K1, src: rel => 66 + rel, view: backdropView(K1, bandB), blur: 36, brightness: 0.55 },
     { kind: 'frame', clip: K1, src: rel => 66 + rel, view: css2src(K1, bandB), place: pB }] });
-  // f36-65 the victory card strip: stars, PERFECT!, FLAWLESS!
+  // f36-65 the victory card: stars, PERFECT!, FLAWLESS! and the word journey
+  // (PAY, PLAN, HEART), filling the width from y 330 to the clear zone. The
+  // crop is the settled card's width (the "results" probe box is the whole
+  // screen, so it is measured from the settled frame instead: card x 36-396)
+  // and ends in the parchment between the journey and the amber breakdown.
   const v = P(K1)[kc + 40]?.victory?.boxes ?? fail('K1: no victory boxes');
-  const card = v.results ?? fail('K1: no results box');
   const rib = v.ribbon ?? fail('K1: no ribbon box');
-  const strip = { x: card.x, y: card.y, w: card.w, h: rib.y + rib.h + 8 - card.y };
-  const k = 1040 / strip.w;
+  const cardX0 = 36, cardX1 = 396, cutY = 414;
+  if (rib.y + rib.h > cutY - 60) fail('K1: the ribbon sits too low for the card crop');
+  const h = (cardX1 - cardX0) * 1110 / 1080;
+  const cardCrop = { x: cardX0, y: cutY - h, w: cardX1 - cardX0, h };
   shots.push({ id: 'S1e', from: 36, to: 65, layers: [
-    { kind: 'frame', clip: K1, src: rel => kc + rel * 2, view: backdropView(K1, strip), blur: 28, brightness: 0.7 },
-    { kind: 'frame', clip: K1, src: rel => kc + rel * 2, view: css2src(K1, strip), place: { x: 20, y: 400, w: 1040, h: strip.h * k } }] });
+    { kind: 'frame', clip: K1, src: rel => kc + rel * 2, view: backdropView(K1, cardCrop), blur: 28, brightness: 0.7 },
+    { kind: 'frame', clip: K1, src: rel => kc + rel * 2, view: css2src(K1, cardCrop), place: { x: 0, y: 330, w: 1080, h: 1110 } }] });
 }
 
 // S2: the valley (K2, 60 fps, real time), crop A pushing in to crop B.
@@ -232,7 +254,9 @@ shots.push({ id: 'S6', ...liftShot(172, 198, 'K2b', range(56, 82), ['Oh!', 'Hell
 // S7: the volume run: SWING, CLOVER, PICKLED.
 shots.push({ id: 'S7a', ...boardShot(199, 211, 'K4', { start: 0, rate: 1 }, 0, 1, range(0, 12)) });
 shots.push({ id: 'S7b', ...boardShot(212, 224, 'K5', { start: 0, rate: 1 }, 0, 1, range(0, 12)) });
-shots.push({ id: 'S7c', ...boardShot(225, 250, 'K6', { start: 0, rate: 1 }, 0, 1, range(0, 25)) });
+// K6 starts at its release (f13) like K4 and K5: before it the arc shows the
+// neutral preview ghosts (LPICKED, PLICKED...) over the target row.
+shots.push({ id: 'S7c', ...boardShot(225, 250, 'K6', { start: 13, rate: 1 }, 0, 1, range(13, 38)) });
 // S8: the Jungle Hammock is built (jump cut in the same framing).
 {
   const v = phoneView('K7a', 0);
@@ -249,8 +273,9 @@ shots.push({ id: 'S9', ...liftShot(291, 396, 'K7b', range(0, 105), ['Three moths
   const z = s => ({ x: v.x + v.w * (1 - 1 / s) / 2, y: v.y + v.h * (1 - 1 / s) / 2, w: v.w / s, h: v.h / s });
   shots.push({ id: 'S10', from: 397, to: 449, layers: [{ kind: 'frame', clip: 'K8', src: { start: 7, rate: 1 }, view: [{ at: 0, ...z(1) }, { at: 1, ...z(1.03), ease: 'inOut' }] }] });
 }
-// S11: "I must have moved them in my sleep." / "I must have." typing in; completes on f476.
-shots.push({ id: 'S11', ...liftShot(450, 555, 'K8', range(fc8 - 26, fc8 + 79), ['I must have moved them in my sleep.', 'I must have.'], { push: 1.03 }) });
+// S11: "I must have moved them in my sleep." / "I must have." typing in; completes on f472,
+// four frames before the music's hard stop at f476.
+shots.push({ id: 'S11', ...liftShot(450, 555, 'K8', range(fc8 - 22, fc8 + 83), ['I must have moved them in my sleep.', 'I must have.'], { push: 1.03 }) });
 // S12/S13: the locked frame: afternoon, then the same frame at sunset, pulling back.
 const wide = (id, spec) => {
   const f = 0, ch = P(id)[f].chrome, cx = houseX(id, f);
@@ -343,7 +368,9 @@ const endCss = `.e { font-family: 'Figtree-Bold'; font-size: 84px; color: #FFF3D
 const e1 = await renderHtml(`<div class="e">It's a lovely house.</div>`, endCss, { width: 1400 });
 const e2 = await renderHtml(`<div class="e">Isn't it?</div>`, endCss, { width: 1400 });
 const mark = await sharp(A('ui/wordmark.png')).resize(760, 190).png().toBuffer();
-const vignette = await sharp(Buffer.from(`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="g" cx="540" cy="300" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="0.2"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#g)"/></svg>`)).png().toBuffer();
+// The gradient ends at y 820 (cy 300 + r 520); the image stops at 840 so
+// nothing added reaches the bottom clear zone.
+const vignette = await sharp(Buffer.from(`<svg width="${W}" height="840" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="g" cx="540" cy="300" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="0.2"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="840" fill="url(#g)"/></svg>`)).png().toBuffer();
 captions.push({ id: 'vig', png: vignette, left: 0, top: 0, from: 796, to: 899, fadeIn: 12 });
 captions.push({ id: 'mark', png: mark, left: 540 - 380, top: 300 - 95, from: 800, to: 899, fadeIn: 10 });
 captions.push({ id: 'E1', png: e1.png, left: Math.round(540 - e1.width / 2), top: Math.round(510 - e1.height / 2), from: 807, to: 899 });
