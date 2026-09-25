@@ -105,18 +105,19 @@ test('a fresh install is walked from the cold-open board to a complete onboardin
   await expect(page.getByText(/Hello up there/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toHaveCount(0);
 
-  // Invite Fox. The home screen raises the invite prompt on its own after the
-  // reveal delay (INVITE_PROMPT_REVEAL_DELAY_MS) and hides the den's free
-  // invite chip once the prompt is up. Pin the EFFECT deterministically: the
-  // chip is never tapped here, so a regression in the automatic invite cannot
-  // hide behind the tap route. (The chip's own visibility is not asserted
-  // first: the polls above can outlast the 2.6 s delay, so by the time this
-  // line runs the prompt may already be up and the chip already gone.)
+  // Invite Fox. Ember's greeting asks to be invited in and waits: the visitor
+  // invite never opens on its own (it used to open on a timer while the
+  // greeting was still being read, which looked like the card dismissing
+  // itself). Her card's button opens it; so does the den chip (next test).
   const denChip = page.getByRole('button', { name: 'Invite animal to Cozy Den for free', exact: true });
   const welcome = page.getByRole('button', { name: 'Welcome friend', exact: true });
+  await page.waitForTimeout(4000);
+  await expect(welcome).toHaveCount(0);
+  await expect(page.getByText(/Will you invite me in/)).toBeVisible();
+  await expect(denChip).toBeVisible();
+  await tapFoxCard(page, 'Come on in!');
   await expect(welcome).toBeVisible({ timeout: 10_000 });
-  // The greeting gets its own readable beat, then yields to the invitation.
-  // It must not remain mounted as a second card beneath the visitor modal.
+  // The greeting yields to the invitation instead of staying mounted beneath it.
   await expect(page.getByText(/Hello up there/)).toHaveCount(0);
   await expect(denChip).toHaveCount(0);
   // The nameplate upper-cases its label.
@@ -180,6 +181,23 @@ test('a fresh install is walked from the cold-open board to a complete onboardin
   expect(progress.puzzlesSolved).toBe(1);
   expect(progress.amber ?? 0).toBeGreaterThan(0);
   expect(await page.evaluate(() => localStorage.getItem('wordshift_tutorial_completed'))).toBe('true');
+});
+
+test('tapping the den also invites Ember in during onboarding', async ({ page }) => {
+  await openColdOpenBoard(page);
+  await solveOpenerBoard(page);
+  const results = page.getByLabel('Results', { exact: true });
+  const continueButton = results.getByRole('button', { name: 'Continue', exact: true });
+  await expect(continueButton).toBeVisible({ timeout: 30_000 });
+  await continueButton.click();
+  await expect.poll(() => readOnboardingStep(page)).toBe('home_empty');
+  const denChip = page.getByRole('button', { name: 'Invite animal to Cozy Den for free', exact: true });
+  await expect(denChip).toBeVisible();
+  await denChip.click();
+  const welcome = page.getByRole('button', { name: 'Welcome friend', exact: true });
+  await expect(welcome).toBeVisible({ timeout: 10_000 });
+  await welcome.click();
+  await expect.poll(() => readOnboardingStep(page)).toBe('fox_invited');
 });
 
 test('skipping from the cold-open board confirms first and lands on a clean home', async ({ page }) => {

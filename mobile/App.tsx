@@ -1262,6 +1262,10 @@ function MainApp() {
   }), [transitionTo, puzzleActions.startNewGame, puzzleActions.setGameState, puzzleActions.clearBoard, puzzleActions.setShowConfetti, persistenceActions.refreshStats, victoryActions.resetVictory]);
 
   const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks);
+  // Onboarding (home_empty): Ember's greeting card asks to be invited in, and
+  // its button asks HomeScreen to open the visitor invite.
+  const [homeInviteRequest, setHomeInviteRequest] = useState(0);
+  const requestHomeInvite = useCallback(() => setHomeInviteRequest(n => n + 1), []);
 
   const getStoryContext = useCallback(async (): Promise<StoryContext> => {
     const progress = await getFullProgress();
@@ -5351,6 +5355,7 @@ function MainApp() {
           <View style={{ flex: 1 }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <HomeScreen
+              inviteRequest={homeInviteRequest}
               onOpenStory={() => { storyFlow.openJournal().catch(() => {}); }}
               storyOverlayActive={storyOverlayActive || phaseTransitionEvent !== null}
               onOverlayActivityChange={setHomeOverlayActive}
@@ -5398,7 +5403,9 @@ function MainApp() {
                   variant="dialogue"
                   text={onboardingActions.getOnboardingFoxText()}
                   buttonText={onboardingActions.getOnboardingButtonText()}
-                  onContinue={onboardingFlow.onboardingStep === 'home_empty' ? undefined : onboardingActions.handleOnboardingContinue}
+                  // home_empty: the button opens the visitor invite (so does
+                  // the den chip); the invite never opens on its own.
+                  onContinue={onboardingFlow.onboardingStep === 'home_empty' ? requestHomeInvite : onboardingActions.handleOnboardingContinue}
                   showSkip={true}
                   onSkip={onboardingActions.handleSkipOnboarding}
                   position={onboardingFlow.onboardingStep === 'home_empty' ? 'middle' : 'bottom'}

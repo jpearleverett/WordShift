@@ -373,6 +373,8 @@ export function useOnboardingFlow(
 
   const getOnboardingButtonText = useCallback((): string => {
     switch (onboardingStep) {
+      case 'home_empty':
+        return 'Come on in!';
       case 'fox_invited': {
         const lines = ONBOARDING_FOX_LINES.fox_invited;
         if (onboardingLineIndex === 0) return 'Nice to meet you!';

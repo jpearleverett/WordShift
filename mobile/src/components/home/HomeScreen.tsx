@@ -250,6 +250,12 @@ interface HomeScreenProps {
   onboardingStep?: OnboardingStep;
   /** Advance onboarding to next step */
   onAdvanceOnboarding?: (step: OnboardingStep) => Promise<void>;
+  /**
+   * Onboarding (home_empty): bumped when the player presses the button on
+   * Ember's greeting card. Opens the visitor invite exactly like tapping the
+   * den; the invite never opens on its own.
+   */
+  inviteRequest?: number;
   /** Whether a phase transition is pending in the pit */
   pitPhaseReady?: boolean;
   /** Persisted vertical pan position for the house scene */
@@ -624,13 +630,12 @@ let heavyHarvestNudgeShownThisSession = false;
 // intro cards never flicker over each other.
 const GATED_ROOM_INTRO_SETTLE_MS = 500;
 
-// Onboarding (home_empty): how long the empty-home reveal breathes before the
-// invite prompt slides in. Long enough for the player to read Ember's ~15-word
-// payoff line ("Hello up there!") before the modal scrim covers it. The safety
-// net below stays a short beat BEHIND this so it never preempts the readable
-// pause on the happy path (it only fires when the primary invite never armed).
-const INVITE_PROMPT_REVEAL_DELAY_MS = 2600;
-const INVITE_PROMPT_SAFETY_DELAY_MS = INVITE_PROMPT_REVEAL_DELAY_MS + 200;
+// Onboarding (home_empty): how long the home waits before re-reading its data
+// when the free invite has not resolved. The invite itself opens only when the
+// player acts (the den chip or Ember's button): it used to open on a 2.6 s
+// timer, covering Ember's "tap it to invite me in" while it was still being
+// read, which looked like the card dismissing itself.
+const INVITE_DATA_RECOVERY_DELAY_MS = 2800;
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
@@ -653,6 +658,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   pitPhaseReady,
   onboardingStep,
   onAdvanceOnboarding,
+  inviteRequest = 0,
   initialHousePanY = null,
   onHousePanChange,
   onHouseCompleted,
@@ -1348,45 +1354,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     void recheckAffordability().catch(handleHomeLoadFailure);
   }, [homeAmber, recheckAffordability, handleHomeLoadFailure]);
 
-  // Onboarding: auto-show invite prompt when data is loaded during home_empty.
-  // Deferred ~2.6s so the empty-home reveal (the little den) lands FIRST AND the
-  // player can comfortably READ Ember's payoff line before the modal scrim
-  // covers it — the invite prompt's "Hello up there!" then reads as a response
-  // to the player discovering the den, not a modal that buries the moment under
-  // its scrim too fast. Tracked timer, cleared if the step/unlock changes.
+  // Onboarding: the player asked to let Ember in from her greeting card. Open
+  // the same visitor invite the den chip opens; if the free invite has not
+  // resolved yet, remember the request and open it once it does.
+  const pendingInviteRequestRef = useRef(false);
+  const lastInviteRequestRef = useRef(inviteRequest);
   useEffect(() => {
-    if (onboardingStep === 'home_empty' && hasHomeProgress && unlockFlow.nextUnlock) {
-      if (unlockFlow.nextUnlock.type === 'character' && unlockFlow.nextUnlock.cost === 0) {
-        const t = setTimeout(() => setShowInvitePrompt(true), INVITE_PROMPT_REVEAL_DELAY_MS);
-        return () => clearTimeout(t);
-      }
+    if (inviteRequest === lastInviteRequestRef.current) return;
+    lastInviteRequestRef.current = inviteRequest;
+    if (onboardingStep !== 'home_empty') return;
+    pendingInviteRequestRef.current = true;
+  }, [inviteRequest, onboardingStep]);
+  useEffect(() => {
+    if (!pendingInviteRequestRef.current || onboardingStep !== 'home_empty') return;
+    const next = unlockFlow.nextUnlock;
+    if (hasHomeProgress && next && next.type === 'character' && next.cost === 0) {
+      pendingInviteRequestRef.current = false;
+      setShowInvitePrompt(true);
     }
-  }, [onboardingStep, unlockFlow.nextUnlock, hasHomeProgress, setShowInvitePrompt]);
+  }, [inviteRequest, onboardingStep, unlockFlow.nextUnlock, hasHomeProgress, setShowInvitePrompt]);
 
   // Onboarding safety net: home_empty is the single most fragile moment in the
-  // funnel — the FoxGuide has no Continue button, so the ONLY way forward is the
-  // invite prompt appearing. If data is slow or `nextUnlock` never resolves to
-  // the free Fox invite, a new player stalls on a dead home screen and bounces.
-  // After a short delay, self-heal: reload data (re-evaluates the invite) when
-  // the unlock hasn't resolved, or force-show the invite when it has. The effect
-  // re-runs as state changes, retrying until recovered (capped to avoid a
-  // pathological reload loop on a genuinely corrupt install).
+  // funnel, and inviting Ember is the only way forward. If data is slow or
+  // `nextUnlock` never resolves to the free Fox invite, the den chip and the
+  // card's button would have nothing to open. After a short delay, reload data
+  // (re-evaluating the invite), retrying as state changes, capped to avoid a
+  // pathological reload loop on a genuinely corrupt install. It never opens
+  // the invite itself: that waits for the player.
   useEffect(() => {
     if (onboardingStep !== 'home_empty') return;
-    // Already in a good state — invite is up with valid data.
-    if (unlockFlow.showInvitePrompt && unlockFlow.nextUnlock) return;
+    const next = unlockFlow.nextUnlock;
+    if (next && next.type === 'character' && next.cost === 0) return;
     const t = setTimeout(() => {
-      const next = unlockFlow.nextUnlock;
-      if (next && next.type === 'character' && next.cost === 0) {
-        setShowInvitePrompt(true);
-      } else if (homeEmptyRecoveryAttemptsRef.current < 5) {
-        // Unlock data hasn't resolved (or isn't the free invite yet) — reload.
+      if (homeEmptyRecoveryAttemptsRef.current < 5) {
         homeEmptyRecoveryAttemptsRef.current += 1;
         void loadAllData().catch(handleHomeLoadFailure);
       }
-    }, INVITE_PROMPT_SAFETY_DELAY_MS);
+    }, INVITE_DATA_RECOVERY_DELAY_MS);
     return () => clearTimeout(t);
-  }, [onboardingStep, unlockFlow.showInvitePrompt, unlockFlow.nextUnlock, setShowInvitePrompt, loadAllData, handleHomeLoadFailure]);
+  }, [onboardingStep, unlockFlow.nextUnlock, loadAllData, handleHomeLoadFailure]);
 
   // Challenge Mode intro (one-time, Fox-led, after 15 puzzles).
   useEffect(() => {
