@@ -2866,7 +2866,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(function HouseWo
                     style={styles.foundationImageInner}
                     resizeMode="stretch"
                   />
-                  {storyKeepsake && onInspectStory && <StoryWorldObject keepsake={storyKeepsake} onPress={onInspectStory} />}
+                  {storyKeepsake && onInspectStory && (
+                    <StoryWorldObject
+                      keepsake={storyKeepsake}
+                      onPress={onInspectStory}
+                      houseWidth={HOUSE_WIDTH}
+                      tintColor={houseTint.color}
+                      tintOpacity={pitTintOpacity}
+                    />
+                  )}
                 </View>
 
                 {/* Its fingers round the walls' top corners, in front of the house. */}
