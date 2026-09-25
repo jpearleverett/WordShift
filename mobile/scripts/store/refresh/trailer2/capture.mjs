@@ -19,7 +19,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launch, gitHead, srcClean, visibleGlitchTexts } from '../lib.mjs';
-import { stageState } from '../states.mjs';
 
 export const mobile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 export const WORK = process.env.TRAILER2_WORK || path.join(os.tmpdir(), 'wordshift-trailer2');
@@ -68,10 +67,49 @@ export async function frameWords(page) {
   });
 }
 
-/** Boot a fresh install in a window of the clip's size and stage a seeded state. */
-export async function boot(stateId, { w = 432, h = 768, dsf = 2.5 } = {}) {
-  const ctx = await launch({ width: w, height: h, dsf, reducedMotion: false, clock: true });
-  await stageState(ctx.page, stateId);
+/**
+ * The date every clip is recorded on. The game's live events are pure date
+ * math (the full-moon event puts a moon disc in the dusk sky and badges on
+ * the daily card on 2026-09-25..27 and about 10-25..27), so the page clock is
+ * pinned to an ordinary day and every seeded "today" follows it.
+ */
+export const PINNED_DAY = process.env.TRAILER2_DAY || '2026-10-06';
+export function pinnedDate() {
+  const [y, m, d] = PINNED_DAY.split('-').map(Number);
+  return new Date(y, m - 1, d, 17, 30, 0);
+}
+const realLocalDay = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
+
+/** A browser whose page clock starts at the pinned day and then flows. */
+export async function launchPinned({ w = 432, h = 768, dsf = 2.5 } = {}) {
+  const ctx = await launch({ width: w, height: h, dsf, reducedMotion: false, clock: false });
+  await ctx.page.clock.install({ time: pinnedDate() });
+  await ctx.page.clock.resume();
+  return ctx;
+}
+
+/**
+ * Seeds a state on the pinned day. `state` is an id from states.mjs or a
+ * custom { patch, extra } seed. Any "today" the state computed in node
+ * (lastPlayDate, the daily login) is moved to the pinned day; the page's own
+ * clock already reads the pinned day.
+ */
+export async function stagePinned(page, state) {
+  const { bootReturning, reloadHome } = await import('../lib.mjs');
+  const { stateSeed } = await import('../states.mjs');
+  const seed = typeof state === 'string' ? stateSeed(state) : state;
+  const today = realLocalDay();
+  const fix = v => (typeof v === 'string' ? v.split(today).join(PINNED_DAY) : v && typeof v === 'object' ? JSON.parse(JSON.stringify(v).split(today).join(PINNED_DAY)) : v);
+  const patch = fix(seed.patch);
+  const extra = seed.extra ? Object.fromEntries(Object.entries(seed.extra).map(([k, v]) => [k, fix(v)])) : null;
+  await bootReturning(page, patch, extra);
+  await reloadHome(page);
+}
+
+/** Boot a fresh install in a window of the clip's size, on the pinned day, and stage a state. */
+export async function boot(state, { w = 432, h = 768, dsf = 2.5 } = {}) {
+  const ctx = await launchPinned({ w, h, dsf });
+  await stagePinned(ctx.page, state);
   return ctx;
 }
 
