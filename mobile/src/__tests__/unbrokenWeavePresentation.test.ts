@@ -316,7 +316,7 @@ describe('one-time quiet-home introduction', () => {
     expect(AMBER_CURRENCY).not.toMatch(/const UNBROKEN_WEAVE_INTRO_SEEN_KEY/);
   });
 
-  test('waits for a quiet post-revelation Phase 5 landing and marks when presented', () => {
+  test('waits for a quiet post-revelation Phase 5 landing and is marked only when read to the end', () => {
     const start = HOME_SCREEN.indexOf('// Unbroken Weave intro');
     const end = HOME_SCREEN.indexOf('// Ambient home line', start);
     const intro = HOME_SCREEN.slice(start, end);
@@ -332,9 +332,24 @@ describe('one-time quiet-home introduction', () => {
     expect(intro).toContain('hasSeenUnbrokenWeaveIntro()');
     expect(intro).toContain("setIntroContext('unbroken_weave_intro')");
     expect(intro).toContain('getUnbrokenWeaveIntroLines(progress.currentPhase)');
-    expect(intro.indexOf('setIntroOverrideLines(')).toBeLessThan(
-      intro.indexOf('markUnbrokenWeaveIntroSeen()'),
-    );
+    // Never marked at presentation: an owner lost the card to a stray tap
+    // and could never read it again.
+    expect(intro).not.toContain('markUnbrokenWeaveIntroSeen()');
+    expect(intro).toContain('weaveDeferredThisLandingRef.current');
+    const advance = HOME_SCREEN.slice(HOME_SCREEN.indexOf('// Intro complete - mark as seen and close'));
+    expect(advance.slice(advance.indexOf("introContext === 'unbroken_weave_intro'"), advance.indexOf("introContext === 'keeper_record_intro'")))
+      .toContain('await markUnbrokenWeaveIntroSeen();');
+    const close = HOME_SCREEN.slice(HOME_SCREEN.indexOf('const handleCloseIntroDialogue'));
+    const closeBranch = close.slice(close.indexOf("introContext === 'unbroken_weave_intro'"), close.indexOf("introContext === 'keeper_record_intro'"));
+    expect(closeBranch).not.toContain('markUnbrokenWeaveIntroSeen');
+    expect(closeBranch).toContain('weaveDeferredThisLandingRef.current = true;');
+  });
+
+  test('a tap outside never closes a one-time home card', () => {
+    expect(HOME_SCREEN).toContain("{!introSaving && (introContext === 'animal_intro' || introContext === 'harvest_heavy_nudge') && (");
+    expect(HOME_SCREEN).toContain('{!dialogueFlow.choiceSaving && !dialogueFlow.onPreDialoguePage && (');
+    const alert = require('fs').readFileSync(require('path').join(__dirname, '../components/ui/GameAlertModal.tsx'), 'utf8');
+    expect(alert).toContain('onPress={isBeat ? undefined : handleRequestClose}');
   });
 
   test('copy is phase-aware, points to setup, stays in-world, and has no em dash', () => {
