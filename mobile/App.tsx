@@ -1263,7 +1263,7 @@ function MainApp() {
 
   const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks);
   // Onboarding (home_empty): Ember's greeting card asks to be invited in, and
-  // its button asks HomeScreen to open the visitor invite.
+  // its button asks HomeScreen to let her in.
   const [homeInviteRequest, setHomeInviteRequest] = useState(0);
   const requestHomeInvite = useCallback(() => setHomeInviteRequest(n => n + 1), []);
 
@@ -5403,8 +5403,8 @@ function MainApp() {
                   variant="dialogue"
                   text={onboardingActions.getOnboardingFoxText()}
                   buttonText={onboardingActions.getOnboardingButtonText()}
-                  // home_empty: the button opens the visitor invite (so does
-                  // the den chip); the invite never opens on its own.
+                  // home_empty: the button lets Ember in (so does the den
+                  // chip); nothing opens on its own.
                   onContinue={onboardingFlow.onboardingStep === 'home_empty' ? requestHomeInvite : onboardingActions.handleOnboardingContinue}
                   showSkip={true}
                   onSkip={onboardingActions.handleSkipOnboarding}

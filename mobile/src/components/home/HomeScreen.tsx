@@ -252,8 +252,8 @@ interface HomeScreenProps {
   onAdvanceOnboarding?: (step: OnboardingStep) => Promise<void>;
   /**
    * Onboarding (home_empty): bumped when the player presses the button on
-   * Ember's greeting card. Opens the visitor invite exactly like tapping the
-   * den; the invite never opens on its own.
+   * Ember's greeting card. Lets her in directly, exactly like tapping the
+   * den; nothing opens on its own.
    */
   inviteRequest?: number;
   /** Whether a phase transition is pending in the pit */
@@ -1354,9 +1354,46 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     void recheckAffordability().catch(handleHomeLoadFailure);
   }, [homeAmber, recheckAffordability, handleHomeLoadFailure]);
 
-  // Onboarding: the player asked to let Ember in from her greeting card. Open
-  // the same visitor invite the den chip opens; if the free invite has not
-  // resolved yet, remember the request and open it once it does.
+  // Onboarding (home_empty): Ember's greeting already asks to come in, so
+  // letting her in (her card's button or the den chip) invites her directly.
+  // The visitor card would only ask the same question a second time; it opens
+  // here only when saving the invite fails, so its error and retry are seen.
+  const onboardingInviteBusyRef = useRef(false);
+  const finishOnboardingInvite = useCallback(async () => {
+    setShowInvitePrompt(false);
+    if (!onAdvanceOnboarding) return;
+    await markIntroSeen('fox');
+    setShowIntroDialogue(false);
+    setIntroAnimal(null);
+    setIntroOverrideLines(null);
+    setIntroContext('animal_intro');
+    await onAdvanceOnboarding('fox_invited');
+  }, [onAdvanceOnboarding, setShowInvitePrompt]);
+  const unlockedAnimalIds = progress?.unlockedAnimals;
+  const { nextUnlock: onboardingNextUnlock, handlePurchase: purchaseUnlockNow } = unlockFlow;
+  const inviteEmberDirectly = useCallback(async () => {
+    if (onboardingInviteBusyRef.current) return;
+    onboardingInviteBusyRef.current = true;
+    try {
+      // An earlier attempt saved the invite but not the step: carry on.
+      if (unlockedAnimalIds?.includes('fox')) {
+        await finishOnboardingInvite();
+        return;
+      }
+      const next = onboardingNextUnlock;
+      if (!next || next.type !== 'character' || next.cost !== 0) return;
+      const invited = await purchaseUnlockNow(next, { suppressIntro: true });
+      if (!invited) {
+        setShowInvitePrompt(true);
+        return;
+      }
+      await finishOnboardingInvite();
+    } finally {
+      onboardingInviteBusyRef.current = false;
+    }
+  }, [unlockedAnimalIds, onboardingNextUnlock, purchaseUnlockNow, finishOnboardingInvite, setShowInvitePrompt]);
+
+  // The request from Ember's card waits for the free invite to resolve.
   const pendingInviteRequestRef = useRef(false);
   const lastInviteRequestRef = useRef(inviteRequest);
   useEffect(() => {
@@ -1366,13 +1403,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     pendingInviteRequestRef.current = true;
   }, [inviteRequest, onboardingStep]);
   useEffect(() => {
-    if (!pendingInviteRequestRef.current || onboardingStep !== 'home_empty') return;
-    const next = unlockFlow.nextUnlock;
-    if (hasHomeProgress && next && next.type === 'character' && next.cost === 0) {
+    if (!pendingInviteRequestRef.current || onboardingStep !== 'home_empty' || !hasHomeProgress) return;
+    const next = onboardingNextUnlock;
+    const freeInviteReady = !!next && next.type === 'character' && next.cost === 0;
+    if (freeInviteReady || unlockedAnimalIds?.includes('fox')) {
       pendingInviteRequestRef.current = false;
-      setShowInvitePrompt(true);
+      void inviteEmberDirectly().catch(handleHomeLoadFailure);
     }
-  }, [inviteRequest, onboardingStep, unlockFlow.nextUnlock, hasHomeProgress, setShowInvitePrompt]);
+  }, [inviteRequest, onboardingStep, onboardingNextUnlock, unlockedAnimalIds, hasHomeProgress, inviteEmberDirectly, handleHomeLoadFailure]);
+
+  // The den chip lets her in the same way during home_empty.
+  const { handleRoomPress: openRoomOrInvite } = unlockFlow;
+  const handleHouseRoomPress = useCallback((room: Room) => {
+    if (onboardingStep === 'home_empty' && room.isUnlocked) {
+      hapticLight();
+      void inviteEmberDirectly().catch(handleHomeLoadFailure);
+      return;
+    }
+    openRoomOrInvite(room);
+  }, [onboardingStep, inviteEmberDirectly, handleHomeLoadFailure, openRoomOrInvite]);
 
   // Onboarding safety net: home_empty is the single most fragile moment in the
   // funnel, and inviting Ember is the only way forward. If data is slow or
@@ -2640,7 +2689,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           currentPhase={progress.currentPhase}
           onAnimalPress={handleAnimalPress}
           pendingGiftRoomIds={pendingGiftRoomIds}
-          onRoomPress={unlockFlow.handleRoomPress}
+          onRoomPress={handleHouseRoomPress}
           ritualWords={progress.ritualWords}
           nextUnlock={unlockFlow.nextUnlock}
           amberBalance={progress.amber}
@@ -3938,16 +3987,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       const purchased = await unlockFlow.handlePurchase(unlockFlow.nextUnlock!, { suppressIntro });
                       if (!purchased) return;
                       setShowInvitePrompt(false);
-                      // During onboarding, advance to fox_invited step
-                      // (skips the standard intro dialogue — FoxGuide handles it)
-                      if (onboardingStep === 'home_empty' && onAdvanceOnboarding) {
-                        await markIntroSeen('fox');
-                        setShowIntroDialogue(false);
-                        setIntroAnimal(null);
-                        setIntroOverrideLines(null);
-                        setIntroContext('animal_intro');
-                        await onAdvanceOnboarding('fox_invited');
-                      }
+                      // During onboarding (the retry after a failed direct
+                      // invite), advance to fox_invited: FoxGuide introduces
+                      // her, not the standard intro dialogue.
+                      if (onboardingStep === 'home_empty') await finishOnboardingInvite();
                     }}
                     disabled={progress ? progress.amber < unlockFlow.nextUnlock!.cost : false}
                     accessibilityLabel={unlockFlow.nextUnlock!.cost === 0 ? 'Welcome friend' : `Invite for ${unlockFlow.nextUnlock!.cost} amber`}

@@ -105,28 +105,26 @@ test('a fresh install is walked from the cold-open board to a complete onboardin
   await expect(page.getByText(/Hello up there/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play puzzle', exact: true })).toHaveCount(0);
 
-  // Invite Fox. Ember's greeting asks to be invited in and waits: the visitor
-  // invite never opens on its own (it used to open on a timer while the
+  // Invite Fox. Ember's greeting asks to be invited in and waits: nothing
+  // opens on its own (a visitor card used to open on a timer while the
   // greeting was still being read, which looked like the card dismissing
-  // itself). Her card's button opens it; so does the den chip (next test).
+  // itself). Her card's button lets her in directly, with no visitor card
+  // asking the same question again; so does the den chip (next test).
   const denChip = page.getByRole('button', { name: 'Invite animal to Cozy Den for free', exact: true });
   const welcome = page.getByRole('button', { name: 'Welcome friend', exact: true });
+  const visitorCard = page.getByText('A VISITOR APPROACHES!', { exact: true });
   await page.waitForTimeout(4000);
   await expect(welcome).toHaveCount(0);
   await expect(page.getByText(/Will you invite me in/)).toBeVisible();
   await expect(denChip).toBeVisible();
   await tapFoxCard(page, 'Come on in!');
-  await expect(welcome).toBeVisible({ timeout: 10_000 });
-  // The greeting yields to the invitation instead of staying mounted beneath it.
-  await expect(page.getByText(/Hello up there/)).toHaveCount(0);
-  await expect(denChip).toHaveCount(0);
-  // The nameplate upper-cases its label.
-  await expect(page.getByText('A VISITOR APPROACHES!', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Maybe later', exact: true })).toHaveCount(0);
-  await welcome.click();
 
   // fox_invited: Ember introduces herself in two cards, then leads to the pit.
   await expect.poll(() => readOnboardingStep(page)).toBe('fox_invited');
+  await expect(visitorCard).toHaveCount(0);
+  await expect(welcome).toHaveCount(0);
+  await expect(page.getByText(/Hello up there/)).toHaveCount(0);
+  await expect(denChip).toHaveCount(0);
   await expect.poll(async () => (await readHomeProgress(page)).unlockedAnimals).toContain('fox');
   await expect(page.getByText(/I'm Ember!/)).toBeVisible();
   await tapFoxCard(page, 'Nice to meet you!');
@@ -183,7 +181,7 @@ test('a fresh install is walked from the cold-open board to a complete onboardin
   expect(await page.evaluate(() => localStorage.getItem('wordshift_tutorial_completed'))).toBe('true');
 });
 
-test('tapping the den also invites Ember in during onboarding', async ({ page }) => {
+test('tapping the den also lets Ember in directly during onboarding', async ({ page }) => {
   await openColdOpenBoard(page);
   await solveOpenerBoard(page);
   const results = page.getByLabel('Results', { exact: true });
@@ -194,10 +192,10 @@ test('tapping the den also invites Ember in during onboarding', async ({ page })
   const denChip = page.getByRole('button', { name: 'Invite animal to Cozy Den for free', exact: true });
   await expect(denChip).toBeVisible();
   await denChip.click();
-  const welcome = page.getByRole('button', { name: 'Welcome friend', exact: true });
-  await expect(welcome).toBeVisible({ timeout: 10_000 });
-  await welcome.click();
   await expect.poll(() => readOnboardingStep(page)).toBe('fox_invited');
+  await expect.poll(async () => (await readHomeProgress(page)).unlockedAnimals).toContain('fox');
+  await expect(page.getByText('A VISITOR APPROACHES!', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/I'm Ember!/)).toBeVisible();
 });
 
 test('skipping from the cold-open board confirms first and lands on a clean home', async ({ page }) => {
