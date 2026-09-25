@@ -58,11 +58,16 @@ export const EpilogueCard: React.FC<EpilogueCardProps> = ({ copy, boundary, onCl
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 },
-  eyebrow: { ...TEXT_ROLE.label, letterSpacing: 2, marginBottom: 4 },
-  title: { ...TEXT_ROLE.title, textAlign: 'center', marginBottom: 10 },
+  eyebrow: { ...TEXT_ROLE.label, alignSelf: 'stretch', textAlign: 'center', letterSpacing: 2, marginBottom: 4 },
+  title: { ...TEXT_ROLE.title, alignSelf: 'stretch', textAlign: 'center', marginBottom: 10 },
   rule: { alignSelf: 'stretch', height: 1, marginVertical: 10 },
-  line: { ...TEXT_ROLE.reading, textAlign: 'center', marginBottom: 4 },
-  closing: { ...TEXT_ROLE.reading, textAlign: 'center', marginBottom: 16 },
+  // Every text block spans the column (alignSelf: 'stretch') and centres its
+  // own glyphs. Inside an alignItems:'center' column a Text sizes itself to its
+  // measured width, and iOS can lay the run out a sub-point wider than that
+  // measurement, which pushed the last word ("CLOSER", "ago.") onto a second
+  // line the one-line box then clipped away.
+  line: { ...TEXT_ROLE.reading, alignSelf: 'stretch', textAlign: 'center', marginBottom: 4 },
+  closing: { ...TEXT_ROLE.reading, alignSelf: 'stretch', textAlign: 'center', marginBottom: 16 },
   action: { alignSelf: 'stretch' },
 });
 

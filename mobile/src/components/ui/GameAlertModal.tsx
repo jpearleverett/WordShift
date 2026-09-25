@@ -181,11 +181,19 @@ export const GameAlertModal: React.FC<GameAlertModalProps> = ({ phase, suspended
         style={[styles.overlay, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}
         accessibilityViewIsModal
       >
+      {/* A 'beat' card (the one-time "the marks step back" card) is marked
+          seen by its button, so a stray tap on the scrim must not end it:
+          only the button or hardware back closes it. */}
       <Pressable
         style={StyleSheet.absoluteFill}
-        onPress={handleRequestClose}
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss alert"
+        onPress={isBeat ? undefined : handleRequestClose}
+        // Out of the accessibility tree for a beat: an unlabelled full-screen
+        // stop that does nothing would be worse than none.
+        accessible={!isBeat}
+        focusable={!isBeat}
+        importantForAccessibility={isBeat ? 'no' : 'auto'}
+        accessibilityRole={isBeat ? undefined : 'button'}
+        accessibilityLabel={isBeat ? undefined : 'Dismiss alert'}
       />
         <Animated.View
           style={[

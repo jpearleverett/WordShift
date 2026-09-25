@@ -1536,7 +1536,8 @@ export const STORY_ART_CATALOG = [
     ],
     "samples": [
       "I will stay by the hearth, friend. You can have as much room as you need.",
-      "I'll stay by the hearth, friend. You can have as much room as you need."
+      "I'll stay by the hearth, friend. You can have as much room as you need.",
+      "Whatever you choose, friend, I'll be right here by the fire when it's done."
     ]
   },
   {

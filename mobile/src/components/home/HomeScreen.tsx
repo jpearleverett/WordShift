@@ -774,6 +774,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // back to the NEXT home visit (per-mount ref: HomeScreen unmounts on every
   // navigation away, so this naturally means "not in the same landing").
   const keeperRecordShownThisLandingRef = useRef(false);
+  // The Unbroken Weave card was put down with Back on this landing: it is not
+  // marked heard, so it waits for the next landing instead of reopening at once.
+  const weaveDeferredThisLandingRef = useRef(false);
   // One automatic Fox intro per home landing (ftue-4). The one-time intros
   // below (challenge, daily, pit nudge, journal spotlight, first gated room)
   // share one guard set, so each used to fire the instant the previous card
@@ -1742,7 +1745,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (progress.currentPhase !== 5 || progress.postRevelation !== true) return;
     if (dialogueFlow.showDialogue || pendingHouseCompletion || pitPhaseReady) return;
     // The Keeper's Record owns the landing it fired on; pitch the weave next visit.
-    if (keeperRecordShownThisLandingRef.current) return;
+    if (keeperRecordShownThisLandingRef.current || weaveDeferredThisLandingRef.current) return;
 
     let cancelled = false;
     const timer = setTimeout(() => {
@@ -1753,17 +1756,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         // back-to-back, BEFORE React's cleanup can flip `cancelled` — without
         // this the weave pitch could clobber the Keeper's Record on the very
         // landing the ref was meant to protect.
-        if (seen || cancelled || introSurfaceBusyRef.current || keeperRecordShownThisLandingRef.current) return;
+        if (seen || cancelled || introSurfaceBusyRef.current || keeperRecordShownThisLandingRef.current || weaveDeferredThisLandingRef.current) return;
 
         const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
         if (!fox) return;
 
+        // Marked heard only when the player reaches the last page
+        // (handleAdvanceIntroDialogue); an app kill or Back brings it back.
         setIntroAnimal(fox);
         setIntroDialogueIndex(0);
         setIntroOverrideLines(getUnbrokenWeaveIntroLines(progress.currentPhase));
         setIntroContext('unbroken_weave_intro');
         setShowIntroDialogue(true);
-        await markUnbrokenWeaveIntroSeen();
       })().catch(() => {});
     }, 650);
 
@@ -2059,7 +2063,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         } else if (introContext === 'harvest_heavy_nudge') {
           // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
         } else if (introContext === 'unbroken_weave_intro') {
-          // Marked at presentation so the quiet one-time landing cannot re-fire.
+          await markUnbrokenWeaveIntroSeen();
         } else if (introContext === 'keeper_record_intro') {
           await markKeeperRecordSeen();
           // The word-memory line is the record's heart — kept in the gallery
@@ -2129,7 +2133,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         } else if (introContext === 'harvest_heavy_nudge') {
           // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
         } else if (introContext === 'unbroken_weave_intro') {
-          // Marked at presentation so closing this optional introduction is enough.
+          if (introDialogueIndex >= currentIntroLines.length - 1) {
+            // Every line was shown: Back on the last page is a deliberate close.
+            await markUnbrokenWeaveIntroSeen();
+          } else {
+            // Put down with Back before the last page: not heard, so it
+            // returns on the next home landing (never again on this one).
+            weaveDeferredThisLandingRef.current = true;
+          }
         } else if (introContext === 'keeper_record_intro') {
           // An early close still counts as heard — never force a re-read.
           await markKeeperRecordSeen();
@@ -2844,7 +2855,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]} accessibilityViewIsModal>
           {/* An unanswered question can wait. Only an answer being saved
               briefly holds the sheet open. */}
-          {!dialogueFlow.choiceSaving && (
+          {/* A one-time page at the start of a visit (a house-wide event, a
+              reaction, a seed or callback) is recorded as heard the moment it
+              shows, so a stray tap must not close it; regular lines are only
+              recorded on Next and keep tap-outside-to-close. */}
+          {!dialogueFlow.choiceSaving && !dialogueFlow.onPreDialoguePage && (
             <Pressable style={StyleSheet.absoluteFill} onPress={dialogueFlow.handleCloseDialogue}
               accessibilityLabel="Close dialogue" accessibilityRole="button" />
           )}
@@ -3959,7 +3974,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={handleCloseIntroDialogue}
       >
         <View style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]} accessibilityViewIsModal>
-          {!introSaving && (
+          {/* A tap outside the sheet closes only a card that costs nothing to
+              close (a resident's welcome pauses and replays; the heavy-harvest
+              nudge is per session). Every other card here is one-time, and
+              closing it records it as heard, so a stray tap on arrival must
+              never end it: those close with their own button or Back. */}
+          {!introSaving && (introContext === 'animal_intro' || introContext === 'harvest_heavy_nudge') && (
             <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseIntroDialogue}
               accessibilityLabel="Close intro dialogue" accessibilityRole="button" />
           )}

@@ -4,6 +4,7 @@ import { Difficulty } from '../types';
 import { incrementShareCount } from './achievements';
 import { PLAY_STORE_URL } from '../constants/links';
 import { saveWithPlayerRetry } from './saveRetry';
+import { getDifficultyShortName } from './phaseNarrative';
 
 /**
  * Share results system for WordShift
@@ -229,7 +230,7 @@ export function generateShareText(result: ShareableResult): string {
   }
 
   const challengeTag = result.isChallenge ? ' 🔒' : '';
-  lines.push(`${starString(result.stars)} ${difficultyEmoji(result.difficulty)} ${result.difficulty}${challengeTag}`);
+  lines.push(`${starString(result.stars)} ${difficultyEmoji(result.difficulty)} ${getDifficultyShortName(result.difficulty)}${challengeTag}`);
   lines.push(
     performanceGrid(result.moveCount, result.hintsUsed, result.invalidAttempts, result.moveOutcomes)
   );

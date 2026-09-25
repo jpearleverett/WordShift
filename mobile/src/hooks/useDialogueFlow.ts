@@ -492,6 +492,12 @@ interface UseDialogueFlowReturn {
   choiceOpen: boolean;
   /** Only an in-flight durable answer blocks another tap or dismissal. */
   choiceSaving: boolean;
+  /**
+   * A one-time page is showing ahead of the visit's regular line. It was
+   * recorded as heard when it appeared, so the host must not let a stray tap
+   * outside the sheet close it.
+   */
+  onPreDialoguePage: boolean;
   choiceError: string | null;
   dialogueSaveError: string | null;
   /**
@@ -1875,6 +1881,7 @@ export function useDialogueFlow({
     activeChoice,
     choiceOpen,
     choiceSaving: choiceSaving || lineSaving,
+    onPreDialoguePage: preDialoguePages.length > 0,
     choiceError,
     choiceEcho,
     dialogueSaveError,

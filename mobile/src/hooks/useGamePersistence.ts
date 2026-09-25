@@ -139,6 +139,11 @@ export interface VictoryData {
   unbrokenWeaveNextObjective?: string | null;
   /** True when this victory advanced the ordered Weave mastery ladder. */
   unbrokenWeaveRankedUp?: boolean;
+  /**
+   * Why this Weave win was not flawless, set only while the next rank asks
+   * for flawless wins (Seamless Dark onward).
+   */
+  unbrokenWeaveNotFlawless?: string | null;
   /** True when this puzzle created a new pending phase transition in the pit */
   phaseTransitionPending: boolean;
   /** The ward-progress fraction storage now holds, mirrored on every award. */

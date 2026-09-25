@@ -1,0 +1,189 @@
+{
+  "model": "RunPod seedream-v4-edit (https://api.runpod.ai/v2/seedream-v4-edit/runsync), input { prompt, images: [data URIs, in the order below], size: \"1024*1024\", enable_safety_checker: true }; the endpoint returned 1920x1920 JPEG, kept as returned",
+  "generated": "2026-09-25",
+  "costUsdEach": 0.027,
+  "references": {
+    "ref_pit_on_green.png": "assets/environment/pit_entrance.png composited at (80,62) on a flat #00FF00 620x620 canvas (style: a standalone world sprite on key green)",
+    "ref_room.png": "assets/rooms/cozy_den.webp as PNG (style; rounds 1 only)",
+    "ref_foundation_zoom.png": "assets/environment/foundation_0.png, crop x 396..792 (the right half), nearest x3 to 1188x360, flattened on #00FF00 (style; rounds 2+)",
+    "ref_design_gate.png": "assets/story/outward-road.png crop left 430 top 430 640x460: the gate in the CLOSER road header the inspection modal shows (STORY_ART.roadHeader), the same gate as pages/after-01-road",
+    "ref_design_door.png": "assets/story/private-room.png crop left 440 top 0 740x940: the arched door in the CLOSED header the inspection modal shows (STORY_ART.privateHeader)",
+    "edit_base_gate_l.png": "assets/raw/keepsakes/gate_l.jpg resized to 1024x1024 PNG: the ONLY image in the round 6 edits",
+    "edit_base_gate_q.png": "assets/raw/keepsakes/gate_q.jpg resized to 1024x1024 PNG: the ONLY image in the round 7 edits",
+    "edit_base_gate_w.png": "assets/raw/keepsakes/gate_w.jpg resized to 1024x1024 PNG: the ONLY image in the round 8 edits"
+  },
+  "rounds": [
+    {
+      "candidates": [
+        "gate_a.jpg",
+        "gate_b.jpg",
+        "gate_c.jpg"
+      ],
+      "refs": [
+        "ref_pit_on_green.png",
+        "ref_room.png",
+        "ref_design_gate.png"
+      ],
+      "prompt": "Image 1 and Image 2 are STYLE references from the same game (Image 1 is one of its standalone world sprites, a stone well, shown on flat green): sophisticated detailed 16-bit storybook pixel art, disciplined hand-placed pixel clusters, soft light from the top left, rich dimensional material shading, a restrained palette of warm walnut browns and cool grey-blue stone with a touch of moss green. Edges are defined by darker shading of the material itself, like Image 1, NOT by a thick uniform black outline, and it must not look like a flat vector icon or a UI button. Image 3 shows the exact garden gate to reproduce, from the story illustrations: a weathered dark walnut wooden garden gate of vertical planks with rounded tops, two horizontal rails and one diagonal brace, dark iron strap hinges, hung on a stout square timber post, with a second matching timber post on the other side of the opening. Paint ONLY that gate as one small standalone game sprite in the style of Image 1: the two timber posts standing upright, and the gate leaf hinged on the left post and swung OPEN outward toward the viewer at an angle, so the empty opening between the posts is clearly visible. Seen from the front at a slight three-quarter angle, slightly from above like Image 1. The posts stand on a small low mound of packed brown earth with a few short dark grass tufts, and a soft dark contact shadow lies on that earth directly under the gate. Chunky, simple, readable shapes that still read as an open gate when shrunk to 40 pixels tall: four or five thick planks, one bold diagonal brace, thick posts. No fence continuing to the sides, no stone wall, no path, no flowers. The object alone, centred, filling most of the frame (about 80 percent of the height), on a perfectly flat uniform pure bright green #00FF00 background: no gradient, no vignette, no shadow cast onto the background, no scenery, no sky, no trees, no border, no text, no letters, no numbers.",
+      "review": "Clean gates but icon-like: thick dark outlines, a raised dirt island; a has cyan key reflection on the wood, c has a second stray leaf."
+    },
+    {
+      "candidates": [
+        "door_a.jpg",
+        "door_b.jpg",
+        "door_c.jpg"
+      ],
+      "refs": [
+        "ref_pit_on_green.png",
+        "ref_room.png",
+        "ref_design_door.png"
+      ],
+      "prompt": "Image 1 and Image 2 are STYLE references from the same game (Image 1 is one of its standalone world sprites, a stone well, shown on flat green): sophisticated detailed 16-bit storybook pixel art, disciplined hand-placed pixel clusters, soft light from the top left, rich dimensional material shading, a restrained palette of warm walnut browns and cool grey-blue stone with a touch of moss green. Edges are defined by darker shading of the material itself, like Image 1, NOT by a thick uniform black outline, and it must not look like a flat vector icon or a UI button. Image 3 shows the exact door to reproduce, from the story illustrations: a dark walnut wooden door of vertical planks with a rounded arched top and a dark iron strap latch across it. Paint ONLY a small closed version of that door as one standalone game sprite in the style of Image 1: a small arched wooden cellar door, fully CLOSED, vertical walnut planks, a rounded arched top, one dark iron strap hinge and a small iron latch ring, set into a rough arched frame of chunky grey-blue stones like the stones of Image 1, with a heavy stone sill at the bottom. A thin warm amber line of lamplight glows through the gap under the door, the only light, so it reads as a lit private room behind it. Seen straight from the front. The door with its stone frame is a little taller than it is wide (about 3 wide to 4 tall). Chunky, simple, readable shapes that still read as a door when shrunk to 36 pixels tall: four thick planks, a bold arch, a clear bright crack of light at the bottom. No wall around it beyond the arch stones, no steps, no plants, no lantern. The object alone, centred, filling most of the frame (about 80 percent of the height), on a perfectly flat uniform pure bright green #00FF00 background: no gradient, no vignette, no shadow cast onto the background, no scenery, no sky, no trees, no border, no text, no letters, no numbers.",
+      "review": "Saturated bright-blue stones with heavy outlines: read as UI icons."
+    },
+    {
+      "candidates": [
+        "gate_d.jpg",
+        "gate_e.jpg",
+        "gate_f.jpg"
+      ],
+      "refs": [
+        "ref_pit_on_green.png",
+        "ref_foundation_zoom.png",
+        "ref_design_gate.png"
+      ],
+      "prompt": "Image 1 and Image 2 are STYLE references: two painted world sprites from the same game (a stone well, and the stone foundation wall of the cottage), shown on flat green. Match their rendering exactly: detailed painted 16-bit storybook pixel art, hand-placed pixel clusters, weathered textured surfaces with visible grain and chips, soft light from the top left with gentle falloff, muted natural colours (dark walnut and umber wood, warm grey stone with cool grey-blue shadows, a little moss). The silhouette edge is just the darker shaded side of the material, NEVER a black or uniform dark outline around the shape. It must look painted into the same scene as Image 1 and Image 2, not like a flat game icon, not like a UI button, not isometric tile art. Image 3 shows the exact garden gate to reproduce, from the story illustrations: a weathered dark walnut wooden garden gate of vertical planks with rounded tops, two horizontal rails and one diagonal brace, dark iron strap hinges, hung on a stout square timber post, with a second matching timber post on the other side of the opening. Paint ONLY that gate as a small standalone world sprite: two old timber posts standing upright, and the single gate leaf hinged on the left post and swung OPEN outward toward the viewer at an angle, so the empty opening between the posts is clearly visible. Seen from the front at a slight three-quarter angle, slightly from above. At the foot of the posts only a thin flat strip of trodden earth and a few short grass tufts, with a soft dark contact shadow directly under the gate, NOT a raised mound or floating island. Simple strong shapes that still read as an open gate when shrunk very small: four or five thick planks, one bold diagonal brace, thick posts. No fence continuing to the sides, no stone wall, no path, no flowers. Only the object, centred, filling about 80 percent of the frame height, on a perfectly flat uniform pure bright green #00FF00 background: no gradient, no vignette, no shadow cast on the green, no scenery, no sky, no trees, no border, no text, no letters, no numbers.",
+      "review": "Painterly, no outline. d reads open but its leaf is a dark slab and the ground a one-pixel stick; e has glowing posts and a skewed leaf; f reads closed."
+    },
+    {
+      "candidates": [
+        "door_d.jpg",
+        "door_e.jpg",
+        "door_f.jpg"
+      ],
+      "refs": [
+        "ref_pit_on_green.png",
+        "ref_foundation_zoom.png",
+        "ref_design_door.png"
+      ],
+      "prompt": "Image 1 and Image 2 are STYLE references: two painted world sprites from the same game (a stone well, and the stone foundation wall of the cottage), shown on flat green. Match their rendering exactly: detailed painted 16-bit storybook pixel art, hand-placed pixel clusters, weathered textured surfaces with visible grain and chips, soft light from the top left with gentle falloff, muted natural colours (dark walnut and umber wood, warm grey stone with cool grey-blue shadows, a little moss). The silhouette edge is just the darker shaded side of the material, NEVER a black or uniform dark outline around the shape. It must look painted into the same scene as Image 1 and Image 2, not like a flat game icon, not like a UI button, not isometric tile art. Image 3 shows the exact door to reproduce, from the story illustrations: a dark walnut wooden door of vertical planks with a rounded arched top and a dark iron strap latch across it. Paint ONLY a small closed version of that door as a standalone world sprite, as if set into the stone foundation wall of Image 2: a small arched wooden cellar door, fully CLOSED, old vertical walnut planks with wood grain, a rounded arched top, one dark iron strap hinge and a small iron latch, framed by an arch of rough weathered stones shaped and shaded exactly like the foundation stones of Image 2 but in neutral warm grey, and a worn stone threshold at the bottom. A thin warm amber line of lamplight glows through the gap under the door, the only light, so it reads as a lit private room behind it. Seen straight from the front, the door and its stones a little taller than wide (about 3 wide to 4 tall). Simple strong shapes that still read as a door when shrunk very small: four thick planks, a clear arch, a bright crack of light at the bottom. No wall around it beyond the arch stones, no steps, no plants, no lantern. Only the object, centred, filling about 80 percent of the frame height, on a perfectly flat uniform pure bright green #00FF00 background: no gradient, no vignette, no shadow cast on the green, no scenery, no sky, no trees, no border, no text, no letters, no numbers.",
+      "review": "Stones now match the foundation shaping but painted tan (from the day foundation reference), and the planks are so dark the crack of light is lost; f puts the light below the sill."
+    },
+    {
+      "candidates": [
+        "gate_g.jpg",
+        "gate_h.jpg",
+        "gate_i.jpg"
+      ],
+      "refs": [
+        "ref_pit_on_green.png",
+        "ref_foundation_zoom.png",
+        "ref_design_gate.png"
+      ],
+      "prompt": "Image 1 and Image 2 are STYLE references: two painted world sprites from the same game (a stone well, and the stone foundation wall of the cottage), shown on flat green. Match their rendering exactly: detailed painted 16-bit storybook pixel art, hand-placed pixel clusters, weathered textured surfaces, soft light from the top left with gentle falloff, muted natural colours. The silhouette edge is just the darker shaded side of the material, NEVER a black or uniform dark outline around the shape. It must look painted into the same scene as Image 1 and Image 2, not like a flat game icon, not like a UI button, not isometric tile art. Image 3 shows the exact garden gate to reproduce, from the story illustrations: a weathered walnut wooden garden gate of vertical planks with rounded tops, a rail at the top and at the bottom and one diagonal brace between them, dark iron strap hinges, hung on a stout square timber post, with a second matching post on the far side of the opening. Paint ONLY that gate as a small standalone world sprite: the two timber posts upright, the gate leaf hinged on the LEFT post and swung OPEN toward the viewer by about 45 degrees, so we still see the face of the leaf with its planks and bold diagonal brace, and the empty opening between the leaf and the right post is clearly visible. Warm mid-brown weathered wood, clearly lit from the top left: the rounded plank tops, the rails and the brace catch the light, so the planks and brace read clearly against each other; the posts are the same wood as the gate. Seen from the front and slightly above. Under and between the posts a small flat oval of worn earth, like the start of a footpath, with a few short grass tufts at its edges and a soft dark contact shadow under the leaf; flat on the ground, NOT a raised mound or island. The whole sprite about as wide as it is tall. Simple strong shapes that still read as an open garden gate when shrunk to 35 pixels tall. No fence continuing to the sides, no stone wall, no flowers. Only the object, centred, filling about 80 percent of the frame height, on a perfectly flat uniform pure bright green #00FF00 background: no gradient, no vignette, no shadow cast on the green, no scenery, no sky, no trees, no border, no text, no letters, no numbers.",
+      "review": "g: posts, leaf swung open with its X brace, worn earth path: the clearest open gate at 35 art pixels (its near-black shadow is graded to earth in processing). h shows two leaves, one lit like fire; i floats the leaf and earth apart."
+    },
+    {
+      "candidates": [
+        "door_g.jpg",
+        "door_h.jpg",
+        "door_i.jpg"
+      ],
+      "refs": [
+        "ref_pit_on_green.png",
+        "ref_foundation_zoom.png",
+        "ref_design_door.png"
+      ],
+      "prompt": "Image 1 and Image 2 are STYLE references: two painted world sprites from the same game (a stone well, and the stone foundation wall of the cottage), shown on flat green. Match their rendering exactly: detailed painted 16-bit storybook pixel art, hand-placed pixel clusters, weathered textured surfaces, soft light from the top left with gentle falloff, muted natural colours. The silhouette edge is just the darker shaded side of the material, NEVER a black or uniform dark outline around the shape. It must look painted into the same scene as Image 1 and Image 2, not like a flat game icon, not like a UI button, not isometric tile art. Image 3 shows the exact door to reproduce, from the story illustrations: a walnut wooden door of vertical planks with a rounded arched top and a dark iron strap latch across it. Paint ONLY a small closed version of that door as a standalone world sprite, as if set into the stone foundation wall of Image 2: a small arched wooden cellar door, fully CLOSED, four old vertical walnut planks with warm wood grain lit from the top left, a rounded arched top, one dark iron strap hinge and a small iron latch ring, framed by an arch of a few large rough weathered stones shaped and shaded like the foundation stones of Image 2 but in a cool desaturated slate grey with a faint blue cast (not tan, not bright blue), and a worn grey stone threshold at the bottom. A thin warm amber line of lamplight glows through the gap directly under the door, above the threshold, the only light, so it reads as a lit private room behind it. Seen straight from the front, the door with its stones about 3 wide to 4 tall. Simple strong shapes that still read as a door when shrunk to 29 pixels tall. No wall around it beyond the arch stones, no steps, no plants, no lantern. Only the object, centred, filling about 80 percent of the frame height, on a perfectly flat uniform pure bright green #00FF00 background: no gradient, no vignette, no shadow cast on the green, no scenery, no sky, no trees, no border, no text, no letters, no numbers.",
+      "review": "g: slate arch, four walnut planks, strap hinges, ring, a crack of amber light at the sill: reads as a door at 29 art pixels (its cyan key reflection is neutralised by the stone grade). h glows at the arch top like a window; i has blue patches."
+    },
+    {
+      "candidates": [
+        "gate_j.jpg",
+        "gate_k.jpg",
+        "gate_l.jpg"
+      ],
+      "refs": [
+        "ref_pit_on_green.png",
+        "ref_foundation_zoom.png",
+        "ref_design_gate.png"
+      ],
+      "prompt": "Image 1 and Image 2 are STYLE references: two painted world sprites from the same game (a stone well, and the stone foundation wall of the cottage), shown on flat green. Match their rendering exactly: detailed painted 16-bit storybook pixel art, hand-placed pixel clusters, weathered textured surfaces, soft light from the top left with gentle falloff, muted natural colours. The silhouette edge is just the darker shaded side of the material, NEVER a black or uniform dark outline around the shape. It must look painted into the same scene as Image 1 and Image 2, not like a flat game icon, not like a UI button, not isometric tile art. Image 3 shows the exact garden gate to reproduce, from the story illustrations: a weathered walnut wooden garden gate of vertical planks with rounded tops, a rail at the top and at the bottom and one diagonal brace between them, dark iron strap hinges, hung on a stout square timber post, with a second matching post on the far side of the opening. Paint ONLY that gate as a small standalone world sprite: the two timber posts upright, the gate leaf hinged on the LEFT post and swung OPEN toward the viewer by about 45 degrees, so we still see the face of the leaf with its planks and bold diagonal brace, and the empty opening between the leaf and the right post is clearly visible. Warm mid-brown weathered wood, clearly lit from the top left: the rounded plank tops, the rails and the brace catch the light, so the planks and brace read clearly against each other; the posts are the same wood as the gate. Seen from the front and slightly above. Under and between the posts a small flat oval of worn brown earth, like the start of a footpath, with a few short grass tufts at its edges; the only shadow is a slightly darker brown patch on that earth right under the leaf, never black, never a hard shape; flat on the ground, NOT a raised mound or island. The whole sprite about as wide as it is tall. Simple strong shapes that still read as an open garden gate when shrunk to 35 pixels tall. No fence continuing to the sides, no stone wall, no flowers. Only the object, centred, filling about 80 percent of the frame height, on a perfectly flat uniform pure bright green #00FF00 background: no gradient, no vignette, no shadow cast on the green, no scenery, no sky, no trees, no border, no text, no letters, no numbers.",
+      "review": "k is closest to the story gate at full size, but its sunlit plank tops turn into a yellow flame at the art pixel; j reads closed; l has mismatched post heights. Kept g."
+    },
+    {
+      "candidates": [
+        "gate_m.jpg",
+        "gate_n.jpg",
+        "gate_o.jpg",
+        "gate_p.jpg"
+      ],
+      "refs": [
+        "ref_pit_on_green.png",
+        "ref_foundation_zoom.png",
+        "ref_design_gate.png"
+      ],
+      "why": "Redraw after a blind review failed gate_g: at the delivery size the leaf covered ~60% of the opening and merged with the left post, its top edge read as broken, the dirt pad and black shadow wedge read as a hole, and lime tufts clashed with the night grass.",
+      "prompt": "Image 1 and Image 2 are STYLE references: two painted world sprites from the same game (a stone well, and the stone foundation wall of the cottage), shown on flat green. Match their rendering exactly: detailed painted 16-bit storybook pixel art, hand-placed pixel clusters, weathered textured surfaces, soft light from the top left with gentle falloff, muted natural colours. The silhouette edge is just the darker shaded side of the material, NEVER a black or uniform dark outline around the shape. It must look painted into the same scene as Image 1 and Image 2, not like a flat game icon, not like a UI button, not isometric tile art. Image 3 shows the exact garden gate to reproduce, from the story illustrations: a weathered walnut garden gate hung on a stout square timber post: vertical planks, a top rail and a bottom rail, two diagonal braces crossing in an X between the rails, dark iron strap hinges. Paint ONLY that gate as a small standalone world sprite that must stay readable as an OPEN gate when shrunk to 40 pixels tall. Two identical square timber posts stand upright, far apart, the same height, each with a small flat cap. The single gate leaf is hinged on the LEFT post and swung WIDE OPEN toward the viewer by about 60 degrees, so it is strongly foreshortened: its free end comes forward and sits lower than its hinged end, the leaf looks much narrower than the opening, and a WIDE empty gap, more than half the distance between the posts, stands clear between the free end of the leaf and the right post. The leaf's planks are cut level under one straight top rail: a clean straight top edge, no jagged, broken or pointed plank tops. The leaf is a lighter warm weathered mid-brown than the two darker posts, and its top rail, bottom rail and X brace are a little lighter still where the top-left light catches them, so the leaf separates clearly from the left post; muted light, no yellow glare, nothing glowing. Nothing on the ground: no earth, no path, no grass, no stones, no cast shadow; the feet of the posts and the bottom of the leaf simply end over the flat green. Seen from the front and slightly above. No fence continuing to the sides, no flowers. Only the object, centred, filling about 80 percent of the frame height, on a perfectly flat uniform pure bright green #00FF00 background: no gradient, no vignette, no shadow cast on the green, no scenery, no sky, no trees, no border, no text, no letters, no numbers.",
+      "review": "All fail: m and o paint two leaves, n is closed with a glowing post, p hangs the leaf on the right post; the lighter-leaf wording turned the wood orange. Text-to-image does not hold an open single leaf, so the next rounds edit the reviewer's pick (gate_l) instead.",
+      "gateRound": 5
+    },
+    {
+      "candidates": [
+        "gate_q.jpg",
+        "gate_r.jpg",
+        "gate_s.jpg"
+      ],
+      "refs": [
+        "edit_base_gate_l.png"
+      ],
+      "prompt": "Image 1 is a pixel-art game sprite of an open wooden garden gate on a flat green background. Edit Image 1 and keep everything not mentioned below exactly as it is: the same two posts in the same places and the same sizes, the same single gate leaf hinged on the left post and swung open toward the viewer at the same angle, the same wide empty opening between the leaf and the right post, the same detailed painted 16-bit storybook pixel-art rendering with soft light from the top left. Changes: 1. Remove ALL of the ground: the brown earth patch, the pale oval stone, every grass tuft and every shadow. Below the two posts and the leaf there is only the flat pure bright green #00FF00 background, and the feet of the posts end cleanly and square. 2. Replace the uneven rounded plank tops with a clean straight top: the planks are cut level just above the top rail, so the top edge of the leaf is one straight line that follows the leaf's perspective. 3. Make the leaf's wood a little lighter than the posts: a warm weathered mid-brown, not orange and not yellow, with the top edge of each rail, the lit side of the diagonal brace and the leaf's free vertical edge catching the top-left light in a pale muted tan, so the leaf stands clearly apart from the dark left post. 4. Keep the posts dark weathered walnut. No new objects, no fence, no text. The whole background stays one perfectly flat uniform pure bright green #00FF00: no gradient, no glow, no light spot, no vignette.",
+      "review": "q keeps gate_l's geometry (leaf swung back from the left post, a wide clear gap to the right post), drops the dirt pad, the pale oval and the tufts, and lightens the leaf, but it turned orange, kept the rounded plank tops and cast a hard shadow on the green. r closed the gate; s adds a light glow to the backdrop.",
+      "gateRound": 6
+    },
+    {
+      "candidates": [
+        "gate_t.jpg",
+        "gate_u.jpg",
+        "gate_v.jpg",
+        "gate_w.jpg"
+      ],
+      "refs": [
+        "edit_base_gate_q.png"
+      ],
+      "prompt": "Image 1 is a pixel-art game sprite of an open wooden garden gate on a flat green background. Edit Image 1 and keep everything not mentioned below exactly as it is: the same leaf hinged on the left post and swung open toward the viewer at the same angle, the same wide empty opening between the leaf and the right post, the same planks, rails, diagonal brace, iron hinges and latch, the same detailed painted 16-bit storybook pixel-art rendering with soft light from the top left. Changes: 1. Remove the dark shadow on the ground completely: under the gate there is only the flat pure bright green #00FF00 background. 2. Recolour all the wood from orange to a muted, weathered dark walnut brown like old garden timber: less saturated, not orange, not yellow, no glow; the leaf stays a shade lighter than the posts, and the top edges of the rails, the lit side of the diagonal brace and the leaf's free vertical edge keep a pale muted tan highlight from the top-left light. No new objects, no fence, no grass, no text. The whole background is one perfectly flat uniform pure bright green #00FF00: no gradient, no glow, no light spot, no vignette.  [v and w add: Make the right post exactly as tall and as thick as the left post, with the same cap, standing upright where it is now.]",
+      "review": "w: muted walnut, no cast shadow, no stray objects (its right post stayed short, which reads as perspective). t and u paint a leaf onto the right post; t and v keep the backdrop glow or the shadow.",
+      "gateRound": 7
+    },
+    {
+      "candidates": [
+        "gate_x.jpg",
+        "gate_y.jpg",
+        "gate_z.jpg",
+        "gate_za.jpg"
+      ],
+      "refs": [
+        "edit_base_gate_w.png"
+      ],
+      "prompt": "Image 1 is a pixel-art game sprite of an open wooden garden gate on a flat green background. Edit Image 1 and keep everything not mentioned below exactly as it is: the same two posts in the same places and sizes, the same leaf hinged on the left post, the same wide empty opening between the leaf and the right post, the same vertical planks, top and bottom rails, diagonal brace, iron hinges and latch, the same muted weathered walnut colours and the same detailed painted 16-bit storybook pixel-art rendering with soft light from the top left. Change: the tops of the leaf's planks. Cut every plank of the leaf off flat at exactly the same height, flush with the top edge of the top rail, so the whole top of the leaf is ONE single clean straight edge running from the hinge to the free end, following the leaf's perspective. No rounded, arched, notched or pointed plank ends, no plank sticking up above the others. No new objects, no ground, no grass, no shadow, no fence, no text. The whole background is one perfectly flat uniform pure bright green #00FF00: no gradient, no glow, no light spot, no vignette.  [z and za add: swing the leaf a little further open toward the viewer, so it looks a little narrower and the empty opening between its free end and the right post is a little wider.]",
+      "review": "x: the leaf's top is one clean straight rail, everything else kept: the chosen gate. y and z step the plank tops and put a glow in the backdrop (it keys into a yellow blob); za adds a stray rail.",
+      "gateRound": 8
+    }
+  ],
+  "chosen": {
+    "gate": {
+      "candidate": "gate_x.jpg",
+      "lineage": "gate_l.jpg (the 4th gate round, the blind reviewer's pick) -> gate_q.jpg (gate round 6 edit) -> gate_w.jpg (gate round 7 edit) -> gate_x.jpg (gate round 8 edit)",
+      "output": "assets/ui/world/gate.png",
+      "onScreenDp": "41 x 44 (41 x 44 art pixels at 1.0dp); its feet stand 2dp above the bottom edge, the soft contact shadow below them",
+      "processing": "keyed by green chroma (the model's cast shadow goes with the backdrop), wood graded to the house wall's timber, iron neutralised, contact shadow synthesised"
+    },
+    "door": {
+      "candidate": "door_g.jpg",
+      "output": "assets/ui/world/door.png",
+      "onScreenDp": "31.25 x 36.25 (25 x 29 art pixels at 1.25dp)",
+      "processing": "keyed by green excess, arch stones graded to slate (the moss too, so no green fleck on the sill), planks to dark walnut, crack of lamplight relit at full strength"
+    }
+  },
+  "process": "node scripts/tools/processKeepsakeArt.mjs (from mobile/)"
+}

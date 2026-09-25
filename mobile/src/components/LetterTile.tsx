@@ -16,6 +16,8 @@ import { FONT_SIZE } from '../theme/typeScale';
 
 interface LetterTileProps {
   letter: Letter;
+  /** Unbroken Weave: this letter was already moved once and can never move again. */
+  spent?: boolean;
   onPress?: () => void;
   /**
    * Feedback-only press for tiles that are NOT interactable (locked tiles in
@@ -130,8 +132,10 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   isGuided = false,
   arrivalMoveId,
   arrivalDirection,
+  spent = false,
 }) => {
   const settings = getSettingsSync();
+  const letterStateLabel = letter.isLocked ? ', locked' : spent ? ', already used' : '';
 
   // Animation values
   const [scaleAnim] = useState(() => new Animated.Value(1));
@@ -671,7 +675,9 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         return {
           bgColor: '#2E2A40',        // Muted purple-gray — eerie calm
           borderColor: '#3A3555',
-          textColor: '#706890',       // Soft ghostly purple
+          // A spent Unbroken Weave letter still sits in a word the player has
+          // to read, so it keeps readable ink (5.1:1) under the dimmed face.
+          textColor: spent && !letter.isLocked ? '#A098BC' : '#706890', // Soft ghostly purple
           shadowColor: '#2E2A40',
         };
       }
@@ -865,7 +871,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       // feedback-pressable, and inactive-pressable tiles are labeled by the
       // wrapping TouchableOpacity.
       accessible={!isClickable && !isFeedbackPressable && !isInactivePressable}
-      accessibilityLabel={!isClickable && !isFeedbackPressable && !isInactivePressable ? `Letter ${letter.char}${letter.isLocked ? ', locked' : ''}` : undefined}
+      accessibilityLabel={!isClickable && !isFeedbackPressable && !isInactivePressable ? `Letter ${letter.char}${letterStateLabel}` : undefined}
       style={[
         styles.tileOuter,
         compact && { width: COMPACT_TILE_W, height: COMPACT_OUTER_H, marginHorizontal: COMPACT_TILE_MARGIN_H },
@@ -975,7 +981,8 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         ]}
       >
         {/* Top highlight (bevel effect) — finish-owned */}
-        <View style={[styles.bevelTop, { backgroundColor: finish.bevel }]} />
+        {/* A spent weave letter skips the cream wash that would halve its ink's contrast. */}
+        {!spent && <View style={[styles.bevelTop, { backgroundColor: finish.bevel }]} />}
 
         {/* Glossy shine overlay — finish-owned */}
         <View style={[styles.glossyShine, { backgroundColor: finish.gloss }]} />
@@ -1081,9 +1088,9 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}
-        accessibilityLabel={`Letter ${letter.char}${letter.isLocked ? ', locked' : ''}`}
+        accessibilityLabel={`Letter ${letter.char}${letterStateLabel}`}
         accessibilityRole="button"
-        accessibilityState={{ selected: !!isSelected, disabled: !!letter.isLocked }}
+        accessibilityState={{ selected: !!isSelected, disabled: !!letter.isLocked || !!spent }}
       >
         {content}
       </TouchableOpacity>
@@ -1099,7 +1106,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       <TouchableOpacity
         onPress={handleInactivePress}
         activeOpacity={1}
-        accessibilityLabel={`Letter ${letter.char}${letter.isLocked ? ', locked' : ''}`}
+        accessibilityLabel={`Letter ${letter.char}${letterStateLabel}`}
       >
         {content}
       </TouchableOpacity>

@@ -34,7 +34,7 @@ import { CHROME_ICONS } from './ui/chromeIcons';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { getStreakInfo, getAmberBalance } from '../services/amberCurrency';
 import { Difficulty } from '../types';
-import { getJourneyAtmosphereText, getPaceTrendMessage } from '../services/phaseNarrative';
+import { getJourneyAtmosphereText, getPaceTrendMessage, getDifficultyShortName } from '../services/phaseNarrative';
 import {
   getBestSpeedRound,
   getResonantChoices,
@@ -645,7 +645,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 <PixelPlaque phase={effectivePhase} label={'PERSONAL BESTS'} style={styles.sectionPlaque} />
                 {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'] as Difficulty[]).map((diff, i) => {
                   const pb = stats.personalBests?.[diff];
-                  const label = diff === 'MEDIUM_PLUS' ? 'MED+' : diff;
+                  const label = getDifficultyShortName(diff);
                   const perfect = !!pb && isPerfectPersonalBest(pb);
                   const summary = pb ? formatPersonalBestSummary(pb) : null;
                   return (
@@ -869,7 +869,7 @@ function DifficultyRow({
   return (
     <View style={[styles.difficultyRow, altBg ? { backgroundColor: altBg } : null]}>
       <Image source={DIFFICULTY_ART[difficulty]} style={styles.difficultySeal} resizeMode="contain" />
-      <Text style={[styles.difficultyLabel, { color: labelColor }]}>{difficulty}</Text>
+      <Text style={[styles.difficultyLabel, { color: labelColor }]}>{getDifficultyShortName(difficulty)}</Text>
       <Text style={[styles.difficultyCount, { color: countColor }]}>{completed} puzzles</Text>
       <Text style={[styles.difficultyAvg, { color: avgColor }]}>{avg} avg</Text>
     </View>

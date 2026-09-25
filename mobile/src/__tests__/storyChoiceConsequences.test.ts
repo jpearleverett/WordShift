@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  STORY_STORAGE_KEY, StoryContext, StoryMemory, StorySceneId, StoryState,
+  COUNCIL_UNANSWERED_PROMISE_LINE, STORY_STORAGE_KEY, StoryContext, StoryMemory, StorySceneId, StoryState,
   advanceStoryPage, beginStoryCycle, buildStoryScene, chooseStoryOption,
   clearStoryState, getStoryPages, getStoryWorldKeepsake, invalidateStoryCache,
   loadStoryState, openStoryScene, recordStoryBoundary, selectStoryScene,
@@ -224,4 +224,15 @@ test('preparations never fabricate protection before a final word or alter an in
   const inherited: StoryState = { ...prepared, carriedBoundary: 'release' };
   expect(getStoryWorldKeepsake(inherited, before)).toMatchObject({ inherited: true, boundary: 'release' });
   expect(getStoryWorldKeepsake(inherited, before)?.result).not.toMatch(/initials|PLEASE KNOCK/);
+});
+
+test('an unanswered promise gets a neutral council line, never the distance the player did not ask for', async () => {
+  const ctx = context({ phase: 4, puzzlesSolved: 115, unlockedAnimals: ['fox'], finaleArmed: true });
+  const empty = await loadStoryState(ctx);
+  const lastLine = (state: StoryState) => buildStoryScene('council', ctx, state).lines.at(-1)!;
+  const neutral = lastLine(empty);
+  expect(neutral.text).toBe(COUNCIL_UNANSWERED_PROMISE_LINE);
+  expect(neutral.text).not.toMatch(/room as you need|beside you/);
+  expect(lastLine(answered(empty, ctx, 'promise', 'apart')).text).toMatch(/as much room as you need/);
+  expect(lastLine(answered(empty, ctx, 'promise', 'beside')).text).toMatch(/stand beside you/);
 });

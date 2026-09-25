@@ -101,6 +101,7 @@ import {
   getPendingCeremonies,
   queueHouseCeremony,
   getRitualWords,
+  getTotalWordsFormed,
   consumeCycleOpening,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
@@ -130,6 +131,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hapticLight, hapticMedium, hapticSuccess, hapticWarning, hapticError, hapticSelection, hapticMoveCommit } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
+  getDifficultyName,
   getLoadingMessage,
   getRitualMicroEvent,
   isSilentVictoryBeat,
@@ -1284,12 +1286,15 @@ function MainApp() {
       const context = await getStoryContext();
       const state = await loadStoryState(context);
       if (!isEpilogueOwed(state, context)) return;
-      const days = await getInstallAgeDays().catch(() => 1);
+      const [days, wordsOffered] = await Promise.all([
+        getInstallAgeDays().catch(() => 1),
+        getTotalWordsFormed().catch(() => 0),
+      ]);
       setEpilogue({
         boundary: state.boundary,
         copy: getEpilogueCopy({
           boundary: state.boundary, puzzlesSolved: context.puzzlesSolved,
-          daysSinceArrival: days, residents: context.unlockedAnimals.length,
+          daysSinceFirstVisit: days, residents: context.unlockedAnimals.length, wordsOffered,
         }),
       });
     } catch { /* the card waits for the next quiet landing */ } finally { epilogueCheckRef.current = false; }
@@ -3647,7 +3652,11 @@ function MainApp() {
     // shake + locked-letter message. Never the select chime a real pick gets.
     // Gated on PLAYING so a stray tap during victory/processing stays silent
     // (matching the hook's own guard, which would swallow the press anyway).
-    if (letter.isLocked) {
+    // A spent Unbroken Weave letter is greyed like a locked tile and gets the
+    // same rejection feedback before the hook's spent-letter message.
+    const spentWeaveLetter = puzzle.unbrokenWeaveMode
+      && puzzle.spentLetters.includes(String(letter.char).toUpperCase());
+    if (letter.isLocked || spentWeaveLetter) {
       if (puzzle.gameState === GameState.PLAYING) {
         hapticError();
         soundInvalidMove();
@@ -3659,7 +3668,7 @@ function MainApp() {
     hapticLight();
     soundLetterSelect();
     puzzleActions.handleLetterPress(letter, rowIndex);
-  }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
+  }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance, puzzle.unbrokenWeaveMode, puzzle.spentLetters]);
 
   // Quiet acknowledgment for taps on tiles in completed/future rows (they
   // used to mount no touchable at all, so a confused poke got literally
@@ -3714,6 +3723,13 @@ function MainApp() {
   const boardWrapperStyle = useMemo(
     () => getBoardScaleWrapperStyle(boardScale, boardLayoutHeight),
     [boardScale, boardLayoutHeight],
+  );
+  // Unbroken Weave: the spent letters as one sorted string, so every memoized
+  // row compares it by value and re-renders only when a letter is spent or
+  // released.
+  const spentLetterKey = useMemo(
+    () => (puzzle.unbrokenWeaveMode ? [...puzzle.spentLetters].sort().join('') : ''),
+    [puzzle.unbrokenWeaveMode, puzzle.spentLetters],
   );
   const rowNodeRefs = useRef(new Map<number, any>());
   const registerRowNode = useCallback((rowIndex: number, node: any) => {
@@ -5755,7 +5771,7 @@ function MainApp() {
               if (opening) measureDifficultyChip();
               puzzleActions.setShowDifficultyMenu(opening);
             }}
-            accessibilityLabel={`Difficulty ${chipDifficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
+            accessibilityLabel={`Difficulty ${getDifficultyName(chipDifficulty)}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
             {/* The tier's wax-seal emblem (the same art the setup menu rows
@@ -5952,6 +5968,7 @@ function MainApp() {
                 hoverSlotIndex={
                   hoverSlot && idx === hoverSlot.rowIndex ? hoverSlot.slotIndex : null
                 }
+                spentLetters={spentLetterKey}
               />
             ))}
             </View>

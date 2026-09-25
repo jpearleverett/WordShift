@@ -387,7 +387,9 @@ describe('cloudSave', () => {
 
     it('invalidates the quest caches after overwriting local data (quest keys are synced)', async () => {
       const before = await loadWeeklyQuests(0);
-      expect(before.daily.quests.length).toBe(5);
+      // Five daily quests, plus one event quest on a full-moon event day
+      // (liveEvents), so the count is compared with itself, not a constant.
+      expect(before.daily.quests.length).toBeGreaterThanOrEqual(5);
 
       // A cloud save from another device: same period, all daily quests done.
       const restoredDaily = {
@@ -402,7 +404,7 @@ describe('cloudSave', () => {
       });
 
       const after = await loadWeeklyQuests(0);
-      expect(after.daily.quests.length).toBe(5);
+      expect(after.daily.quests.length).toBe(before.daily.quests.length);
       expect(after.daily.quests.every(q => q.completed)).toBe(true);
     });
 

@@ -23,7 +23,7 @@ describe('HomeScreen hosts the choice page', () => {
     expect(home).toContain('error={dialogueFlow.choiceError}');
     const scrim = home.indexOf('accessibilityLabel="Close dialogue"');
     expect(scrim).toBeGreaterThan(0);
-    const gate = home.lastIndexOf('{!dialogueFlow.choiceSaving && (', scrim);
+    const gate = home.lastIndexOf('{!dialogueFlow.choiceSaving && !dialogueFlow.onPreDialoguePage && (', scrim);
     expect(gate).toBeGreaterThan(0);
     expect(scrim - gate).toBeLessThan(400);
   });

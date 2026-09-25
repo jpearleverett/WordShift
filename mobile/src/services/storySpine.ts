@@ -287,6 +287,9 @@ export async function deferStoryScene(context: StoryContext, id: StorySceneId): 
   });
 }
 
+/** Ember's last council line when the promise question was never answered. */
+export const COUNCIL_UNANSWERED_PROMISE_LINE = "Whatever you choose, friend, I'll be right here by the fire when it's done.";
+
 export function buildStoryScene(id: StorySceneId, context: StoryContext, state: StoryState): StoryScene {
   const has = (animal: AnimalType) => context.unlockedAnimals.includes(animal);
   const say = (speaker: StorySpeaker, text: string, artId?: string): StoryLine => ({ speaker, text, ...(artId ? { artId } : {}) });
@@ -432,7 +435,11 @@ export function buildStoryScene(id: StorySceneId, context: StoryContext, state: 
       ...(shelter === 'road' ? [ember("We marked the road because you asked. CLOSER would keep it open for good. But you can still choose CLOSED, friend. A lamp by the gate doesn't decide your last word.", 'council-12')]
         : shelter === 'room' ? [ember("We fitted the latch because you asked. CLOSED would shut that room to it, and to us. But you can still choose CLOSER, friend. A latch doesn't decide your last word.", 'council-13')] : []),
       narrator("The last arrangement ends at CLOSE. Give it the D, and it reads CLOSED. Give it the R, and it reads CLOSER. Neither is the greater offering.", 'council-14'),
-      ember(beside ? "I'll stand beside you, friend. You asked me to." : "I'll stay by the hearth, friend. You can have as much room as you need.", beside ? 'council-15-beside' : 'council-15-apart'),
+      // An unanswered promise gets its own neutral line: the player never asked
+      // for distance, so Ember must not act as if they had.
+      ember(beside ? "I'll stand beside you, friend. You asked me to."
+        : storyChoice(state, 'promise') === 'apart' ? "I'll stay by the hearth, friend. You can have as much room as you need."
+          : COUNCIL_UNANSWERED_PROMISE_LINE, beside ? 'council-15-beside' : 'council-15-apart'),
     ], "A welcome can come with terms: one private room, or a road that lets you leave.");
     case 'after':
       // Readers who heard the complete terms have already seen the boundary

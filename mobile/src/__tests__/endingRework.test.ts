@@ -87,12 +87,26 @@ describe('the closing card', () => {
   });
 
   test('names the last word and real numbers, and never an em dash', () => {
-    const copy = getEpilogueCopy({ boundary: 'release', puzzlesSolved: 1204, daysSinceArrival: 41, residents: 13 });
-    expect(copy.lines).toContain('Your last word: CLOSER');
-    expect(copy.lines.join(' ')).toContain('1,204');
-    expect(copy.lines.join(' ')).toContain('41 days');
+    const copy = getEpilogueCopy({ boundary: 'release', puzzlesSolved: 1204, daysSinceFirstVisit: 41, residents: 13, wordsOffered: 5321 });
+    expect(copy.lines).toEqual([
+      'Your last word: CLOSER',
+      'Puzzles you finished: 1,204',
+      'Words you offered: 5,321',
+      'Friends who live here: 13',
+      'Days since you first came: 41',
+    ]);
     expect(copy.closing).toMatch(/still here/);
     expect(JSON.stringify(copy)).not.toMatch(/[–—]/);
-    expect(getEpilogueCopy({ boundary: null, puzzlesSolved: 1, daysSinceArrival: 0, residents: 1 }).lines.join(' ')).toContain('one day');
+    const bare = getEpilogueCopy({ boundary: null, puzzlesSolved: 1, daysSinceFirstVisit: 0, residents: 1 });
+    expect(bare.lines).toEqual(['Puzzles you finished: 1', 'Friends who live here: 1', 'Days since you first came: 1']);
+  });
+
+  test('every line of the card spans the column, so iOS cannot clip its last word', () => {
+    const card = fs.readFileSync(path.join(__dirname, '../components/EpilogueCard.tsx'), 'utf8');
+    for (const role of ['eyebrow', 'title', 'line', 'closing']) {
+      expect(card).toMatch(new RegExp(`\\n  ${role}: \\{[^}]*alignSelf: 'stretch'`));
+    }
+    const app = fs.readFileSync(path.join(__dirname, '../../App.tsx'), 'utf8');
+    expect(app).toContain('wordsOffered');
   });
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { TouchableOpacity as GestureTouchableOpacity } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DialoguePhase } from '../../types/homeWorld';
@@ -13,16 +13,67 @@ import { PanelCard } from '../ui/PanelCard';
 import { STORY_ART } from '../storyArt';
 const WorldButton = Platform.OS === 'web' ? TouchableOpacity : GestureTouchableOpacity;
 
-/** Part of the foundation, with the same touch arbitration as the resident sprites. */
-export function StoryWorldObject({ keepsake, onPress }: { keepsake: StoryWorldKeepsake; onPress: () => void }) {
+// Painted keepsakes (scripts/tools/processKeepsakeArt.mjs, raws and prompts in
+// assets/raw/keepsakes/). Each is drawn at exactly the size the script prints,
+// so one art pixel lands on the dp grid.
+const GATE_IMG = require('../../../assets/ui/world/gate.png');
+const DOOR_IMG = require('../../../assets/ui/world/door.png');
+export const KEEPSAKE_GATE = { width: 41, height: 44, feetAboveBottom: 2 } as const;
+export const KEEPSAKE_DOOR = { width: 31.25, height: 36.25 } as const;
+/** The door's sill sits this far above the foundation's bottom edge, this far in from its right end. */
+const DOOR_BOTTOM_DP = 7;
+const DOOR_RIGHT_DP = 12;
+/** The gate's feet stand on the ground line this far above the foundation's bottom edge. */
+const GATE_GROUND_DP = 4;
+
+/**
+ * Where the gate stands, relative to the foundation's left edge: on the grass
+ * just past the foundation's right end, pulled in on a narrow phone so the
+ * latch post never runs off the screen (the house is centred in the window).
+ */
+export function getKeepsakeGateLeft(houseWidth: number, windowWidth: number): number {
+  const edgeRoom = (windowWidth + houseWidth) / 2 - KEEPSAKE_GATE.width - 2;
+  return Math.round(Math.min(houseWidth + 1, edgeRoom));
+}
+
+interface StoryWorldObjectProps {
+  keepsake: StoryWorldKeepsake;
+  onPress: () => void;
+  /** The foundation's width; the object is laid out against its right end. */
+  houseWidth: number;
+  /** The house exterior's phase light, so the keepsake sits in the same light as the roof and pit. */
+  tintColor: string;
+  tintOpacity: number;
+}
+
+/**
+ * Part of the foundation, with the same touch arbitration as the resident
+ * sprites: the private door drawn into the stones, or the outward gate on the
+ * grass beside them.
+ */
+export function StoryWorldObject({ keepsake, onPress, houseWidth, tintColor, tintOpacity }: StoryWorldObjectProps) {
+  const { width: windowWidth } = useWindowDimensions();
   const door = keepsake.boundary === 'remember';
-  return <WorldButton onPress={onPress} accessibilityRole="button" accessibilityLabel={`Inspect ${keepsake.title.toLowerCase()}`} style={styles.object}>
-    <View style={door ? styles.door : styles.gate} pointerEvents="none">
-      <View style={styles.plank} /><View style={styles.plank} />
-      {door ? <View style={styles.latch} /> : <View style={styles.crossbar} />}
-    </View>
-    <Text style={styles.objectLabel}>{door ? 'PRIVATE' : 'OUTWARD'}</Text>
-  </WorldButton>;
+  const size = door ? KEEPSAKE_DOOR : KEEPSAKE_GATE;
+  const source = door ? DOOR_IMG : GATE_IMG;
+  const place = door
+    ? { right: DOOR_RIGHT_DP, bottom: DOOR_BOTTOM_DP }
+    : { left: getKeepsakeGateLeft(houseWidth, windowWidth), bottom: GATE_GROUND_DP - KEEPSAKE_GATE.feetAboveBottom };
+  // The placement lives on a plain wrapper View. On native, RNGH's touchable
+  // sends `style` to its INNER view while its outer native button stays in
+  // normal flow, so absolute placement on the touchable left a zero-height
+  // hit box at the foundation's bottom edge and the art could not be tapped.
+  // Here the button is in flow inside the wrapper and sized to the art.
+  return <View style={[styles.object, place]} pointerEvents="box-none">
+    <WorldButton onPress={onPress} accessibilityRole="button" accessibilityLabel={`Inspect ${keepsake.title.toLowerCase()}`}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      style={{ width: size.width, height: size.height }}>
+      <Image source={source} style={styles.fill} resizeMode="contain" fadeDuration={0} accessible={false} />
+      {tintOpacity > 0 && (
+        <Image source={source} style={[styles.fill, styles.tint, { tintColor, opacity: tintOpacity }]} resizeMode="contain" fadeDuration={0} accessible={false} />
+      )}
+    </WorldButton>
+  </View>;
 }
 
 interface StoryWorldInspectionProps {
@@ -67,13 +118,9 @@ function StoryWorldInspectionContents({ keepsake, context, phase, onClose, onIns
   </Modal>;
 }
 const styles = StyleSheet.create({
-  object: { position: 'absolute', right: 8, bottom: 8, width: 64, minHeight: 72, alignItems: 'center', zIndex: 5 },
-  door: { width: 40, height: 54, backgroundColor: '#573B31', borderWidth: 4, borderColor: '#A38158', flexDirection: 'row', gap: 3, padding: 3 },
-  gate: { width: 48, height: 48, borderLeftWidth: 5, borderRightWidth: 5, borderColor: '#A38158', flexDirection: 'row', gap: 5, padding: 5 },
-  plank: { flex: 1, backgroundColor: '#725143' },
-  latch: { position: 'absolute', right: 4, top: 24, width: 5, height: 5, backgroundColor: '#E8C77C' },
-  crossbar: { position: 'absolute', top: 24, left: 0, right: 0, height: 6, backgroundColor: '#A38158', transform: [{ rotate: '-25deg' }] },
-  objectLabel: { fontFamily: PIXEL_FONT_BOLD, fontSize: 9, color: '#F5E4C2', backgroundColor: '#352B30', paddingHorizontal: 4, paddingVertical: 3 },
+  object: { position: 'absolute', zIndex: 5 },
+  fill: { width: '100%', height: '100%' },
+  tint: { position: 'absolute', top: 0, left: 0 },
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   panel: { width: '100%', maxWidth: 560, maxHeight: '100%' },
   reading: { padding: 24, gap: 16 },

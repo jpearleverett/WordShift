@@ -346,10 +346,12 @@ describe('move feedback stack', () => {
   });
 
   test('locked-tile taps get the full rejection language, never the select chime', () => {
-    expect(APP_TSX).toMatch(/if \(letter\.isLocked\) \{/);
+    // A spent Unbroken Weave letter shares the locked branch.
+    const branch = 'if (letter.isLocked || spentWeaveLetter) {';
+    expect(APP_TSX).toContain(branch);
     const lockedBranch = APP_TSX.slice(
-      APP_TSX.indexOf('if (letter.isLocked) {'),
-      APP_TSX.indexOf('hapticLight();', APP_TSX.indexOf('if (letter.isLocked) {'))
+      APP_TSX.indexOf(branch),
+      APP_TSX.indexOf('hapticLight();', APP_TSX.indexOf(branch))
     );
     expect(lockedBranch).toContain('hapticError();');
     expect(lockedBranch).toContain('soundInvalidMove();');

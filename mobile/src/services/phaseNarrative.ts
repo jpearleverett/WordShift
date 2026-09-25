@@ -288,6 +288,47 @@ export function getUnbrokenWeaveRankUpLine(
   return `A new mastery rank! ${title}.`;
 }
 
+// ============================================================================
+// DIFFICULTY NAMES: the one place a difficulty becomes words. The enum value
+// ('MEDIUM_PLUS') must never reach the player; there used to be three hand
+// spellings (MED+, Medium Plus, Medium+) and five raw leaks.
+// ============================================================================
+
+const DIFFICULTY_NAMES: Record<string, string> = {
+  EASY: 'Easy', MEDIUM: 'Medium', MEDIUM_PLUS: 'Medium+', HARD: 'Hard', EXPERT: 'Expert',
+};
+const DIFFICULTY_SHORT_NAMES: Record<string, string> = {
+  EASY: 'EASY', MEDIUM: 'MEDIUM', MEDIUM_PLUS: 'MED+', HARD: 'HARD', EXPERT: 'EXPERT',
+};
+
+/** The full name for running text and labels: 'Medium+', 'Hard'. */
+export function getDifficultyName(difficulty: string): string {
+  return DIFFICULTY_NAMES[difficulty] ?? difficulty.replace(/_/g, ' ');
+}
+
+/** The capitalised short form for chips, plaques and tight rows: 'MED+', 'HARD'. */
+export function getDifficultyShortName(difficulty: string): string {
+  return DIFFICULTY_SHORT_NAMES[difficulty] ?? difficulty.replace(/_/g, ' ');
+}
+
+/**
+ * Why an Unbroken Weave win did not count as flawless, shown on the victory
+ * card while the next rank asks for flawless wins. Three stars forgive one
+ * slipped drop and never look at undos; flawless allows neither, and a player
+ * who had just won a three-star HARD weave could not tell why the rank held.
+ */
+export function getUnbrokenWeaveNotFlawlessLine(counts: { hintsUsed: number; invalidAttempts: number; undosUsed: number }): string | null {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const parts = [
+    ...(counts.hintsUsed > 0 ? [plural(counts.hintsUsed, 'hint', 'hints')] : []),
+    ...(counts.invalidAttempts > 0 ? [plural(counts.invalidAttempts, 'slipped drop', 'slipped drops')] : []),
+    ...(counts.undosUsed > 0 ? [plural(counts.undosUsed, 'undo', 'undos')] : []),
+  ];
+  if (parts.length === 0) return null;
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `Not flawless this time: ${list}. A flawless weave has no hints, no slipped drops and no undos.`;
+}
+
 export function getUnbrokenWeaveIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 5) {
     return [
@@ -3218,23 +3259,30 @@ export interface EpilogueCopy { eyebrow: string; title: string; lines: string[];
 export function getEpilogueCopy(input: {
   boundary: 'remember' | 'release' | null;
   puzzlesSolved: number;
-  daysSinceArrival: number;
+  /** Local days since the install date (the player's first visit). */
+  daysSinceFirstVisit: number;
   residents: number;
+  /** Lifetime words formed; the line is left out when unknown or zero. */
+  wordsOffered?: number;
 }): EpilogueCopy {
   const word = input.boundary === 'remember' ? 'CLOSED' : input.boundary === 'release' ? 'CLOSER' : null;
-  const days = Math.max(1, Math.round(input.daysSinceArrival));
+  const days = Math.max(1, Math.round(input.daysSinceFirstVisit));
+  const words = Math.max(0, Math.round(input.wordsOffered ?? 0));
+  // Every line is one "label: value" fact, so none of them reads as a sentence
+  // with a missing ending.
   const lines = [
     ...(word ? [`Your last word: ${word}`] : []),
-    `Arrangements you finished: ${input.puzzlesSolved.toLocaleString('en-US')}`,
+    `Puzzles you finished: ${input.puzzlesSolved.toLocaleString('en-US')}`,
+    ...(words > 0 ? [`Words you offered: ${words.toLocaleString('en-US')}`] : []),
     `Friends who live here: ${input.residents}`,
-    `You first came in ${days === 1 ? 'one day' : `${days} days`} ago.`,
+    `Days since you first came: ${days.toLocaleString('en-US')}`,
   ];
   return {
     eyebrow: 'WORDSHIFT',
     title: 'The story of the arrival is over',
     lines,
     closing: input.boundary === 'remember'
-      ? 'One room in the house belongs to no one but the people inside it. The house, and everyone in it, is still here.'
+      ? 'One room in the house belongs only to the people inside it. The house, and everyone in it, is still here.'
       : input.boundary === 'release'
         ? 'The road out stays open, and coming back is a choice. The house, and everyone in it, is still here.'
         : 'The house, and everyone in it, is still here.',
