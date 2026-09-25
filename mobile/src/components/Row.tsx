@@ -152,6 +152,13 @@ interface RowProps {
   onDragActiveChange?: (active: boolean) => void;
   /** Registers this row's measurable node by index so the parent can Y-bounds-check drops */
   onMeasureRef?: (rowIndex: number, node: View | null) => void;
+  /**
+   * Unbroken Weave: the letters already spent this board, as one uppercase
+   * string ('' outside the mode). A string, not a Set, so the memoized row
+   * compares it by value. Tiles of a spent letter in any row still ahead
+   * render grey like a locked tile, because they can never move again.
+   */
+  spentLetters?: string;
 }
 
 // Phase-aware row color helper
@@ -638,6 +645,7 @@ export const Row: React.FC<RowProps> = memo(({
   onLetterDragMove,
   onDragActiveChange,
   onMeasureRef,
+  spentLetters = '',
 }) => {
   const phaseColors = getPhaseRowColors(phase);
   const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
@@ -654,6 +662,10 @@ export const Row: React.FC<RowProps> = memo(({
     ? rowIndex < activeRowIndex
     : rowIndex > activeRowIndex;
   const showSlots = isTarget && selectedLetter && !isProcessing;
+  // A spent letter can never move again, so it greys out in every row still
+  // ahead; completed rows are history and keep their normal look.
+  const isSpentLetter = (letter: Letter): boolean =>
+    !isCompleted && !letter.isLocked && spentLetters.length > 0 && spentLetters.includes(letter.char.toUpperCase());
 
   // Resonance: check if this row's word belongs to a dread tier relevant to the current phase.
   // Only visible at Phase 1+ — creates the subliminal "these words feel different" effect.
@@ -1010,7 +1022,8 @@ export const Row: React.FC<RowProps> = memo(({
           >
             <LetterTile
               letter={displayLetter}
-              highlight={letter.isLocked ? 'locked' : 'default'}
+              highlight={letter.isLocked || isSpentLetter(letter) ? 'locked' : 'default'}
+              spent={isSpentLetter(letter)}
               phase={phase}
               compact={compactTiles}
               isResonant={isRowResonant}
@@ -1043,21 +1056,25 @@ export const Row: React.FC<RowProps> = memo(({
       const displayLetter = (concealLetters && !isSource)
         ? { ...letter, char: '•' }
         : letter;
-      const canDrag = isSource && !isProcessing && !letter.isLocked && !!onLetterDragDrop;
+      const spent = isSpentLetter(letter);
+      const canDrag = isSource && !isProcessing && !letter.isLocked && !spent && !!onLetterDragDrop;
       const tile = (
         <LetterTile
           letter={displayLetter}
           isSelected={selectedLetter?.id === letter.id}
-          isInteractable={isSource && !isProcessing && !letter.isLocked}
-          highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
+          isInteractable={isSource && !isProcessing && !letter.isLocked && !spent}
+          highlight={letter.isLocked || spent ? 'locked' : isSource ? 'source' : 'default'}
+          spent={spent}
           onPress={canDrag ? undefined : tilePressHandlers.get(letter.id)}
           // Locked tiles in the ACTIVE source row are tappable for feedback
           // only: the press routes to the same handler, whose locked branch
           // fires the error haptic + locked-letter message. Previously the
           // touchable never mounted for locked tiles, so that path was
           // unreachable and the tap produced literally nothing.
+          // A spent Unbroken Weave letter takes the same path; the hook
+          // answers it with the spent-letter message.
           onLockedPress={
-            isSource && !isProcessing && letter.isLocked
+            isSource && !isProcessing && (letter.isLocked || spent)
               ? tilePressHandlers.get(letter.id)
               : undefined
           }

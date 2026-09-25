@@ -16,6 +16,8 @@ import { FONT_SIZE } from '../theme/typeScale';
 
 interface LetterTileProps {
   letter: Letter;
+  /** Unbroken Weave: this letter was already moved once and can never move again. */
+  spent?: boolean;
   onPress?: () => void;
   /**
    * Feedback-only press for tiles that are NOT interactable (locked tiles in
@@ -130,8 +132,10 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   isGuided = false,
   arrivalMoveId,
   arrivalDirection,
+  spent = false,
 }) => {
   const settings = getSettingsSync();
+  const letterStateLabel = letter.isLocked ? ', locked' : spent ? ', already used' : '';
 
   // Animation values
   const [scaleAnim] = useState(() => new Animated.Value(1));
@@ -865,7 +869,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       // feedback-pressable, and inactive-pressable tiles are labeled by the
       // wrapping TouchableOpacity.
       accessible={!isClickable && !isFeedbackPressable && !isInactivePressable}
-      accessibilityLabel={!isClickable && !isFeedbackPressable && !isInactivePressable ? `Letter ${letter.char}${letter.isLocked ? ', locked' : ''}` : undefined}
+      accessibilityLabel={!isClickable && !isFeedbackPressable && !isInactivePressable ? `Letter ${letter.char}${letterStateLabel}` : undefined}
       style={[
         styles.tileOuter,
         compact && { width: COMPACT_TILE_W, height: COMPACT_OUTER_H, marginHorizontal: COMPACT_TILE_MARGIN_H },
@@ -1081,9 +1085,9 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}
-        accessibilityLabel={`Letter ${letter.char}${letter.isLocked ? ', locked' : ''}`}
+        accessibilityLabel={`Letter ${letter.char}${letterStateLabel}`}
         accessibilityRole="button"
-        accessibilityState={{ selected: !!isSelected, disabled: !!letter.isLocked }}
+        accessibilityState={{ selected: !!isSelected, disabled: !!letter.isLocked || !!spent }}
       >
         {content}
       </TouchableOpacity>
@@ -1099,7 +1103,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
       <TouchableOpacity
         onPress={handleInactivePress}
         activeOpacity={1}
-        accessibilityLabel={`Letter ${letter.char}${letter.isLocked ? ', locked' : ''}`}
+        accessibilityLabel={`Letter ${letter.char}${letterStateLabel}`}
       >
         {content}
       </TouchableOpacity>

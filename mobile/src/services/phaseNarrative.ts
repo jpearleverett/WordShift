@@ -3218,23 +3218,30 @@ export interface EpilogueCopy { eyebrow: string; title: string; lines: string[];
 export function getEpilogueCopy(input: {
   boundary: 'remember' | 'release' | null;
   puzzlesSolved: number;
-  daysSinceArrival: number;
+  /** Local days since the install date (the player's first visit). */
+  daysSinceFirstVisit: number;
   residents: number;
+  /** Lifetime words formed; the line is left out when unknown or zero. */
+  wordsOffered?: number;
 }): EpilogueCopy {
   const word = input.boundary === 'remember' ? 'CLOSED' : input.boundary === 'release' ? 'CLOSER' : null;
-  const days = Math.max(1, Math.round(input.daysSinceArrival));
+  const days = Math.max(1, Math.round(input.daysSinceFirstVisit));
+  const words = Math.max(0, Math.round(input.wordsOffered ?? 0));
+  // Every line is one "label: value" fact, so none of them reads as a sentence
+  // with a missing ending.
   const lines = [
     ...(word ? [`Your last word: ${word}`] : []),
-    `Arrangements you finished: ${input.puzzlesSolved.toLocaleString('en-US')}`,
+    `Puzzles you finished: ${input.puzzlesSolved.toLocaleString('en-US')}`,
+    ...(words > 0 ? [`Words you offered: ${words.toLocaleString('en-US')}`] : []),
     `Friends who live here: ${input.residents}`,
-    `You first came in ${days === 1 ? 'one day' : `${days} days`} ago.`,
+    `Days since you first came: ${days.toLocaleString('en-US')}`,
   ];
   return {
     eyebrow: 'WORDSHIFT',
     title: 'The story of the arrival is over',
     lines,
     closing: input.boundary === 'remember'
-      ? 'One room in the house belongs to no one but the people inside it. The house, and everyone in it, is still here.'
+      ? 'One room in the house belongs only to the people inside it. The house, and everyone in it, is still here.'
       : input.boundary === 'release'
         ? 'The road out stays open, and coming back is a choice. The house, and everyone in it, is still here.'
         : 'The house, and everyone in it, is still here.',

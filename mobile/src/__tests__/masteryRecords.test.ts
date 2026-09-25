@@ -155,25 +155,25 @@ describe('Unbroken Weave mastery', () => {
       name: 'Thread Joined',
       input: { wins: 1, flawlessWins: 0, difficultyClears: ['EASY'] as const, hardFlawless: false },
       rank: 1,
-      nextObjective: 'Clear Unbroken Weave on every difficulty (1/4).',
+      nextObjective: 'Clear Unbroken Weave on every difficulty (1/5).',
     },
     {
-      name: 'Fourfold Weave',
+      name: 'Fivefold Weave',
       input: {
-        wins: 4,
+        wins: 5,
         flawlessWins: 0,
-        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const,
+        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'] as const,
         hardFlawless: false,
       },
       rank: 2,
-      nextObjective: 'Complete a flawless HARD Unbroken Weave.',
+      nextObjective: 'Complete a flawless HARD or EXPERT Unbroken Weave.',
     },
     {
       name: 'Seamless Dark',
       input: {
         wins: 4,
         flawlessWins: 1,
-        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const,
+        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'] as const,
         hardFlawless: true,
       },
       rank: 3,
@@ -184,7 +184,7 @@ describe('Unbroken Weave mastery', () => {
       input: {
         wins: 12,
         flawlessWins: 10,
-        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const,
+        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'] as const,
         hardFlawless: true,
       },
       rank: 4,
@@ -195,7 +195,7 @@ describe('Unbroken Weave mastery', () => {
       input: {
         wins: 27,
         flawlessWins: 25,
-        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const,
+        difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'] as const,
         hardFlawless: true,
       },
       rank: 5,
@@ -207,6 +207,39 @@ describe('Unbroken Weave mastery', () => {
       title: name,
       nextObjective,
     });
+  });
+
+  test('EXPERT counts: four difficulties are no longer every difficulty', () => {
+    expect(resolveUnbrokenWeaveMastery({
+      wins: 4, flawlessWins: 0, difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'], hardFlawless: false,
+    })).toMatchObject({ rank: 1, nextObjective: 'Clear Unbroken Weave on every difficulty (4/5).' });
+  });
+
+  test('an EXPERT clear is kept and a flawless EXPERT earns Seamless Dark', async () => {
+    for (const d of ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const) await recordUnbrokenWeaveVictory(d, false);
+    const expert = await recordUnbrokenWeaveVictory('EXPERT', true);
+    expect(expert.mastery).toMatchObject({ rank: 3, title: 'Seamless Dark', hardFlawless: true });
+    invalidateMasteryCache();
+    expect((await getUnbrokenWeaveMastery()).difficultyClears).toContain('EXPERT');
+  });
+
+  test('a rank earned under the four-difficulty rule is never taken back', async () => {
+    await AsyncStorage.setItem('wordshift_mastery', JSON.stringify({
+      solveTimes: {}, bestSpeedRound: 0, unbrokenWeaveWins: 30, unbrokenWeaveFlawlessWins: 12,
+      unbrokenWeaveDifficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'], unbrokenWeaveHardFlawless: true,
+    }));
+    invalidateMasteryCache();
+    expect(await getUnbrokenWeaveMastery()).toMatchObject({ rank: 4, title: 'Loomkeeper' });
+    // ...and the grandfathering survives the next save.
+    await recordUnbrokenWeaveVictory('EASY', false);
+    invalidateMasteryCache();
+    expect((await getUnbrokenWeaveMastery()).rank).toBe(4);
+  });
+
+  test('a new save with four clears still needs EXPERT', async () => {
+    for (const d of ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const) await recordUnbrokenWeaveVictory(d, false);
+    invalidateMasteryCache();
+    expect((await getUnbrokenWeaveMastery()).rank).toBe(1);
   });
 
   test('does not skip ordered ranks when a later objective is already met', () => {

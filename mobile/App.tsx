@@ -101,6 +101,7 @@ import {
   getPendingCeremonies,
   queueHouseCeremony,
   getRitualWords,
+  getTotalWordsFormed,
   consumeCycleOpening,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
@@ -1284,12 +1285,15 @@ function MainApp() {
       const context = await getStoryContext();
       const state = await loadStoryState(context);
       if (!isEpilogueOwed(state, context)) return;
-      const days = await getInstallAgeDays().catch(() => 1);
+      const [days, wordsOffered] = await Promise.all([
+        getInstallAgeDays().catch(() => 1),
+        getTotalWordsFormed().catch(() => 0),
+      ]);
       setEpilogue({
         boundary: state.boundary,
         copy: getEpilogueCopy({
           boundary: state.boundary, puzzlesSolved: context.puzzlesSolved,
-          daysSinceArrival: days, residents: context.unlockedAnimals.length,
+          daysSinceFirstVisit: days, residents: context.unlockedAnimals.length, wordsOffered,
         }),
       });
     } catch { /* the card waits for the next quiet landing */ } finally { epilogueCheckRef.current = false; }
@@ -3715,6 +3719,13 @@ function MainApp() {
     () => getBoardScaleWrapperStyle(boardScale, boardLayoutHeight),
     [boardScale, boardLayoutHeight],
   );
+  // Unbroken Weave: the spent letters as one sorted string, so every memoized
+  // row compares it by value and re-renders only when a letter is spent or
+  // released.
+  const spentLetterKey = useMemo(
+    () => (puzzle.unbrokenWeaveMode ? [...puzzle.spentLetters].sort().join('') : ''),
+    [puzzle.unbrokenWeaveMode, puzzle.spentLetters],
+  );
   const rowNodeRefs = useRef(new Map<number, any>());
   const registerRowNode = useCallback((rowIndex: number, node: any) => {
     if (node) rowNodeRefs.current.set(rowIndex, node);
@@ -5952,6 +5963,7 @@ function MainApp() {
                 hoverSlotIndex={
                   hoverSlot && idx === hoverSlot.rowIndex ? hoverSlot.slotIndex : null
                 }
+                spentLetters={spentLetterKey}
               />
             ))}
             </View>

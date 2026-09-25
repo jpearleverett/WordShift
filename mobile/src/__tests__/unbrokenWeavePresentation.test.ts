@@ -143,8 +143,8 @@ jest.mock('../services/masteryRecords', () => ({
   getSolveTrend: jest.fn(async () => null),
   getUnbrokenWeaveMastery: jest.fn(async () => ({
     rank: 2,
-    title: 'Fourfold Weave',
-    nextObjective: 'Complete a flawless HARD Unbroken Weave.',
+    title: 'Fivefold Weave',
+    nextObjective: 'Complete a flawless HARD or EXPERT Unbroken Weave.',
     wins: 4,
     flawlessWins: 2,
     difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'],
@@ -238,8 +238,8 @@ describe('Unbroken Weave presentation surfaces', () => {
       onToggleUnbrokenWeave: jest.fn(),
       unbrokenWeaveMastery: {
         rank: 2,
-        title: 'Fourfold Weave',
-        nextObjective: 'Complete a flawless HARD Unbroken Weave.',
+        title: 'Fivefold Weave',
+        nextObjective: 'Complete a flawless HARD or EXPERT Unbroken Weave.',
         wins: 4,
         flawlessWins: 2,
         difficultyClears: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'],
@@ -250,8 +250,8 @@ describe('Unbroken Weave presentation surfaces', () => {
 
     expect(text).toContain('UNBROKEN WEAVE');
     expect(text).toContain('Each letter may cross the chain only once.');
-    expect(text).toMatch(/Rank\s+2\s*:\s*Fourfold Weave/);
-    expect(text).toContain('Complete a flawless HARD Unbroken Weave.');
+    expect(text).toMatch(/Rank\s+2\s*:\s*Fivefold Weave/);
+    expect(text).toContain('Complete a flawless HARD or EXPERT Unbroken Weave.');
     expect(findByA11yLabel(tree, 'Unbroken Weave, off. Each letter may cross the chain only once.')).not.toBeNull();
   });
 
@@ -277,8 +277,8 @@ describe('Unbroken Weave presentation surfaces', () => {
 
     expect(findByProp(tree, 'label', 'MASTERY')).not.toBeNull();
     expect(text).toContain('Unbroken Weave');
-    expect(text).toMatch(/Rank\s+2\s*:\s*Fourfold Weave/);
-    expect(text).toContain('Complete a flawless HARD Unbroken Weave.');
+    expect(text).toMatch(/Rank\s+2\s*:\s*Fivefold Weave/);
+    expect(text).toContain('Complete a flawless HARD or EXPERT Unbroken Weave.');
   });
 
   test('Victory renders rank progress and a conditional rank-up line', () => {

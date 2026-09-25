@@ -48,6 +48,13 @@ interface MasteryState {
   unbrokenWeaveFlawlessWins: number;
   unbrokenWeaveDifficultyClears: Difficulty[];
   unbrokenWeaveHardFlawless: boolean;
+  /**
+   * The every-difficulty rank was earned before EXPERT joined the ladder
+   * (2026-09-25). EXPERT clears were silently dropped until then, so a player
+   * who cleared the four older difficulties keeps the rank rather than being
+   * demoted by the new requirement.
+   */
+  unbrokenWeaveEveryDifficultyHeld: boolean;
 }
 
 export interface SolveTrend {
@@ -79,7 +86,11 @@ export function invalidateMasteryCache(): void {
 }
 
 
-const DIFFICULTIES: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+const DIFFICULTIES: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD', 'EXPERT'];
+/** The ladder before EXPERT counted; used only to grandfather an earned rank. */
+const LEGACY_DIFFICULTIES: readonly Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+/** The two hardest tiers; a flawless clear of either earns Seamless Dark. */
+const SEAMLESS_DIFFICULTIES: readonly Difficulty[] = ['HARD', 'EXPERT'];
 
 function normalizeDifficultyClears(value: unknown): Difficulty[] {
   if (!Array.isArray(value)) return [];
@@ -108,6 +119,7 @@ const getDefault = (): MasteryState => ({
   unbrokenWeaveFlawlessWins: 0,
   unbrokenWeaveDifficultyClears: [],
   unbrokenWeaveHardFlawless: false,
+  unbrokenWeaveEveryDifficultyHeld: false,
 });
 
 async function load(): Promise<MasteryState> {
@@ -116,16 +128,20 @@ async function load(): Promise<MasteryState> {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
+      const clears = normalizeDifficultyClears(parsed.unbrokenWeaveDifficultyClears);
       cache = {
         solveTimes: parsed.solveTimes ?? {},
         bestSpeedRound: parsed.bestSpeedRound ?? 0,
         resonantChoices: normalizeCount(parsed.resonantChoices),
         unbrokenWeaveWins: normalizeCount(parsed.unbrokenWeaveWins),
         unbrokenWeaveFlawlessWins: normalizeCount(parsed.unbrokenWeaveFlawlessWins),
-        unbrokenWeaveDifficultyClears: normalizeDifficultyClears(
-          parsed.unbrokenWeaveDifficultyClears,
-        ),
+        unbrokenWeaveDifficultyClears: clears,
         unbrokenWeaveHardFlawless: parsed.unbrokenWeaveHardFlawless === true,
+        // A save written before the flag existed earned the rank under the
+        // four-difficulty rule when it holds all four older clears.
+        unbrokenWeaveEveryDifficultyHeld: typeof parsed.unbrokenWeaveEveryDifficultyHeld === 'boolean'
+          ? parsed.unbrokenWeaveEveryDifficultyHeld
+          : LEGACY_DIFFICULTIES.every(d => clears.includes(d)),
       };
       return cache!;
     }
@@ -253,6 +269,8 @@ export function resolveUnbrokenWeaveMastery(input: {
   flawlessWins: number;
   difficultyClears: readonly Difficulty[];
   hardFlawless: boolean;
+  /** The every-difficulty rank was earned under the older four-difficulty rule. */
+  everyDifficultyHeld?: boolean;
 }): UnbrokenWeaveMastery {
   const wins = normalizeCount(input.wins);
   const flawlessWins = normalizeCount(input.flawlessWins);
@@ -266,12 +284,12 @@ export function resolveUnbrokenWeaveMastery(input: {
   if (wins >= 1) {
     rank = 1;
     title = 'Thread Joined';
-    nextObjective = `Clear Unbroken Weave on every difficulty (${difficultyClears.length}/4).`;
+    nextObjective = `Clear Unbroken Weave on every difficulty (${difficultyClears.length}/${DIFFICULTIES.length}).`;
   }
-  if (rank === 1 && difficultyClears.length === DIFFICULTIES.length) {
+  if (rank === 1 && (difficultyClears.length === DIFFICULTIES.length || input.everyDifficultyHeld === true)) {
     rank = 2;
-    title = 'Fourfold Weave';
-    nextObjective = 'Complete a flawless HARD Unbroken Weave.';
+    title = 'Fivefold Weave';
+    nextObjective = 'Complete a flawless HARD or EXPERT Unbroken Weave.';
   }
   if (rank === 2 && hardFlawless) {
     rank = 3;
@@ -306,6 +324,7 @@ function masteryFromState(state: MasteryState): UnbrokenWeaveMastery {
     flawlessWins: state.unbrokenWeaveFlawlessWins,
     difficultyClears: state.unbrokenWeaveDifficultyClears,
     hardFlawless: state.unbrokenWeaveHardFlawless,
+    everyDifficultyHeld: state.unbrokenWeaveEveryDifficultyHeld,
   });
 }
 
@@ -328,7 +347,7 @@ export async function recordUnbrokenWeaveVictory(
     unbrokenWeaveFlawlessWins: state.unbrokenWeaveFlawlessWins + (flawless ? 1 : 0),
     unbrokenWeaveDifficultyClears: difficultyClears,
     unbrokenWeaveHardFlawless:
-      state.unbrokenWeaveHardFlawless || (difficulty === 'HARD' && flawless),
+      state.unbrokenWeaveHardFlawless || (SEAMLESS_DIFFICULTIES.includes(difficulty) && flawless),
   };
   const mastery = masteryFromState(nextState);
   await save(nextState);
