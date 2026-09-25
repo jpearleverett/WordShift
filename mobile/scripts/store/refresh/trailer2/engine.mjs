@@ -40,14 +40,14 @@ const clipMeta = new Map();
 export async function loadClip(id) {
   if (clipMeta.has(id)) return clipMeta.get(id);
   const ev = JSON.parse(await readFile(path.join(WORK, 'events', `${id}.json`), 'utf8'));
-  const meta = { id, dir: path.join(WORK, 'clips', id), frames: ev.frames, w: ev.frameSize.width, h: ev.frameSize.height, fps: ev.fps ?? FPS, events: ev.events, ev };
+  const meta = { id, dir: path.join(WORK, 'clips', id), frames: ev.frames, w: ev.frameSize.width, h: ev.frameSize.height, fps: ev.fps ?? FPS, ext: ev.ext ?? 'png', events: ev.events, ev };
   clipMeta.set(id, meta);
   return meta;
 }
 /** File for clip frame f (f is the clip's own frame number; the handle is added and clamped). */
 export function clipFile(meta, f) {
   const i = Math.max(0, Math.min(meta.frames - 1, Math.round(f) + HANDLE));
-  return path.join(meta.dir, `f${String(i).padStart(5, '0')}.png`);
+  return path.join(meta.dir, `f${String(i).padStart(5, '0')}.${meta.ext}`);
 }
 
 // Decoded source frames, small LRU (a frame is often used by two layers).
@@ -132,7 +132,8 @@ async function renderLayer(layer, shot, t, W, H) {
   const k = Math.max(0, Math.min(1, (t - shot.from) / span));
   const opacity = lerpKeys(layer.opacity, k, 1);
   if (opacity <= 0.001) return null;
-  const place = layer.place ?? { x: 0, y: 0, w: W, h: H };
+  const place0 = typeof layer.place === 'function' ? layer.place(k, t) : (layer.place ?? { x: 0, y: 0, w: W, h: H });
+  const place = { x: Math.round(place0.x), y: Math.round(place0.y), w: Math.round(place0.w), h: Math.round(place0.h) };
   if (layer.kind === 'fill') {
     const [r, g, b] = hex(layer.color);
     const raw = Buffer.alloc(place.w * place.h * 3);
@@ -150,7 +151,7 @@ async function renderLayer(layer, shot, t, W, H) {
   const cf = typeof src === 'function' ? src(t - shot.from, t) : src.start + (t - shot.from) * (src.rate ?? 1);
   const file = clipFile(meta, cf);
   const decodedFrame = await decode(file);
-  const view = viewAt(layer.view ?? { x: 0, y: 0, w: meta.w, h: meta.h }, lerpKeys(layer.viewProgress, k, k));
+  const view = typeof layer.view === 'function' ? layer.view(t - shot.from, t) : viewAt(layer.view ?? { x: 0, y: 0, w: meta.w, h: meta.h }, lerpKeys(layer.viewProgress, k, k));
   // Fit the view's aspect to the place's aspect (cover): widen or heighten around the centre.
   let rect = { ...view };
   const pa = place.w / place.h, va = rect.w / rect.h;
@@ -210,10 +211,38 @@ async function renderShot(shot, t, W, H) {
   for (const layer of shot.layers) {
     const L = await renderLayer(layer, shot, t, W, H);
     if (!L) continue;
+    if (layer.outline) {
+      const o = layer.outline;
+      const key = `sh:${L.w}x${L.h}:${o.px}:${o.shadowPx}`;
+      let sh = maskCache.get(key);
+      if (!sh) {
+        const pad = o.shadowPx * 3;
+        const svg = Buffer.from(`<svg width="${L.w + 2 * pad}" height="${L.h + 2 * pad}" xmlns="http://www.w3.org/2000/svg"><rect x="${pad}" y="${pad + Math.round(o.shadowPx / 2)}" width="${L.w}" height="${L.h}" fill="${o.shadowColor ?? '#1A0F08'}" fill-opacity="${o.shadowOpacity ?? 0.45}"/></svg>`);
+        const rgba = await sharp(svg).blur(o.shadowPx / 2).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+        sh = { rgba: rgba.data, w: rgba.info.width, h: rgba.info.height, pad };
+        maskCache.set(key, sh);
+      }
+      blit(canvas, W, H, { rgba: sh.rgba, left: L.left - sh.pad, top: L.top - sh.pad, w: sh.w, h: sh.h, opacity: L.opacity });
+      const [r, g, b] = hex(o.color ?? '#3B2416');
+      const ow = L.w + 2 * o.px, oh = L.h + 2 * o.px;
+      const raw = Buffer.alloc(ow * oh * 3);
+      for (let i = 0; i < raw.length; i += 3) { raw[i] = r; raw[i + 1] = g; raw[i + 2] = b; }
+      blit(canvas, W, H, { raw, left: L.left - o.px, top: L.top - o.px, w: ow, h: oh, opacity: L.opacity });
+    }
     if (L.mask) L.maskAlpha = await roundedMask(L.w, L.h, L.mask.radius);
     blit(canvas, W, H, L);
   }
   return canvas;
+}
+
+/** Scale the composed shot about a point: zoom { from, to, s0, s1, cx, cy, ease } over output frames. */
+async function postZoom(canvas, W, H, z, t) {
+  const u = Math.max(0, Math.min(1, (t - z.from) / Math.max(1, z.to - z.from)));
+  const sc = z.s0 + (z.s1 - z.s0) * (EASE[z.ease ?? 'inOut'])(u);
+  if (sc <= 1.0005) return canvas;
+  const w = W / sc, h = H / sc;
+  const x = Math.max(0, Math.min(W - w, z.cx - (z.cx) / sc)), y = Math.max(0, Math.min(H - h, z.cy - (z.cy) / sc));
+  return cropScaled({ data: canvas, info: { width: W, height: H, channels: 3 } }, { x, y, w, h }, W, H);
 }
 
 /** Composes output frame t of a cut. */
@@ -224,6 +253,7 @@ export function makeComposer(cut) {
     if (i < 0) throw new Error(`no shot covers frame ${t}`);
     const shot = shots[i];
     let canvas = await renderShot(shot, t, W, H);
+    if (shot.postZoom) canvas = await postZoom(canvas, W, H, shot.postZoom, t);
     const d = shot.dissolveIn ?? 0;
     if (d > 0 && i > 0 && t - shot.from < d) {
       // The previous shot keeps playing under the dissolve.
@@ -312,7 +342,7 @@ export function mixAudio({ beds, sfx, duration, out, targetBedLufs = -20 }) {
       b.fadeOut ? `afade=t=out:st=${b.fadeOut[0].toFixed(3)}:d=${b.fadeOut[1]}` : null,
     ].filter(Boolean).join(',');
     const ms = Math.round(b.at * 1000);
-    chains.push(`[${i}:a]aresample=48000,aformat=channel_layouts=stereo,volume=${gain.toFixed(2)}dB${fades ? ',' + fades : ''},adelay=${ms}|${ms},apad=whole_dur=${duration}[m${i}]`);
+    chains.push(`[${i}:a]aresample=48000,aformat=channel_layouts=stereo,volume=${gain.toFixed(2)}dB${b.filter ? ',' + b.filter : ''}${fades ? ',' + fades : ''},adelay=${ms}|${ms},apad=whole_dur=${duration}[m${i}]`);
     labels.push(`[m${i}]`);
   });
   sfx.forEach((e, k) => {

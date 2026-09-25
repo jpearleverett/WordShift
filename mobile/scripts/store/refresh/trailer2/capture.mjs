@@ -18,7 +18,10 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { launch, gitHead, srcClean, visibleGlitchTexts } from '../lib.mjs';
+
+const sharp = createRequire(import.meta.url)('sharp');
 
 export const mobile = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 export const WORK = process.env.TRAILER2_WORK || path.join(os.tmpdir(), 'wordshift-trailer2');
@@ -120,7 +123,7 @@ export async function boot(state, { w = 432, h = 768, dsf = 2.5 } = {}) {
  * { action, sfx } for the event log. `window` is the recorded CSS rectangle
  * { x, y, w, h } at scale `dsf` (defaults to the whole viewport).
  */
-export async function recordClip(page, clip, { state, dsf, window: win = null, used = 0, actions = {}, probe = null, until = null, maxFrames = 900, notes = [], meta = {}, afterFrame = null }) {
+export async function recordClip(page, clip, { state, dsf, fps = FPS, format = 'jpeg', quality = 95, window: win = null, used = 0, actions = {}, probe = null, until = null, maxFrames = 1200, notes = [], meta = {}, afterFrame = null }) {
   const vp = page.viewportSize();
   const rect = win ?? { x: 0, y: 0, w: vp.width, h: vp.height };
   const pxW = Math.round(rect.w * dsf), pxH = Math.round(rect.h * dsf);
@@ -132,6 +135,7 @@ export async function recordClip(page, clip, { state, dsf, window: win = null, u
   await page.clock.pauseAt(t + 100);
   const cdp = await page.context().newCDPSession(page);
   const events = [], probes = {}, screening = { glitch: [], grim: [] };
+  const ext = format === 'jpeg' ? 'jpg' : 'png';
   let end = used ? used - 1 + HANDLE : Infinity;
   let elapsed = 0;
   for (let f = -HANDLE; f <= end; f++) {
@@ -140,13 +144,17 @@ export async function recordClip(page, clip, { state, dsf, window: win = null, u
       const ev = await actions[f]();
       for (const e of [].concat(ev || [])) events.push({ frame: f, ...e });
     }
-    const target = Math.round(((f + HANDLE + 1) * 1000) / FPS);
+    const target = Math.round(((f + HANDLE + 1) * 1000) / fps);
     await page.clock.runFor(target - elapsed);
     elapsed = target;
-    const shot = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false, clip: { x: rect.x, y: rect.y, width: rect.w, height: rect.h, scale: dsf } });
-    const png = Buffer.from(shot.data, 'base64');
-    if (png.readUInt32BE(16) !== pxW || png.readUInt32BE(20) !== pxH) throw new Error(`${clip}: frame ${f} is ${png.readUInt32BE(16)}x${png.readUInt32BE(20)}, not ${pxW}x${pxH}`);
-    await writeFile(path.join(dir, `f${String(f + HANDLE).padStart(5, '0')}.png`), png);
+    const shot = await cdp.send('Page.captureScreenshot', { format, ...(format === 'jpeg' ? { quality } : {}), captureBeyondViewport: false, clip: { x: rect.x, y: rect.y, width: rect.w, height: rect.h, scale: dsf } });
+    const img = Buffer.from(shot.data, 'base64');
+    const file = path.join(dir, `f${String(f + HANDLE).padStart(5, '0')}.${ext}`);
+    await writeFile(file, img);
+    if (f === -HANDLE) {
+      const m = await sharp(img).metadata();
+      if (m.width !== pxW || m.height !== pxH) throw new Error(`${clip}: frame ${f} is ${m.width}x${m.height}, not ${pxW}x${pxH}`);
+    }
     const glitch = await visibleGlitchTexts(page);
     if (glitch.length) screening.glitch.push({ frame: f, glitch });
     const words = await frameWords(page);
@@ -168,8 +176,8 @@ export async function recordClip(page, clip, { state, dsf, window: win = null, u
   const ok = screening.glitch.length === 0 && screening.grim.length === 0 && !(screening.other ?? []).length;
   const out = {
     clip, state, recordedAt: new Date().toISOString(), gitHead: HEAD, gameSourceMatchesHead: SRC_CLEAN,
-    method: `clock-stepped capture: Playwright fake clock paused, runFor(1000/30 ms) then a CDP Page.captureScreenshot of the CSS rectangle ${JSON.stringify(rect)} of a ${vp.width}x${vp.height} viewport at DPR ${dsf} = ${pxW}x${pxH}; reducedMotion false; sound/music/haptics off in-game`,
-    fps: FPS, handle: HANDLE, frameSize: { width: pxW, height: pxH }, viewport: vp, window: rect, dsf,
+    method: `clock-stepped capture: Playwright fake clock paused, runFor(1000/${fps} ms) then a CDP Page.captureScreenshot (${format}${format === 'jpeg' ? ' q' + quality : ''}) of the CSS rectangle ${JSON.stringify(rect)} of a ${vp.width}x${vp.height} viewport at DPR ${dsf} = ${pxW}x${pxH}; reducedMotion false; sound/music/haptics off in-game; page clock pinned to ${PINNED_DAY}`,
+    fps, format, ext, handle: HANDLE, pinnedDay: PINNED_DAY, frameSize: { width: pxW, height: pxH }, viewport: vp, window: rect, dsf,
     frames, firstFrame: -HANDLE, lastFrame: end, framesDir: path.relative(WORK, dir),
     fileIndex: 'file f%05d.png = clip frame + handle', events, screening: { ...screening, ok }, notes, ...meta, probes,
   };
