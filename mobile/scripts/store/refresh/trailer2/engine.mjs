@@ -21,6 +21,7 @@
  * previous shot, which keeps playing past its end.
  * Captions: { png, left, top, from, to, fadeIn, fadeOut } composited last.
  */
+import { Buffer } from 'node:buffer';
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';

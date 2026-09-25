@@ -17,12 +17,12 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { expect, dismissIntros } from '../lib.mjs';
+import { dismissIntros } from '../lib.mjs';
 import { boot, recordClip, retake, RetakeError, WORK, HANDLE } from './capture.mjs';
 import { seed2 } from './states2.mjs';
 import {
   openBoard, boardWords, solutionStep, boardProbe, victoryProbe, victoryEvents, toastVisible, dragMove,
-  roomBox, panUntil, bottomClamp, homeChrome, residents, emoteClashes, dialogueBlocks,
+  roomBox, panUntil, homeChrome, residents, emoteClashes, dialogueBlocks,
 } from './helpers.mjs';
 
 const CLIPS = {};

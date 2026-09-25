@@ -18,6 +18,7 @@
  * wordmark and lines. House crops never take in the Next sign, the ambient goal
  * line or the PLAY dock (asserted below).
  */
+import { Buffer } from 'node:buffer';
 import path from 'node:path';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { WORK, FPS } from './capture.mjs';
@@ -44,13 +45,6 @@ const lerpRect = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) 
 const easeOut = u => 1 - (1 - u) ** 3;
 const zoomAbout = (r, z) => ({ x: r.x + r.w * (1 - 1 / z) / 2, y: r.y + r.h * (1 - 1 / z) / 2, w: r.w / z, h: r.h / z });
 
-/** A 9:16 view of the whole source frame centred on a rectangle (for blurred backdrops). */
-function backdropView(id, r) {
-  const m = K[id]; const w = m.w, h = Math.min(m.h, Math.round(w * 16 / 9));
-  const cy = (r.y + r.h / 2) * S(id);
-  return { x: 0, y: Math.max(0, Math.min(m.h - h, cy - h / 2)), w, h };
-}
-
 // ---------------------------------------------------------------- marks from the recordings
 
 const kc = K['K1'].ev.marks?.cardVisible ?? 76;            // victory card mostly opaque (clip 76)
@@ -68,7 +62,7 @@ if (fe12next <= fe12) fail('K12: the third sentence starts before the second com
 
 const houseX = (id, f) => { const d = P(id)[f]?.den; return d.x + d.w / 2; };
 /** Phone close-up: 276x491 CSS from y 205, x-centred on the house (clear of the ambient line and the dock). */
-const phoneView = (id, f0 = 0) => css2src(id, { x: houseX(id, f0) - 138, y: 205, w: 276, h: 491 });
+const phoneView = (id, f0 = 0, y = 205) => css2src(id, { x: houseX(id, f0) - 138, y, w: 276, h: 491 });
 function assertClear(id, frames, rCss, what) {
   for (const f of frames) {
     const c = P(id)[f]?.chrome; if (!c) continue;
@@ -119,7 +113,8 @@ async function sheetTop(id, f) {
 /**
  * A resident's line: their real dialogue sheet (portrait, name, words, from
  * the sheet's top edge to `bottom`), in the space between the caption and the clear zone,
- * over a dark blur of their room (the frame before the tap). The caption
+ * over their part of the house, dimmed as the game dims it behind a sheet
+ * (the phone view of the frame before the tap, softened a little). The caption
  * plaque above it carries the line's point in large type for muted viewing.
  */
 async function cardShot(sid, from, to, id, srcAt, room, { k = 2.42, bottom = K[id].ev.viewport.height } = {}) {
@@ -136,7 +131,7 @@ async function cardShot(sid, from, to, id, srcAt, room, { k = 2.42, bottom = K[i
   const highest = bottomY - hMax;
   if (highest < 330) fail(`${sid}: the card reaches y ${Math.round(highest)}, under the caption`);
   return { id: sid, from, to, layers: [
-    { kind: 'frame', clip: room.clip, src: { start: room.f, rate: 0 }, view: backdropView(room.clip, room.box), blur: 40, brightness: 0.42 },
+    { kind: 'frame', clip: room.clip, src: { start: room.f, rate: 0 }, view: room.view, blur: 10, brightness: 0.4 },
     { kind: 'frame', clip: id, src: rel => srcAt(idx(rel)), outline: { px: 4, color: '#3B2416', shadowPx: 18 },
       view: rel => css2src(id, { x: 0, y: tops[idx(rel)], w: 432, h: hAt(rel) }),
       place: (_k, t) => { const h = hAt(t - from) * k; return { x: 540 - cardW / 2, y: bottomY - h, w: cardW, h }; } },
@@ -151,13 +146,17 @@ const next = n => { const from = cursor; cursor += n; return [from, cursor - 1];
 
 // H1: the rule, then the win, on the whole board in one unbroken view. K1 is
 // 60 fps: half speed from the L in the hand (clip -6) to its drop (26) and over
-// the T's drag (42 to 66), so each check reads; real time between and after,
-// through the victory card (stars at clips 79, 90 and 103).
-const H1_BOARD = 64;
+// the T's drag (42 to 66), each drag holding 0.4 s over its checked slot
+// (clips 23 and 62: the tile above PLANT, then above HEART) so the check reads;
+// real time between and after, through the victory card (stars at clips 79,
+// 90 and 103).
+const H1_MAP = [[0, -6, 1], [29, 23, 0], [41, 23, 1], [44, 26, 2], [52, 42, 1], [72, 62, 0], [84, 62, 1], [88, 66, 2]];
+const H1_BOARD = 88;
+const h1Clip = rel => { let seg = H1_MAP[0]; for (const m of H1_MAP) if (rel >= m[0]) seg = m; return seg[1] + (rel - seg[0]) * seg[2]; };
 {
-  const [from, to] = next(105);
-  const src = rel => rel < 32 ? -6 + rel : rel < 40 ? 26 + (rel - 32) * 2 : rel < H1_BOARD ? 42 + (rel - 40) : 66 + (rel - H1_BOARD) * 2;
-  if (src(H1_BOARD) !== 66 || src(32) !== 26 || src(40) !== 42) fail('H1 speed map is off its marks');
+  const [from, to] = next(111);
+  const src = h1Clip;
+  if (src(H1_BOARD) !== 66 || src(44) !== 26 || src(52) !== 42 || src(29) !== 23 || src(41) !== 23) fail('H1 speed map is off its marks');
   shots.push({ id: 'H1', from, to, layers: [{ kind: 'frame', clip: 'K1', src, view: boardView('K1') }], meta: { clip: `K1 -12..${src(104)}` } });
 }
 // H2: the house (K2, 60 fps, real time), crop A pushing in to crop B at the
@@ -177,16 +176,17 @@ const H1_BOARD = 64;
   // H3: the whole invite card ("A NEW FRIEND!", Axel, the Invite button; K2b
   // clip 6..38), pushing in, over a dark blur of the house around the empty
   // aquarium (not of the card itself).
-  const card = { x: 12, y: 112, w: 408, h: 486 };
-  const kv = 2.4;
-  const [f3, t3] = next(45);
+  // The card with its whole frame (CSS 28-404 x 120-640), under the caption.
+  const card = { x: 18, y: 112, w: 396, h: 536 };
+  const kv = 1.98;
+  const [f3, t3] = next(48);
   shots.push({ id: 'H3', from: f3, to: t3, layers: [
     { kind: 'frame', clip: 'K2', src: { start: 150, rate: 0 }, view: css2src('K2', cropB), blur: 40, brightness: 0.45 },
     { kind: 'frame', clip: 'K2b', src: { start: 6, rate: 1 }, outline: { px: 4, color: '#3B2416', shadowPx: 18 },
       view: [{ at: 0, ...css2src('K2b', card) }, { at: 1, ...css2src('K2b', zoomAbout(card, 1.04)), ease: 'inOut' }],
-      place: { x: 540 - (card.w * kv) / 2, y: 190, w: card.w * kv, h: card.h * kv } }] });
-  const [f3b, t3b] = next(27);
-  shots.push({ id: 'H3b', from: f3b, to: t3b, layers: [{ kind: 'frame', clip: 'K2', src: { start: i0 + 2, rate: 1 }, view: css2src('K2', cropB) }] });
+      place: { x: 540 - (card.w * kv) / 2, y: 332, w: card.w * kv, h: card.h * kv } }] });
+  // (Axel moving in is not shown: the game's scrim is still fading there, and
+  // the welcome confetti reads as a glitch at that size.)
 }
 // H4: three whole boards: EASY and MED+ from the drag into the drop, EXPERT from
 // its drop (its drag fans neutral ghost words across the target row). The chips read.
@@ -200,25 +200,27 @@ for (const [sid, id, start] of [['H4a', 'K4', -12], ['H4b', 'K5', -10], ['H4c', 
   assertClear('K7a', [...range(-14, -1), ...range(21, 46)], { x: v.x / 5, y: v.y / 5, w: v.w / 5, h: v.h / 5 }, 'H5');
   const [fa, ta] = next(14);
   shots.push({ id: 'H5a', from: fa, to: ta, layers: [{ kind: 'frame', clip: 'K7a', src: { start: -14, rate: 1 }, view: v }] });
-  const [fb, tb] = next(26);
+  const [fb, tb] = next(32);
   shots.push({ id: 'H5b', from: fb, to: tb, layers: [{ kind: 'frame', clip: 'K7a', src: { start: 21, rate: 1 }, view: v }] });
 }
 {
   const [from, to] = next(78);
-  shots.push(await cardShot('H5c', from, to, 'K7b', rel => rel, { clip: 'K7a', f: 46, box: P('K7a')[46].jungle }));
+  shots.push(await cardShot('H5c', from, to, 'K7b', rel => rel, { clip: 'K7a', f: 46, view: phoneView('K7a', 0) }));
 }
 // H6: Panko in her kitchen (before the tap), then her line: the last two
 // sentences type in, "I must have." completes a second in.
 {
-  const v = phoneView('K8', 7);
-  assertClear('K8', range(7, 46), { x: v.x / 5, y: v.y / 5, w: v.w / 5, h: v.h / 5 }, 'H6');
-  const [from, to] = next(36);
+  // 20 CSS higher than the other phone views, so the caption sits on the
+  // aquarium and clears the Scholar's Study nameplate.
+  const v = phoneView('K8', 7, 185);
+  assertClear('K8', range(7, 52), { x: v.x / 5, y: v.y / 5, w: v.w / 5, h: v.h / 5 }, 'H6');
+  const [from, to] = next(42);
   shots.push({ id: 'H6a', from, to, layers: [{ kind: 'frame', clip: 'K8', src: { start: 7, rate: 1 }, view: [{ at: 0, ...zoomAbout(v, 1) }, { at: 1, ...zoomAbout(v, 1.03), ease: 'inOut' }] }] });
 }
 {
   const [from, to] = next(90);
   const s0 = fc8 - 31;
-  shots.push(await cardShot('H6b', from, to, 'K8', rel => s0 + rel, { clip: 'K8', f: 30, box: P('K8')[30].kitchen }));
+  shots.push(await cardShot('H6b', from, to, 'K8', rel => s0 + rel, { clip: 'K8', f: 30, view: phoneView('K8', 7) }));
 }
 // H7: the locked frame: afternoon, then the same frame at sunset, pulling back.
 {
@@ -226,7 +228,7 @@ for (const [sid, id, start] of [['H4a', 'K4', -12], ['H4b', 'K5', -10], ['H4c', 
   if (Math.abs(d9.y - d10.y) > 1.5 || Math.abs(d9.x - d10.x) > 1.5) fail(`K9/K10 dens differ: ${JSON.stringify([d9, d10])}`);
   assertClear('K9', range(0, 26), W2('K9'), 'H7a');
   assertClear('K10', range(0, 163), W3('K10'), 'H7b/END');
-  const [fa, ta] = next(30);
+  const [fa, ta] = next(36);
   shots.push({ id: 'DAY', from: fa, to: ta, layers: [{ kind: 'frame', clip: 'K9', src: { start: 0, rate: 1 }, view: css2src('K9', W2('K9')) }] });
   const [fb, tb] = next(69);
   shots.push({ id: 'DUSK', from: fb, to: tb, layers: [{ kind: 'frame', clip: 'K10', src: { start: 0, rate: 1 }, view: [{ at: 0, ...css2src('K10', W2('K10')) }, { at: 1, ...css2src('K10', W3('K10')), ease: 'out' }] }] });
@@ -242,9 +244,10 @@ for (const [sid, id, start] of [['H4a', 'K4', -12], ['H4b', 'K5', -10], ['H4c', 
 {
   const [from, to] = next(84);
   const s0 = 52;
-  // Ember's name (CSS y 749-758) sits at the screen's bottom edge, which cuts
-  // its underline: the card ends at 761, under the name and above the line.
-  shots.push(await cardShot('H8b', from, to, 'K12', rel => Math.min(fe12, s0 + rel), { clip: 'K12', f: 30, box: P('K12')[30].den }, { bottom: 761 }));
+  // Ember's name (CSS y 749-758) sits on the screen's bottom edge, which cuts
+  // its underline, so her card ends at 745, under the Next button; the caption
+  // names her.
+  shots.push(await cardShot('H8b', from, to, 'K12', rel => Math.min(fe12, s0 + rel), { clip: 'K12', f: 30, view: phoneView('K12', 22) }, { bottom: 745 }));
 }
 // END: the real sunset house, pulling back.
 const END0 = cursor;
@@ -254,6 +257,13 @@ const END0 = cursor;
     { kind: 'frame', clip: 'K10', src: { start: 45, rate: 1 }, view: rel => css2src('K10', lerpRect(W3('K10'), W4('K10'), easeOut(Math.min(1, rel / 19)))) }] });
 }
 if (cursor !== TOTAL) fail(`timeline is ${cursor} frames, not ${TOTAL}`);
+// Nothing added below y 1440: a placed layer with an outline adds its outline
+// and a drop shadow (about 27 px below the layer), so those must end above it.
+for (const s of shots) for (const l of s.layers) if (l.place && l.outline) for (let t = s.from; t <= s.to; t++) {
+  const k = (t - s.from) / Math.max(1, s.to - s.from);
+  const p = typeof l.place === 'function' ? l.place(k, t) : l.place;
+  if (p.y + p.h + l.outline.px + 27 > 1440) fail(`${s.id} f${t}: an outlined layer's shadow reaches y ${Math.round(p.y + p.h + l.outline.px + 27)}`);
+}
 const shotOf = sid => shots.find(s => s.id === sid) ?? fail(`no shot ${sid}`);
 
 // ---------------------------------------------------------------- captions and end card
@@ -295,14 +305,15 @@ async function plaque(lines, skin = 'bright', size = 76) {
 // over the house and above the dialogue cards. Caption 1 leaves as the victory
 // card rises.
 const CAPTIONS = [
-  { id: 1, lines: ['One letter. Two new words.'], shot: 'H1', to: H1_BOARD + 1, top: 300 },
+  { id: 1, lines: ['One letter. Two real words.'], shot: 'H1', to: H1_BOARD + 1, top: 300 },
   { id: 2, lines: ['Solve puzzles.', 'Build them a home.'], shot: 'H2', top: 120 },
-  { id: 3, lines: ['Over 4,000 puzzles.'], shot: ['H4a', 'H4c'], top: 360 },
-  { id: 4, lines: ['New rooms. New neighbors.'], shot: ['H5a', 'H5b'], top: 120 },
-  { id: 5, lines: ['Three moths.', 'All named Gerald.'], shot: 'H5c', top: 120 },
-  { id: 6, lines: ['Who moved the spice jars?'], shot: ['H6a', 'H6b'], top: 120 },
-  { id: 7, lines: ['Where did the day go?'], shot: 'DUSK', top: 120, skin: 'dusk' },
-  { id: 8, lines: ['Ember is fond of you.'], shot: 'H8b', top: 120, skin: 'dusk' },
+  { id: 3, lines: ['13 friends to welcome.'], shot: 'H3', top: 120 },
+  { id: 4, lines: ['Over 4,000 puzzles.'], shot: ['H4a', 'H4c'], top: 360 },
+  { id: 5, lines: ['More rooms. More neighbors.'], shot: ['H5a', 'H5b'], top: 120 },
+  { id: 6, lines: ['Three moths.', 'All named Gerald.'], shot: 'H5c', top: 120 },
+  { id: 7, lines: ['Who moved the spice jars?'], shot: ['H6a', 'H6b'], top: 120 },
+  { id: 8, lines: ['Where did the day go?'], shot: 'DUSK', top: 120, skin: 'dusk' },
+  { id: 9, lines: ['Ember is fond of you.'], shot: 'H8b', top: 120, skin: 'dusk' },
 ].map(c => {
   const [a, b] = Array.isArray(c.shot) ? c.shot : [c.shot, c.shot];
   return { ...c, text: c.lines.join(' '), from: shotOf(a).from, to: c.to !== undefined ? shotOf(a).from + c.to : shotOf(b).to };
@@ -430,17 +441,16 @@ const beds = [
 const SND = f => A(`sounds/${f}`);
 const sfx = [];
 const add = (file, frame, gainDb = 0, why = '') => sfx.push({ file: SND(file), at: frame / FPS, gainDb, why });
-// H1 (K1 at 60 fps; see the src map): the L is in the hand at rel 0, PLANT at
-// clip 26 (rel 32), the T lifts at clip 42 (rel 40), HEART at clip 66 (rel
-// 64); PERFECT! and the stars follow at real time.
-const clipToRel = c => c <= 26 ? c + 6 : c <= 42 ? 32 + (c - 26) / 2 : c <= 66 ? 40 + (c - 42) : H1_BOARD + (c - 66) / 2;
+// H1 (K1 at 60 fps; see H1_MAP): the L is in the hand at rel 0, PLANT at clip
+// 26, the T lifts at clip 42, HEART at clip 66; PERFECT! and the stars follow
+// at real time. clipToRel finds the first output frame showing a clip frame.
+const clipToRel = c => { for (let r = 0; r < 111; r++) if (h1Clip(r) >= c) return r; return fail(`clip ${c} is not in H1`); };
 add('letter_select.wav', 0, -8, 'the L in the hand');
 add('valid_move.wav', clipToRel(26), 0, 'PLANT');
 add('letter_select.wav', clipToRel(42), -6, 'the T lifts');
 add('valid_move_2.wav', clipToRel(66), 0, 'HEART');
 for (const e of K['K1'].events.filter(e => /star|PERFECT/.test(e.action))) add(e.sfx, clipToRel(e.frame), e.sfx === 'perfect.wav' ? -2 : 0, e.action);
 add('ui_tap.wav', shotOf('H3').from, -8, 'the invite');
-add('unlock.wav', shotOf('H3b').from, 0, 'Axel moves in');
 add('letter_select.wav', shotOf('H4a').from, -8, 'the W lifts');
 add('valid_move.wav', shotOf('H4a').from + 12, -2, 'SWING');
 add('valid_move_2.wav', shotOf('H4b').from + 10, -2, 'CLOVER');
@@ -449,7 +459,6 @@ add('unlock.wav', shotOf('H5b').from, 0, 'the Jungle Hammock is built');
 add('dialogue.wav', shotOf('H5c').from, -4, 'Sloane speaks');
 add('dialogue.wav', shotOf('H6b').from, -6, 'Panko speaks');
 add('dialogue.wav', shotOf('H8b').from, -6, 'Ember speaks');
-add('valid_move.wav', E2_AT, -10, 'a soft chime under "Isn\'t it?"');
 
 // ---------------------------------------------------------------- captions SRT
 

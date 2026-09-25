@@ -14,6 +14,7 @@
  * Frames:  $TRAILER2_WORK/clips/<clip>/f00000.png ...  (file index = frame + HANDLE)
  * Events:  $TRAILER2_WORK/events/<clip>.json
  */
+import { Buffer } from 'node:buffer';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
