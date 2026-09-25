@@ -117,35 +117,30 @@ async function sheetTop(id, f) {
   return fail(`${id} f${f}: no sheet top above ${anchor}`);
 }
 /**
- * A resident's line: a panel of their room (the frame before the tap, still,
- * pushing in) above their real dialogue sheet (portrait, name, words, from the
- * sheet's top edge to the screen's bottom), over a dark blur of the room.
+ * A resident's line: their real dialogue sheet (portrait, name, words, from
+ * the sheet's top edge to `bottom`), in the space between the caption and the clear zone,
+ * over a dark blur of their room (the frame before the tap). The caption
+ * plaque above it carries the line's point in large type for muted viewing.
  */
-async function cardShot(sid, from, to, id, srcAt, room, { k = 2.3, bottomY = 1430, push = 1.04 } = {}) {
+async function cardShot(sid, from, to, id, srcAt, room, { k = 2.42, bottom = K[id].ev.viewport.height } = {}) {
   const n = to - from + 1;
   const tops = [];
   for (let rel = 0; rel < n; rel++) tops.push(await sheetTop(id, srcAt(rel)));
-  const bottom = K[id].ev.viewport.height;
+  // The tallest the sheet gets is centred between the caption (to y 330) and
+  // the clear zone (y 1430); the sheet grows upward from that bottom as it types.
+  const hMax = (bottom - Math.min(...tops)) * k;
+  const bottomY = Math.min(1430, 330 + (1100 + hMax) / 2);
   const idx = rel => Math.max(0, Math.min(n - 1, rel));
   const cardW = 432 * k;
   const hAt = rel => bottom - tops[idx(rel)];
-  const r = room.box;
-  const roomCrop = { x: r.x - 22, y: r.y - 16, w: r.w + 44, h: r.h + 26 };
-  // The room panel is 1000 wide from y 80, or smaller when the sheet is tall,
-  // so a 36 px gap always separates it from the card's highest top.
-  const maxCardTop = bottomY - (bottom - Math.min(...tops)) * k;
-  const rh = Math.min(1000 * roomCrop.h / roomCrop.w, maxCardTop - 36 - 80);
-  const rw = rh * roomCrop.w / roomCrop.h;
-  if (rw < 760) fail(`${sid}: the room panel would be only ${Math.round(rw)} wide`);
-  const roomPlace = { x: 540 - rw / 2, y: 80, w: rw, h: rh };
+  const highest = bottomY - hMax;
+  if (highest < 330) fail(`${sid}: the card reaches y ${Math.round(highest)}, under the caption`);
   return { id: sid, from, to, layers: [
-    { kind: 'frame', clip: room.clip, src: { start: room.f, rate: 0 }, view: backdropView(room.clip, r), blur: 40, brightness: 0.42 },
-    { kind: 'frame', clip: room.clip, src: { start: room.f, rate: 0 }, outline: { px: 4, color: '#3B2416', shadowPx: 18 }, place: roomPlace,
-      view: [{ at: 0, ...css2src(room.clip, roomCrop) }, { at: 1, ...css2src(room.clip, zoomAbout(roomCrop, push)), ease: 'inOut' }] },
+    { kind: 'frame', clip: room.clip, src: { start: room.f, rate: 0 }, view: backdropView(room.clip, room.box), blur: 40, brightness: 0.42 },
     { kind: 'frame', clip: id, src: rel => srcAt(idx(rel)), outline: { px: 4, color: '#3B2416', shadowPx: 18 },
       view: rel => css2src(id, { x: 0, y: tops[idx(rel)], w: 432, h: hAt(rel) }),
       place: (_k, t) => { const h = hAt(t - from) * k; return { x: 540 - cardW / 2, y: bottomY - h, w: cardW, h }; } },
-  ], meta: { card: { k, tops: [Math.min(...tops), Math.max(...tops)], room: roomPlace } } };
+  ], meta: { card: { k, bottom, tops: [Math.min(...tops), Math.max(...tops)], highest: Math.round(highest) } } };
 }
 
 // ---------------------------------------------------------------- timeline (9:16)
@@ -154,28 +149,20 @@ const shots = [];
 let cursor = 0;
 const next = n => { const from = cursor; cursor += n; return [from, cursor - 1]; };
 
-// H1: the rule, on the whole board. K1 is 60 fps: half speed while each fan is
-// open (its check reads), real time between. The L is already lifted on frame 0.
+// H1: the rule, then the win, on the whole board in one unbroken view. K1 is
+// 60 fps: half speed from the L in the hand (clip -6) to its drop (26) and over
+// the T's drag (42 to 66), so each check reads; real time between and after,
+// through the victory card (stars at clips 79, 90 and 103).
+const H1_BOARD = 64;
 {
-  const [from, to] = next(55);
-  const src = rel => rel < 22 ? 6 + rel : rel < 34 ? 27 + (rel - 22) * 2 : rel < 50 ? 50 + (rel - 34) : 66 + (rel - 50) * 2;
-  shots.push({ id: 'H1', from, to, layers: [{ kind: 'frame', clip: 'K1', src, view: boardView('K1') }], meta: { clip: 'K1 6..74' } });
-}
-// H1b: the victory card: stars, PERFECT!, FLAWLESS! and the word journey.
-{
-  const [from, to] = next(30);
-  const v = P('K1')[kc + 40]?.victory?.boxes ?? fail('K1: no victory boxes');
-  const rib = v.ribbon ?? fail('K1: no ribbon box');
-  const cardX0 = 36, cardX1 = 396, cutY = 414;
-  if (rib.y + rib.h > cutY - 60) fail('K1: the ribbon sits too low for the card crop');
-  const h = (cardX1 - cardX0) * 1110 / 1080;
-  const cardCrop = { x: cardX0, y: cutY - h, w: cardX1 - cardX0, h };
-  shots.push({ id: 'H1b', from, to, layers: [
-    { kind: 'frame', clip: 'K1', src: rel => kc + rel * 2, view: backdropView('K1', cardCrop), blur: 28, brightness: 0.7 },
-    { kind: 'frame', clip: 'K1', src: rel => kc + rel * 2, view: css2src('K1', cardCrop), place: { x: 0, y: 330, w: 1080, h: 1110 } }] });
+  const [from, to] = next(105);
+  const src = rel => rel < 32 ? -6 + rel : rel < 40 ? 26 + (rel - 32) * 2 : rel < H1_BOARD ? 42 + (rel - 40) : 66 + (rel - H1_BOARD) * 2;
+  if (src(H1_BOARD) !== 66 || src(32) !== 26 || src(40) !== 42) fail('H1 speed map is off its marks');
+  shots.push({ id: 'H1', from, to, layers: [{ kind: 'frame', clip: 'K1', src, view: boardView('K1') }], meta: { clip: `K1 -12..${src(104)}` } });
 }
 // H2: the house (K2, 60 fps, real time), crop A pushing in to crop B at the
-// empty aquarium's invite card.
+// empty aquarium's invite card; it ends before K2's own invite dialog opens
+// (clip 120), which H3 shows whole from K2b.
 {
   const f = 0, ch = P('K2')[f].chrome, den = P('K2')[f].den, aq = P('K2')[f].aquarium;
   const cx = den.x + den.w / 2;
@@ -183,26 +170,28 @@ const next = n => { const from = cursor; cursor += n; return [from, cursor - 1];
   const cropB = { x: cx - 200, y: aq.y - 265, w: 400, h: 711 };
   for (const r of [cropA, cropB]) if (r.y < ch.next.y + ch.next.h + 4) fail(`K2 crop starts above the Next sign: ${JSON.stringify(r)}`);
   assertClear('K2', range(0, 160), cropA, 'H2 A');
-  const [from, to] = next(78);
+  const [from, to] = next(60);
+  if ((to - from) * 2 >= 120) fail('H2 runs into the invite dialog');
   shots.push({ id: 'H2', from, to, layers: [
     { kind: 'frame', clip: 'K2', src: { start: 0, rate: 2 }, view: [{ at: 0, ...css2src('K2', cropA) }, { at: 1, ...css2src('K2', cropB), ease: 'inOut' }] }] });
-  // H3: "A NEW FRIEND!" (K2b clip 8..34), push 1.00 to 1.05, then Axel moves in (K2 at half speed, crop B).
-  const m = P('K2b')[20].medallion;
-  const u = { x: Math.min(m.portrait.x, m.ribbon.x) - 12, y: m.portrait.y - 12 };
-  u.w = Math.max(m.portrait.x + m.portrait.w, m.ribbon.x + m.ribbon.w) + 12 - u.x;
-  u.h = m.ribbon.y + m.ribbon.h + 12 - u.y;
-  const km = Math.min(4.5, 900 / u.w);
-  const [f3, t3] = next(27);
+  // H3: the whole invite card ("A NEW FRIEND!", Axel, the Invite button; K2b
+  // clip 6..38), pushing in, over a dark blur of the house around the empty
+  // aquarium (not of the card itself).
+  const card = { x: 12, y: 112, w: 408, h: 486 };
+  const kv = 2.4;
+  const [f3, t3] = next(45);
   shots.push({ id: 'H3', from: f3, to: t3, layers: [
-    { kind: 'frame', clip: 'K2b', src: { start: 8, rate: 1 }, view: backdropView('K2b', u), blur: 28, brightness: 0.6 },
-    { kind: 'frame', clip: 'K2b', src: { start: 8, rate: 1 }, view: [{ at: 0, ...css2src('K2b', u) }, { at: 1, ...css2src('K2b', zoomAbout(u, 1.05)), ease: 'inOut' }],
-      place: { x: 540 - (u.w * km) / 2, y: 700 - (u.h * km) / 2, w: u.w * km, h: u.h * km } }] });
-  const [f3b, t3b] = next(13);
+    { kind: 'frame', clip: 'K2', src: { start: 150, rate: 0 }, view: css2src('K2', cropB), blur: 40, brightness: 0.45 },
+    { kind: 'frame', clip: 'K2b', src: { start: 6, rate: 1 }, outline: { px: 4, color: '#3B2416', shadowPx: 18 },
+      view: [{ at: 0, ...css2src('K2b', card) }, { at: 1, ...css2src('K2b', zoomAbout(card, 1.04)), ease: 'inOut' }],
+      place: { x: 540 - (card.w * kv) / 2, y: 190, w: card.w * kv, h: card.h * kv } }] });
+  const [f3b, t3b] = next(27);
   shots.push({ id: 'H3b', from: f3b, to: t3b, layers: [{ kind: 'frame', clip: 'K2', src: { start: i0 + 2, rate: 1 }, view: css2src('K2', cropB) }] });
 }
-// H4: three whole boards, each from its drop: EASY, MED+, EXPERT (the chips read).
-for (const [sid, id, start] of [['H4a', 'K4', 0], ['H4b', 'K5', 0], ['H4c', 'K6', 13]]) {
-  const [from, to] = next(32);
+// H4: three whole boards: EASY and MED+ from the drag into the drop, EXPERT from
+// its drop (its drag fans neutral ghost words across the target row). The chips read.
+for (const [sid, id, start] of [['H4a', 'K4', -12], ['H4b', 'K5', -10], ['H4c', 'K6', 13]]) {
+  const [from, to] = next(36);
   shots.push({ id: sid, from, to, layers: [{ kind: 'frame', clip: id, src: { start, rate: 1 }, view: boardView(id) }] });
 }
 // H5: the Jungle Hammock is built (jump cut in the same framing), then Sloane.
@@ -215,7 +204,7 @@ for (const [sid, id, start] of [['H4a', 'K4', 0], ['H4b', 'K5', 0], ['H4c', 'K6'
   shots.push({ id: 'H5b', from: fb, to: tb, layers: [{ kind: 'frame', clip: 'K7a', src: { start: 21, rate: 1 }, view: v }] });
 }
 {
-  const [from, to] = next(90);
+  const [from, to] = next(78);
   shots.push(await cardShot('H5c', from, to, 'K7b', rel => rel, { clip: 'K7a', f: 46, box: P('K7a')[46].jungle }));
 }
 // H6: Panko in her kitchen (before the tap), then her line: the last two
@@ -223,11 +212,11 @@ for (const [sid, id, start] of [['H4a', 'K4', 0], ['H4b', 'K5', 0], ['H4c', 'K6'
 {
   const v = phoneView('K8', 7);
   assertClear('K8', range(7, 46), { x: v.x / 5, y: v.y / 5, w: v.w / 5, h: v.h / 5 }, 'H6');
-  const [from, to] = next(40);
+  const [from, to] = next(36);
   shots.push({ id: 'H6a', from, to, layers: [{ kind: 'frame', clip: 'K8', src: { start: 7, rate: 1 }, view: [{ at: 0, ...zoomAbout(v, 1) }, { at: 1, ...zoomAbout(v, 1.03), ease: 'inOut' }] }] });
 }
 {
-  const [from, to] = next(102);
+  const [from, to] = next(90);
   const s0 = fc8 - 31;
   shots.push(await cardShot('H6b', from, to, 'K8', rel => s0 + rel, { clip: 'K8', f: 30, box: P('K8')[30].kitchen }));
 }
@@ -237,9 +226,9 @@ for (const [sid, id, start] of [['H4a', 'K4', 0], ['H4b', 'K5', 0], ['H4c', 'K6'
   if (Math.abs(d9.y - d10.y) > 1.5 || Math.abs(d9.x - d10.x) > 1.5) fail(`K9/K10 dens differ: ${JSON.stringify([d9, d10])}`);
   assertClear('K9', range(0, 26), W2('K9'), 'H7a');
   assertClear('K10', range(0, 163), W3('K10'), 'H7b/END');
-  const [fa, ta] = next(27);
+  const [fa, ta] = next(30);
   shots.push({ id: 'DAY', from: fa, to: ta, layers: [{ kind: 'frame', clip: 'K9', src: { start: 0, rate: 1 }, view: css2src('K9', W2('K9')) }] });
-  const [fb, tb] = next(66);
+  const [fb, tb] = next(69);
   shots.push({ id: 'DUSK', from: fb, to: tb, layers: [{ kind: 'frame', clip: 'K10', src: { start: 0, rate: 1 }, view: [{ at: 0, ...css2src('K10', W2('K10')) }, { at: 1, ...css2src('K10', W3('K10')), ease: 'out' }] }] });
 }
 // H8: Ember by the fire at dusk, then her line typing in; it holds (frozen) on
@@ -251,9 +240,11 @@ for (const [sid, id, start] of [['H4a', 'K4', 0], ['H4b', 'K5', 0], ['H4c', 'K6'
   shots.push({ id: 'H8a', from, to, layers: [{ kind: 'frame', clip: 'K12', src: { start: 22, rate: 1 }, view: v }] });
 }
 {
-  const [from, to] = next(102);
+  const [from, to] = next(84);
   const s0 = 52;
-  shots.push(await cardShot('H8b', from, to, 'K12', rel => Math.min(fe12, s0 + rel), { clip: 'K12', f: 30, box: P('K12')[30].den }, { push: 1.06 }));
+  // Ember's name (CSS y 749-758) sits at the screen's bottom edge, which cuts
+  // its underline: the card ends at 761, under the name and above the line.
+  shots.push(await cardShot('H8b', from, to, 'K12', rel => Math.min(fe12, s0 + rel), { clip: 'K12', f: 30, box: P('K12')[30].den }, { bottom: 761 }));
 }
 // END: the real sunset house, pulling back.
 const END0 = cursor;
@@ -301,16 +292,20 @@ async function plaque(lines, skin = 'bright', size = 76) {
 }
 // The plaque sits over the move pill on the board shots (the pill is CSS y 201
 // on K1 and 227 on K4-K6, so y 300 and 360 at 2.5x from y 60), and at y 120
-// over the house.
+// over the house and above the dialogue cards. Caption 1 leaves as the victory
+// card rises.
 const CAPTIONS = [
-  { id: 1, lines: ['One letter. Two new words.'], shot: 'H1', top: 300 },
+  { id: 1, lines: ['One letter. Two new words.'], shot: 'H1', to: H1_BOARD + 1, top: 300 },
   { id: 2, lines: ['Solve puzzles.', 'Build them a home.'], shot: 'H2', top: 120 },
   { id: 3, lines: ['Over 4,000 puzzles.'], shot: ['H4a', 'H4c'], top: 360 },
-  { id: 4, lines: ['Who moved the spice jars?'], shot: 'H6a', top: 120 },
-  { id: 5, lines: ['Where did the day go?'], shot: 'DUSK', top: 120, skin: 'dusk' },
+  { id: 4, lines: ['New rooms. New neighbors.'], shot: ['H5a', 'H5b'], top: 120 },
+  { id: 5, lines: ['Three moths.', 'All named Gerald.'], shot: 'H5c', top: 120 },
+  { id: 6, lines: ['Who moved the spice jars?'], shot: ['H6a', 'H6b'], top: 120 },
+  { id: 7, lines: ['Where did the day go?'], shot: 'DUSK', top: 120, skin: 'dusk' },
+  { id: 8, lines: ['Ember is fond of you.'], shot: 'H8b', top: 120, skin: 'dusk' },
 ].map(c => {
   const [a, b] = Array.isArray(c.shot) ? c.shot : [c.shot, c.shot];
-  return { ...c, text: c.lines.join(' '), from: shotOf(a).from, to: shotOf(b).to };
+  return { ...c, text: c.lines.join(' '), from: shotOf(a).from, to: c.to !== undefined ? shotOf(a).from + c.to : shotOf(b).to };
 });
 const captions = [];
 for (const c of CAPTIONS) {
@@ -326,7 +321,7 @@ const e2 = await renderHtml(`<div class="e">Isn't it?</div>`, endCss, { width: 1
 const mark = await sharp(A('ui/wordmark.png')).resize(760, 190).png().toBuffer();
 // The gradient ends at y 820 (cy 300 + r 520); the image stops at 840 so
 // nothing added reaches the bottom clear zone.
-const vignette = await sharp(Buffer.from(`<svg width="${W}" height="840" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="g" cx="540" cy="300" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="0.2"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="840" fill="url(#g)"/></svg>`)).png().toBuffer();
+const vignette = await sharp(Buffer.from(`<svg width="${W}" height="840" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="g" cx="540" cy="300" r="520" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="0.38"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="840" fill="url(#g)"/></svg>`)).png().toBuffer();
 captions.push({ id: 'vig', png: vignette, left: 0, top: 0, from: END0, to: TOTAL - 1, fadeIn: 12 });
 captions.push({ id: 'mark', png: mark, left: 540 - 380, top: 300 - 95, from: END0 + 4, to: TOTAL - 1, fadeIn: 10 });
 captions.push({ id: 'E1', png: e1.png, left: Math.round(540 - e1.width / 2), top: Math.round(510 - e1.height / 2), from: E1_AT, to: TOTAL - 1 });
@@ -408,7 +403,7 @@ const shots16 = shots.map(s => {
 {
   const e1b = await renderHtml(`<div class="e" style="font-size:76px">It's a lovely house.</div>`, endCss, { width: 1400 });
   const e2b = await renderHtml(`<div class="e" style="font-size:76px">Isn't it?</div>`, endCss, { width: 1400 });
-  const vig16 = await sharp(Buffer.from(`<svg width="${W16}" height="760" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="g" cx="960" cy="300" r="620" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="0.22"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs><rect width="${W16}" height="760" fill="url(#g)"/></svg>`)).png().toBuffer();
+  const vig16 = await sharp(Buffer.from(`<svg width="${W16}" height="760" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="g" cx="960" cy="300" r="620" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="0.38"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs><rect width="${W16}" height="760" fill="url(#g)"/></svg>`)).png().toBuffer();
   captions16.push({ id: 'vig', png: vig16, left: 0, top: 0, from: END0, to: TOTAL - 1, fadeIn: 12 });
   captions16.push({ id: 'mark', png: mark, left: 960 - 380, top: 210 - 95, from: END0 + 4, to: TOTAL - 1, fadeIn: 10 });
   captions16.push({ id: 'E1', png: e1b.png, left: Math.round(960 - e1b.width / 2), top: Math.round(400 - e1b.height / 2), from: E1_AT, to: TOTAL - 1 });
@@ -435,18 +430,20 @@ const beds = [
 const SND = f => A(`sounds/${f}`);
 const sfx = [];
 const add = (file, frame, gainDb = 0, why = '') => sfx.push({ file: SND(file), at: frame / FPS, gainDb, why });
-// H1 (K1 at 60 fps; see the src map): the L lifts before frame 0, PLANT at
-// clip 26 (rel 20), the T lifts at clip 42 (rel 30), HEART at clip 66 (rel 50).
+// H1 (K1 at 60 fps; see the src map): the L is in the hand at rel 0, PLANT at
+// clip 26 (rel 32), the T lifts at clip 42 (rel 40), HEART at clip 66 (rel
+// 64); PERFECT! and the stars follow at real time.
+const clipToRel = c => c <= 26 ? c + 6 : c <= 42 ? 32 + (c - 26) / 2 : c <= 66 ? 40 + (c - 42) : H1_BOARD + (c - 66) / 2;
 add('letter_select.wav', 0, -8, 'the L in the hand');
-add('valid_move.wav', 20, 0, 'PLANT');
-add('letter_select.wav', 30, -6, 'the T lifts');
-add('valid_move_2.wav', 50, 0, 'HEART');
-const h1b = shotOf('H1b').from;
-for (const e of K['K1'].events.filter(e => /star|PERFECT/.test(e.action))) add(e.sfx, Math.max(51, h1b + (e.frame - kc) / 2), e.sfx === 'perfect.wav' ? -2 : 0, e.action);
+add('valid_move.wav', clipToRel(26), 0, 'PLANT');
+add('letter_select.wav', clipToRel(42), -6, 'the T lifts');
+add('valid_move_2.wav', clipToRel(66), 0, 'HEART');
+for (const e of K['K1'].events.filter(e => /star|PERFECT/.test(e.action))) add(e.sfx, clipToRel(e.frame), e.sfx === 'perfect.wav' ? -2 : 0, e.action);
 add('ui_tap.wav', shotOf('H3').from, -8, 'the invite');
 add('unlock.wav', shotOf('H3b').from, 0, 'Axel moves in');
-add('valid_move.wav', shotOf('H4a').from, -2, 'SWING');
-add('valid_move_2.wav', shotOf('H4b').from, -2, 'CLOVER');
+add('letter_select.wav', shotOf('H4a').from, -8, 'the W lifts');
+add('valid_move.wav', shotOf('H4a').from + 12, -2, 'SWING');
+add('valid_move_2.wav', shotOf('H4b').from + 10, -2, 'CLOVER');
 add('valid_move_3.wav', shotOf('H4c').from, 0, 'PICKLED');
 add('unlock.wav', shotOf('H5b').from, 0, 'the Jungle Hammock is built');
 add('dialogue.wav', shotOf('H5c').from, -4, 'Sloane speaks');
@@ -457,8 +454,9 @@ add('valid_move.wav', E2_AT, -10, 'a soft chime under "Isn\'t it?"');
 // ---------------------------------------------------------------- captions SRT
 
 const ts = f => { const ms = Math.round(f / FPS * 1000); const p = (n, w = 2) => String(n).padStart(w, '0'); return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`; };
-const cues = [...CAPTIONS.map(c => ({ from: c.from, to: c.to + 1, text: c.lines.join('\n') })),
-  { from: E1_AT, to: E2_AT, text: "It's a lovely house." }, { from: E2_AT, to: TOTAL, text: "It's a lovely house.\nIsn't it?" }];
+// One line per cue, as trailer.captions in the listing JSON holds them.
+const cues = [...CAPTIONS.map(c => ({ from: c.from, to: c.to + 1, text: c.text })),
+  { from: E1_AT, to: E2_AT, text: "It's a lovely house." }, { from: E2_AT, to: TOTAL, text: "Isn't it?" }];
 const srt = cues.map((c, i) => `${i + 1}\n${ts(c.from)} --> ${ts(c.to)}\n${c.text}\n`).join('\n');
 
 // ---------------------------------------------------------------- output
