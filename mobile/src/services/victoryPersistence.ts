@@ -364,8 +364,11 @@ async function computeVictory(input: VictoryInput): Promise<VictoryData> {
       let weave: Partial<VictoryData> = {};
       if (input.unbrokenWeave) {
         const { mastery, rankedUp } = await recordUnbrokenWeaveVictory(difficulty, flawless);
-        // Ranks 2-4 wait on flawless wins; say what broke this one.
-        const flawlessObjective = mastery.rank >= 2 && mastery.nextObjective !== null;
+        // Ranks 2-4 wait on flawless wins; say what broke this one. Rank 2
+        // waits on a flawless HARD or EXPERT win only, so an easier board
+        // there says nothing (a flawless one would not have ranked up either).
+        const flawlessCounts = mastery.rank >= 3 || difficulty === 'HARD' || difficulty === 'EXPERT';
+        const flawlessObjective = mastery.rank >= 2 && mastery.nextObjective !== null && flawlessCounts;
         weave = { unbrokenWeaveRank: mastery.rank, unbrokenWeaveTitle: mastery.title,
           unbrokenWeaveNextObjective: mastery.nextObjective, unbrokenWeaveRankedUp: rankedUp,
           unbrokenWeaveNotFlawless: flawlessObjective && !flawless

@@ -187,6 +187,11 @@ export const GameAlertModal: React.FC<GameAlertModalProps> = ({ phase, suspended
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={isBeat ? undefined : handleRequestClose}
+        // Out of the accessibility tree for a beat: an unlabelled full-screen
+        // stop that does nothing would be worse than none.
+        accessible={!isBeat}
+        focusable={!isBeat}
+        importantForAccessibility={isBeat ? 'no' : 'auto'}
         accessibilityRole={isBeat ? undefined : 'button'}
         accessibilityLabel={isBeat ? undefined : 'Dismiss alert'}
       />

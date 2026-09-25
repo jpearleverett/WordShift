@@ -29,6 +29,12 @@ describe('spent letters on the Unbroken Weave board', () => {
     expect(row).toMatch(/onLockedPress=\{\s*isSource && !isProcessing && \(letter\.isLocked \|\| spent\)/);
   });
 
+  test('a spent letter keeps readable ink, and a tap on it gets rejection feedback, never the pick chime', () => {
+    expect(tile).toContain("textColor: spent && !letter.isLocked ? '#A098BC' : '#706890'");
+    expect(tile).toContain('{!spent && <View style={[styles.bevelTop');
+    expect(app).toMatch(/const spentWeaveLetter = puzzle\.unbrokenWeaveMode\s*&& puzzle\.spentLetters\.includes\(String\(letter\.char\)\.toUpperCase\(\)\);\s*if \(letter\.isLocked \|\| spentWeaveLetter\)/);
+  });
+
   test('screen readers hear that the letter is already used', () => {
     expect(tile).toContain("const letterStateLabel = letter.isLocked ? ', locked' : spent ? ', already used' : '';");
     expect(tile).toContain('disabled: !!letter.isLocked || !!spent');

@@ -3652,7 +3652,11 @@ function MainApp() {
     // shake + locked-letter message. Never the select chime a real pick gets.
     // Gated on PLAYING so a stray tap during victory/processing stays silent
     // (matching the hook's own guard, which would swallow the press anyway).
-    if (letter.isLocked) {
+    // A spent Unbroken Weave letter is greyed like a locked tile and gets the
+    // same rejection feedback before the hook's spent-letter message.
+    const spentWeaveLetter = puzzle.unbrokenWeaveMode
+      && puzzle.spentLetters.includes(String(letter.char).toUpperCase());
+    if (letter.isLocked || spentWeaveLetter) {
       if (puzzle.gameState === GameState.PLAYING) {
         hapticError();
         soundInvalidMove();
@@ -3664,7 +3668,7 @@ function MainApp() {
     hapticLight();
     soundLetterSelect();
     puzzleActions.handleLetterPress(letter, rowIndex);
-  }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
+  }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance, puzzle.unbrokenWeaveMode, puzzle.spentLetters]);
 
   // Quiet acknowledgment for taps on tiles in completed/future rows (they
   // used to mount no touchable at all, so a confused poke got literally

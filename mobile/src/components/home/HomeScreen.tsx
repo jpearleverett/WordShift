@@ -2133,9 +2133,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         } else if (introContext === 'harvest_heavy_nudge') {
           // App-session-scoped (heavyHarvestNudgeShownThisSession) — nothing to persist.
         } else if (introContext === 'unbroken_weave_intro') {
-          // Put down with Back before the last page: not heard, so it returns
-          // on the next home landing (never again on this one).
-          weaveDeferredThisLandingRef.current = true;
+          if (introDialogueIndex >= currentIntroLines.length - 1) {
+            // Every line was shown: Back on the last page is a deliberate close.
+            await markUnbrokenWeaveIntroSeen();
+          } else {
+            // Put down with Back before the last page: not heard, so it
+            // returns on the next home landing (never again on this one).
+            weaveDeferredThisLandingRef.current = true;
+          }
         } else if (introContext === 'keeper_record_intro') {
           // An early close still counts as heard — never force a re-read.
           await markKeeperRecordSeen();

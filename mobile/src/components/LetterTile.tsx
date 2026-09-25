@@ -675,7 +675,9 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         return {
           bgColor: '#2E2A40',        // Muted purple-gray — eerie calm
           borderColor: '#3A3555',
-          textColor: '#706890',       // Soft ghostly purple
+          // A spent Unbroken Weave letter still sits in a word the player has
+          // to read, so it keeps readable ink (5.1:1) under the dimmed face.
+          textColor: spent && !letter.isLocked ? '#A098BC' : '#706890', // Soft ghostly purple
           shadowColor: '#2E2A40',
         };
       }
@@ -979,7 +981,8 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         ]}
       >
         {/* Top highlight (bevel effect) — finish-owned */}
-        <View style={[styles.bevelTop, { backgroundColor: finish.bevel }]} />
+        {/* A spent weave letter skips the cream wash that would halve its ink's contrast. */}
+        {!spent && <View style={[styles.bevelTop, { backgroundColor: finish.bevel }]} />}
 
         {/* Glossy shine overlay — finish-owned */}
         <View style={[styles.glossyShine, { backgroundColor: finish.gloss }]} />

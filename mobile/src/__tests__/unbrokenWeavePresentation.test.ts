@@ -341,7 +341,9 @@ describe('one-time quiet-home introduction', () => {
       .toContain('await markUnbrokenWeaveIntroSeen();');
     const close = HOME_SCREEN.slice(HOME_SCREEN.indexOf('const handleCloseIntroDialogue'));
     const closeBranch = close.slice(close.indexOf("introContext === 'unbroken_weave_intro'"), close.indexOf("introContext === 'keeper_record_intro'"));
-    expect(closeBranch).not.toContain('markUnbrokenWeaveIntroSeen');
+    // Back on the last page counts as read; earlier, it defers to the next landing.
+    expect(closeBranch).toContain('if (introDialogueIndex >= currentIntroLines.length - 1) {');
+    expect(closeBranch).toContain('await markUnbrokenWeaveIntroSeen();');
     expect(closeBranch).toContain('weaveDeferredThisLandingRef.current = true;');
   });
 
@@ -350,6 +352,7 @@ describe('one-time quiet-home introduction', () => {
     expect(HOME_SCREEN).toContain('{!dialogueFlow.choiceSaving && !dialogueFlow.onPreDialoguePage && (');
     const alert = require('fs').readFileSync(require('path').join(__dirname, '../components/ui/GameAlertModal.tsx'), 'utf8');
     expect(alert).toContain('onPress={isBeat ? undefined : handleRequestClose}');
+    expect(alert).toContain('accessible={!isBeat}');
   });
 
   test('copy is phase-aware, points to setup, stays in-world, and has no em dash', () => {
@@ -386,7 +389,8 @@ describe('why a weave win was not flawless', () => {
     const fs = require('fs');
     const path = require('path');
     const persistence = fs.readFileSync(path.join(__dirname, '../services/victoryPersistence.ts'), 'utf8');
-    expect(persistence).toContain('const flawlessObjective = mastery.rank >= 2 && mastery.nextObjective !== null;');
+    expect(persistence).toContain("const flawlessCounts = mastery.rank >= 3 || difficulty === 'HARD' || difficulty === 'EXPERT';");
+    expect(persistence).toContain('const flawlessObjective = mastery.rank >= 2 && mastery.nextObjective !== null && flawlessCounts;');
     expect(persistence).toContain('unbrokenWeaveNotFlawless: flawlessObjective && !flawless');
     const modal = fs.readFileSync(path.join(__dirname, '../components/puzzle/VictoryModal.tsx'), 'utf8');
     expect(modal.match(/\{victoryData\.unbrokenWeaveNotFlawless\}/g)).toHaveLength(2);

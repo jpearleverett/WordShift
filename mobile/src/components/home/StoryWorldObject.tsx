@@ -59,14 +59,21 @@ export function StoryWorldObject({ keepsake, onPress, houseWidth, tintColor, tin
   const place = door
     ? { right: DOOR_RIGHT_DP, bottom: DOOR_BOTTOM_DP }
     : { left: getKeepsakeGateLeft(houseWidth, windowWidth), bottom: GATE_GROUND_DP - KEEPSAKE_GATE.feetAboveBottom };
-  return <WorldButton onPress={onPress} accessibilityRole="button" accessibilityLabel={`Inspect ${keepsake.title.toLowerCase()}`}
-    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-    style={[styles.object, place, { width: size.width, height: size.height }]}>
-    <Image source={source} style={styles.fill} resizeMode="contain" fadeDuration={0} accessible={false} />
-    {tintOpacity > 0 && (
-      <Image source={source} style={[styles.fill, styles.tint, { tintColor, opacity: tintOpacity }]} resizeMode="contain" fadeDuration={0} accessible={false} />
-    )}
-  </WorldButton>;
+  // The placement lives on a plain wrapper View. On native, RNGH's touchable
+  // sends `style` to its INNER view while its outer native button stays in
+  // normal flow, so absolute placement on the touchable left a zero-height
+  // hit box at the foundation's bottom edge and the art could not be tapped.
+  // Here the button is in flow inside the wrapper and sized to the art.
+  return <View style={[styles.object, place]} pointerEvents="box-none">
+    <WorldButton onPress={onPress} accessibilityRole="button" accessibilityLabel={`Inspect ${keepsake.title.toLowerCase()}`}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      style={{ width: size.width, height: size.height }}>
+      <Image source={source} style={styles.fill} resizeMode="contain" fadeDuration={0} accessible={false} />
+      {tintOpacity > 0 && (
+        <Image source={source} style={[styles.fill, styles.tint, { tintColor, opacity: tintOpacity }]} resizeMode="contain" fadeDuration={0} accessible={false} />
+      )}
+    </WorldButton>
+  </View>;
 }
 
 interface StoryWorldInspectionProps {
