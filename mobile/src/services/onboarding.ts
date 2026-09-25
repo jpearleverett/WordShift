@@ -170,7 +170,7 @@ export async function resetOnboarding(): Promise<void> {
 export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // Step 1: Empty home — guide to invite Fox
   home_empty: [
-    "Oh! Hello up there! I'm down here, by the little den.\nTap it to invite me in, and I'll come say hello properly!",
+    "Oh! Hello up there! I'm down here, by the little den.\nWill you invite me in? Then I can come say hello properly!",
   ],
 
   // Fox arrives after the player has already solved the cold-open puzzle.
