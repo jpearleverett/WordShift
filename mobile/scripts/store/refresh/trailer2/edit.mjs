@@ -497,9 +497,10 @@ add('dialogue.wav', shotOf('H8b').from, -6, 'Ember speaks');
 // ---------------------------------------------------------------- captions SRT
 
 const ts = f => { const ms = Math.round(f / FPS * 1000); const p = (n, w = 2) => String(n).padStart(w, '0'); return `${p(Math.floor(ms / 3600000))}:${p(Math.floor(ms / 60000) % 60)}:${p(Math.floor(ms / 1000) % 60)},${p(ms % 1000, 3)}`; };
-// One line per cue, as trailer.captions in the listing JSON holds them.
+// One line per cue, as trailer.captions in the listing JSON holds them. The
+// last cue carries both end-card lines, which are both on screen by then.
 const cues = [...CAPTIONS.map(c => ({ from: c.from, to: c.to + 1, text: c.text })),
-  { from: E1_AT, to: E2_AT, text: "It's a lovely house." }, { from: E2_AT, to: TOTAL, text: "Isn't it?" }];
+  { from: E1_AT, to: E2_AT, text: "It's a lovely house." }, { from: E2_AT, to: TOTAL, text: "It's a lovely house. Isn't it?" }];
 const srt = cues.map((c, i) => `${i + 1}\n${ts(c.from)} --> ${ts(c.to)}\n${c.text}\n`).join('\n');
 
 // ---------------------------------------------------------------- output

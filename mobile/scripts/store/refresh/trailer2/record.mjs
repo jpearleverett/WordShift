@@ -39,6 +39,20 @@ const combine = (...fns) => async (f, p) => { for (const fn of fns) { const w = 
 // ---------------------------------------------------------------- K1 hook (state A')
 
 /**
+ * The phase-0 darkness seeds (PHASE_0_SEED_MESSAGES in phaseNarrative.ts) can
+ * replace a move pill on about 5% of moves. They belong to the glitch family
+ * the trailer keeps out, so a take whose pill shows one is retaken (the 16:9
+ * master shows the pill that the 9:16 caption covers).
+ */
+const SEED_PILLS = ['That one lingered.', 'Something shifted.', 'A little warmth.', 'Room for another.'];
+function seedPillScreen(clip, out) {
+  for (const [f, p] of Object.entries(out.probes)) {
+    const hit = p?.board?.pills?.find(q => SEED_PILLS.includes(q.t));
+    if (hit) throw new RetakeError(`${clip} f${f}: the move pill shows the seed line "${hit.t}"`);
+  }
+}
+
+/**
  * The opener board PLAY / PANT / HEAR at DPR 5 and 60 fps. The L is pressed
  * at -20 and dragged frame by frame into PANT (release at 26, PLANT), then the
  * T is dragged out of PLANT into HEAR (release at 66, HEART), and the victory
@@ -65,6 +79,7 @@ CLIPS.K1 = () => retake('K1', () => withSession("A'", { w: 432, h: 844, dsf: 5 }
       return won !== null ? won + 90 : null;
     },
     afterFrame: noToast(page), meta: { board: 'PLAY/PANT/HEAR (curated opener)' } });
+  seedPillScreen('K1', out);
   out.marks = { cardHalfOpaque: won };
   out.events.push(...victoryEvents(out.probes));
   await writeFile(path.join(WORK, 'events', 'K1.json'), JSON.stringify(out, null, 1) + '\n');
@@ -138,8 +153,10 @@ function boardMoveClip(id, { state, key, target, words, dsf = 5, h = 844, pressA
       if (w.join('/') !== words) throw new Error(`${id}: board is ${w.join('/')}`);
       const s0 = await solutionStep(page, 0);
       const actions = dragMove(page, { start: pressAt, end: drop, from: s0.letter, to: s0.slot, approx: page.getByTestId(`puzzle-row-${s0.to}`), label: `drag the ${s0.char} into ${s0.formed}`, sfxUp: 'valid_move.wav' });
-      return recordClip(page, id, { state, dsf, fps: 30, used, actions, probe: async () => ({ board: await boardProbe(page) }),
+      const out = await recordClip(page, id, { state, dsf, fps: 30, used, actions, probe: async () => ({ board: await boardProbe(page) }),
         afterFrame: noToast(page), meta: { board: `${key} ${target}`, rows: words, move: `${s0.char}: ${s0.left} and ${s0.formed}` } });
+      seedPillScreen(id, out);
+      return out;
     });
   });
 }
