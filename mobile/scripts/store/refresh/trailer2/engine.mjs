@@ -15,6 +15,7 @@
  *              interpolated over the shot (zoom interpolated in log space).
  *       place: where the crop lands in the output { x, y, w, h } (default: full frame, cover)
  *   { kind: 'image', png (Buffer) or file, place, opacity }
+ *   { kind: 'fn', render(t, k) -> { raw, left, top, w, h } or null, opacity }
  *   { kind: 'fill', color }
  * Shot options: dissolveIn (frames): the first n frames blend over the
  * previous shot, which keeps playing past its end.
@@ -139,6 +140,11 @@ async function renderLayer(layer, shot, t, W, H) {
     const raw = Buffer.alloc(place.w * place.h * 3);
     for (let i = 0; i < raw.length; i += 3) { raw[i] = r; raw[i + 1] = g; raw[i + 2] = b; }
     return { raw, left: place.x, top: place.y, w: place.w, h: place.h, opacity };
+  }
+  if (layer.kind === 'fn') {
+    // A layer the caller renders itself: returns { raw, left, top, w, h } (RGB).
+    const r = await layer.render(t, k);
+    return r ? { ...r, opacity } : null;
   }
   if (layer.kind === 'image') {
     const key = layer._key ??= Symbol('img');
