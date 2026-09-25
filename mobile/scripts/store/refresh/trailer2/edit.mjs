@@ -374,12 +374,27 @@ for (const c of CAPTIONS) {
   if (96 + p.w > COL.x - 24) fail(`16:9 caption "${c.text}" (${p.w} wide) reaches the column`);
   captions16.push({ ...c, png: p.png, left: 96, top: 72, h: p.h });
 }
+// Behind the column and the placed layers, the game's own sky art, blurred and
+// darkened (as the first trailer's 16:9 master), rather than a blurred copy of
+// the same frame: day through the house and the invite, afternoon from the
+// boards, dusk from the sunset on.
+const skies16 = {};
+for (const name of ['day', 'afternoon', 'dusk']) {
+  const src = sharp(A(`environment/sky_${name}.webp`));
+  const m = await src.metadata();
+  const h = Math.round(m.width * 9 / 16);
+  const top = Math.round(m.height * 0.12);
+  skies16[name] = await sharp(A(`environment/sky_${name}.webp`)).extract({ left: 0, top, width: m.width, height: h })
+    .resize(W16, H16).blur(22).modulate({ brightness: 0.72 }).removeAlpha().png().toBuffer();
+}
+const skyFor = s => (s.from >= shotOf('DUSK').from ? 'dusk' : s.from >= shotOf('H4a').from ? 'afternoon' : 'day');
+const skyLayer = s => ({ kind: 'image', png: skies16[skyFor(s)], place: undefined, fit: 'fill' });
 function remap16(s) {
   const out = [];
   const placed = s.layers.filter(l => l.place);
   if (!placed.length) {
     for (const l of s.layers) {
-      out.push({ ...l, blur: 36, brightness: 0.55, place: undefined });
+      out.push(skyLayer(s));
       out.push({ kind: 'fn', render: async () => ({ raw: edgeRaw, left: COL.x - 6, top: 0, w: 6, h: H16 }) });
       out.push({ kind: 'fn', render: async () => ({ raw: edgeRaw, left: COL.x + COL.w, top: 0, w: 6, h: H16 }) });
       out.push({ ...l, place: { x: COL.x, y: 0, w: COL.w, h: COL.h } });
@@ -397,8 +412,7 @@ function remap16(s) {
   const ox = area.x + area.w / 2 - ((x0 + x1) / 2) * sc, oy = area.y + area.h / 2 - ((y0 + y1) / 2) * sc;
   const map = p => ({ x: ox + p.x * sc, y: oy + p.y * sc, w: p.w * sc, h: p.h * sc });
   for (const l of s.layers) {
-    // The backdrop is seen much larger here than in 9:16, so it takes more blur.
-    if (!l.place) { out.push({ ...l, place: undefined, blur: Math.max(56, l.blur ?? 0) }); continue; }
+    if (!l.place) { out.push(skyLayer(s)); continue; }
     const pl = l.place;
     out.push({ ...l, place: typeof pl === 'function' ? (k, t) => map(pl(k, t)) : map(pl) });
   }
