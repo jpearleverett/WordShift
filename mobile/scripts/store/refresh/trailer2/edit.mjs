@@ -160,6 +160,7 @@ function liftShot(from, to, id, frames, sentences, opts = {}) {
 
 const kc = K['K1'].ev.marks?.cardVisible ?? 76;            // victory card mostly opaque (checked by eye: clip 76)
 const fc8 = (() => { const f = Object.keys(P('K8')).map(Number).sort((a, b) => a - b).find(f => P('K8')[f]?.blocks?.blocks?.some(q => q.text === 'I must have.')); return f ?? fail('K8: "I must have." never completes'); })();
+const e12 = 43;
 const fe12 = (() => { const f = Object.keys(P('K12')).map(Number).sort((a, b) => a - b).find(f => P('K12')[f]?.blocks?.blocks?.[0]?.text === 'I am fond of you, whatever my fire is up to.'); return f ?? fail('K12: block 1 never completes'); })();
 const i0 = K['K2'].events.find(e => /Axel moves in/.test(e.action))?.frame ?? 192;
 
@@ -303,8 +304,10 @@ shots.push({ id: 'S14', ...boardShot(642, 682, 'K11', { start: -14, rate: 1 }, 0
   shots.push({ id: 'S15', from: 683, to: 695, layers: [{ kind: 'frame', clip: 'K12', src: { start: 27, rate: 1 }, view: v }] });
 }
 // S16: Ember's line types in, the picture freezes on the completed line and pushes in.
+// It starts on K12 f43 ("I am f"): before that the sheet is still fading in
+// and the PLAY dock shows through it.
 {
-  const frames = range(40, fe12);
+  const frames = range(e12, fe12);
   const sh = liftShot(696, 795, 'K12', frames, ['I am fond of you, whatever my fire is up to.']);
   const freezeAt = 696 + frames.length - 1;
   sh.postZoom = { from: freezeAt, to: 795, s0: 1, s1: 1.1, cx: 540, cy: 640, ease: 'inOut' };
@@ -386,7 +389,7 @@ const secs = f => f / FPS;
 const beds = [
   { file: A('music/home_phase0.mp3'), ss: 23.28, at: 0, dur: secs(476), fadeIn: [0, 0.01], fadeOut: [secs(476) - 0.015, 0.015], lufs: -20 },
   { file: A('music/home_phase0.mp3'), ss: 23.28 + secs(503), at: secs(503), dur: secs(582 - 503), fadeIn: [0, 0.08], fadeOut: [secs(582 - 503) - 0.015, 0.015], lufs: -29, filter: 'lowpass=f=1200' },
-  { file: A('music/home_phase2.mp3'), ss: 66.22, at: secs(642), dur: secs(696 + (fe12 - 40) - 642), fadeIn: [0, 0.3], fadeOut: [secs(696 + (fe12 - 40) - 642) - 0.015, 0.015], lufs: -22 },
+  { file: A('music/home_phase2.mp3'), ss: 66.22, at: secs(642), dur: secs(696 + (fe12 - e12) - 642), fadeIn: [0, 0.3], fadeOut: [secs(696 + (fe12 - e12) - 642) - 0.015, 0.015], lufs: -22 },
 ];
 const SND = f => A(`sounds/${f}`);
 const clipTime = (shot, clipFrame, rate = 1, start = 0) => shot.from + (clipFrame - start) / rate;
