@@ -32,7 +32,8 @@ import { makeBillboard, poseEmote, makeContactShadow } from '../world/fx.js';
 import { poseCharacter } from '../world/sprites.js';
 import { makeTile, setLocked, makeSprout, TILE_SCALE, TILE_H } from '../core/tiles.js';
 import { ease, seg, lerp, clamp, spring, catmull } from '../core/math.js';
-import { mm, setAspect, look } from './common.js';
+import { mm, setAspect, look, travelPx, blurFor } from './common.js';
+import { emberDenX } from './handoff.js';
 import { makeStrokeSparks, HOUSE_STROKES } from './interiors-sparks.js';
 
 const D2R = Math.PI / 180;
@@ -46,6 +47,9 @@ const toWorld = (rm, p) => [rm.x + p[0], rm.y + p[1], p[2]];
 /** The midpoint between two 30 fps frames nearest t: an instant switch there never lands inside a
  *  motion-blur shutter (subframes span +-1/120 s around each frame), so it never ghosts. */
 const midFrame = (t) => (Math.round(t * 30 - 0.5) + 0.5) / 30;
+/** The centre of the 30 fps frame a (motion-blur sub)frame time belongs to: sprite flipbooks
+ *  (walk cycles, talk/idle) switch on it, so a shutter never blends two drawings into a ghost. */
+const frameT = (t) => Math.round(t * 30) / 30;
 
 /** A tiny canvas texture drawn pixel by pixel, crisp when magnified. */
 function pixelTexture(w, h, draw) {
@@ -147,12 +151,34 @@ function aimCam(camera, cam) {
   camera.lookAt(...cam.target);
 }
 
-/** Motion-blur subframes from the frame centre's travel over one shutter, in output px (1080p). */
-function blurFrames(rig, t, pxAcross) {
-  const a = rig(t - 1 / 120), b = rig(t + 1 / 120);
-  const w = Math.max(1, b.frameW);
-  const move = (Math.hypot(b.target[0] - a.target[0], b.target[1] - a.target[1]) + Math.abs(b.frameW - a.frameW) / 2) / w * pxAcross;
-  return move < 10 ? 1 : move < 26 ? 2 : 3;
+/** Screen position (output px from the frame centre) of a world point seen by a rig camera. */
+function screenPx(cam, p, frameH) {
+  const f = [cam.target[0] - cam.pos[0], cam.target[1] - cam.pos[1], cam.target[2] - cam.pos[2]];
+  const fl = Math.hypot(...f); f[0] /= fl; f[1] /= fl; f[2] /= fl;
+  // right = f x up(0,1,0), up' = right x f
+  const r = [-f[2], 0, f[0]]; const rl = Math.hypot(...r) || 1; r[0] /= rl; r[2] /= rl;
+  const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+  const d = [p[0] - cam.pos[0], p[1] - cam.pos[1], p[2] - cam.pos[2]];
+  const z = d[0] * f[0] + d[1] * f[1] + d[2] * f[2];
+  const k = (frameH / 2) / Math.tan(cam.fov * D2R / 2) / z;
+  return [(d[0] * r[0] + d[1] * r[1] + d[2] * r[2]) * k, (d[0] * u[0] + d[1] * u[1] + d[2] * u[2]) * k];
+}
+
+/**
+ * Adaptive motion blur (common.js blurFor): enough subframes, over a short enough shutter,
+ * that pixel art never shows stepped copies. The travel is the camera's own (travelPx) or a
+ * tracked subject's on screen (subject(t) -> world point), whichever is larger.
+ */
+function adaptiveBlur(rig, frameH, subject = null) {
+  const px = (t) => {
+    let v = travelPx(rig, t, frameH);
+    if (subject) {
+      const a = screenPx(rig(t - 1 / 120), subject(t - 1 / 120), frameH), b = screenPx(rig(t + 1 / 120), subject(t + 1 / 120), frameH);
+      v = Math.max(v, Math.hypot(b[0] - a[0], b[1] - a[1]));
+    }
+    return v;
+  };
+  return { mb: (t) => blurFor(px(t)).n, shutter: (t) => blurFor(px(t)).shutter };
 }
 
 export default async function make(ctx) {
@@ -194,6 +220,7 @@ export default async function make(ctx) {
   }
   for (const o of shelf.children) { o.castShadow = true; o.receiveShadow = true; }
   world.register(shelf, kit.builtG);
+  shelf.name = 'P.shelf'; shelf.userData.probe = [[-PLANK_W / 2, PLANK_TOP, WALL_Z + 0.05 + PLANK_D], [PLANK_W / 2, PLANK_TOP + 0.5, WALL_Z + 0.05 + PLANK_D], [0, BB.y1, WALL_Z]];
 
   // the jars and the L: [L, SAGE, MINT, DILL] -> [DILL, SAGE, MINT, L] while the shelf is away
   const JAR_R = 0.155, JAR_H = 0.46, GAP = 0.05, L_W = TILE_SCALE;
@@ -233,6 +260,7 @@ export default async function make(ctx) {
   const ovenFire = makeFire({ px: 0.03, width: 0.26, height: 0.46, count: 56, sparks: 4, seed: 23, lightColor: '#ff9447', lightRange: 4.5 });
   ovenFire.group.children[1].visible = false; // its own sparks would climb the stone
   ovenFire.group.position.set(paintX(kit, 0.908), paintY(kit, 0.362), WALL_Z + 0.1);
+  ovenFire.group.name = 'P.oven'; ovenFire.group.userData.probe = [[-0.13, 0], [0.13, 0], [0, 0.46]];
   world.register(ovenFire.group, kit.builtG);
   // steam from her pot on the range (the painted pot's rim: image u 0.539, v 0.455)
   const POT = [paintX(kit, 0.539), paintY(kit, 0.455), WALL_Z + 0.12];
@@ -243,6 +271,7 @@ export default async function make(ctx) {
   });
   const question = await makeBillboard('ui/emote_question.png', portrait ? 0.5 : 0.62);
   world.register(question, kit.builtG);
+  question.name = 'P.question';
   // lamplight and the oven's glow pooled on the floor boards (they read near black at dusk otherwise)
   const kitPool = world.register(lightPool(6.4, 2.8, '#ffb25c'), kit.builtG);
   kitPool.position.set(0.9, 0.008, -0.2);
@@ -253,7 +282,7 @@ export default async function make(ctx) {
   // with her, down and right, so the shelf leaves the frame) and at the end turns back
   // toward the shelf. In 16:9 she stays out of the lower-centre caption: her face is high
   // in the frame while she is low, and at the frame's right edge when the jars come back.
-  const STAGE = { from: portrait ? 1.05 : 0.78, fromFacing: -1, to: 2.9, turn: -1 };
+  const STAGE = portrait ? { from: 1.3, fromFacing: -1, to: 1.85, turn: -1 } : { from: -0.6, fromFacing: 1, to: -2.3, turn: 1 };
   const P_Z = -0.5, STRIDE = 0.72;
   const T_WALK0 = E.JARS_AWAY + 0.02, T_WALK1 = E.JARS_AWAY + 1.22;
   const T_FLIP = midFrame(E.PANKO_TURN);
@@ -261,17 +290,19 @@ export default async function make(ctx) {
   const walkK = (t) => { const u = seg(t, T_WALK0, T_WALK1), a = 0.16; return u < a ? u * u / (2 * a * (1 - a)) : u > 1 - a ? 1 - (1 - u) * (1 - u) / (2 * a * (1 - a)) : (u - a / 2) / (1 - a); };
   function pankoState(t) {
     const x = lerp(STAGE.from, STAGE.to, walkK(t));
-    const walking = t > T_WALK0 && t < T_WALK1;
-    let facing = t < T_WALK0 ? STAGE.fromFacing : Math.sign(STAGE.to - STAGE.from);
+    const tc = frameT(t);
+    const walking = tc > T_WALK0 && tc < T_WALK1;
+    let facing = tc < T_WALK0 ? STAGE.fromFacing : Math.sign(STAGE.to - STAGE.from);
     if (t >= T_FLIP) facing = STAGE.turn;
-    const hum = (t0, t1) => t > t0 && t < t1 && Math.floor((t - t0) * 6) % 2 === 0;
+    const hum = (t0, t1) => tc > t0 && tc < t1 && Math.floor((tc - t0) * 6) % 2 === 0;
     const talking = hum(E.JARS_RACK + 0.1, T_WALK0 - 0.05) || hum(T_WALK1 + 0.3, T_WALK1 + 0.9);
     return { x, facing, walking, pose: walking ? 'walk' : talking ? 'talk' : 'idle' };
   }
   function posePanko(t) {
     const st = pankoState(t);
     const ch = panko.ch;
-    if (st.walking) poseCharacter(ch, { pose: 'walk', walkPhase: Math.abs(st.x - STAGE.from) / STRIDE, facing: st.facing });
+    const xc = lerp(STAGE.from, STAGE.to, walkK(frameT(t))); // the walk drawing follows the frame, the position the subframe
+    if (st.walking) poseCharacter(ch, { pose: 'walk', walkPhase: Math.abs(xc - STAGE.from) / STRIDE, facing: st.facing });
     ch.position.set(st.x, 0.02, P_Z);
     panko.shadow.position.set(st.x, 0.012, P_Z);
     // a stirring rock at the stove, a small start and a look up at the turn
@@ -301,19 +332,22 @@ export default async function make(ctx) {
   const FZ = ITEM_Z;
   const F = (x, y, w, pitch = 0) => [x, y, FZ, w, 0, pitch];
   const RIG7 = portrait ? {
-    J0: F(1.74, 2.78, 2.32, -1), J1: F(2.04, 2.78, 2.32, -1),
-    R1: F(1.8, 2.7, 2.42, -1.2), R: F(1.44, 2.55, 2.62, -1.5), R2: F(1.42, 2.54, 2.64, -1.5),
-    D: F(2.5, 0.72, 2.2, -10), D2: F(2.54, 0.7, 2.18, -10),
-    B: F(2.15, 2.62, 2.45, -1.5), B2: F(2.12, 2.61, 2.47, -1.5),
+    // the jars sit below the caption band; Panko (soft) stays out of the jar macro
+    J0: F(1.8, 3.03, 2.1, -1), J1: F(2.12, 3.03, 2.1, -1),
+    R1: F(1.9, 2.8, 2.5, -1.2), R: F(1.32, 2.55, 2.8, -1.5), R2: F(1.3, 2.54, 2.82, -1.5),
+    D: F(1.85, 0.75, 2.5, -9), D2: F(1.89, 0.73, 2.48, -9),
+    B: F(1.85, 2.57, 2.7, -1.5), B2: F(1.83, 2.56, 2.72, -1.5),
   } : {
-    // R1 lowers the frame while Panko is still left of it, so she joins from the left edge
+    // 16:9 blocks the break to the left counter: the caption (lower centre, x 20-80%) then never
+    // crosses her face or chest, and when the jars come back she turns at the frame's left edge
     J0: F(1.62, 2.93, 4.3, 1), J1: F(2.02, 2.93, 4.3, 1),
-    R1: F(2.32, 1.95, 4.45, 0), R: F(1.6, 1.55, 4.6, -3), R2: F(1.6, 1.55, 4.6, -3),
-    D: F(2.3, 1.42, 4.6, -4), D2: F(2.34, 1.4, 4.58, -4),
-    B: F(0.0, 1.98, 7.0, -1), B2: F(-0.06, 1.98, 6.95, -1),
+    R1: F(2.3, 1.45, 4.9, -1), R: F(0.7, 1.3, 5.2, -2), R2: F(0.68, 1.3, 5.18, -2),
+    D: F(-1.3, 1.05, 5.3, -3.5), D2: F(-1.34, 1.03, 5.28, -3.5),
+    B: F(0.62, 1.93, 6.7, 0), B2: F(0.6, 1.94, 6.64, 0),
   };
-  // 9:16 settles on Panko while the focus racks to her, then holds until she sets off
-  const T_J1 = E.JARS_RACK + 0.1, T_R = E.JARS_AWAY + 0.04, T_RA = portrait ? E.JARS_RACK + 0.55 : T_R, T_D = E.JARS_AWAY + 0.78, T_B = E.JARS_BACK + 0.48;
+  // both cuts settle on Panko while the focus racks to her, then hold until she sets off
+  const T_J1 = E.JARS_RACK + 0.1, T_R = E.JARS_AWAY + 0.04, T_RA = E.JARS_RACK + (portrait ? 0.55 : 0.66), T_D = E.JARS_AWAY + 0.78;
+  const T_B = E.JARS_BACK + (portrait ? 0.35 : 0.42); // settled on the jars (and her) just before she turns
   const vfov7 = portrait ? 25 : mm(100);
   const mixF = (a, b, k) => a.map((v, i) => lerp(v, b[i], k));
   function framing7(t) {
@@ -365,14 +399,15 @@ export default async function make(ctx) {
       s.material.opacity = Math.min(1, u * 6) * (1 - u) * 0.5;
     });
     const st = pankoState(t);
-    const head = [st.x + 0.08 * st.facing, 1.5 + 0.2, P_Z + 0.15];
+    const head = [st.x + 0.45 * st.facing, 1.62, P_Z + 0.15];
     question.position.set(...head); question.userData.y0 = head[1];
     poseEmote(question, t - E.PANKO_TURN, { hold: 1.0, rise: 0.22, fade: 0.3 });
   }
 
   const s07 = {
     id: 'S07', start: E.S07, end: E.S08,
-    mb: (t) => blurFrames(rig7, t, portrait ? 1080 : 1920),
+    ...adaptiveBlur(rig7, portrait ? 1920 : 1080, (t) => toWorld(kit, [pankoState(t).x, 1.1, P_Z])),
+    debug: { RIG7, STAGE },
     pose(t) {
       setAspect(camera, portrait);
       const cam = rig7(t);
@@ -405,6 +440,7 @@ export default async function make(ctx) {
   const MOUTH = [FIRE[0] - DRAW_O[0], FIRE[1] + 0.62 - DRAW_O[1]];
   const draw = makeStrokeSparks({ strokes: HOUSE_STROKES, scale: DRAW_SCALE, cell: 0.05, mouth: MOUTH, embers: 9, seed: 11 });
   draw.group.position.set(...DRAW_O);
+  draw.group.name = 'P.draw'; draw.group.userData.probe = [[-0.36 * DRAW_SCALE, 0], [0.36 * DRAW_SCALE, 0.6 * DRAW_SCALE], [MOUTH[0], MOUTH[1] - 0.62]];
   world.register(draw.group, den.builtG);
   // each stroke is drawn over the eighth that ends on its E.STROKES beat, so the house is
   // complete on the last one (~26.13, where the swell peaks and Ember smiles)
@@ -424,12 +460,14 @@ export default async function make(ctx) {
   world.register(mlShadow, den.builtG);
   const heart = await makeBillboard('ui/emote_heart.png', portrait ? 0.5 : 0.52);
   world.register(heart, den.builtG);
+  heart.name = 'P.heart';
   const hearthPool = world.register(lightPool(3.6, 2.4, '#ff8a3a'), den.builtG);
   hearthPool.position.set(FIRE[0] + 0.3, 0.008, -0.7);
-  // Ember watches from her own spot by the armchair, turned toward the fire. As the camera finds
-  // her she turns to chat through the wall, which is exactly where S09 (a continuous pull-back)
-  // has her: same place, same facing, same talk frame.
-  const EM_X = ember.x0, EM_Z = ember.z0;
+  // Ember stands at her S08/S09 spot (handoff.js: u 0.40, between the hearth and the window),
+  // turned toward the fire. As the camera settles on her she turns to chat through the wall,
+  // which is exactly where S09 (a continuous pull-back) has her: same place, same facing,
+  // same talk frame.
+  const EM_X = emberDenX(den), EM_Z = ember.z0;
   const T_TURN = midFrame(E.S09 - 0.15);
   // the painted fire's own dusk glow card would wash the 3D fire out to white
   const fireGlow = den.lamps[0];
@@ -446,22 +484,25 @@ export default async function make(ctx) {
     ch.rotation.z = -0.075 * up; // facing left: leaning back moves the top to the right
     const breath = 1 + 0.013 * Math.sin(t * 2.5 + 0.4) * handoff(t);
     ch.scale.set(1, breath * (1 + 0.025 * up), 1);
-    if (t >= T_TURN) poseCharacter(ch, { pose: Math.floor(t * 6) % 2 === 0 ? 'talk' : 'idle', facing: 1 }); // S09's chatter
-    else poseCharacter(ch, { pose: t >= E.EMBER_SMILE ? 'talk' : 'idle', facing: -1 }); // the soft smile, held
+    const tc = frameT(t);
+    if (t >= T_TURN) poseCharacter(ch, { pose: Math.floor(tc * 6) % 2 === 0 ? 'talk' : 'idle', facing: 1 }); // S09's chatter
+    else poseCharacter(ch, { pose: tc >= E.EMBER_SMILE ? 'talk' : 'idle', facing: -1 }); // the soft smile, held
     const head = [EM_X - 0.1, ember.h + 0.14, EM_Z + 0.15];
     heart.position.set(...head); heart.userData.y0 = head[1];
     poseEmote(heart, t - E.EMBER_HEART, { hold: 0.58, rise: 0.22, fade: 0.26 }); // gone before the cut
   }
 
-  // camera: a slow push toward the drawing, then a pan right (with a small truck) to Ember
+  // camera: a slow push toward the drawing (16:9 holds the fire mouth, the whole drawing and
+  // Ember three-quarter at the right; 9:16 holds the fire and the drawing, Ember just out of
+  // frame), then a pan right (with a small truck) onto Ember as she smiles and the heart pops
   const vfov8 = portrait ? 30 : mm(85);
-  const A8 = portrait ? [-2.52, 2.32, DRAW_O[2], 2.6, 3, 2] : [-2.0, 2.6, DRAW_O[2], 4.9, 4, 3];
-  const A8b = portrait ? [-2.52, 2.34, DRAW_O[2], 2.46, 3, 2] : [-2.02, 2.61, DRAW_O[2], 4.62, 4, 3];
-  const PAN_TO = portrait ? [0.36, 1.95, EM_Z] : [-0.45, 1.2, EM_Z];
+  // (16:9 keeps the frame's left edge inside the room: past x -4 the dark side wall shows)
+  const A8 = portrait ? [-2.75, 2.32, DRAW_O[2], 2.6, 3, 2] : [-0.98, 2.11, DRAW_O[2], 6.05, 2, 1];
+  const A8b = portrait ? [-2.75, 2.34, DRAW_O[2], 2.46, 3, 2] : [-0.97, 2.15, DRAW_O[2], 5.85, 2, 1];
+  const PAN_TO = portrait ? [EM_X - 0.35, 1.6, EM_Z] : [EM_X + 0.4, 1.2, EM_Z];
   const TRUCK = portrait ? 2.1 : 0.55;
-  // 9:16 finds her sooner (its frame starts further from her) and then holds on her
-  const T_PAN = portrait ? E.EMBER_HEART - 0.14 : E.EMBER_HEART + 0.02;
-  const T_PAN_END = portrait ? E.S09 - 0.25 : E.S09;
+  const T_PAN = portrait ? E.EMBER_SMILE : HOLD_END - 0.04; // 16:9 holds the whole drawing until it lets go
+  const T_PAN_END = portrait ? E.EMBER_HEART + 0.2 : E.S09;
   function rig8(t) {
     const k = ease.inOutSine(seg(t, E.S08, T_PAN));
     const f = A8.map((v, i) => lerp(v, A8b[i], k));
@@ -494,7 +535,8 @@ export default async function make(ctx) {
 
   const s08 = {
     id: 'S08', start: E.S08, end: E.S09,
-    mb: (t) => blurFrames(rig8, t, portrait ? 1080 : 1920),
+    ...adaptiveBlur(rig8, portrait ? 1920 : 1080),
+    debug: { A8, A8b, PAN_TO },
     pose(t) {
       setAspect(camera, portrait);
       const cam = rig8(t);

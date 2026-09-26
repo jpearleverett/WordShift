@@ -17,7 +17,8 @@ import { ease, spring, seg, lerp, clamp, smooth, mulberry32 } from '../core/math
 import { bar, SIXTEENTH } from '../grid.js';
 import { LAYOUT, GROUND_Y } from '../sets/world.js';
 import { makeGrass, makeParticles } from '../world/env.js';
-import { mm, dist, aim, setAspect, look } from './common.js';
+import { skyWipe } from '../world/tod.js';
+import { mm, dist, aim, setAspect, look, travelPx, blurFor } from './common.js';
 
 const D2R = Math.PI / 180;
 
@@ -67,38 +68,67 @@ const dirtTexture = () => pixelTexture(3, 3, (g) => {
 });
 
 /**
- * A pixel cumulus card: one tall dome with two shoulders and two small ends on a
- * flat base, shaded as a single silhouette (top-left rim light, a lower shade band,
- * a darker base), in four tones; the painting's clouds have no outline.
+ * A pixel cumulus card: one tall dome with two shoulders and two small ends over a
+ * soft, slightly bellied base, shaded as a single silhouette in five tones: a lit
+ * top-left rim, the body, a side shade, and a rounded underside that darkens toward
+ * its lowest pixels (a card with a flat, clipped bottom read as a sticker). No outline:
+ * the painting's clouds have none.
  */
 function cloudTexture(seed, tones) {
-  const W = 112, H = 40;
+  const W = 112, H = 44;
   const rnd = mulberry32(seed);
   const cx = W * (0.4 + rnd() * 0.2);
+  const B = H - 6; // the base line, bellied down a little under the dome
   const discs = [
-    [cx, H - 17, 13 + rnd() * 3],
-    [cx - 17 - rnd() * 4, H - 12, 9 + rnd() * 2], [cx + 17 + rnd() * 4, H - 11, 8 + rnd() * 2],
-    [cx - 32 - rnd() * 4, H - 8, 5 + rnd() * 2], [cx + 33 + rnd() * 4, H - 8, 5 + rnd() * 2],
+    [cx, B - 12, 13 + rnd() * 3],
+    [cx - 17 - rnd() * 4, B - 7, 9 + rnd() * 2], [cx + 17 + rnd() * 4, B - 6, 8 + rnd() * 2],
+    [cx - 32 - rnd() * 4, B - 3, 5 + rnd() * 2], [cx + 33 + rnd() * 4, B - 3, 5 + rnd() * 2],
   ];
-  if (rnd() < 0.7) discs.push([cx + 7 + rnd() * 5, H - 23, 7 + rnd() * 2]);
+  if (rnd() < 0.7) discs.push([cx + 7 + rnd() * 5, B - 18, 7 + rnd() * 2]);
+  const span = [Math.min(...discs.map(([dx, , r]) => dx - r)), Math.max(...discs.map(([dx, , r]) => dx + r))];
+  const base = (x) => { const k = (x + 0.5 - (span[0] + span[1]) / 2) / ((span[1] - span[0]) / 2); return B + 3.5 * Math.sqrt(Math.max(0, 1 - k * k)); };
   const inside = (x, y) => {
-    if (x < 0 || y < 0 || x >= W || y >= H - 4) return false;
+    if (x < 0 || y < 0 || x >= W || y >= H || y + 0.5 > base(x)) return false;
     for (const [dx, dy, r] of discs) if (Math.hypot(x + 0.5 - dx, (y + 0.5 - dy) * 1.12) < r) return true;
     return false;
   };
   return pixelTexture(W, H, (g) => {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (!inside(x, y)) continue;
+      const under = base(x) - (y + 0.5); // pixels above the base
       let c = tones[1];
-      if (y >= H - 6) c = tones[3];
-      else if (y >= H - 11 || !inside(x + 2, y + 1)) c = tones[2];
+      if (under < 2) c = tones[4];
+      else if (under < 5 || (under < 7 && (x + y) % 2 === 0)) c = tones[3];
+      else if (under < 9 || !inside(x + 2, y + 1)) c = tones[2];
       if (!inside(x - 1, y - 2) || !inside(x, y - 2)) c = tones[0];
       g.fillStyle = c; g.fillRect(x, y, 1, 1);
     }
   });
 }
-const CLOUD_DAY = ['#ffffff', '#f1f4f8', '#cdd7e8', '#b4c1da'];
-const CLOUD_DUSK = ['#ffe0b0', '#f7b193', '#c98597', '#9b6c93'];
+const CLOUD_DAY = ['#ffffff', '#f1f4f8', '#dde3ee', '#c6d0e2', '#b3bfd6'];
+const CLOUD_DUSK = ['#ffe0b0', '#f7b193', '#e2a097', '#c98597', '#a8778f'];
+
+/**
+ * Monotone cubic (Fritsch-Carlson) through knots [[t, v], ...], flat at both ends and
+ * held outside them: the front slows and speeds up without ever reversing.
+ */
+function monotone(K, t) {
+  if (t <= K[0][0]) return K[0][1];
+  const n = K.length;
+  if (t >= K[n - 1][0]) return K[n - 1][1];
+  const hs = K.slice(1).map((k, i) => k[0] - K[i][0]);
+  const d = K.slice(1).map((k, i) => (k[1] - K[i][1]) / hs[i]);
+  const m = K.map((_, i) => {
+    if (i === 0 || i === n - 1 || d[i - 1] * d[i] <= 0) return 0;
+    const w1 = 2 * hs[i] + hs[i - 1], w2 = hs[i] + 2 * hs[i - 1];
+    return (w1 + w2) / (w1 / d[i - 1] + w2 / d[i]);
+  });
+  let i = 0;
+  while (t > K[i + 1][0]) i++;
+  const h = K[i + 1][0] - K[i][0], u = (t - K[i][0]) / h;
+  const h00 = 2 * u ** 3 - 3 * u ** 2 + 1, h10 = u ** 3 - 2 * u ** 2 + u, h01 = -2 * u ** 3 + 3 * u ** 2, h11 = u ** 3 - u ** 2;
+  return h00 * K[i][1] + h10 * h * m[i] + h01 * K[i + 1][1] + h11 * h * m[i + 1];
+}
 
 /** A 0 -> 1 -> 0 bump over [0, d]. */
 const bump = (u, d) => (u > 0 && u < d ? Math.sin(Math.PI * u / d) : 0);
@@ -112,7 +142,7 @@ export default async function make(ctx) {
   // starting on the off-eighth so the whip settles first.
   const ROW_T = [0, 1, 2, 3].map((r) => bar(9, 1 + r, 1));
   const ACT = (r, c) => ROW_T[r] + c * SIXTEENTH;
-  const SKY_END = E.DUSK_START + 1.4;           // ~19.30 the painted sky has turned (a time-lapse: ahead of the light)
+  const SKY_END = E.DUSK_START + 1.45;          // ~19.35 the painted sky has turned (a time-lapse: ahead of the light)
   const CRANE_END = E.ROOF_CLEAR + 0.5;          // the crane eases out while the camera tips up
   const TIP_END = E.S06 + 0.7;                   // ~18.45 tipped up into the sky
   const DESC0 = E.S06 + 0.78;                    // ~18.53 the camera comes down and back
@@ -120,11 +150,20 @@ export default async function make(ctx) {
   const L_HIDE = E.S06 + 0.7;                    // the L on the chimney leaves with the roof
 
   const dusk = (t) => smooth(seg(t, E.DUSK_START, E.DUSK_END));
-  const skyMix = (t) => smooth(seg(t, E.DUSK_START, SKY_END));
+  // the wipe front's progress (tod.js skyWipe), through knots set below where the sun hands over
+  const skyMix = (t) => monotone(SKY_KNOTS, t);
   const LAMP_ORDER = LAYOUT.flat();
-  const lampsAt = (t) => (id) => {
+  // each lamp pops on its sixteenth: a quick rise past full with a small overshoot that
+  // settles (light and glow card), and its glow card swells a touch as it catches
+  const LAMP_POP = 0.22;
+  const lampPop = (t, id) => {
     const i = LAMP_ORDER.indexOf(id);
-    return i < 0 ? 0 : ease.outCubic(seg(t, E.LAMPS[i] - 0.015, E.LAMPS[i] + 0.07));
+    return i < 0 ? -1 : t - (E.LAMPS[i] - 0.015);
+  };
+  const lampsAt = (t) => (id) => {
+    const s = lampPop(t, id);
+    if (s <= 0) return 0;
+    return s >= LAMP_POP ? 1 : ease.outBack(s / LAMP_POP, 3.2);
   };
 
   // ---------------- the cast: where each one stands (room-local) and when they act
@@ -137,6 +176,8 @@ export default async function make(ctx) {
   const PANKO_X = (0.43 - 0.5) * kitchen.roomW;
   const POT = [kitchen.x + (0.545 - 0.5) * kitchen.roomW, kitchen.y + 0.47 * kitchen.roomH, -kitchen.roomD / 2 + 0.25];
   for (const r of Object.values(R)) world.track(r.ch);
+  // the lamps' glow cards swell as they pop on (begin() restores their size every frame)
+  for (const rm of Object.values(house.rooms)) for (const sp of rm.lamps || []) world.track(sp);
 
   // ---------------- props (registered: hidden unless this shot shows them)
   const emoteOf = { ember: 'heart', archimedes: 'thought', chill: 'note', bamboo: 'sparkle' };
@@ -186,10 +227,32 @@ export default async function make(ctx) {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   const sunGlow = world.register(new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })), world.sky);
-  const SUN_A = skyLocal(0.840, 0.848, 1.5), SUN_B = skyLocal(0.379, 0.744, 1.5);
+  const SUN_UV_A = [0.840, 0.848], SUN_UV_B = [0.379, 0.744];
+  const bandY = (v) => (v - SKY_BAND[0]) / (SKY_BAND[1] - SKY_BAND[0]);
+  const SUN_R = 0.05; // the painted suns' radius with their bright core, in band heights
+  // The front's progress where it has just wiped the afternoon sun away, and where it is
+  // about to uncover the dusk one: it crawls between the two (0.4 s) while the glow
+  // carries the sun across, and runs quickly everywhere else.
+  const mAt = (uv, dy, level) => {
+    let a = 0, b = 1;
+    for (let i = 0; i < 40; i++) { const m = (a + b) / 2; if (skyWipe(m, uv[0], bandY(uv[1]) + dy) < level) a = m; else b = m; }
+    return (a + b) / 2;
+  };
+  const SKY_KNOTS = [[E.DUSK_START, 0], [E.DUSK_START + 0.3, mAt(SUN_UV_A, -SUN_R, 0.98)], [E.DUSK_START + 0.7, mAt(SUN_UV_B, SUN_R, 0.02)], [SKY_END, 1]];
+  const SUN_A = skyLocal(...SUN_UV_A, 1.5), SUN_B = skyLocal(...SUN_UV_B, 1.5);
   const SUN_C = [lerp(SUN_A[0], SUN_B[0], 0.45), Math.max(SUN_A[1], SUN_B[1]) + 6, 1.5]; // the arc's control point, above the peaks
-  // glow in (over the fading afternoon sun), glide, glow out (over the dusk sun)
-  const SUN_T = [E.DUSK_START + 0.25, E.DUSK_START + 0.5, E.DUSK_START + 0.9, E.DUSK_START + 1.2];
+  // Only one sun at a time, timed on the wipe front: the glow comes up over the painted
+  // afternoon sun just before the front reaches it, starts its glide only once the front
+  // has wiped that sun away, lands on the dusk sun's place before the front uncovers the
+  // painted one, and fades once the painted dusk sun is fully in.
+  const wipeAt = (uv, dy, level) => {
+    let a = E.DUSK_START - 0.5, b = SKY_END + 0.5;
+    for (let i = 0; i < 40; i++) { const m = (a + b) / 2; if (skyWipe(skyMix(m), uv[0], bandY(uv[1]) + dy) < level) a = m; else b = m; }
+    return (a + b) / 2;
+  };
+  const A_TOUCH = wipeAt(SUN_UV_A, SUN_R, 0.02), A_GONE = wipeAt(SUN_UV_A, -SUN_R, 0.98);
+  const B_TOUCH = wipeAt(SUN_UV_B, SUN_R, 0.02), B_FULL = wipeAt(SUN_UV_B, -SUN_R, 0.98);
+  const SUN_T = [A_TOUCH - 0.14, A_GONE, B_TOUCH, B_FULL + 0.18];
 
   // racing pixel clouds high in the painted sky (a day card and a dusk card per cloud,
   // crossfaded with the wipe); cards on the backdrop, so they never cross a mountain
@@ -197,7 +260,7 @@ export default async function make(ctx) {
   const clouds = [];
   for (let i = 0; i < 4; i++) {
     const w = 20 + rnd() * 8;
-    const geo = new THREE.PlaneGeometry(w, w * 40 / 112);
+    const geo = new THREE.PlaneGeometry(w, w * 44 / 112);
     const mk = (tones) => world.register(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: cloudTexture(900 + i, tones), transparent: true, depthWrite: false, fog: false })), world.sky);
     clouds.push({ day: mk(CLOUD_DAY), dusk: mk(CLOUD_DUSK), u0: -0.35 + i * 0.3 + rnd() * 0.08, v: 0.9 + rnd() * 0.06, speed: 0.24 + rnd() * 0.1 });
   }
@@ -207,6 +270,56 @@ export default async function make(ctx) {
   // evening light (lit, 3000 alpha-tested cards under the twelve room lights more than
   // doubled the frame cost on SwiftShader).
   const meadow = makeGrass({ count: 2400, height: 0.8, area: { x0: -24, x1: 24, z0: 3.6, z1: 16, y: GROUND_Y }, seed: 77 });
+  // Where the meadow meets the painting: the far ground is fogged lighter than the
+  // painted meadow it runs into, so the hero wide showed a hard, bright horizon line. A
+  // decal on the far ground takes on the painting's own (blurred) dusk colours just above
+  // the line where the ground meets it, column by column as the backdrop shows them
+  // (mirrored margins included, see tod.js), and fades out toward the house, so the real
+  // meadow runs on into the painted one.
+  const SKY = world.sky.userData, SKY_Y0 = world.sky.position.y - SKY.height / 2;
+  const seamV = SKY_BAND[0] + ((GROUND_Y + 1.5 - SKY_Y0) / SKY.height) * (SKY_BAND[1] - SKY_BAND[0]);
+  const FAR_Z = world.ground.position.z - 180, SEAM_DEPTH = 120, SEAM_W = 640;
+  const seamMap = (() => {
+    const read = (tex) => { const img = tex.image; return { img, d: img.getContext('2d').getImageData(0, 0, img.width, img.height).data }; };
+    const blur = read(SKY.mat.uniforms.blurB.value), row = read(SKY.mat.uniforms.rowB.value);
+    const at = ({ img, d }, u, v) => { const x = Math.min(img.width - 1, Math.max(0, Math.round(u * (img.width - 1)))), y = Math.min(img.height - 1, Math.max(0, Math.round((1 - v) * (img.height - 1)))); const o = (y * img.width + x) * 4; return [d[o], d[o + 1], d[o + 2]]; };
+    const mixA = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+    const sstep = (a, b, x) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
+    const margin = (SKY.width / SKY.paintWidth - 1) / 2;
+    const hz = [201, 140, 134];
+    const c = document.createElement('canvas'); c.width = 256; c.height = 1;
+    const g = c.getContext('2d');
+    // the camera sits near x = 0, about 230 units from the backdrop and 220 from the far edge
+    const spread = (world.sky.position.z - 58) / (FAR_Z - 58);
+    for (let i = 0; i < 256; i++) {
+      const xb = ((i + 0.5) / 256 - 0.5) * SEAM_W * spread;
+      const pu = (xb / SKY.width + 0.5) * (1 + 2 * margin) - margin;
+      const out = Math.max(-pu, pu - 1);
+      const u = pu < 0 ? -pu : pu > 1 ? 2 - pu : pu;
+      let col = at(blur, u, seamV);
+      if (out > 0) { col = mixA(col, at(row, 0.5, seamV), sstep(0.08, 0.6, out)); col = mixA(col, hz, sstep(0.3, 1, out) * 0.18); }
+      g.fillStyle = `rgb(${col.map((v) => Math.round(v)).join(',')})`; g.fillRect(i, 0, 1, 1);
+    }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false;
+    // the mean of the middle half, for the evening haze (below)
+    const d = g.getImageData(64, 0, 128, 1).data, m = [0, 0, 0];
+    for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) m[k] += d[i + k] / 128;
+    t.userData.mean = new THREE.Color().setRGB(m[0] / 255, m[1] / 255, m[2] / 255, THREE.SRGBColorSpace).multiplyScalar(0.95);
+    return t;
+  })();
+  const seamAlpha = (() => {
+    const c = document.createElement('canvas'); c.width = 4; c.height = 128;
+    const g = c.getContext('2d');
+    for (let y = 0; y < 128; y++) {
+      const k = Math.min(1, Math.max(0, (y + 0.5) / 128 / 0.85)); // canvas top = the far edge
+      const a = 1 - k * k * (3 - 2 * k);
+      g.fillStyle = `rgb(${Math.round(a * 255)},${Math.round(a * 255)},${Math.round(a * 255)})`; g.fillRect(0, y, 4, 1);
+    }
+    return new THREE.CanvasTexture(c);
+  })();
+  const seam = world.register(new THREE.Mesh(new THREE.PlaneGeometry(SEAM_W, SEAM_DEPTH), new THREE.MeshBasicMaterial({ map: seamMap, alphaMap: seamAlpha, color: new THREE.Color(0.95, 0.95, 0.95), transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+  seam.rotation.x = -Math.PI / 2;
+  seam.position.set(0, GROUND_Y + 0.08, FAR_Z + SEAM_DEPTH / 2);
   for (const m of meadow.group.children) {
     m.material = new THREE.MeshBasicMaterial({ map: m.material.map, alphaTest: 0.5, side: THREE.DoubleSide, color: '#8a7272' });
     m.receiveShadow = false;
@@ -335,14 +448,14 @@ export default async function make(ctx) {
     // the L on the chimney cap, sprout swaying
     heroL.visible = t < L_HIDE;
     sprout.rotation.z = Math.sin(t * 2.3) * 0.07;
-    // the time-lapse clouds race across the sky, taking the dusk colours with the wipe
-    // (the backdrop's own wipe: k = mix * 1.7 - (1 - y) * 0.7 at band height y)
+    // the time-lapse clouds race across the sky, taking the dusk colours as the wipe
+    // front passes them (the backdrop's own wipe, tod.js skyWipe)
     const sm = skyMix(t);
     const on = seg(t, E.S06 - 0.5, E.S06) * (1 - seg(t, DESC1 - 0.3, DESC1 + 0.4));
     for (const c of clouds) {
       const u = c.u0 + c.speed * (t - E.S06);
       const p = skyLocal(u, c.v, 2 + c.u0);
-      const k = clamp(sm * 1.7 - (1 - (c.v - SKY_BAND[0]) / (SKY_BAND[1] - SKY_BAND[0])) * 0.7);
+      const k = skyWipe(sm, u, bandY(c.v));
       const edge = clamp(Math.min(u + 0.1, 1.1 - u) / 0.15); // fade out over the painting's edges
       for (const [m, a] of [[c.day, 1 - k], [c.dusk, k]]) {
         m.visible = on * edge > 0.001 && a > 0.001;
@@ -353,7 +466,7 @@ export default async function make(ctx) {
     // the sun's glide: the glow takes over the painted afternoon sun as the wipe reaches
     // it, slides over the peaks, and hands over to the painted dusk sun as that one
     // wipes in (the wipe crosses the two suns at sky mix ~0.3 and ~0.65)
-    const gIn = seg(t, SUN_T[0], SUN_T[1]), gOut = seg(t, SUN_T[2], SUN_T[3]);
+    const gIn = seg(t, SUN_T[0], A_TOUCH), gOut = seg(t, B_FULL, SUN_T[3]);
     const gk = ease.inOutSine(seg(t, SUN_T[1], SUN_T[2]));
     const g1 = 1 - gk;
     const sp = [0, 1].map((i) => g1 * g1 * SUN_A[i] + 2 * g1 * gk * SUN_C[i] + gk * gk * SUN_B[i]);
@@ -383,13 +496,13 @@ export default async function make(ctx) {
   // whole painted vista. The hero wide is low, the house standing against the sunset.
   const P = portrait ? {
     craneX: [0, 0], craneY: [3.4, 31], craneZ: 21, lookDrop: 0.5, fov: 54,
-    tipPitch: 10, tipFov: 40, skyRise: 2.5, skyBack: 4,
+    tipPitch: 9, tipFov: 40, skyRise: 2.5, skyBack: 4,
     hero: fromAim([0, 9, 40], [0, 13.5, 0], 53, { aperture: 7 }),
     heroDrift: [0, 0, 0],
     kitchen: fromAim([0.2, 2.9, 15.5], [0, 2.35, 0], 38, { aperture: 8 }),
   } : {
     craneX: [-2.5, 0], craneY: [2.0, 29], craneZ: 24, lookDrop: 0.5, fov: mm(40),
-    tipPitch: 20, tipFov: mm(65), skyRise: 2.5, skyBack: 4,
+    tipPitch: 17, tipFov: mm(65), skyRise: 2.5, skyBack: 4,
     hero: fromAim([0, 6.2, 58], [0, 13.4, 0], mm(40), { aperture: 6.5 }),
     heroDrift: [0.35, 0, 0],
     kitchen: fromAim([0.5, 3.5, 14], [0, 2.3, 0], mm(50), { aperture: 8 }),
@@ -398,10 +511,11 @@ export default async function make(ctx) {
   const residentsZ = -kitchen.roomD / 2 + 0.75;
 
   function rig(t) {
-    // S05 crane: y rises on an inOut ease that is still easing out when the camera tips up,
-    // bent (power 1.4) so it lingers on the rooms and passes the roof quicker; each row
-    // is entering the upper frame on its beat and stays in view while its actions play
-    const kc = Math.pow(ease.inOutSine(seg(t, E.S05, CRANE_END)), 1.4);
+    // S05 crane: a near-linear rise (only a third of an inOut ease, so the whip lands into
+    // it and it is still moving when the camera tips up), so each row passes the centre of
+    // frame close to its beat, slowly enough that every resident reads as they go by
+    const u = seg(t, E.S05, CRANE_END);
+    const kc = lerp(u, ease.inOutSine(u), 0.35);
     const ko = ease.inOutSine(seg(t, E.S05, E.ROOF_CLEAR));
     let y = lerp(P.craneY[0], P.craneY[1], kc);
     const x = lerp(P.craneX[0], P.craneX[1], ko);
@@ -452,22 +566,14 @@ export default async function make(ctx) {
   }
 
   /**
-   * Motion-blur subframes from the camera's image-space speed over the shutter
-   * (rotation, lateral travel against the subject distance, dolly and zoom): 1 when
-   * still, 3 for the crane (spec), 5-7 for the fastest frames of the descent and the push.
+   * Motion blur from how far the image moves across the shutter (common.js travelPx:
+   * rotation, lateral travel against the focus distance, dolly and zoom), with enough
+   * subframes and a short enough shutter that pixel edges smear instead of stepping
+   * (common.js blurFor). Portrait measures against its 1920 px height.
    */
-  function subframes(t) {
-    if (t < E.S05) return 3;
-    const a = rig(t - 1 / 120), b = rig(t + 1 / 120);
-    const pxPerRad = 1080 / (b.fov * D2R);
-    const f = dirPoint([0, 0, 0], b.yaw, b.pitch, 1);
-    const dp = b.pos.map((v, i) => v - a.pos[i]);
-    const along = dp[0] * f[0] + dp[1] * f[1] + dp[2] * f[2];
-    const lat = Math.hypot(dp[0] - along * f[0], dp[1] - along * f[1], dp[2] - along * f[2]);
-    const d = Math.min(Math.max(b.focus, 6), 40);
-    const px = Math.hypot(a.yaw - b.yaw, a.pitch - b.pitch) * pxPerRad + lat / d * pxPerRad + Math.abs(along) / d * 960 + Math.abs(a.fov - b.fov) / b.fov * 960;
-    return px < 3 ? 1 : px < 30 || t < DESC0 ? 3 : px < 70 ? 5 : 7;
-  }
+  const frameH = portrait ? 1920 : 1080;
+  const rigAim = (t) => { const r = rig(t); return { pos: r.pos, target: dirPoint(r.pos, r.yaw, r.pitch, 1), fov: r.fov, focus: r.focus }; };
+  const motion = (t) => blurFor(travelPx(rigAim, t, frameH));
 
   function pose(t) {
     setAspect(camera, portrait);
@@ -488,10 +594,14 @@ export default async function make(ctx) {
     // glow cards run hotter there, back to the house's own level by the end of the push
     // (so the kitchen matches S07 at the cut); every lamp only ever rises
     const hot = 1 + 0.9 * (1 - ease.inOutSine(seg(t, E.PUSH_KITCHEN, E.S07)));
-    for (const rm of Object.values(house.rooms)) {
+    for (const [id, rm] of Object.entries(house.rooms)) {
       if (!rm.light) continue;
       rm.light.intensity *= hot;
-      for (const sp of rm.lamps) sp.material.opacity = Math.min(1, sp.material.opacity * (0.5 + 0.5 * hot));
+      const swell = 1 + 0.35 * bump(lampPop(t, id), 0.3);
+      for (const sp of rm.lamps) {
+        sp.material.opacity = Math.min(1, sp.material.opacity * (0.5 + 0.5 * hot));
+        sp.scale.multiplyScalar(swell);
+      }
     }
     // the chimney smoke thins while the lens looks up through it (it reads as a smear)
     const thin = 1 - 0.75 * seg(t, E.S06 - 0.1, E.S06 + 0.4) * (1 - seg(t, DESC0 + 0.2, DESC1));
@@ -502,6 +612,11 @@ export default async function make(ctx) {
     flies.points.position.y = -1.6 * (1 - fk);
     flies.uniforms.time.value = t; flies.uniforms.focus.value = r.focus; flies.uniforms.aperture.value = r.aperture; flies.uniforms.opacity.value = fk;
     meadow.group.visible = t >= DESC0;
+    seam.visible = t >= DESC0;
+    // on the wide the evening haze takes the painted meadow's colour, so the far ground
+    // fades into the painting instead of into a paler band (world.pose sets the fog again
+    // every frame, so this never outlives the shot)
+    if (seam.visible) world.scene.fog.color.lerp(seamMap.userData.mean, seg(t, DESC0, DESC1) * (1 - seg(t, E.PUSH_KITCHEN, E.S07)));
     if (meadow.group.visible) {
       meadow.update(t, 1);
       for (const m of meadow.group.children) m.material.color.set(MEADOW_EVE).lerp(MEADOW_DUSK, seg(dk, 0.4, 1));
@@ -518,8 +633,8 @@ export default async function make(ctx) {
     {
       id: 'S05', start: E.WHIP, end: E.ROOF_CLEAR,
       transition: { type: 'whip', dur: E.S05 - E.WHIP, dir: [0, -1] },
-      mb: subframes, pose,
+      mb: (t) => motion(t).n, shutter: (t) => motion(t).shutter, pose,
     },
-    { id: 'S06', start: E.ROOF_CLEAR, end: E.S07, mb: subframes, pose },
+    { id: 'S06', start: E.ROOF_CLEAR, end: E.S07, mb: (t) => motion(t).n, shutter: (t) => motion(t).shutter, pose },
   ];
 }

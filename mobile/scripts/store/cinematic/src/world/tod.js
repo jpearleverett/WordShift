@@ -33,8 +33,26 @@ function softCopy(img, cw, ch) {
 }
 
 /**
+ * The afternoon -> dusk wipe of the painted sky: a narrow, soft front that falls from
+ * above the painting to below it as mixv goes 0 -> 1, tilted so the east (right) side,
+ * away from the setting sun, turns first. Above the front the dusk painting shows,
+ * below it the afternoon one: the two paintings only blend inside the front itself, so
+ * the two painted suns (and the two colourings of every mountain) are never seen
+ * together. Returns the dusk weight at painting u (0..1 across) and band height y
+ * (0 bottom .. 1 top); the shader below runs the same formula.
+ */
+export const SKY_WIPE = { half: 0.05, tilt: 0.3 };
+export function skyWipe(mixv, u, y) {
+  const { half, tilt } = SKY_WIPE;
+  const T = tilt / 2;
+  const p = 1 + half + T - mixv * (1 + 2 * half + 2 * T) - tilt * (Math.min(1, Math.max(0, u)) - 0.5);
+  const x = Math.min(1, Math.max(0, (y - (p - half)) / (2 * half)));
+  return x * x * (3 - 2 * x);
+}
+
+/**
  * The painted sky as one backdrop plane: a single copy of the painting (a band of
- * it, v from the bottom), crossfading afternoon -> dusk with a top-down wipe. The
+ * it, v from the bottom), wiping afternoon -> dusk top-down (skyWipe). The
  * margins beyond the painting continue it softly: a short mirrored strip that
  * melts into a blurred copy and then into the painting's own row colours (its sky
  * gradient, tree line and meadow), so wide shots never show an edge and no
@@ -64,7 +82,9 @@ export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b 
         float u = pu < 0.0 ? -pu : (pu > 1.0 ? 2.0 - pu : pu);
         // canvas copies are stored top-down; flipY on the loaded textures makes v run bottom-up everywhere
         vec2 uv = vec2(clamp(u, 0.0, 1.0), ${band[0].toFixed(3)} + vUv.y * ${(band[1] - band[0]).toFixed(3)});
-        float k = clamp(mixv * 1.7 - (1.0 - vUv.y) * 0.7, 0.0, 1.0);
+        float hw = ${SKY_WIPE.half.toFixed(4)}, tl = ${SKY_WIPE.tilt.toFixed(4)};
+        float front = 1.0 + hw + 0.5 * tl - mixv * (1.0 + 2.0 * hw + tl) - tl * (clamp(pu, 0.0, 1.0) - 0.5);
+        float k = smoothstep(front - hw, front + hw, vUv.y);
         vec3 c = mix(texture2D(ta, uv).rgb, texture2D(tb, uv).rgb, k);
         if (out_ > 0.0) {
           vec3 soft = mix(texture2D(blurA, uv).rgb, texture2D(blurB, uv).rgb, k);

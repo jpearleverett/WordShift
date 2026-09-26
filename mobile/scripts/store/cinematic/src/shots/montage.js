@@ -17,8 +17,8 @@ import { slotX } from '../world/wordrow.js';
 import { makeBillboard, poseEmote } from '../world/fx.js';
 import { makeParticles } from '../world/env.js';
 import { setLocked, setTileGlow, TILE_SCALE, TILE_H, TILE_D } from '../core/tiles.js';
-import { ease, seg, hash01 } from '../core/math.js';
-import { mm, add, setAspect, look } from './common.js';
+import { ease, seg, clamp, hash01 } from '../core/math.js';
+import { mm, add, setAspect, look, travelPx, blurFor } from './common.js';
 
 const RAD = Math.PI / 180;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -40,16 +40,41 @@ const TALL_RACK_SCALE = 0.7;
 const APERTURE = 26;
 /** Target (lower) row centre above the floor, world units (buildMiniRack's row height). */
 const ROW_Y = TILE_H * 1.0 * TILE_SCALE;
+/**
+ * The letter is lifted just before each cut, so a shot's first frame reads the source
+ * word with its letter raised (SNAP, SPOON, GLOVES); the flight starts on the cut.
+ */
+const LIFT_BEFORE_CUT = 0.062;
+/**
+ * The picture's impact leads the chime by half a frame: the landings fall just after a
+ * frame boundary, and without the lead that frame shows the tile seated but not yet
+ * squashed while the chime plays.
+ */
+const IMPACT_LEAD = 0.5 / 30;
+/**
+ * The tile-hero grade (spec 7.2 gate 5: faces within dE2000 6 of the FG-B swatches).
+ * Exposure alone cannot get there under AgX: its desaturation holds the lavender and the
+ * locked powder 9-14 away at any exposure, even under neutral light. ACES keeps the
+ * game's candy hues, and a slightly cool camera white balance offsets the warm sun and
+ * day gain on the cool tiles, so the faces measure dE 1-7 (most under 6) and the
+ * parchment about 5-6. Relative to the day look: exposure is a multiplier on it.
+ */
+const TILE_GRADE = { toneMap: 'aces', exposure: 0.88, whiteBalance: [0.94, 1, 1.13] };
+/** Flight shape of the moved letter (tile units): lift height, arc, bow toward the lens, tumble. */
+const FLY = { liftH: 0.6, arc: 0.3, zArc: 1.2, tumble: 0.25 };
 
 /**
  * Camera rigs. An anchor is pinned to `ndc` (x right, y up, -1..1) and the camera sits
  * `dist` away along the ray through it, so the push never moves it on screen. 16:9 pins
- * the landing slot (the match cut); 9:16 pins the centre of the target row (the trays
- * stacked at centre, spec 3.2), since a pinned slot cannot keep SUPPER and GLITTER both
- * inside the frame at a readable size.
+ * the landing slot (the match cut); 9:16 pins the centre of the target row, since a
+ * pinned slot cannot keep SUPPER and GLITTER both inside the frame at a readable size.
+ * The tall frame spans almost two floors, so 9:16 sits the trays low (target row at
+ * 67%, inside the 1440 px safe line) on a longer lens from a gentler height: the room
+ * below (Ember, Archimedes and Fennick facing the lens) stays under the frame while the
+ * resident behind the rack still shows head and shoulders above it.
  */
 const RIG_WIDE = { yaw: 8, pitch: 1.5, fov: mm(65), ndc: [-0.17, -0.3], dist: 10.4, push: 0.6, anchor: 'slot' };
-const RIG_TALL = { yaw: 5, pitch: -18, fov: 40, ndc: [-0.06, -0.1], dist: 8.2, push: 0.6, anchor: 'row' };
+const RIG_TALL = { yaw: 5, pitch: -10, fov: 28, ndc: [-0.06, -0.35], dist: 12.5, push: 0.9, anchor: 'row' };
 
 function basis(yawDeg, pitchDeg) {
   const y = yawDeg * RAD, p = pitchDeg * RAD;
@@ -80,15 +105,15 @@ export default async function make(ctx) {
   for (let i = 0; i < BOARDS.length; i++) {
     const b = BOARDS[i];
     const rm = house.rooms[b.room];
-    const land = E.M_LANDS[i];
+    const land = E.M_LANDS[i] - IMPACT_LEAD;
     const cut = E.M_CUTS[i];
     const n = b.words[1].length + 1;
-    // cut mid-flight: the lift is before the cut, the gap is already open, both words
-    // settle on the landing (the game's "both words stay real" moment)
+    // cut mid-flight: the lift is just before the cut, the gap is already open, both
+    // words settle on the landing (the game's "both words stay real" moment)
     const rack = buildMiniRack({
       words: b.words,
       slots: n + (portrait ? 0.05 : 0.35),
-      moves: [{ from: 0, letter: b.letter, to: 1, slot: b.slot, lift: land - 0.62, open: land - 0.6, land, closeAt: land, liftH: 0.6, arc: 0.3, zArc: 1.2 }],
+      moves: [{ from: 0, letter: b.letter, to: 1, slot: b.slot, lift: cut - LIFT_BEFORE_CUT, open: E.M_LANDS[i] - 0.6, land, closeAt: land, liftH: FLY.liftH, arc: FLY.arc, zArc: FLY.zArc }],
     });
     rack.group.position.set(b.rx, 0, RACK_Z);
     rack.group.scale.setScalar(RS);
@@ -100,12 +125,16 @@ export default async function make(ctx) {
     const slotLocal = [b.rx + slotX(b.slot, n) * unit, rowY, RACK_Z + TILE_D / 2 * unit];
     const slotW = [rm.x + slotLocal[0], rm.y + slotLocal[1], slotLocal[2]];
     const anchorW = RIG.anchor === 'slot' ? slotW : [rm.x + b.rx, slotW[1], slotW[2]];
+    // the flight in the rows' shared (tile-unit) space, from the top of the lift to the slot
+    const [src, dst] = rack.rows.map((r) => r.group.position);
+    const A = [slotX(b.letter, b.words[0].length) + src.x, src.y + FLY.liftH, src.z + 0.45];
+    const B = [slotX(b.slot, n) + dst.x, dst.y, dst.z];
     const [px, pz, lift, facing] = portrait ? b.tall : b.wide;
     const r = world.residents[b.who];
     world.track(r.ch); world.track(r.shadow);
     const sparks = [];
     for (let k = 0; k < 6; k++) sparks.push(world.register(await makeBillboard('ui/emote_sparkle.png', 0.2 * RS), rm.group));
-    boards.push({ ...b, i, rm, rack, tiles, moved, rowTiles, n, land, cut, end: i < 2 ? E.M_CUTS[i + 1] : E.S05, slotLocal, slotW, anchorW, px, pz, lift, facing, r, sparks });
+    boards.push({ ...b, i, rm, rack, tiles, moved, rowTiles, n, land, cut, A, B, end: i < 2 ? E.M_CUTS[i + 1] : E.S05, slotLocal, slotW, anchorW, px, pz, lift, facing, r, sparks });
   }
 
   // --- per-room life
@@ -157,13 +186,38 @@ export default async function make(ctx) {
     glitter.push(world.register(s, GD.rm.group));
   }
 
-  // tile key: a warm spot from the front-left that makes the clearcoat sing
-  const key = world.register(new THREE.SpotLight('#ffe2b8', 0, 16, 0.42, 0.7, 1.2));
+  // tile key: a white spot from the front-left that makes the clearcoat sing (a warm key
+  // under the warm afternoon sun turned lavender and the locked powder beige)
+  const key = world.register(new THREE.SpotLight('#eef0ff', 0, 16, 0.5, 0.7, 1.2));
   world.register(key.target);
+
+  /**
+   * The moved letter's flight (tile units, rows' space) at time t, from the top of the lift
+   * at the cut to the slot at the landing: it hangs a moment, then accelerates into the
+   * slot (inQuad), so it never settles before its squash and chime.
+   */
+  function flightAt(b, t) {
+    const v = clamp((t - b.cut) / (b.land - b.cut));
+    const e = v * v;
+    const s = Math.sin(Math.PI * e);
+    const p = [b.A[0] + (b.B[0] - b.A[0]) * e, b.A[1] + (b.B[1] - b.A[1]) * e + s * FLY.arc, b.A[2] + (b.B[2] - b.A[2]) * e + s * FLY.zArc];
+    const rot = [s * FLY.tumble * 0.6 + 0.1 * (1 - v), 0, -s * FLY.tumble * Math.sign(b.B[0] - b.A[0] || 1) - 0.1 * (1 - v)];
+    return { p, rot };
+  }
+  /** World position of a rows'-space point on board b (the rack's inner group, then the cell). */
+  function rackWorld(b, p) {
+    const k = unit;
+    return [b.rm.x + b.rx + p[0] * k, b.rm.y + p[1] * k, RACK_Z + p[2] * k];
+  }
 
   function poseBoard(b, t) {
     b.rack.group.visible = true;
     b.rack.set.pose(t);
+    if (t >= b.cut && t < b.land) {
+      const f = flightAt(b, t);
+      b.moved.position.set(...f.p);
+      b.moved.rotation.set(f.rot[0], 0, f.rot[2]);
+    }
     setLocked(b.moved, ease.outCubic(seg(t, b.land, b.land + 0.3)));
     for (const x of b.tiles.values()) setTileGlow(x.obj, 0);
     // both words flash as they become real, the moved letter carries a warm rim for 0.4 s
@@ -282,16 +336,37 @@ export default async function make(ctx) {
     return { pos, target, fov, depth };
   }
 
+  const boardAt = (t) => boards[t < E.M_CUTS[1] ? 0 : t < E.M_CUTS[2] ? 1 : 2];
+  // Motion blur (common.js blurFor) from how far the image travels across the shutter:
+  // the camera (the push is slow enough to stay sharp; the whip is not) and the flying
+  // letter, whose last frames before the slot move tens of pixels.
+  const frameH = portrait ? 1920 : 1080;
+  const probe = new THREE.PerspectiveCamera(RIG.fov, aspect, 0.05, 900);
+  const toPx = (p) => { const v = new THREE.Vector3(...p).project(probe); return [v.x * frameH * aspect / 2, v.y * frameH / 2]; };
+  function motion(t) {
+    const b = boardAt(t);
+    if (t - b.cut < 1 / 120) return blurFor(0); // never average across a cut
+    let px = travelPx((u) => { const c = rigAt(b, u); return { ...c, focus: c.depth }; }, t, frameH);
+    if (px < 6) px = 0; // the push creeps; only the whip needs the camera smeared
+    if (t < b.land + 1 / 120) {
+      const c = rigAt(b, t);
+      probe.fov = c.fov; probe.aspect = aspect; probe.updateProjectionMatrix();
+      probe.position.set(...c.pos); probe.up.set(0, 1, 0); probe.lookAt(...c.target); probe.updateMatrixWorld();
+      const a = toPx(rackWorld(b, flightAt(b, t - 1 / 120).p)), z = toPx(rackWorld(b, flightAt(b, Math.min(t + 1 / 120, b.land)).p));
+      px = Math.max(px, Math.hypot(a[0] - z[0], a[1] - z[1]));
+    }
+    return blurFor(px);
+  }
+
   return {
     id: 'S04',
     start: E.S04,
     end: E.S05,
-    // motion blur only on the whip (three subframes strobe a flying tile rather than blur it)
-    mb: (t) => (t >= E.WHIP ? 3 : 1),
+    mb: (t) => motion(t).n,
+    shutter: (t) => motion(t).shutter,
     pose(t) {
       setAspect(camera, portrait);
-      const i = t < E.M_CUTS[1] ? 0 : t < E.M_CUTS[2] ? 1 : 2;
-      const b = boards[i];
+      const b = boardAt(t);
       const cam = rigAt(b, t);
       camera.fov = cam.fov; camera.updateProjectionMatrix();
       camera.position.set(...cam.pos); camera.up.set(0, 1, 0); camera.lookAt(...cam.target);
@@ -307,12 +382,15 @@ export default async function make(ctx) {
       motes.uniforms.focus.value = cam.depth; motes.uniforms.aperture.value = APERTURE;
       // warm key on the rack from the front-left (the sun's side)
       key.visible = true; key.target.visible = true;
-      const kp = add(b.slotW, [-2.6, 2.6, 3.2]);
-      key.position.set(...kp); key.target.position.set(b.slotW[0] + 1.0, b.slotW[1] + 0.1, b.slotW[2] - 0.2);
-      key.intensity = 14;
+      // aimed at the rack's centre so the far end of a seven-tile row is lit as well as the slot
+      const rc = [b.rm.x + b.rx, b.slotW[1], b.slotW[2]];
+      const kp = add(rc, [-3.2, 2.7, 3.6]);
+      key.position.set(...kp); key.target.position.set(rc[0] + 0.3, rc[1] + 0.2, rc[2] - 0.2);
+      key.angle = 0.5;
+      key.intensity = 16;
       world.sun.castShadow = true;
       const maxBlur = whip ? 10 : 7;
-      return { scene: world.scene, camera, look: look(grade, 0, { exposure: grade.exposure * 1.1, msaa: !whip, dof: { focus: cam.depth, aperture: APERTURE, maxBlur } }) };
+      return { scene: world.scene, camera, look: look(grade, 0, { ...TILE_GRADE, exposure: grade.exposure * TILE_GRADE.exposure, msaa: !whip, dof: { focus: cam.depth, aperture: APERTURE, maxBlur } }) };
     },
   };
 }
