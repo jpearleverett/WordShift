@@ -123,3 +123,26 @@ export function makeContactShadow(w = 1, d = 0.4, opacity = 0.4) {
   m.rotation.x = -Math.PI / 2;
   return m;
 }
+
+/**
+ * A little three-lump pixel dust cloud (lit top-left, shaded underneath, three stepped alpha
+ * tiers), nearest-filtered: the impact puffs of the end card and the build's landings.
+ */
+export function makeDustPuff() {
+  // a little three-lump pixel cloud: lit top-left, shaded underneath, three alpha steps
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const g = c.getContext('2d');
+  const lumps = [[5.5, 9.8, 3.3], [10.6, 9.2, 3.6], [8.0, 5.6, 3.0]];
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const d = Math.min(...lumps.map(([lx, ly, r]) => Math.hypot(x + 0.5 - lx, y + 0.5 - ly) - r)) + 0.35 * Math.sin(x * 2.1 + y * 1.3);
+      const a = d < -1.4 ? 0.85 : d < 0 ? 0.55 : d < 1 ? 0.22 : 0;
+      if (!a) continue;
+      const rgb = y > 10 ? '150,122,96' : x + y < 13 ? '232,212,178' : '198,172,138';
+      g.fillStyle = `rgba(${rgb},${a})`; g.fillRect(x, y, 1, 1);
+    }
+  }
+  const tx = new THREE.CanvasTexture(c);
+  tx.colorSpace = THREE.SRGBColorSpace; tx.magFilter = THREE.NearestFilter; tx.minFilter = THREE.NearestFilter; tx.generateMipmaps = false;
+  return tx;
+}

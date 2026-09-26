@@ -74,11 +74,13 @@ export function travelPx(rig, t, frameH = 1080) {
  * Motion blur for an image travelling `px` per frame: enough subframes (and a short
  * enough shutter) that neighbouring copies sit at most ~2.5 px apart, so hard-edged
  * pixel art smears instead of showing stepped ghosts. Returns { n, shutter }.
+ * maxN caps the subframes; minShutterFrac keeps the shutter at least that fraction of
+ * 1/60 s (a fast pull-back wants a long smear more than it wants invisible steps).
  */
-export function blurFor(px) {
+export function blurFor(px, { maxN = 12, minShutterFrac = 0 } = {}) {
   if (!(px >= 2)) return { n: 1, shutter: 1 / 60 };
-  const n = Math.min(12, Math.ceil(px / 2) + 1);
-  return { n, shutter: (1 / 60) * Math.min(1, (2.5 * (n - 1)) / px) };
+  const n = Math.min(maxN, Math.ceil(px / 2) + 1);
+  return { n, shutter: (1 / 60) * Math.max(minShutterFrac, Math.min(1, (2.5 * (n - 1)) / px)) };
 }
 
 /** Smoothly blend between two camera setups over [a, b] with an easing fn. */

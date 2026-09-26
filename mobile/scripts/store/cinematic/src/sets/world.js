@@ -150,7 +150,7 @@ export async function buildWorld({ pxScale = 1 } = {}) {
       for (const rm of Object.values(house.rooms)) if (rm.reveal) rm.reveal.value = 1;
       for (const id of Object.keys(house.rooms)) if (!house.rooms[id].empty) house.setBuilt(id, true);
       for (const r of Object.values(residents)) { r.ch.visible = true; r.shadow.visible = true; }
-      sun.castShadow = true;
+      sun.castShadow = true; sun.shadow.intensity = 1;
       grass.group.visible = true; grassFar.group.visible = true;
       pollen.points.visible = true; flies.points.visible = true;
     },

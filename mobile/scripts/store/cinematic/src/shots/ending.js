@@ -17,7 +17,7 @@ import { slotX } from '../world/wordrow.js';
 import { buildRack, RACK_ROWS_WORLD } from '../world/rack.js';
 import { pixelWood } from '../world/house.js';
 import { makeWordmarkSign } from '../world/logo.js';
-import { makeBillboard, poseEmote } from '../world/fx.js';
+import { makeBillboard, poseEmote, makeDustPuff } from '../world/fx.js';
 import { makeParticles } from '../world/env.js';
 import { drawText } from '../core/text.js';
 import { ease, spring, seg, lerp } from '../core/math.js';
@@ -262,24 +262,7 @@ export default async function make(ctx) {
   const chips = [0, 1].map(() => world.register(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.08), new THREE.MeshStandardMaterial({ color: '#8a5f3e' })), end));
   // The impact's dust: small pixel puffs (three stepped alpha tiers, nearest-filtered) at the
   // sign's ends and along its lower edge, and at the posts' feet where those are in frame.
-  const puffTex = (() => {
-    // a little three-lump pixel cloud: lit top-left, shaded underneath, three alpha steps
-    const c = document.createElement('canvas'); c.width = c.height = 16;
-    const g = c.getContext('2d');
-    const lumps = [[5.5, 9.8, 3.3], [10.6, 9.2, 3.6], [8.0, 5.6, 3.0]];
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) {
-        const d = Math.min(...lumps.map(([lx, ly, r]) => Math.hypot(x + 0.5 - lx, y + 0.5 - ly) - r)) + 0.35 * Math.sin(x * 2.1 + y * 1.3);
-        const a = d < -1.4 ? 0.85 : d < 0 ? 0.55 : d < 1 ? 0.22 : 0;
-        if (!a) continue;
-        const rgb = y > 10 ? '150,122,96' : x + y < 13 ? '232,212,178' : '198,172,138';
-        g.fillStyle = `rgba(${rgb},${a})`; g.fillRect(x, y, 1, 1);
-      }
-    }
-    const tx = new THREE.CanvasTexture(c);
-    tx.colorSpace = THREE.SRGBColorSpace; tx.magFilter = THREE.NearestFilter; tx.minFilter = THREE.NearestFilter; tx.generateMipmaps = false;
-    return tx;
-  })();
+  const puffTex = makeDustPuff();
   const VIS = { hw: (L10.signW * 0.868) / 2, hh: (L10.signW / 4) * 0.4 }; // the wordmark's inked extents (the PNG has margins)
   const PUFFS = [
     { at: [-VIS.hw * 0.97, SIGN_Y - VIS.hh * 0.3, SIGN_Z + 0.25], dir: [-1, 0.3], size: 0.38 },

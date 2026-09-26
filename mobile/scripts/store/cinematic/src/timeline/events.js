@@ -94,10 +94,10 @@ export const CAPTIONS = [
   { id: 'c3', text: 'Puzzles earn amber. Amber builds rooms.', voice: 'claim', in: 4.9, out: E.DROP - 0.01, line: 0 },
   { id: 'c5', text: 'Over 4,000 word puzzles.', voice: 'claim', in: E.M_LANDS[0] - 0.05, out: E.S05 - 0.16, line: 0 },
   { id: 'c6', text: 'Animal friends. Each with a room.', voice: 'claim', in: E.S05 + 0.19, out: E.ROOF_CLEAR - 0.13, line: 0 },
-  { id: 'c7', text: "Panko's spice jars keep changing places.", voice: 'tease', in: E.S07 + 0.27, out: E.S08 - 0.25, line: 0 },
+  { id: 'c7', text: "Panko's spice jars keep changing places.", voice: 'tease', in: E.S07 + 0.27, out: E.JARS_BACK + 0.1, line: 0 },
   { id: 'c8', text: "The animals talk about you when you're away.", voice: 'tease', in: E.S09 + 0.7, out: E.BREATH - 0.01, line: 0 },
   { id: 'c9', text: 'All good things.', voice: 'tease', in: E.S09 + 2.4, out: E.BREATH - 0.01, line: 1 },
-  { id: 'c10', text: 'Probably.', voice: 'tease', size: 'big', in: E.PROBABLY, out: E.S10 - 0.24, line: 0 },
+  { id: 'c10', text: 'Probably.', voice: 'tease', size: 'big', in: E.PROBABLY, out: E.S10 - 0.21, line: 0 },
 ];
 
 /** Captions for the SRT (bubble and end line included). */

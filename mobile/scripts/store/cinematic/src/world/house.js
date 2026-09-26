@@ -28,7 +28,7 @@ const BORDER_U = 0.014, BORDER_V = 0.028;
 export const LAMPS = {
   cozy_den: [[0.22, 0.37, 1.1], [0.855, 0.75, 0.9]],
   kitchen: [[0.15, 0.85, 0.9], [0.91, 0.40, 1.0]],
-  office: [[0.41, 0.555, 0.8]],
+  office: [[0.41, 0.555, 0.45]],
   burrow: [[0.86, 0.44, 0.8]],
   garden: [[0.49, 0.83, 0.8]],
   bamboo: [[0.50, 0.81, 0.8]],
@@ -395,6 +395,26 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
   // timber in the house, so a frame reads as a room waiting to be built (a dark vertical
   // board read as the back of a bookcase)
   const pineTex = pixelWood({ base: '#d9b27f', planks: 4, seed: 11 });
+  // ambient occlusion for an empty cubby: clear in the middle, 0.4 at the edges, and a
+  // 0.35 band under the top fifth (the floor above shades it); deterministic, drawn once
+  const aoMat = (() => {
+    const W = 64, H = 32;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    const img = g.createImageData(W, H);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const u = (x + 0.5) / W, v = (y + 0.5) / H;
+        const e = Math.min(u, 1 - u, v * 0.5, (1 - v) * 0.5) / 0.18;
+        let a = 0.4 * (1 - Math.min(1, e)) ** 1.6;
+        if (v < 0.2) a = Math.max(a, 0.35 * (1 - v / 0.2) ** 0.7);
+        img.data.set([0, 0, 0, Math.round(a * 255)], (y * W + x) * 4);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    const tx = new THREE.CanvasTexture(c);
+    return new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false, fog: false });
+  })();
   const rooms = {};
   const slots = [];
 
@@ -411,11 +431,15 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
       group.add(g);
       // an empty frame: raw pine boards at the back, nothing else
       const emptyG = new THREE.Group();
-      const board = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), mk(pineTex, roomW / 2.4, roomH / 1.6, '#fff2e0'));
-      // a little warm self-light keeps the boards reading as pine in the shade (the sky fill alone greys them)
-      board.material.emissive = new THREE.Color('#ffc890'); board.material.emissiveMap = board.material.map; board.material.emissiveIntensity = 0.15;
+      const board = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), mk(pineTex, roomW / 2.4, roomH / 1.6, '#d8c4ae'));
+      // a little warm self-light keeps the boards reading as pine in the shade (the sky fill alone
+      // greys them); kept low, and no sun on them, so the new timber of a build outshines them
+      board.material.emissive = new THREE.Color('#ffc890'); board.material.emissiveMap = board.material.map; board.material.emissiveIntensity = 0.05;
       // (where a painting would hang: the shell's back face is 0.02 behind, never coplanar with it)
-      board.position.set(0, roomH / 2, -roomD / 2); board.receiveShadow = true; emptyG.add(board);
+      board.position.set(0, roomH / 2, -roomD / 2); board.receiveShadow = false; emptyG.add(board);
+      // a cubby's own shade: darker at its edges and under the floor above
+      const ao = new THREE.Mesh(board.geometry, aoMat);
+      ao.position.set(0, roomH / 2, -roomD / 2 + 0.01); ao.renderOrder = 1; emptyG.add(ao);
       g.add(emptyG);
       // a built room: floor, side returns, painting, window tint, lamp, glow cards
       const builtG = new THREE.Group();
@@ -429,7 +453,7 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
       const returns = [];
       for (const sd of [-1, 1]) {
         const w = new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), innerMat);
-        w.position.set(sd * roomW / 2, roomH / 2, 0); w.rotation.y = -sd * Math.PI / 2; w.receiveShadow = true; builtG.add(w);
+        w.position.set(sd * (roomW / 2 - 0.04), roomH / 2, 0); w.rotation.y = -sd * Math.PI / 2; w.receiveShadow = true; builtG.add(w);
         returns.push(w);
       }
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), mk(woodTex, roomW / 1.6, roomD / 1.6, '#c79a72'));
@@ -458,7 +482,7 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
         sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vRUv;\nuniform float uReveal;\n' + GLASS_UNIFORMS)
           .replace('#include <map_fragment>', GLASS_MAP_FRAGMENT)
           .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= sampledDiffuseColor.rgb; // emissiveMap is the same texture as map')
-          .replace('#include <dithering_fragment>', '#include <dithering_fragment>\nif (uReveal < 0.999) { float edge = 1.0 - uReveal; if (vRUv.y < edge) discard; float seam = 1.0 - smoothstep(0.0, 0.03, vRUv.y - edge); gl_FragColor.rgb += vec3(1.0, 0.92, 0.7) * seam * 2.5; }');
+          .replace('#include <dithering_fragment>', '#include <dithering_fragment>\nif (uReveal < 0.999) { float edge = 1.0 - uReveal; if (vRUv.y < edge) discard; float seam = 1.0 - smoothstep(0.0, 0.03, vRUv.y - edge); gl_FragColor.rgb += vec3(1.0, 0.92, 0.7) * seam * 1.5 * (1.0 - smoothstep(0.75, 1.0, uReveal)); }');
       };
       mat.customProgramCacheKey = () => 'painting-reveal';
       const painting = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), mat);
@@ -509,6 +533,8 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
     p.position.set(x, height / 2, 0.1); p.castShadow = true; p.receiveShadow = true; group.add(p);
   }
   const slabMat = mk(woodTex, width / 2.4, 0.3, '#d4a577');
+  // (each room's floor sits 0.003 above its slab: pushed back in depth so the two never fight)
+  slabMat.polygonOffset = true; slabMat.polygonOffsetFactor = 1; slabMat.polygonOffsetUnits = 2;
   for (let r = 0; r <= layout.length; r++) {
     const s = new THREE.Mesh(new THREE.BoxGeometry(width + 0.3, slab, roomD + 0.5), slabMat);
     s.position.set(0, slab / 2 + r * floorH, 0.12); s.castShadow = true; s.receiveShadow = true; group.add(s);
