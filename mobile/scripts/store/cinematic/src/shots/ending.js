@@ -278,7 +278,7 @@ export default async function make(ctx) {
       wideFlies.points.visible = fk > 0.001;
       Object.assign(wideFlies.uniforms.time, { value: t }); wideFlies.uniforms.focus.value = focus;
       wideFlies.uniforms.aperture.value = cam.aperture; wideFlies.uniforms.opacity.value = fk;
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1.04, exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: 0.24, dof: { focus, aperture: cam.aperture, maxBlur: 10 } }) };
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1, exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: 0.24, dof: { focus, aperture: cam.aperture, maxBlur: 10 } }) };
     },
   };
 

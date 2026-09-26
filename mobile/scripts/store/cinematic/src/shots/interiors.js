@@ -508,9 +508,9 @@ export default async function make(ctx) {
       interiorOnly();
       soloRoomLight(den, 10);
       // S09 (a continuous pull-back) starts from this camera and look, so S08 eases into its
-      // grade over the pan (contrast 1.0 keeps the lifted blacks; S09 opens at 1.04)
+      // grade over the pan into S09's (contrast 1.0 keeps the lifted blacks)
       const m = 1 - handoff(t);
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: lerp(1, 1.04, m), exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: lerp(0.2, 0.24, m), dof: { focus, aperture, maxBlur: 16 } }) };
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1, exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: lerp(0.2, 0.24, m), dof: { focus, aperture, maxBlur: 16 } }) };
     },
   };
 
