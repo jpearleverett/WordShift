@@ -111,4 +111,39 @@ export class Overlay {
 
   hide(name) { const it = this.items.get(name); if (it) it.mesh.visible = false; }
   hideAll() { for (const it of this.items.values()) it.mesh.visible = false; }
+
+  /**
+   * QA: screen-space boxes of every visible item's inked pixels (alpha * opacity > 0.01),
+   * in output pixels. Rotation is ignored (items rotate by a few degrees at most).
+   */
+  boxes() {
+    const out = [];
+    for (const [name, it] of this.items) {
+      if (!it.mesh.visible || it.mat.opacity <= 0.01) continue;
+      const bb = inkBox(it, 0.01 / it.mat.opacity);
+      if (!bb) continue;
+      const sx = it.mesh.scale.x, sy = it.mesh.scale.y, cx = it.mesh.position.x, cy = -it.mesh.position.y;
+      out.push({ name, opacity: it.mat.opacity, x0: cx + (bb.x0 - 0.5) * sx, x1: cx + (bb.x1 - 0.5) * sx, y0: cy + (bb.y0 - 0.5) * sy, y1: cy + (bb.y1 - 0.5) * sy });
+    }
+    return out;
+  }
+}
+
+/** Normalised bounds (0..1, top-left origin) of an item's pixels whose alpha exceeds `thr`. */
+function inkBox(it, thr) {
+  const img = it.texture.image;
+  if (!img || !img.width) return { x0: 0, y0: 0, x1: 1, y1: 1 };
+  if (!it.alpha) {
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+    it.alpha = { data: g.getImageData(0, 0, c.width, c.height).data, w: c.width, h: c.height };
+  }
+  const { data, w, h } = it.alpha;
+  const a8 = Math.min(255, Math.max(1, Math.floor(thr * 255)));
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (data[(y * w + x) * 4 + 3] > a8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  }
+  if (x1 < 0) return null;
+  return { x0: x0 / w, y0: y0 / h, x1: (x1 + 1) / w, y1: (y1 + 1) / h };
 }

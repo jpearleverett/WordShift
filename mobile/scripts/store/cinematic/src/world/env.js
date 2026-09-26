@@ -28,7 +28,7 @@ export async function makeBackdrop(rel, { width = 90, band = [0.3, 0.9], tilesX 
  * Ground texture cut from a sky painting's own meadow band, so the 3D ground
  * meets the painted backdrop in the same greens. Mirrored so it tiles.
  */
-export async function meadowFromPainting(rel = 'environment/sky_day.webp', { y0 = 0.74, y1 = 0.86 } = {}) {
+export async function meadowFromPainting(rel = 'environment/sky_afternoon.webp', { y0 = 0.74, y1 = 0.86 } = {}) {
   const tex = await loadTexture(rel);
   const img = tex.image;
   const c = document.createElement('canvas'); c.width = 512; c.height = 256;

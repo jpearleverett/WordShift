@@ -49,6 +49,13 @@ async function boot() {
     lastFrame = frame;
     return lastFrame;
   };
+  /** QA: pose (without rendering) and lay out the overlay at t; returns its inked boxes. */
+  TRAILER.overlayAt = (t) => {
+    const out = trailer.update(t);
+    for (const l of out.layers || []) l.pose(t);
+    out.afterRender?.();
+    return overlay.boxes();
+  };
   TRAILER.grab = (q = 0.96) => {
     const url = renderer.domElement.toDataURL('image/jpeg', q);
     return url.slice(url.indexOf(',') + 1);

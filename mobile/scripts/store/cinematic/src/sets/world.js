@@ -70,11 +70,27 @@ export async function buildWorld({ pxScale = 1 } = {}) {
   scene.add(ground);
   const contact = makeContactShadow(house.width + 3, house.roomD + 5, 0.45);
   contact.position.set(0, GROUND_Y + 0.02, 0.4); scene.add(contact);
+  // at dusk the open-fronted rooms spill warm lamplight onto the grass in front of the house
+  const spill = (() => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+    const g = c.getContext('2d');
+    const gr = g.createRadialGradient(128, 0, 4, 128, 0, 128);
+    gr.addColorStop(0, 'rgba(255,190,110,1)'); gr.addColorStop(0.45, 'rgba(255,170,90,0.45)'); gr.addColorStop(1, 'rgba(255,150,80,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 128);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(house.width * 1.5, 16), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    m.rotation.x = -Math.PI / 2; m.position.set(0, GROUND_Y + 0.04, house.roomD / 2 + 8);
+    m.renderOrder = 1;
+    return m;
+  })();
+  scene.add(spill);
 
   const W = house.width / 2 + 1.2;
   const grass = makeGrass({ count: 4200, height: 0.62, area: { x0: -34, x1: 34, z0: 3, z1: 30, y: GROUND_Y }, avoid: (x, z) => Math.abs(x) < W && z < house.roomD / 2 + 1.4, seed: 21 });
   const grassFar = makeGrass({ count: 300, height: 0.9, area: { x0: -70, x1: 70, z0: -30, z1: 3, y: GROUND_Y }, avoid: (x, z) => Math.abs(x) < W + 2 && z > -house.roomD / 2 - 2, seed: 22 });
   scene.add(grass.group, grassFar.group);
+  // the tufts keep a little of their own green at dusk, like the painted meadow behind them
+  for (const m of [...grass.group.children, ...grassFar.group.children]) { m.material.emissiveMap = m.material.map; m.material.emissive = new THREE.Color('#000000'); m.material.needsUpdate = true; }
 
   // residents
   const residents = {};
@@ -116,7 +132,7 @@ export async function buildWorld({ pxScale = 1 } = {}) {
   const env = { sun, hemi, sky, house, scene, azimuth: -38, azimuthDusk: -70, sunCenter: new THREE.Vector3(0, house.height / 2, 0), sunDist: 110 };
 
   const world = {
-    scene, house, residents, sun, hemi, sky, ground, grass, grassFar, pollen, flies, env, puffs,
+    scene, house, residents, sun, hemi, sky, ground, spill, grass, grassFar, pollen, flies, env, puffs,
     /** Register a shot-owned prop: added to the scene, hidden unless its shot shows it. */
     register(obj, parent = scene) { parent.add(obj); extras.add(obj); obj.visible = false; return obj; },
     /** Snapshot a shared object's transform, visibility and opacity; begin() restores them. */
@@ -147,7 +163,11 @@ export async function buildWorld({ pxScale = 1 } = {}) {
       env.lamps = lamps; env.time = t;
       const grade = applyTod(dusk, env);
       scene.background.set('#9dc0ea').lerp(new THREE.Color('#b18ab8'), dusk);
-      ground.material.emissive.set('#4a3f26').multiplyScalar(0.55 * dusk);
+      ground.material.emissive.set('#5e4e2a').multiplyScalar(0.5 * dusk);
+      for (const m of [...grass.group.children, ...grassFar.group.children]) m.material.emissive.set('#b89a60').multiplyScalar(0.42 * dusk);
+      const lampLevel = typeof lamps === 'function' ? 0.8 : (lamps ?? Math.max(0, (dusk - 0.35) / 0.65));
+      spill.material.opacity = 0.2 * dusk * lampLevel;
+      spill.visible = spill.material.opacity > 0.003;
       // dusk haze: the far meadow melts into the painted horizon instead of ending in a dark band
       scene.fog.near = 120 - 55 * dusk; scene.fog.far = 300 - 70 * dusk;
       if (grass.group.visible) grass.update(t, wind);

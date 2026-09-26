@@ -253,7 +253,7 @@ export default async function make(ctx) {
       });
       const grade = world.pose(t, { dusk: 1, lamps: 1, focus, aperture: wide ? 9 : 26, camera, behaviours: chatter(t) });
       world.sun.castShadow = wide;
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1.04, dof: { focus, aperture: wide ? 9 : 26, maxBlur: 10 } }) };
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1.04, exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: 0.24, dof: { focus, aperture: wide ? 9 : 26, maxBlur: 10 } }) };
     },
   };
 
@@ -273,7 +273,7 @@ export default async function make(ctx) {
       aim(camera, cam.pos, cam.target, cam.fov);
       const focus = Math.hypot(cam.pos[0] - END.pos[0], cam.pos[2] - END.pos[2]) + 0.7;
       const grade = world.pose(t, { dusk: 1, lamps: 1, focus, aperture: 22, camera, behaviours: chatter(t) });
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: true, contrast: 1.04, exposure: 1.1, dof: { focus, aperture: 22, maxBlur: portrait ? 20 : 12 } }) };
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: true, contrast: 1.04, exposure: 1.16, vignette: 0.26, dof: { focus, aperture: 22, maxBlur: portrait ? 20 : 12 } }) };
     },
     overlay(t) {
       if (t < E.LINE) return;
