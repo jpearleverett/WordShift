@@ -17,7 +17,7 @@ import { makeBlueprint } from '../world/blueprint.js';
 import { makeMoths } from '../world/fire.js';
 import { makeShaft } from '../world/env.js';
 import { makeBubble } from '../world/bubble.js';
-import { makeSprout, setLocked, setTileGlow, TILE_SCALE, TILE_D, TILE_EMISSIVE_BASE } from '../core/tiles.js';
+import { makeSprout, setLocked, setTileGlow, TILE_SCALE, TILE_D } from '../core/tiles.js';
 import { ease, spring, seg, lerp, clamp, smooth, catmull, hash01 } from '../core/math.js';
 import { GROUND_Y } from '../sets/world.js';
 import { mm, wpos, add, mix3, dist, aim, setAspect, look, project, travelPx, blurFor } from './common.js';
@@ -117,10 +117,7 @@ export default async function make(ctx) {
       airBlob.material.opacity = 0.3 * clamp(1 - away / 1.6);
     }
     // landing rim flash on PLANT (6 frames) and the three row flashes
-    // on the tile shots the tiles carry more of their own light, so the warm golden key
-    // does not grey the cool letters (purple A, the locked powder blue); eases back on the crane
-    const glowBase = lerp(TILE_EMISSIVE_BASE, TILE_SELF_LIGHT, 1 - smooth(seg(t, E.CRANE, E.CRANE + 0.8)));
-    for (const x of tiles.values()) { x.obj.userData.glowBase = glowBase; setTileGlow(x.obj, 0); }
+    for (const x of tiles.values()) setTileGlow(x.obj, 0);
     const flash = (t0, ri) => { const k = seg(t, t0, t0 + 0.2); if (k > 0 && k < 1) for (const o of rowTiles(ri)) setTileGlow(o, Math.sin(Math.PI * k) * 0.9); };
     flash(E.L_LAND, 1); flash(E.T_LAND, 2);
     E.FLASH.forEach((f, i) => flash(f, i));
@@ -368,7 +365,7 @@ export default async function make(ctx) {
   // Moths: each keeps its own height band around her head (never two side by side at
   // one height, so they cannot pair into eyes), loop centred up-left of her head, away
   // from the bubble's tail; at MOTH_LAND moth 0 settles on the L's sprout.
-  const MOTH_BANDS = [0.42, 0.0, -0.36];
+  const MOTH_BANDS = [0.6, 0.28, -0.02];
   function poseS03(t) {
     // Sloane pops in, talks while her line types; moths loop around her head
     if (t < E.DROP) return;
@@ -562,9 +559,11 @@ export default async function make(ctx) {
       const kc = smooth(seg(t, E.CRANE, E.CRANE + 1.2));
       const aperture = lerp(lerp(40, 12, kc), 30, smooth(seg(t, E.DROP, E.DROP + 0.8)));
       const maxBlur = lerp(18, 14, kc);
-      // exposure: the tile shots are lifted to the spec swatches, easing back as the crane starts
-      const exposure = (grade.exposure ?? 1) * lerp(TILE_EXPOSURE, 1, smooth(seg(t, E.CRANE, E.CRANE + 0.8)));
-      const kx = 1 - smooth(seg(t, E.CRANE, E.CRANE + 0.8));
+      // the tile shots' grade (spec 2.2 swatches: exposure, a white balance that takes the
+      // golden key's cast off the cool letters, and back the saturation AgX takes out of
+      // the pastels) eases back to the day look under the boom, never on a still frame
+      const kx = 1 - smooth(seg(t, BOOM[0], BOOM[1]));
+      const exposure = (grade.exposure ?? 1) * lerp(1, TILE_EXPOSURE, kx);
       const wb = TILE_WB.map((v) => lerp(1, v, kx));
       const sat = lerp(grade.saturation ?? 1, TILE_SAT, kx);
       return { scene: world.scene, camera, look: look(grade, 0, { exposure, whiteBalance: wb, saturation: sat, msaa: t < E.CRANE, dof: { focus, aperture, maxBlur } }) };
@@ -599,7 +598,6 @@ const TILE_WB = [0.96, 1.0, 1.5];
 const TILE_SAT = 1.4;
 const TRAY_EMISSIVE = 0.5;
 const TRAY_GLOW = '#F7D9A2';
-const TILE_SELF_LIGHT = 0.15;
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };

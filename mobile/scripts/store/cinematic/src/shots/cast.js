@@ -468,9 +468,9 @@ export default async function make(ctx) {
         m.material.opacity = on * edge * a * 0.92;
       }
     }
-    // the sun's glide: the glow takes over the painted afternoon sun as the wipe reaches
-    // it, slides over the peaks, and hands over to the painted dusk sun as that one
-    // wipes in (the wipe crosses the two suns at sky mix ~0.3 and ~0.65)
+    // the sun's glide: the glow takes over the painted afternoon sun as the wipe front
+    // reaches it, slides over the peaks while the front crawls between the two suns, and
+    // hands over to the painted dusk sun as the front uncovers it (SUN_T above)
     const gIn = seg(t, SUN_T[0], A_TOUCH), gOut = seg(t, B_FULL, SUN_T[3]);
     const gk = ease.inOutSine(seg(t, SUN_T[1], SUN_T[2]));
     const g1 = 1 - gk;
