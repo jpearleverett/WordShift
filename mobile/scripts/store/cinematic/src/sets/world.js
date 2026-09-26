@@ -86,7 +86,7 @@ export async function buildWorld({ pxScale = 1 } = {}) {
   scene.add(spill);
 
   const W = house.width / 2 + 1.2;
-  const grass = makeGrass({ count: 4200, height: 0.62, area: { x0: -34, x1: 34, z0: 3, z1: 30, y: GROUND_Y }, avoid: (x, z) => Math.abs(x) < W && z < house.roomD / 2 + 1.4, seed: 21 });
+  const grass = makeGrass({ count: 4200, height: 0.62, area: { x0: -34, x1: 34, z0: 2.2, z1: 30, y: GROUND_Y }, avoid: (x, z) => Math.abs(x) < W && z < house.roomD / 2 + 0.7, seed: 21 });
   const grassFar = makeGrass({ count: 300, height: 0.9, area: { x0: -70, x1: 70, z0: -30, z1: 3, y: GROUND_Y }, avoid: (x, z) => Math.abs(x) < W + 2 && z > -house.roomD / 2 - 2, seed: 22 });
   scene.add(grass.group, grassFar.group);
   // the tufts keep a little of their own green at dusk, like the painted meadow behind them

@@ -4,21 +4,25 @@
 
 import * as THREE from 'three';
 
-const W = 640, H = 440;
+// The sheet is landscape (2:1, like a room): S02 lays it on the empty frame at 90% of
+// the room's width, and a taller sheet ran past the floor and the ceiling there, so the
+// title block sank into the floor slab. Everything below sits inside a 16 px margin, and
+// the title block has its own strip under the drawing, where no chalk line ever crosses it.
+const W = 640, H = 320;
 
 // A room seen from the front: back wall rectangle, perspective lines to the front
 // corners, floorboards, ONE cross-paned window up at the left and a hammock slung
 // between two posts at the lower right. Deliberately asymmetric: nothing in the
 // drawing may pair up into eyes above a curve (spec 7.1, no faces).
 const STROKES = [
-  [[70, 60], [570, 60], [570, 330], [70, 330], [70, 60]],
-  [[70, 60], [20, 20]], [[570, 60], [620, 20]], [[70, 330], [20, 410]], [[570, 330], [620, 410]],
-  [[20, 410], [620, 410]],
-  [[40, 370], [600, 370]],
-  [[105, 95], [225, 95], [225, 200], [105, 200], [105, 95]],
-  [[165, 95], [165, 200]], [[105, 147], [225, 147]],
-  [[330, 330], [330, 205]], [[540, 330], [540, 205]],
-  [[330, 215], [390, 262], [435, 272], [480, 262], [540, 215]],
+  [[98, 44], [542, 44], [542, 200], [98, 200], [98, 44]],
+  [[98, 44], [30, 18]], [[542, 44], [610, 18]], [[98, 200], [30, 256]], [[542, 200], [610, 256]],
+  [[30, 256], [610, 256]],
+  [[48, 232], [592, 232]],
+  [[128, 66], [226, 66], [226, 144], [128, 144], [128, 66]],
+  [[177, 66], [177, 144]], [[128, 105], [226, 105]],
+  [[330, 200], [330, 124]], [[516, 200], [516, 124]],
+  [[330, 132], [382, 162], [423, 170], [464, 162], [516, 132]],
 ];
 
 function strokeLen(s) { let l = 0; for (let i = 1; i < s.length; i++) l += Math.hypot(s[i][0] - s[i - 1][0], s[i][1] - s[i - 1][1]); return l; }
@@ -39,11 +43,11 @@ export function makeBlueprint({ width = 1.6 } = {}) {
   function paperBase(ctx) {
     ctx.fillStyle = '#F3E2BF'; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#E4CC9C';
-    for (let i = 0; i < 9; i++) ctx.fillRect(0, i * 52 + 24, W, 1);
+    for (let i = 0; i < 6; i++) ctx.fillRect(0, i * 52 + 24, W, 1);
     ctx.strokeStyle = '#3B2416'; ctx.globalAlpha = 0.35; ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6); ctx.globalAlpha = 1;
-    // title block
-    ctx.fillStyle = '#E4CC9C'; ctx.fillRect(W - 170, H - 64, 150, 46);
-    ctx.fillStyle = '#3B2416'; ctx.font = '700 30px "Figtree"'; ctx.textBaseline = 'middle'; ctx.fillText('PLAN', W - 146, H - 40);
+    // title block, in the strip under the drawing (the front floor line is at y 256)
+    ctx.fillStyle = '#E4CC9C'; ctx.fillRect(W - 176, H - 54, 146, 38);
+    ctx.fillStyle = '#3B2416'; ctx.font = '700 28px "Figtree"'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillText('PLAN', W - 103, H - 34); ctx.textAlign = 'left';
   }
 
   function draw(k) {
