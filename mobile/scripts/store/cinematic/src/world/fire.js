@@ -113,7 +113,7 @@ const MOTH_ART = [
   ['........', '.W....W.', '.WWBBWW.', '..WBBW..', '.WWBBWW.', '........'],
 ];
 const MOTH_ANTENNAE = [[[3, 0], [6, 0]], [[3, 1], [6, 1]]];
-const MOTH_INK = '#3B2416';
+const MOTH_INK = '#3B2416', MOTH_GAIN = 0.78;
 export function makeMoths({ px = 0.045, radius = 0.55, colors = ['#F4C7D8', '#CBE3F2', '#F6E3A2'] } = {}) {
   const group = new THREE.Group();
   const frames = colors.map((c) => MOTH_ART.map((art, f) => {
@@ -130,7 +130,9 @@ export function makeMoths({ px = 0.045, radius = 0.55, colors = ['#F4C7D8', '#CB
     const g = cv.getContext('2d');
     cell.forEach((row, y) => row.forEach((col, x) => { if (col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } }));
     const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
+    // held a little under white so the lit rooms' exposure keeps the pastels coloured
+    // (at full value the tone curve washed all three to the same pale grey)
+    return new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(MOTH_GAIN, MOTH_GAIN, MOTH_GAIN), transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
   }));
   const moths = frames.map((fr, i) => {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(10 * px, 8 * px), fr[0]);

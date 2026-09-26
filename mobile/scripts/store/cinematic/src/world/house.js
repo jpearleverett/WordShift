@@ -41,13 +41,14 @@ export const LAMPS = {
  * the painting's own light) instead of the unlit dusk tint laid over it: [colour, amount]
  * by day and at dusk, mixed into the glass's albedo through the room's window mask.
  * - The Star Loft's two round portholes sit side by side above a curved cushion and read as
- *   a pair of eyes in every wide, so the two panes never match: by day the left one takes a
- *   light warm wash (the afternoon sun on its glass) while the right stays clear, and at dusk
- *   their painted sky is pulled most of the way to a tone just above the wall's value (never
- *   dark: both stay above luma 40), the left warm and lamp-lit (the lantern is below it), the
- *   right (`right` of `split` in the art's u) a cooler, dimmer mauve. Ivy grows over the right
- *   one's lower-left rim (starLoftIvy). An unlit overlay could not do this: the lamp-lit sky
- *   under it stayed pale however strong the tint.
+ *   a pair of eyes in every wide, so the two panes never match. The shapes do most of it: a
+ *   curtain leaves the left one a lopsided crescent (starLoftCurtain) and ivy crosses the right
+ *   one corner to corner (starLoftIvy). The glass does the rest: by day the left crescent takes
+ *   a warm sunlit wash while the right stays clear sky, and at dusk the left is pulled most of
+ *   the way to a warm lamp-lit tone (the lantern is below it) and the right (`right` of `split`
+ *   in the art's u) to a cooler, dimmer mauve. Never dark: both measure luma 64 or more in the
+ *   dusk wides (S06 20.5, S09 30.0 and 31.5, both aspects). An unlit overlay could not do
+ *   this: the lamp-lit sky under it stayed pale however strong the tint.
  * - The Sky Garden's painted rain would read as a storm: the glass is always softened
  *   (`blur`, uv steps across and down) and veiled, a pale mist by day and a light dusk tint,
  *   so the forest still shows through. `cut` stops the mask at the glass's lower edge (v from

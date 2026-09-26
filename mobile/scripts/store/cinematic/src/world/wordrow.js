@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { makeTile, TILE_W, TILE_H, TILE_D } from '../core/tiles.js';
-import { clamp, ease, spring, hash01 } from '../core/math.js';
+import { clamp, ease, spring, hash01, smooth } from '../core/math.js';
 import { pixelWood } from './house.js';
 
 export const GAP = 0.12;
@@ -86,7 +86,7 @@ const TRAY_PX = 20;
 const TRAY_BASE = '#F3E2BF';
 /** Contact shade: how much darker the parchment gets right at a tile's edge, how far it reaches, and its cap. */
 const TRAY_CONTACT = { dark: 0.14, reach: 0.22, cap: 0.15 };
-/** At most this many tiles shade one tray (a row's tiles plus one arriving in flight). */
+/** At most this many tiles shade one tray: a row holds up to 7, plus one arriving in flight. */
 const TRAY_MAX_TILES = 8;
 
 /**
@@ -175,9 +175,11 @@ export function makeTray(n, { depth = 0.7 } = {}) {
   const face = new THREE.Mesh(new THREE.PlaneGeometry(w, h), faceMat);
   face.position.z = -TILE_D / 2 + 0.065;
   face.receiveShadow = true;
-  // the tiles near this face, in its own units: seated tiles shade fully, a lifted or
-  // flying one fades out as it leaves the parchment
+  // the tiles on this face, in its own units: a seated tile shades fully; one lifting off
+  // the parchment (toward the lens) or leaving its extent (up out of the row, or a tray
+  // above or below) fades out smoothly, so a shade never pops in or out
   const inv = new THREE.Matrix4(), v = new THREE.Vector3(), sv = new THREE.Vector3(), fs = new THREE.Vector3();
+  const fade = (d) => 1 - smooth(clamp(d / 0.6));
   face.onBeforeRender = () => {
     const root = group.parent?.parent || group.parent;
     for (const u of tilesU.value) u.set(0, 0, 0, 1);
@@ -188,9 +190,8 @@ export function makeTray(n, { depth = 0.7 } = {}) {
     root.traverseVisible((o) => {
       if (k >= TRAY_MAX_TILES || !o.userData?.faceMat || !o.userData.lockMat) return;
       v.setFromMatrixPosition(o.matrixWorld).applyMatrix4(inv);
-      if (Math.abs(v.x) > w / 2 + 0.6 || Math.abs(v.y) > h / 2 + 0.6) return;
       const lift = Math.max(0, v.z - (TILE_D / 2 - 0.065));
-      const s = TRAY_CONTACT.dark * (1 - clamp(lift / 0.45));
+      const s = TRAY_CONTACT.dark * (1 - clamp(lift / 0.45)) * fade(Math.abs(v.x) - w / 2) * fade(Math.abs(v.y) - h / 2);
       if (s <= 0) return;
       sv.setFromMatrixScale(o.matrixWorld);
       tilesU.value[k++].set(v.x, v.y, s, sv.x / fs.x);

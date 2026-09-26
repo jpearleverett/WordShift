@@ -153,6 +153,7 @@ export default async function make(ctx) {
         t0 = E.L_LAND + i * 0.02;
         const [gx, side, sz] = PLANT_SPARKS[i];
         s.userData.base = sz;
+        s.material.color.setRGB(1.5, 1.28, 0.85); // warm and a touch over white, so it glints on the parchment
         // (an emote hangs from its base: centre it on the margin line)
         p = add(RACK_POS, [gx, 1.75 + side * 0.38 - sz / 2, 0.12]); // just in front of the tile faces
         s.position.set(p[0], p[1], p[2]); s.userData.y0 = p[1];
@@ -161,6 +162,7 @@ export default async function make(ctx) {
       }
       t0 = E.FLASH[i - 6]; p = add(RACK_POS, [1.25, [2.5, 1.75, 1.0][i - 6] + 0.25, 0.3]);
       s.userData.base = 0.34;
+      s.material.color.setRGB(1, 1, 1);
       s.position.set(p[0], p[1], p[2]); s.userData.y0 = p[1];
       poseEmote(s, t - t0, { hold: 0.35, rise: 0.2, fade: 0.25 });
     });
@@ -211,10 +213,17 @@ export default async function make(ctx) {
   };
   standMat.customProgramCacheKey = () => 'pine-return-reveal';
   const standIns = [-1, 1].map(() => world.register(new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), standMat), jungle.group));
+  // and a pine floor, wiped away from the back edge forward by the same unroll (a plane's uv
+  // y runs to its back edge once it lies flat), just above the room's own floor
+  const standFloorMat = standMat.clone(); standFloorMat.map = pine(roomW / 2.2, roomD / 1.1).map; standFloorMat.emissiveMap = standFloorMat.map;
+  standFloorMat.onBeforeCompile = standMat.onBeforeCompile; standFloorMat.customProgramCacheKey = standMat.customProgramCacheKey;
+  const standFloor = world.register(new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), standFloorMat), jungle.group);
+  standFloor.rotation.x = -Math.PI / 2;
   for (const m of [beam, ...trims, ...standIns]) { m.castShadow = true; m.receiveShadow = true; }
+  standFloor.receiveShadow = true;
   // where each piece lands (room-local) and where its dust puffs (left and right ones at
   // different heights, so no two ever pair up)
-  const LAND = [[0, 0.003, 0], [-(roomW / 2 - 0.07), roomH / 2, 0], [roomW / 2 - 0.07, roomH / 2, 0], [0, roomH - 0.11, roomD / 2 - 0.2], [-(roomW / 2 - 0.12), roomH / 2, roomD / 2 - 0.2], [roomW / 2 - 0.12, roomH / 2, roomD / 2 - 0.2]];
+  const LAND = [[0, 0.008, 0], [-(roomW / 2 - 0.07), roomH / 2, 0], [roomW / 2 - 0.07, roomH / 2, 0], [0, roomH - 0.11, roomD / 2 - 0.2], [-(roomW / 2 - 0.12), roomH / 2, roomD / 2 - 0.2], [roomW / 2 - 0.12, roomH / 2, roomD / 2 - 0.2]];
   const PUFF_AT = [[-0.9, 0.14, 1.05], [-(roomW / 2 - 0.35), 0.3, 1.1], [roomW / 2 - 0.35, 0.62, 0.9], [0.55, roomH - 0.42, 1.5], [-(roomW / 2 - 0.4), 1.2, 1.55], [roomW / 2 - 0.4, 2.25, 1.55]];
   const puffTex = makeDustPuff();
   // (depth-written, so the depth of field sees each at its piece)
@@ -315,11 +324,10 @@ export default async function make(ctx) {
     const K = E.KNOCKS;
     const flying = (i) => t >= K[i] - 0.36;
     const squash = (i, amp = 0.22) => (t < K[i] ? 1 : 1 - amp * Math.exp(-(t - K[i]) * 16) * Math.cos((t - K[i]) * 38));
-    // 0 the floor drops in and rebounds a hair
-    if (t < E.DROP) {
-      jungle.floor.visible = flying(0);
-      jungle.floor.position.y = piecePos(0, t)[1];
-    }
+    // 0 the pine floor drops in and rebounds a hair (the room's own floor comes in under
+    // the unroll)
+    jungle.floor.visible = t >= E.DROP;
+    if (flying(0) && t < E.DROP + 0.4) { standFloor.visible = true; standFloor.position.set(...piecePos(0, t)); }
     // 1, 2 the pine returns swing in from outside the frame (up and toward the lens),
     // arcing over and turning flush with the posts; cut away under the unroll
     standIns.forEach((w, k) => {
@@ -438,7 +446,7 @@ export default async function make(ctx) {
       g.material.rotation = gp.h2 * 6 + t * 2.4 * (gp.h1 - 0.5);
       // deep amber: undo the tile shots' exposure lift (it pushed the gems past AgX's
       // shoulder into cream) and warm the sprite, so the gold keeps its hue and dark rim
-      g.material.color.setRGB(gk, gk * 0.74, gk * 0.15);
+      g.material.color.setRGB(gk, gk * 0.66, gk * 0.12);
       g.material.opacity = Math.min(1, u * 12) * (1 - seg(ride, 0.9, 1));
       if (ride > 0) { lit++; c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; }
     });
@@ -490,11 +498,12 @@ export default async function make(ctx) {
     poseEmote(pop, t - E.SLOANE_POP, { hold: 0.18, rise: 0.1, fade: 0.2 });
     moths.group.visible = t >= E.SLOANE_POP;
     moths.pose(t, camera);
-    const centre = add(head, [-0.55, -0.45, 0.2]);
+    const centre = add(head, [-0.95, -0.45, 0.25]);
     moths.group.position.set(...centre);
     moths.group.children.forEach((m, i) => {
       const a = t * (1.1 + i * 0.27) + i * 2.1;
-      m.position.set(Math.sin(a) * 0.5, MOTH_BANDS[i] + Math.sin(a * 1.7 + i) * 0.05, Math.cos(a) * 0.3);
+      // (a loop 0.7 wide: its right end stays a hand's width left of her face)
+      m.position.set(Math.sin(a) * 0.35, MOTH_BANDS[i] + Math.sin(a * 1.7 + i) * 0.05, Math.cos(a) * 0.3);
       // appear out of her fur: grow from her head over the pop
       m.scale.setScalar(Math.max(0.001, spring(t - E.SLOANE_POP - 0.1 - i * 0.12, 2.6, 0.6)));
     });
@@ -763,7 +772,7 @@ const TILE_SELF = 0.25;
 const CHROMA_PUSH = 3.0;
 const TRAY_EMISSIVE = 0.5;
 const TRAY_GLOW = '#F3E2BF';
-const GEM_TINT = 0.5; // the gems' sprite colour under the day grade (see poseAmber)
+const GEM_TINT = 0.55; // the gems' sprite colour under the day grade (see poseAmber)
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
@@ -772,7 +781,7 @@ const ZERO3 = [0, 0, 0];
 // size]. The x values are the gaps between PLANT's tiles (slot pitch 0.504, tiles 0.45
 // wide); the margins sit between PLANT and its neighbour rows, and the sprout's side of
 // the top margin is left clear so nothing pairs up around it.
-const PLANT_SPARKS = [[-0.756, -1, 0.18], [0.252, 1, 0.17], [0.756, -1, 0.16], [-0.252, -1, 0.17], [0.756, 1, 0.18], [0.252, -1, 0.16]];
+const PLANT_SPARKS = [[-0.756, -1, 0.26], [0.252, 1, 0.24], [0.756, -1, 0.23], [-0.252, -1, 0.25], [0.756, 1, 0.26], [0.252, -1, 0.23]];
 /** Cubic Hermite from a (velocity va) to b (velocity vb) over T seconds, at s in 0..1. */
 function hermite3(a, va, b, vb, s, T) {
   const s2 = s * s, s3 = s2 * s;

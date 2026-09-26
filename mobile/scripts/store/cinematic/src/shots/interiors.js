@@ -209,6 +209,10 @@ export default async function make(ctx) {
   const GRADE7 = { exposure: 1.12, contrast: 1.14 };
   const GRADE8 = { exposure: portrait ? 1.10 : 1.14, contrast: 1.14 };
   const INTERIOR_TINT = '#F6EFE4';
+  const interiorTint = new THREE.Color(INTERIOR_TINT);
+  // S08: the den's painted light a touch lower, so Ember's fur stands 15+ luma off the wood
+  // panelling behind her (both are the same warm orange)
+  const DEN_PAINT = 0.93;
 
   // ================================================================ S07 Panko's jars
   const kit = house.rooms.kitchen;
@@ -602,7 +606,6 @@ export default async function make(ctx) {
   const s08 = {
     id: 'S08', start: E.S08, end: E.S09,
     rig: rig8, // S09's pull-back continues this camera (ending.js s09Camera)
-    handoffLook: { ...GRADE8, tint: INTERIOR_TINT }, // and eases its grade and the den's tint from these
     ...adaptiveBlur(rig8, portrait ? 1920 : 1080),
     pose(t) {
       setAspect(camera, portrait);
@@ -616,9 +619,12 @@ export default async function make(ctx) {
       fireGlow.material.opacity *= lerp(1, 0.35, handoff(t));
       interiorOnly();
       soloRoomLight(den, 10);
-      den.mat.color.set(INTERIOR_TINT);
-      // S09 (a continuous pull-back) starts from this camera and look, and eases its grade (and
-      // the den's tint) from GRADE8 / INTERIOR_TINT to the wide's
+      // the interior tint and the lower painted light ease back to the wide's dusk values over
+      // the hand-off, so S09 (a continuous pull-back that samples this camera and look, and eases
+      // its exposure and contrast from GRADE8) takes over the den with nothing stepping at the cut
+      const h = handoff(t);
+      den.mat.color.lerp(interiorTint, h);
+      den.mat.emissiveIntensity *= lerp(1, DEN_PAINT, h);
       return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, ...GRADE8, dof: { focus, aperture, maxBlur: 16 } }) };
     },
   };

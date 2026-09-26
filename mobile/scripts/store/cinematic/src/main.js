@@ -107,6 +107,13 @@ async function boot() {
       const p = onScreen(w, new THREE.Vector3((cu - 0.5) * g.width, (cv - 0.5) * g.height, 0));
       if (p) windows.push({ ...p, room: id });
     }
+    // glass-look rooms hide the dusk overlay (house.js WINDOW_LOOK): probe their glass directly
+    const GLASS_PROBES = { observatory: [[-0.4, 2.75], [0.67, 3.1]] }; // left crescent, right pane's clear upper-left
+    for (const [id, pts] of Object.entries(GLASS_PROBES)) {
+      const rm = trailer.world.house.rooms[id];
+      if (!rm || !rm.painting || !visible(rm.painting)) continue;
+      for (const [x, y] of pts) { const p = onScreen(rm.builtG, new THREE.Vector3(x, y, -rm.roomD / 2 + 0.03)); if (p) windows.push({ ...p, room: id }); }
+    }
     return { tiles, windows };
   };
   TRAILER.grab = (q = 0.96) => {
