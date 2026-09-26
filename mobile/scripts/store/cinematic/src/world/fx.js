@@ -1,9 +1,9 @@
-// Small reusable effects: emote pops, amber gem streams, ribbon trails, and a
-// soft contact shadow. All are pure functions of time.
+// Small reusable effects: emote pops, ribbon trails, a soft contact shadow and the
+// pixel dust puff. All are pure functions of time.
 
 import * as THREE from 'three';
 import { loadTexture } from '../core/assets.js';
-import { clamp, ease, spring, catmull, mulberry32 } from '../core/math.js';
+import { clamp, ease, spring } from '../core/math.js';
 
 /** Billboard sprite (always faces the camera) from a UI png. */
 export async function makeBillboard(rel, size = 1, { pixel = true, additive = false } = {}) {
@@ -25,47 +25,6 @@ export function poseEmote(sprite, u, { hold = 1.2, rise = 0.35, fade = 0.35 } = 
   // callers set userData.y0 (the resting height) when they place the emote
   sprite.position.y = (sprite.userData.y0 ?? 0) + ease.outCubic(clamp(u / (hold + fade))) * rise;
   sprite.material.opacity = u > hold ? 1 - (u - hold) / fade : 1;
-}
-
-/**
- * A stream of amber gems flowing along a Catmull-Rom path.
- * pose(t0, t1, t): gems depart between t0 and t0 + spread and each takes `travel` s.
- */
-export async function makeAmberStream({ count = 40, size = 0.45, seed = 12 } = {}) {
-  const tex = await loadTexture('ui/amber.png', { pixel: true });
-  const group = new THREE.Group();
-  const rnd = mulberry32(seed);
-  const gems = [];
-  for (let i = 0; i < count; i++) {
-    const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
-    const s = new THREE.Sprite(m);
-    s.userData = { off: rnd(), jitter: [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], sz: size * (0.6 + rnd() * 0.7), spin: rnd() * 6 };
-    group.add(s);
-    gems.push(s);
-  }
-  const glow = new THREE.PointLight('#ffb347', 0, 8, 2);
-  group.add(glow);
-  return {
-    group,
-    pose(points, t, { start = 0, spread = 0.8, travel = 0.7, spreadRadius = 0.35 } = {}) {
-      let lit = 0; let cx = 0, cy = 0, cz = 0;
-      for (const g of gems) {
-        const u = (t - start - g.userData.off * spread) / travel;
-        if (u < 0 || u > 1) { g.visible = false; continue; }
-        g.visible = true;
-        const e = ease.inOutSine(u);
-        const p = catmull(points, e);
-        const w = Math.sin(Math.PI * u) * spreadRadius;
-        g.position.set(p[0] + g.userData.jitter[0] * w, p[1] + g.userData.jitter[1] * w, p[2] + g.userData.jitter[2] * w);
-        const sc = g.userData.sz * (0.6 + 0.4 * Math.sin(Math.PI * u));
-        g.scale.set(sc, sc, 1);
-        g.material.rotation = g.userData.spin + t * 2;
-        g.material.opacity = Math.min(1, u * 6, (1 - u) * 5);
-        lit++; cx += g.position.x; cy += g.position.y; cz += g.position.z;
-      }
-      if (lit) { glow.position.set(cx / lit, cy / lit, cz / lit); glow.intensity = Math.min(1, lit / 10) * 6; } else glow.intensity = 0;
-    },
-  };
 }
 
 /** Additive ribbon trail following a point history (camera-facing strip). */

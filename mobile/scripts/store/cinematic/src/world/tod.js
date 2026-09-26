@@ -67,7 +67,7 @@ export function skyWipe(mixv, u, y) {
  *   `rowBlend`, and into the evening haze (up to `haze` by `hazeEnd`).
  * cast.js (the horizon decal) samples the same way.
  */
-export const SKY_EDGE = { melt: 0.12, heavy: 0.05, rowBlend: 0.45, haze: 0.2, hazeEnd: 0.6, mid: [36, 76], heavyRes: [12, 20], rowRes: 24 };
+export const SKY_EDGE = { melt: 0.12, heavy: 0.05, rowBlend: 0.45, haze: 0.4, hazeEnd: 0.4, mid: [36, 76], heavyRes: [12, 20], rowRes: 24 };
 
 /**
  * The painted sky as one backdrop plane: a single copy of the painting (a band of

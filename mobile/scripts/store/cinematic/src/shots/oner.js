@@ -363,9 +363,13 @@ export default async function make(ctx) {
     });
   }
 
+  // the laid sheet's extent in the painting's height (0 floor .. 1 ceiling)
+  const BP_H = (jungle.roomW * 0.9) / 2;
+  const BP_V0 = (jungle.roomH - BP_H) / 2 / jungle.roomH, BP_V1 = 1 - BP_V0;
   function poseBlueprint(t) {
     const bp = blueprint.mesh;
-    if (t < E.GEMS || t >= E.DROP + 0.22) return;
+    blueprint.cut.value = 2;
+    if (t < E.GEMS || t >= E.DROP + 0.4) return;
     bp.visible = true;
     const onBoard = add(JW, [0, jungle.roomH / 2, -jungle.roomD / 2 + 0.06]);
     if (t < E.BLUEPRINT_LAY) {
@@ -388,8 +392,11 @@ export default async function make(ctx) {
       const full = jungle.roomW * 0.9 / 1.6;
       bp.scale.setScalar(1 + (full - 1) * k);
       blueprint.draw(seg(t, E.BLUEPRINT_LAY + 0.2, E.GEM_BURST + 0.25));
-      // it fades as the wallpaper starts to unroll over it
-      blueprint.mat.opacity = 1 - smooth(seg(t, E.DROP, E.DROP + 0.22));
+      // the wallpaper unrolls down over it and takes it away line by line (a fade of the
+      // bright sheet stepped the whole frame's luma): the sheet spans painting heights
+      // BP_V0..BP_V1, and the painting's edge is at 1 - reveal
+      blueprint.mat.opacity = 1;
+      if (t >= E.DROP) blueprint.cut.value = (1 - jungle.reveal.value - BP_V0) / (BP_V1 - BP_V0);
     }
   }
 
@@ -446,7 +453,7 @@ export default async function make(ctx) {
       g.material.rotation = gp.h2 * 6 + t * 2.4 * (gp.h1 - 0.5);
       // deep amber: undo the tile shots' exposure lift (it pushed the gems past AgX's
       // shoulder into cream) and warm the sprite, so the gold keeps its hue and dark rim
-      g.material.color.setRGB(gk, gk * 0.66, gk * 0.12);
+      g.material.color.setRGB(gk, gk * 0.62, gk * 0.08);
       g.material.opacity = Math.min(1, u * 12) * (1 - seg(ride, 0.9, 1));
       if (ride > 0) { lit++; c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; }
     });
@@ -561,7 +568,7 @@ export default async function make(ctx) {
   // Measured with travelPx every 1/30 s: peak 31 px (16:9) / 53 (9:16), at least 8 px
   // from 5.1 to 7.9 (11 in 9:16), no frame above 2.5x its neighbours.
   const T_TOP = E.GEMS + 1.1;
-  const PUSH = 1.25; // the push to Sloane after the drop
+  const PUSH = 1.4; // the push to Sloane after the drop (the drop's carried velocity is set for 1.25 s: a slightly longer push keeps its peak under the crane's)
   const MACRO_D = 10.5;
   /** 1 on the macro and rack shots, easing to 0 as the boom lifts off them. */
   const tileShot = (t) => 1 - smooth(seg(t, E.GEMS + 0.28, E.GEMS + 0.98));
@@ -601,7 +608,7 @@ export default async function make(ctx) {
   const T_BOOM = T_TOP - E.CRANE, T_LONG = E.DROP - T_TOP;
   const mono = (a, b, c, ta, tc) => b.map((_, i) => { const d0 = (b[i] - a[i]) / ta, d1 = (c[i] - b[i]) / tc; return d0 * d1 <= 0 ? 0 : (4 * d0 * d1) / (d0 + d1); });
   const V_M_POS = mono(B.pos, M.pos, D.pos, T_BOOM, T_LONG), V_M_AIM = mono(B.target, M.target, D.target, T_BOOM, T_LONG);
-  const through = (c, d, s, k) => c.map((_, i) => k * ((d[i] - c[i]) / T_LONG + (s[i] - d[i]) / PUSH) / 2);
+  const through = (c, d, s, k) => c.map((_, i) => k * ((d[i] - c[i]) / T_LONG + (s[i] - d[i]) / 1.25) / 2);
   const V_POS = through(M.pos, D.pos, S.pos, 0.8), V_AIM = through(M.target, D.target, S.target, portrait ? 0.5 : 1);
   const CREEP = [0, 0, -0.35 / (E.S04 - E.DROP - PUSH)]; // the slow drift in on Sloane after the push
   function onerCamera(t) {
@@ -664,7 +671,7 @@ export default async function make(ctx) {
   }
   function blurAt(t) {
     const easing = t > E.L_LAND + 0.1 && t < E.L_LAND + 0.82;
-    const crane = t >= E.CRANE && t < E.DROP + 1.3;
+    const crane = t >= E.CRANE && t < E.DROP + PUSH + 0.05;
     if (!easing && !crane) return { n: 1, shutter: 1 / 60 };
     let px = travelPx(onerCamera, t, FRAME_H);
     // the hero L and the amber ride faster than the camera: blur for them too (every
@@ -772,7 +779,7 @@ const TILE_SELF = 0.25;
 const CHROMA_PUSH = 3.0;
 const TRAY_EMISSIVE = 0.5;
 const TRAY_GLOW = '#F3E2BF';
-const GEM_TINT = 0.55; // the gems' sprite colour under the day grade (see poseAmber)
+const GEM_TINT = 0.53; // the gems' sprite colour under the day grade (see poseAmber)
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };

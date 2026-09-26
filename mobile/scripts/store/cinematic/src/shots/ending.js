@@ -203,8 +203,9 @@ export default async function make(ctx) {
   const rack = buildRack({ words: ['', '', ''], slots: portrait ? 6 : 7 });
   rack.trays[1].visible = false; rack.trays[2].visible = false;
   // the tray face self-lights like S01's (oner.js TRAY_EMISSIVE), so the parchment holds
-  // its cream under the dusk key instead of greying to mauve
-  rack.trays[0].traverse((o) => { if (o.isMesh && o.geometry.type === 'PlaneGeometry') { o.material.emissive = new THREE.Color('#F3E2BF'); o.material.emissiveIntensity = 0.5; } });
+  // its cream under the dusk key instead of greying to mauve (a warmer self-light than S01's,
+  // against the dusk grade's pink)
+  rack.trays[0].traverse((o) => { if (o.isMesh && o.geometry.type === 'PlaneGeometry') { o.material.emissive = new THREE.Color('#FFDFA0'); o.material.emissiveIntensity = 0.55; } });
   end.add(rack.group);
   const letters = ['M', 'O', 'S', 'T', 'L', 'Y'];
   const endTiles = letters.map((ch) => { const tl = makeTile(ch); rack.rows[0].group.add(tl); return tl; });
@@ -286,13 +287,16 @@ export default async function make(ctx) {
   const puffTex = makeDustPuff();
   const VIS = { hw: (L10.signW * 0.868) / 2, hh: (L10.signW / 4) * 0.4 }; // the wordmark's inked extents (the PNG has margins)
   const BOTTOM = SIGN_Y + signBox.min.y * 0.92; // just inside the sign's lower edge
+  // The two outer puffs burst from where the sign bites into its posts, the two inner ones
+  // (smaller, a frame later, mirrored) from the edge between; the feet puff where the posts
+  // are driven into the ground. Sizes, drifts and delays differ so no two read as a pair.
   const PUFFS = [
-    { at: [-VIS.hw * 0.8, BOTTOM, SIGN_Z + 0.3], dir: [-0.9, -0.2], size: 0.95 },
-    { at: [-VIS.hw * 0.28, BOTTOM - 0.05, SIGN_Z + 0.34], dir: [-0.35, -0.3], size: 0.85 },
-    { at: [VIS.hw * 0.3, BOTTOM - 0.05, SIGN_Z + 0.34], dir: [0.35, -0.3], size: 0.88 },
-    { at: [VIS.hw * 0.82, BOTTOM, SIGN_Z + 0.3], dir: [0.9, -0.2], size: 1.0 },
+    { at: [postX(-1), BOTTOM, SIGN_Z + 0.3], dir: [-0.9, -0.35], size: 1.0 },
+    { at: [-VIS.hw * 0.3, BOTTOM - 0.04, SIGN_Z + 0.34], dir: [-0.3, -0.45], size: 0.82, delay: 1 / 30, flip: true },
+    { at: [VIS.hw * 0.2, BOTTOM - 0.06, SIGN_Z + 0.34], dir: [0.35, -0.4], size: 0.86, delay: 1 / 30 },
+    { at: [postX(1), BOTTOM, SIGN_Z + 0.3], dir: [0.9, -0.3], size: 0.95, flip: true },
     { at: [postX(-1), 0.2, POST_Z + 0.12], dir: [-0.7, 0.25], size: 0.9, foot: true },
-    { at: [postX(1), 0.2, POST_Z + 0.12], dir: [0.7, 0.25], size: 0.9, foot: true },
+    { at: [postX(1), 0.2, POST_Z + 0.12], dir: [0.7, 0.25], size: 0.85, foot: true, flip: true },
   ];
   // (they write depth, so the depth of field sees them at the sign and keeps them crisp)
   const puffs = PUFFS.map(() => world.register(new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, alphaTest: 0.1 })), end));
@@ -376,16 +380,17 @@ export default async function make(ctx) {
     });
     // dust: pixel-stepped (15 fps growth, four alpha steps), 0.45 -> 1.0 of its size over
     // 0.6 s, drifting out and down from where the sign bit into its posts
-    const u = Math.floor(s * 15) / 15 / 0.6;
     puffs.forEach((p, i) => {
       const q = PUFFS[i];
-      p.visible = u < 1 && footInFrame[i] !== false;
+      const sd = s - (q.delay || 0);
+      const u = Math.floor(sd * 15) / 15 / 0.6;
+      p.visible = sd >= 0 && u < 1 && footInFrame[i] !== false;
       if (!p.visible) return;
       const e = ease.outCubic(u);
       const sz = q.size * lerp(0.45, 1.0, e);
-      p.scale.set(sz, sz, 1);
+      p.scale.set(q.flip ? -sz : sz, sz, 1);
       p.position.set(q.at[0] + q.dir[0] * 0.45 * e, q.at[1] + q.dir[1] * 0.3 * e, q.at[2]);
-      p.material.opacity = Math.ceil((1 - u) * 4) / 4 * 0.85;
+      p.material.opacity = Math.ceil((1 - u) * 4) / 4 * 0.75;
     });
   }
 
@@ -444,7 +449,17 @@ export default async function make(ctx) {
     const a = from || (portrait ? { pos: add(face, [0.5, 0.1, 6.2]), target: face, fov: mm(35) } : { pos: add(face, [0.8, 0.3, 5]), target: face, fov: mm(50) });
     const b = WIDE(pushAt(t));
     const ap0 = handoff ? handoff.aperture : (portrait ? 60 : 70);
-    return { pos: mix3(a.pos, b.pos, k), target: mix3(a.target, b.target, k), fov: lerp(a.fov, b.fov, k), k, aperture: lerp(ap0, 9, k) };
+    // The camera's distance to its target grows geometrically (an even rate of change of
+    // scale), its direction and target blending with k: a linear blend of the positions
+    // front-loads the move (7-8% of the frame per frame within 0.15 s of a still close-up),
+    // this starts at half that and peaks mid-move instead.
+    const target = mix3(a.target, b.target, k);
+    const da = [a.pos[0] - a.target[0], a.pos[1] - a.target[1], a.pos[2] - a.target[2]], db = [b.pos[0] - b.target[0], b.pos[1] - b.target[1], b.pos[2] - b.target[2]];
+    const la = Math.hypot(...da), lb = Math.hypot(...db);
+    const dir = mix3(da.map((v) => v / la), db.map((v) => v / lb), k), dl = Math.hypot(...dir) || 1;
+    const L = la * Math.pow(lb / la, k);
+    const pos = target.map((v, i) => v + (dir[i] / dl) * L);
+    return { pos, target, fov: lerp(a.fov, b.fov, k), k, aperture: lerp(ap0, 9, k) };
   }
   /**
    * Adaptive motion blur for the pull-back: up to 32 subframes, and never a shutter shorter
@@ -620,8 +635,10 @@ export default async function make(ctx) {
       const grade = world.pose(t, { dusk: 1, lamps: 1, focus, aperture, camera, behaviours: ch.beh });
       applyWalks(ch.walks);
       uprightResidents();
-      // Ember is in the den window behind the card: she stays out of the end frame
-      world.residents.ember.ch.visible = false; world.residents.ember.shadow.visible = false;
+      // Ember is in the den window behind the card: she stays out of the end frame; so does
+      // Axel in 9:16, whose aquarium sits right behind the sign (he would peek out between
+      // the logo and the line)
+      for (const name of portrait ? ['ember', 'axel'] : ['ember']) { world.residents[name].ch.visible = false; world.residents[name].shadow.visible = false; }
       // the aquarium's bright water sits right beside the logo: its painted light is held
       // down here only (world.pose sets it afresh every frame, so nothing carries over)
       const aq = house.rooms.aquarium;

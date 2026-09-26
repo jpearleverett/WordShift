@@ -37,6 +37,15 @@ export function makeBlueprint({ width = 1.6 } = {}) {
   const eg = emC.getContext('2d');
   const emTex = new THREE.CanvasTexture(emC); emTex.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.MeshStandardMaterial({ map: tex, emissive: new THREE.Color('#FFF4DA'), emissiveMap: emTex, emissiveIntensity: 1.6, roughness: 0.9, side: THREE.DoubleSide, transparent: true });
+  // `cut`: everything above this height of the sheet (0 bottom .. 1 top) is gone, so a
+  // wallpaper unrolling down over it can take it away line by line (> 1: all of it shows)
+  const cut = { value: 2 };
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uCut = cut;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vBpUv;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvBpUv = uv;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vBpUv;\nuniform float uCut;').replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vBpUv.y > uCut) discard;');
+  };
+  mat.customProgramCacheKey = () => 'blueprint-cut';
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width * H / W), mat);
   mesh.castShadow = true;
   let last = -1;
@@ -102,5 +111,5 @@ export function makeBlueprint({ width = 1.6 } = {}) {
     tex.needsUpdate = true; emTex.needsUpdate = true;
   }
   draw(0);
-  return { mesh, draw, mat };
+  return { mesh, draw, mat, cut };
 }
