@@ -238,7 +238,9 @@ void main() {
   } else {
     float s = sin(3.14159265 * u);
     vec2 d = whipDir * s * 0.35;
-    vec3 a = blurAlong(tA, vUv + whipDir * u * 0.6, d);
+    // the outgoing frame holds for a moment before it smears away
+    vec2 da = d * smoothstep(0.12, 0.45, u);
+    vec3 a = blurAlong(tA, vUv + whipDir * u * u * 0.9, da);
     vec3 b = blurAlong(tB, vUv - whipDir * (1.0 - u) * 0.6, d);
     float m = smoothstep(0.35, 0.65, u);
     gl_FragColor = vec4(mix(a, b, m), 1.0);

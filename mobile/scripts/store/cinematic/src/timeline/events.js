@@ -41,7 +41,7 @@ export const E = {
   S04: bar(7),                   // 11.58
   M_CUTS: [bar(7), bar(7, 3, 1), bar(8, 2)],
   M_LANDS: [bar(7, 1, 1), bar(7, 4), bar(8, 2, 1)],
-  WHIP: bar(8, 4),               // 14.67
+  WHIP: bar(8, 4) + SIXTEENTH,   // 14.78: GLITTER holds 0.8 s before the whip smears it
   // --- S05 cast crane
   S05: bar(9),                   // 15.11
   ROOF_CLEAR: bar(10, 3),        // 17.75
