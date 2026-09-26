@@ -236,7 +236,6 @@ export default async function make(ctx) {
   }
   for (const o of shelf.children) { o.castShadow = true; o.receiveShadow = true; }
   world.register(shelf, kit.builtG);
-  shelf.name = 'P.shelf'; shelf.userData.probe = [[-PLANK_W / 2, PLANK_TOP, WALL_Z + 0.05 + PLANK_D], [PLANK_W / 2, PLANK_TOP + 0.5, WALL_Z + 0.05 + PLANK_D], [0, BB.y1, WALL_Z]];
 
   // the jars and the L: [L, SAGE, MINT, DILL] -> [DILL, SAGE, MINT, L] while the shelf is away
   const JAR_R = 0.155, JAR_H = 0.46, GAP = 0.05, L_W = TILE_SCALE;
@@ -287,7 +286,6 @@ export default async function make(ctx) {
   const ovenFire = makeFire({ px: 0.03, width: 0.26, height: 0.46, count: 56, sparks: 4, seed: 23, lightColor: '#ff9447', lightRange: 4.5 });
   ovenFire.group.children[1].visible = false; // its own sparks would climb the stone
   ovenFire.group.position.set(paintX(kit, 0.908), paintY(kit, 0.362), WALL_Z + 0.1);
-  ovenFire.group.name = 'P.oven'; ovenFire.group.userData.probe = [[-0.13, 0], [0.13, 0], [0, 0.46]];
   world.register(ovenFire.group, kit.builtG);
   // steam from her pot on the range (the painted pot's rim: image u 0.539, v 0.455)
   const POT = [paintX(kit, 0.539), paintY(kit, 0.455), WALL_Z + 0.12];
@@ -298,7 +296,6 @@ export default async function make(ctx) {
   });
   const question = await makeBillboard('ui/emote_question.png', portrait ? 0.5 : 0.62);
   world.register(question, kit.builtG);
-  question.name = 'P.question';
   // lamplight and the oven's glow pooled on the floor boards (they read near black at dusk otherwise)
   const kitPool = world.register(lightPool(6.4, 3.2, '#ffb25c'), kit.builtG);
   kitPool.position.set(0.9, 0.008, 0.0);
@@ -368,8 +365,8 @@ export default async function make(ctx) {
     J0: F(1.8, 3.03, 2.1, -1), J1: F(2.12, 3.03, 2.1, -1),
     // (frame tops stay under ~4.9 here: higher, the view clears the ceiling slab into the room above)
     R1: F(1.9, 2.65, 2.5, -1.2), R: F(1.32, 2.5, 2.7, -1.5), R2: F(1.3, 2.49, 2.72, -1.5),
-    D: F(1.85, 0.75, 2.5, -9), D2: F(1.89, 0.73, 2.48, -9),
-    B: F(1.85, 2.57, 2.7, -1.5), B2: F(1.83, 2.56, 2.72, -1.5),
+    D: F(2.0, 0.72, 2.2, -9), D2: F(2.03, 0.7, 2.19, -9),
+    B: F(1.85, 2.5, 2.7, -1.5), B2: F(1.83, 2.49, 2.72, -1.5),
   } : {
     // 16:9 blocks the break to the left counter: the caption (lower centre, x 20-80%) then never
     // crosses her face or chest, and when the jars come back she turns at the frame's left edge
@@ -440,7 +437,6 @@ export default async function make(ctx) {
   const s07 = {
     id: 'S07', start: E.S07, end: E.S08,
     ...adaptiveBlur(rig7, portrait ? 1920 : 1080, (t) => toWorld(kit, [pankoState(t).x, 1.1, P_Z])),
-    debug: { RIG7, STAGE },
     pose(t) {
       setAspect(camera, portrait);
       const cam = rig7(t);
@@ -473,7 +469,6 @@ export default async function make(ctx) {
   const MOUTH = [FIRE[0] - DRAW_O[0], FIRE[1] + 0.62 - DRAW_O[1]];
   const draw = makeStrokeSparks({ strokes: HOUSE_STROKES, scale: DRAW_SCALE, cell: 0.05, mouth: MOUTH, embers: 9, seed: 11 });
   draw.group.position.set(...DRAW_O);
-  draw.group.name = 'P.draw'; draw.group.userData.probe = [[-0.36 * DRAW_SCALE, 0], [0.36 * DRAW_SCALE, 0.6 * DRAW_SCALE], [MOUTH[0], MOUTH[1] - 0.62]];
   world.register(draw.group, den.builtG);
   // each stroke is drawn over the eighth that ends on its E.STROKES beat, so the house is
   // complete on the last one (~26.13, where the swell peaks and Ember smiles)
@@ -493,7 +488,6 @@ export default async function make(ctx) {
   world.register(mlShadow, den.builtG);
   const heart = await makeBillboard('ui/emote_heart.png', portrait ? 0.5 : 0.52);
   world.register(heart, den.builtG);
-  heart.name = 'P.heart';
   const hearthPool = world.register(lightPool(3.6, 2.4, '#ff8a3a'), den.builtG);
   hearthPool.position.set(FIRE[0] + 0.3, 0.008, -0.7);
   // Ember stands at her S08/S09 spot (handoff.js: u 0.40, between the hearth and the window),
@@ -571,7 +565,6 @@ export default async function make(ctx) {
   const s08 = {
     id: 'S08', start: E.S08, end: E.S09,
     ...adaptiveBlur(rig8, portrait ? 1920 : 1080),
-    debug: { A8, A8b, PAN_TO },
     pose(t) {
       setAspect(camera, portrait);
       const cam = rig8(t);
