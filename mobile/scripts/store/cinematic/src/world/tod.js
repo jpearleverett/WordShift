@@ -10,8 +10,8 @@ const C = (h) => new THREE.Color(h);
 const mixC = (a, b, t) => a.clone().lerp(b, t);
 
 export const TOD = {
-  day: { sun: C('#FFE2B0'), sunI: 2.6, elev: 34, fillSky: C('#A9C4FF'), fillGround: C('#7FA85A'), fillI: 1.05, fog: C('#cfe0ef'), exposure: 1.0 },
-  dusk: { sun: C('#FF8E5E'), sunI: 1.25, elev: 7, fillSky: C('#8C6FC4'), fillGround: C('#4a3a4a'), fillI: 0.72, fog: C('#b98aa6'), exposure: 1.02 },
+  day: { sun: C('#FFE2B0'), sunI: 2.6, elev: 34, fillSky: C('#A9C4FF'), fillGround: C('#7FA85A'), fillI: 1.05, fog: C('#bcd2a0'), exposure: 1.0 },
+  dusk: { sun: C('#FF8E5E'), sunI: 1.25, elev: 7, fillSky: C('#8C6FC4'), fillGround: C('#4a3a4a'), fillI: 0.8, fog: C('#9c7090'), exposure: 1.08 },
 };
 
 /** A backdrop plane that crossfades between two painted skies. */
@@ -69,7 +69,7 @@ export function applyTod(dusk, env) {
     env.sky.userData.mat.uniforms.mixv.value = dusk;
     env.sky.userData.mat.uniforms.bright.value = lerp(1.0, 0.95, dusk);
   }
-  if (env.house) env.house.setLight({ paint: lerp(1, 0.62, dusk), lamps: Math.max(0, (dusk - 0.35) / 0.65), tint: '#' + mixC(C('#ffffff'), C('#e6cfe0'), dusk).getHexString(), windowDusk: dusk, windowColor: '#f2a07e' });
+  if (env.house) env.house.setLight({ paint: lerp(1, 0.62, dusk), lamps: Math.max(0, (dusk - 0.35) / 0.65), tint: '#' + mixC(C('#ffffff'), C('#e6cfe0'), dusk).getHexString(), windowDusk: dusk, windowColor: '#B5623C' });
   if (env.scene && env.scene.fog) env.scene.fog.color.copy(mixC(d.fog, n.fog, dusk));
   return {
     exposure: lerp(d.exposure, n.exposure, dusk),

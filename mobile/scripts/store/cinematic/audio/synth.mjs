@@ -41,8 +41,8 @@ function biquad(type) {
 const softclip = (x) => Math.tanh(x);
 
 /** Cinematic sub boom: pitch-dropping sine body + click + noise thump. */
-export function boom({ dur = 3.2, f0 = 70, f1 = 30, drop = 0.35, gain = 1, seed = 1, click = 0.6 } = {}) {
-  const b = buffer(dur); const rnd = mulberry32(seed); const lp = biquad('lp');
+export function boom({ dur = 3.2, f0 = 70, f1 = 30, drop = 0.35, gain = 1, seed = 1, click = 0.25 } = {}) {
+  const b = buffer(dur); const rnd = mulberry32(seed); const lp = biquad('lp'); const clp = biquad('lp');
   let ph = 0;
   for (let i = 0; i < b.L.length; i++) {
     const t = i / SR;
@@ -51,7 +51,7 @@ export function boom({ dur = 3.2, f0 = 70, f1 = 30, drop = 0.35, gain = 1, seed 
     const env = Math.min(1, t / 0.004) * Math.exp(-t / (dur * 0.33));
     const body = Math.sin(ph) * env * 1.3 + Math.sin(ph * 2) * env * 0.18;
     const nz = lp((rnd() * 2 - 1), 180 + 1600 * Math.exp(-t / 0.03), 0.7) * Math.exp(-t / 0.09) * 0.9;
-    const ck = (rnd() * 2 - 1) * Math.exp(-t / 0.0025) * click;
+    const ck = clp((rnd() * 2 - 1), 2600, 0.7) * Math.exp(-t / 0.004) * click * 2;
     const v = softclip((body + nz + ck) * 1.4) * gain;
     b.L[i] = v; b.R[i] = v;
   }
@@ -59,14 +59,14 @@ export function boom({ dur = 3.2, f0 = 70, f1 = 30, drop = 0.35, gain = 1, seed 
 }
 
 /** Whoosh: band-passed noise sweeping in frequency and across the stereo field. */
-export function whoosh({ dur = 1.0, from = 400, to = 3200, q = 1.2, pan = [-0.6, 0.6], gain = 0.6, seed = 2, shape = 0.55 } = {}) {
-  const b = buffer(dur); const rnd = mulberry32(seed); const bpL = biquad('bp'); const bp2 = biquad('bp');
+export function whoosh({ dur = 1.0, from = 400, to = 3200, q = 1.6, pan = [-0.6, 0.6], gain = 0.45, seed = 2, shape = 0.55 } = {}) {
+  const b = buffer(dur); const rnd = mulberry32(seed); const bpL = biquad('bp'); const bp2 = biquad('bp'); const lp = biquad('lp');
   for (let i = 0; i < b.L.length; i++) {
     const u = i / b.L.length;
     const f = from * Math.pow(to / from, u);
     const env = Math.pow(Math.sin(Math.PI * Math.pow(u, shape)), 2);
     const n = rnd() * 2 - 1;
-    const v = (bpL(n, f, q) + 0.5 * bp2(n, f * 2.1, q * 1.5)) * env * gain * 2.2;
+    const v = lp(bpL(n, f, q) + 0.35 * bp2(n, f * 2.1, q * 1.5), Math.min(9000, f * 2.2), 0.7) * env * gain * 2.2;
     const p = pan[0] + (pan[1] - pan[0]) * u;
     b.L[i] = v * Math.cos((p + 1) * Math.PI / 4) * 1.41;
     b.R[i] = v * Math.sin((p + 1) * Math.PI / 4) * 1.41;
@@ -76,7 +76,7 @@ export function whoosh({ dur = 1.0, from = 400, to = 3200, q = 1.2, pan = [-0.6,
 
 /** Riser: noise + rising detuned tone cluster that swells and cuts at the end. */
 export function riser({ dur = 3, f0 = 180, f1 = 900, gain = 0.5, seed = 3 } = {}) {
-  const b = buffer(dur); const rnd = mulberry32(seed); const hp = biquad('hp'); const bp = biquad('bp');
+  const b = buffer(dur); const rnd = mulberry32(seed); const hp = biquad('hp'); const bp = biquad('bp'); const lp = biquad('lp');
   const phases = [0, 0, 0, 0, 0, 0];
   const det = [1, 1.004, 0.996, 1.5, 1.503, 2.0];
   for (let i = 0; i < b.L.length; i++) {
@@ -84,10 +84,10 @@ export function riser({ dur = 3, f0 = 180, f1 = 900, gain = 0.5, seed = 3 } = {}
     const f = f0 * Math.pow(f1 / f0, Math.pow(u, 1.6));
     let tone = 0;
     for (let k = 0; k < phases.length; k++) { phases[k] += TAU * f * det[k] / SR; tone += Math.sin(phases[k]) / phases.length; }
-    const n = hp(rnd() * 2 - 1, 800 + 6000 * u, 0.7);
+    const n = lp(hp(rnd() * 2 - 1, 800 + 4000 * u, 0.7), 3000 + 5000 * u, 0.7);
     const nb = bp(rnd() * 2 - 1, 500 + 5000 * u * u, 2);
     const env = Math.pow(u, 2.2) * (u > 0.985 ? (1 - u) / 0.015 : 1);
-    const v = (tone * 0.6 + n * 0.35 + nb * 0.4) * env * gain;
+    const v = (tone * 0.7 + n * 0.14 + nb * 0.2) * env * gain;
     const w = Math.sin(TAU * 0.8 * u * dur) * 0.2;
     b.L[i] = v * (1 + w); b.R[i] = v * (1 - w);
   }

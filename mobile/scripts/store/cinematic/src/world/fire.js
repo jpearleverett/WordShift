@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { mulberry32, clamp, ease, noise1, hash01 } from '../core/math.js';
 
-const FLAME_COLS = ['#fff4b8', '#ffd76a', '#ffab40', '#ff7a2e', '#e2492b'].map((c) => new THREE.Color(c).multiplyScalar(2.2));
+const FLAME_COLS = ['#fff4b8', '#ffd76a', '#ffab40', '#ff7a2e', '#e2492b'].map((c) => new THREE.Color(c).multiplyScalar(1.5));
 
 /**
  * opts: { px: pixel size (world units), width, height, count, sparks }
@@ -31,7 +31,7 @@ export function makeFire({ px = 0.06, width = 0.9, height = 1.1, count = 90, spa
   for (let i = 0; i < sparks; i++) sk.push({ ph: rnd(), x: (rnd() - 0.5) * width * 0.8, rate: 0.35 + rnd() * 0.3, drift: (rnd() - 0.5) * 0.6, seed: rnd() * 100 });
   group.add(sp);
 
-  const light = new THREE.PointLight(lightColor, 10, lightRange, 1.5);
+  const light = new THREE.PointLight(lightColor, 3, lightRange, 1.8);
   light.position.set(0, height * 0.4, 0.4);
   group.add(light);
 
@@ -91,11 +91,11 @@ export function makeFire({ px = 0.06, width = 0.9, height = 1.1, count = 90, spa
         p3.set(snap(x), snap(y), 0.05); s3.set(size, size, 1);
         m.compose(p3, q.identity(), s3);
         sp.setMatrixAt(i, m);
-        col.set('#ffcf7a').multiplyScalar(3 * a * intensity);
+        col.set('#ffcf7a').multiplyScalar(2.2 * a * intensity);
         sp.setColorAt(i, col);
       }
       sp.instanceMatrix.needsUpdate = true; sp.instanceColor.needsUpdate = true;
-      light.intensity = intensity * (9 + 3 * noise1(t * 9, 5) + 1.5 * noise1(t * 23, 9));
+      light.intensity = intensity * (2.6 + 0.8 * noise1(t * 9, 5) + 0.4 * noise1(t * 23, 9));
     },
   };
 }

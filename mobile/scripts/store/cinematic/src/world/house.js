@@ -117,7 +117,7 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
       let windowMesh = null;
       if (WINDOW_MASKS.includes(id)) {
         const wtex = await loadTexture(`rooms/windows/${id}.png`);
-        windowMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), new THREE.MeshBasicMaterial({ alphaMap: wtex, color: '#ff9f7a', transparent: true, opacity: 0, depthWrite: false }));
+        windowMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), new THREE.MeshBasicMaterial({ map: wtex, color: '#B5623C', transparent: true, opacity: 0, depthWrite: false }));
         windowMesh.position.set(0, roomH / 2, -roomD / 2 + 0.004); g.add(windowMesh);
       }
       const light = new THREE.PointLight('#ffb070', 0, roomW * 1.3, 1.6);
@@ -208,12 +208,12 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
   return {
     group, rooms, slots, width, height, roomW, roomH, roomD, floorH, roof: roofGroup, chimneyTop,
     /** paint: painted-light multiplier (day 1, dusk ~0.55); lamps 0..1; windowDusk 0..1 tints painted skies. */
-    setLight({ paint = 1, lamps = 0, tint = '#ffffff', windowDusk = 0, windowColor = '#f09a78' } = {}) {
+    setLight({ paint = 1, lamps = 0, tint = '#ffffff', windowDusk = 0, windowColor = '#B5623C' } = {}) {
       for (const rm of Object.values(rooms)) {
         rm.mat.emissiveIntensity = (rm.empty ? 0 : 0.62) * paint;
         rm.mat.color.set(tint);
         if (rm.light) rm.light.intensity = lamps * 9;
-        if (rm.windowMesh) { rm.windowMesh.material.opacity = windowDusk * 0.85; rm.windowMesh.material.color.set(windowColor); }
+        if (rm.windowMesh) { rm.windowMesh.material.opacity = windowDusk * 0.62; rm.windowMesh.material.color.set(windowColor); }
       }
     },
   };

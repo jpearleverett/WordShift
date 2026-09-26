@@ -24,6 +24,21 @@ export async function makeBackdrop(rel, { width = 90, band = [0.3, 0.9], tilesX 
   return mesh;
 }
 
+/**
+ * Ground texture cut from a sky painting's own meadow band, so the 3D ground
+ * meets the painted backdrop in the same greens. Mirrored so it tiles.
+ */
+export async function meadowFromPainting(rel = 'environment/sky_day.webp', { y0 = 0.74, y1 = 0.86 } = {}) {
+  const tex = await loadTexture(rel);
+  const img = tex.image;
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  c.getContext('2d').drawImage(img, 0, img.height * y0, img.width, img.height * (y1 - y0), 0, 0, 512, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping;
+  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.anisotropy = 8;
+  return t;
+}
+
 /** Procedural pixel-art meadow texture (tileable). */
 export function meadowTexture({ seed = 7, base = '#5e9a3c', size = 256 } = {}) {
   const c = document.createElement('canvas'); c.width = c.height = size;
