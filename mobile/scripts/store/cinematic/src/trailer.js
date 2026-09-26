@@ -19,6 +19,7 @@ export async function buildTrailer(ctx) {
   const camera = new THREE.PerspectiveCamera(30, ctx.width / ctx.height, 0.05, 900);
   const common = { ...ctx, world, camera, E, portrait: ctx.aspect === '9x16' };
   const shots = [];
+  common.shots = shots; // lets a continuous shot pick up exactly where the previous one ends
   for (const make of SHOT_MAKERS) {
     const made = await make(common);
     for (const s of [].concat(made)) shots.push(s);

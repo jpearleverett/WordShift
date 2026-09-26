@@ -210,20 +210,36 @@ export default async function make(ctx) {
   world.track(world.sky); // S10 moves the painted sun behind the sign; begin() restores it
 
   // ---------------------------------------------------------------- cameras
+  // S08 -> S09 is one continuous move: the pull-back starts exactly where S08's camera
+  // ends (sampled once from S08 itself; the same value whatever frame asks first).
+  let handoff = null;
+  function s08End() {
+    if (handoff !== null) return handoff;
+    handoff = false;
+    const s08 = (ctx.shots || []).find((s) => s.id === 'S08');
+    if (!s08) return handoff;
+    world.begin();
+    const f = s08.pose(E.S09 - 1e-4, ctx);
+    const dir = new THREE.Vector3(); f.camera.getWorldDirection(dir);
+    const d = f.look?.dof?.focus ?? 6;
+    const p = f.camera.position;
+    handoff = { pos: [p.x, p.y, p.z], target: [p.x + dir.x * d, p.y + dir.y * d, p.z + dir.z * d], fov: f.camera.fov, aperture: f.look?.dof?.aperture ?? 26 };
+    world.begin();
+    return handoff;
+  }
+
   function s09Camera(t) {
     const den = house.rooms.cozy_den;
     const ember = world.residents.ember;
     const face = [den.x + ember.x0, den.y + ember.h * 0.7, ember.z0];
     const k = ease.inOutCubic(seg(t, E.S09, E.S09 + 0.9));
     const push = ease.inOutSine(seg(t, E.S09 + 0.9, E.S10));
-    if (!portrait) {
-      const a = { pos: add(face, [0.8, 0.3, 5]), target: face, fov: mm(50) };
-      const b = { pos: [0, 8.6, 49 - 0.4 * push], target: [0, 8.9, 0], fov: mm(29) };
-      return { pos: mix3(a.pos, b.pos, k), target: mix3(a.target, b.target, k), fov: lerp(a.fov, b.fov, k) };
-    }
-    const a = { pos: add(face, [0.5, 0.1, 6.2]), target: face, fov: mm(35) };
-    const b = { pos: [0, 13.4, 44 - 0.4 * push], target: [0, 13.4, 0], fov: mm(24) };
-    return { pos: mix3(a.pos, b.pos, k), target: mix3(a.target, b.target, k), fov: lerp(a.fov, b.fov, k) };
+    const from = s08End();
+    const a = from || (portrait ? { pos: add(face, [0.5, 0.1, 6.2]), target: face, fov: mm(35) } : { pos: add(face, [0.8, 0.3, 5]), target: face, fov: mm(50) });
+    const b = portrait
+      ? { pos: [0, 13.4, 44 - 0.4 * push], target: [0, 13.4, 0], fov: mm(24) }
+      : { pos: [0, 8.6, 49 - 0.4 * push], target: [0, 8.9, 0], fov: mm(29) };
+    return { pos: mix3(a.pos, b.pos, k), target: mix3(a.target, b.target, k), fov: lerp(a.fov, b.fov, k), k, aperture: lerp(from ? from.aperture : 26, 9, k) };
   }
 
   function s10Camera(t) {
@@ -241,7 +257,7 @@ export default async function make(ctx) {
       setAspect(camera, portrait);
       const cam = s09Camera(t);
       const focus = aim(camera, cam.pos, cam.target, cam.fov);
-      const wide = t > E.S09 + 0.6;
+      const wide = cam.k > 0.6;
       // staggered emote cascade: bottom row first, left to right, one per sixteenth
       order.forEach((room, i) => {
         const r = world.residents[RESIDENTS[room].name];
@@ -251,9 +267,9 @@ export default async function make(ctx) {
         e.position.set(...head); e.userData.y0 = head[1];
         poseEmote(e, t - E.CASCADE[i], { hold: 1.3, rise: 0.35, fade: 0.4 });
       });
-      const grade = world.pose(t, { dusk: 1, lamps: 1, focus, aperture: wide ? 9 : 26, camera, behaviours: chatter(t) });
+      const grade = world.pose(t, { dusk: 1, lamps: 1, focus, aperture: cam.aperture, camera, behaviours: chatter(t) });
       world.sun.castShadow = wide;
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1.04, exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: 0.24, dof: { focus, aperture: wide ? 9 : 26, maxBlur: 10 } }) };
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1.04, exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: 0.24, dof: { focus, aperture: cam.aperture, maxBlur: 10 } }) };
     },
   };
 
