@@ -43,8 +43,9 @@ async function boot() {
   TRAILER.renderAt = async (t) => {
     const frame = Math.round(t * trailer.fps);
     const out = trailer.update(t);
-    const layers = out.layers || [{ scene: out.scene, camera: out.camera, look: out.look }];
-    pipeline.render(layers, frame, overlay, out.transition);
+    // legacy single-scene form: { scene, camera, look }
+    const layers = out.layers || [{ pose: () => out, mb: 1 }];
+    pipeline.render(layers, t, frame, overlay, out.transition, out.afterRender);
     lastFrame = frame;
     return lastFrame;
   };

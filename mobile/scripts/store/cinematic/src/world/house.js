@@ -13,8 +13,34 @@ export const FLOOR_LINE = {
   office: 0.16, burrow: 0.16, garden: 0.14, bamboo: 0.14, observatory: 0.14, rainforest: 0.14,
 };
 
-/** Rooms that have a window-sky mask in assets/rooms/windows. */
-export const WINDOW_MASKS = ['cozy_den', 'kitchen', 'study', 'office', 'garden'];
+/** Rooms that have a window-sky mask in assets/rooms/windows (never the workshop). */
+export const WINDOW_MASKS = ['cozy_den', 'kitchen', 'study', 'office', 'garden', 'desert', 'jungle', 'observatory', 'rainforest'];
+
+/** Painted frame border of the room art, cropped in the UVs (fraction of width / height). */
+const BORDER_U = 0.014, BORDER_V = 0.028;
+
+/** Painted lamps and fires that get an additive glow card at dusk: [u, v from bottom, size]. */
+export const LAMPS = {
+  cozy_den: [[0.22, 0.37, 1.1], [0.855, 0.75, 0.9]],
+  kitchen: [[0.15, 0.85, 0.9], [0.91, 0.40, 1.0]],
+  office: [[0.47, 0.60, 0.8]],
+  burrow: [[0.86, 0.44, 0.8]],
+  garden: [[0.49, 0.83, 0.8]],
+  bamboo: [[0.58, 0.87, 0.8]],
+  observatory: [[0.10, 0.33, 0.8]],
+  rainforest: [[0.78, 0.66, 0.8]],
+};
+
+let glowTex = null;
+function glowTexture() {
+  if (glowTex) return glowTex;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  glowTex = new THREE.CanvasTexture(c);
+  return glowTex;
+}
 
 /** Procedural pixel-wood texture (tileable plank grain). */
 export function pixelWood({ seed = 3, base = '#6e4a2e', size = 64, planks = 4, vertical = false } = {}) {
@@ -83,10 +109,11 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
   const woodTex = pixelWood({ base: '#6b4629', planks: 4 });
   const woodV = pixelWood({ base: '#6b4629', planks: 4, vertical: true, seed: 5 });
   const mk = (tex, rx, ry, color = '#ffffff') => { const t = tex.clone(); t.needsUpdate = true; t.repeat.set(rx, ry); return new THREE.MeshStandardMaterial({ map: t, color, roughness: 0.82 }); };
-  const innerMat = new THREE.MeshStandardMaterial({ color: '#4d3121', roughness: 0.9 });
+  const innerMat = new THREE.MeshStandardMaterial({ color: '#6e4a31', roughness: 0.9 });
   const rooms = {};
   const slots = [];
 
+  const lampTex = glowTexture();
   for (let r = 0; r < layout.length; r++) {
     const row = [];
     for (let c = 0; c < cols; c++) {
@@ -97,44 +124,72 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
       const g = new THREE.Group();
       g.position.set(x, y, 0);
       group.add(g);
-      // inner side returns + floor + ceiling so each box has real depth
-      for (const s of [-1, 1]) {
+      // an empty frame: a dark board at the back, nothing else
+      const emptyG = new THREE.Group();
+      const board = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), mk(woodV, roomW / 1.6, roomH / 1.6, '#e0b88c'));
+      board.material.emissive = new THREE.Color('#5a3a22'); board.material.emissiveIntensity = 0.5;
+      board.position.set(0, roomH / 2, -roomD / 2 - 0.02); board.receiveShadow = true; emptyG.add(board);
+      g.add(emptyG);
+      // a built room: floor, side returns, painting, window tint, lamp, glow cards
+      const builtG = new THREE.Group();
+      g.add(builtG);
+      const returns = [];
+      for (const sd of [-1, 1]) {
         const w = new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), innerMat);
-        w.position.set(s * roomW / 2, roomH / 2, 0); w.rotation.y = -s * Math.PI / 2; w.receiveShadow = true; g.add(w);
+        w.position.set(sd * roomW / 2, roomH / 2, 0); w.rotation.y = -sd * Math.PI / 2; w.receiveShadow = true; builtG.add(w);
+        returns.push(w);
       }
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), mk(woodTex, roomW / 1.6, roomD / 1.6, '#c79a72'));
-      floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0.003, 0); floor.receiveShadow = true; g.add(floor);
+      floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0.003, 0); floor.receiveShadow = true; builtG.add(floor);
       if (!id) {
-        const back = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), mk(woodV, roomW / 1.6, roomH / 1.6, '#d0a57c'));
-        back.position.set(0, roomH / 2, -roomD / 2); back.receiveShadow = true; g.add(back);
-        rooms[`empty_${r}_${c}`] = { group: g, painting: back, mat: back.material, light: null, x, y, roomW, roomH, roomD, row: r, col: c, empty: true };
+        rooms[`empty_${r}_${c}`] = { group: g, builtG, emptyG, x, y, roomW, roomH, roomD, row: r, col: c, empty: true, lamps: [] };
+        builtG.visible = false;
         continue;
       }
-      const tex = await loadTexture(`rooms/${id}.webp`, { pixel: true });
+      const tex0 = await loadTexture(`rooms/${id}.webp`, { pixel: true });
+      // crop the painted frame border (the house's timber frames the room instead)
+      const tex = tex0.clone(); tex.needsUpdate = true; tex.repeat.set(1 - 2 * BORDER_U, 1 - 2 * BORDER_V); tex.offset.set(BORDER_U, BORDER_V);
       const mat = new THREE.MeshStandardMaterial({ map: tex, emissive: new THREE.Color('#ffffff'), emissiveMap: tex, emissiveIntensity: 0.62, roughness: 1, metalness: 0 });
+      const reveal = { value: 1 };
+      mat.onBeforeCompile = (sh) => {
+        sh.uniforms.uReveal = reveal;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vRUv;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvRUv = uv;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vRUv;\nuniform float uReveal;')
+          .replace('#include <dithering_fragment>', '#include <dithering_fragment>\nif (uReveal < 0.999) { float edge = 1.0 - uReveal; if (vRUv.y < edge) discard; float seam = 1.0 - smoothstep(0.0, 0.03, vRUv.y - edge); gl_FragColor.rgb += vec3(1.0, 0.92, 0.7) * seam * 2.5; }');
+      };
+      mat.customProgramCacheKey = () => 'painting-reveal';
       const painting = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), mat);
-      painting.position.set(0, roomH / 2, -roomD / 2); painting.receiveShadow = true; g.add(painting);
+      painting.position.set(0, roomH / 2, -roomD / 2); painting.receiveShadow = true; builtG.add(painting);
       let windowMesh = null;
       if (WINDOW_MASKS.includes(id)) {
-        const wtex = await loadTexture(`rooms/windows/${id}.png`);
+        const wtex0 = await loadTexture(`rooms/windows/${id}.png`);
+        const wtex = wtex0.clone(); wtex.needsUpdate = true; wtex.repeat.copy(tex.repeat); wtex.offset.copy(tex.offset);
         windowMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), new THREE.MeshBasicMaterial({ map: wtex, color: '#B5623C', transparent: true, opacity: 0, depthWrite: false }));
-        windowMesh.position.set(0, roomH / 2, -roomD / 2 + 0.004); g.add(windowMesh);
+        windowMesh.position.set(0, roomH / 2, -roomD / 2 + 0.004); builtG.add(windowMesh);
       }
-      const light = new THREE.PointLight('#ffb070', 0, roomW * 1.3, 1.6);
-      light.position.set(0, roomH * 0.75, roomD * 0.1); g.add(light);
-      rooms[id] = { group: g, painting, mat, light, windowMesh, x, y, roomW, roomH, roomD, row: r, col: c, floorLine: (FLOOR_LINE[id] ?? 0.15) * roomH };
+      const light = new THREE.PointLight('#ffb25c', 0, roomW * 1.3, 1.6);
+      light.position.set(0, roomH * 0.75, roomD * 0.1); builtG.add(light);
+      const lamps = (LAMPS[id] || []).map(([u, v, sz]) => {
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: lampTex, color: '#ffb25c', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0 }));
+        sp.position.set((u - 0.5) * roomW, v * roomH, -roomD / 2 + 0.08);
+        const k = (sz || 1) * roomW * 0.16; sp.scale.set(k, k, 1);
+        builtG.add(sp);
+        return sp;
+      });
+      rooms[id] = { group: g, builtG, emptyG, painting, mat, reveal, returns, floor, light, lamps, windowMesh, x, y, roomW, roomH, roomD, row: r, col: c, floorLine: (FLOOR_LINE[id] ?? 0.15) * roomH, built: true, lampLevel: 0 };
+      emptyG.visible = false;
     }
     slots.push(row);
   }
 
   // timber frame: vertical posts and horizontal slabs across the front
-  const postMat = mk(woodV, 0.35, height / 2.4, '#b58a62');
+  const postMat = mk(woodV, 0.35, height / 2.4, '#d4a577');
   for (let c = 0; c <= cols; c++) {
     const x = -width / 2 + post / 2 + c * (roomW + post);
     const p = new THREE.Mesh(new THREE.BoxGeometry(post, height, roomD + 0.4), postMat);
     p.position.set(x, height / 2, 0.1); p.castShadow = true; p.receiveShadow = true; group.add(p);
   }
-  const slabMat = mk(woodTex, width / 2.4, 0.3, '#b58a62');
+  const slabMat = mk(woodTex, width / 2.4, 0.3, '#d4a577');
   for (let r = 0; r <= layout.length; r++) {
     const s = new THREE.Mesh(new THREE.BoxGeometry(width + 0.3, slab, roomD + 0.5), slabMat);
     s.position.set(0, slab / 2 + r * floorH, 0.12); s.castShadow = true; s.receiveShadow = true; group.add(s);
@@ -207,14 +262,28 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
 
   return {
     group, rooms, slots, width, height, roomW, roomH, roomD, floorH, roof: roofGroup, chimneyTop,
-    /** paint: painted-light multiplier (day 1, dusk ~0.55); lamps 0..1; windowDusk 0..1 tints painted skies. */
-    setLight({ paint = 1, lamps = 0, tint = '#ffffff', windowDusk = 0, windowColor = '#B5623C' } = {}) {
-      for (const rm of Object.values(rooms)) {
-        rm.mat.emissiveIntensity = (rm.empty ? 0 : 0.62) * paint;
+    /**
+     * paint: painted-light multiplier (day 1, dusk >= 0.82); lamps: 0..1 for every room,
+     * or a function(roomId) -> 0..1 (lamps switching on in sequence); windowDusk tints painted skies.
+     */
+    setLight({ paint = 1, lamps = 0, tint = '#ffffff', windowDusk = 0, windowColor = '#B5623C', time = 0 } = {}) {
+      for (const [id, rm] of Object.entries(rooms)) {
+        if (rm.empty) continue;
+        const lv = typeof lamps === 'function' ? lamps(id) : lamps;
+        rm.lampLevel = lv;
+        rm.mat.emissiveIntensity = 0.62 * paint;
         rm.mat.color.set(tint);
-        if (rm.light) rm.light.intensity = lamps * 9;
+        rm.light.intensity = lv * 7;
+        rm.lamps.forEach((sp, i) => { sp.material.opacity = lv * (0.55 + 0.06 * Math.sin(time * 9 + i * 3 + rm.col)); });
         if (rm.windowMesh) { rm.windowMesh.material.opacity = windowDusk * 0.62; rm.windowMesh.material.color.set(windowColor); }
       }
+    },
+    /** Show a room as built (true) or as an empty timber frame (false). */
+    setBuilt(id, built) {
+      const rm = rooms[id];
+      if (!rm) return;
+      rm.builtG.visible = built; rm.emptyG.visible = !built; rm.built = built;
+      if (rm.reveal) rm.reveal.value = 1;
     },
   };
 }

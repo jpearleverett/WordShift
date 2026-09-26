@@ -10,37 +10,46 @@ const C = (h) => new THREE.Color(h);
 const mixC = (a, b, t) => a.clone().lerp(b, t);
 
 export const TOD = {
-  day: { sun: C('#FFE2B0'), sunI: 2.6, elev: 34, fillSky: C('#A9C4FF'), fillGround: C('#7FA85A'), fillI: 1.05, fog: C('#bcd2a0'), exposure: 1.0 },
-  dusk: { sun: C('#FF8E5E'), sunI: 1.25, elev: 7, fillSky: C('#8C6FC4'), fillGround: C('#4a3a4a'), fillI: 0.8, fog: C('#9c7090'), exposure: 1.08 },
+  day: { sun: C('#FFD49A'), sunI: 2.6, elev: 30, fillSky: C('#9DB8FF'), fillGround: C('#7FA85A'), fillI: 1.05, fog: C('#bcd2a0'), exposure: 1.0 },
+  dusk: { sun: C('#FF8E5E'), sunI: 1.25, elev: 6, fillSky: C('#8C6FC4'), fillGround: C('#4a3a4a'), fillI: 0.8, fog: C('#9c7090'), exposure: 1.08 },
 };
 
-/** A backdrop plane that crossfades between two painted skies. */
-export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b = 'environment/sky_dusk.webp', width = 160, band = [0.36, 1.0], tilesX = 3 } = {}) {
-  const ta = (await loadTexture(a)).clone(); const tb = (await loadTexture(b)).clone();
-  for (const t of [ta, tb]) {
-    t.needsUpdate = true; t.wrapS = THREE.MirroredRepeatWrapping;
-    t.repeat.set(tilesX, band[1] - band[0]); t.offset.set(-(tilesX - 1) / 2, band[0]);
-  }
-  const aspect = (ta.image.width * tilesX) / (ta.image.height * (band[1] - band[0]));
+/**
+ * The painted sky as one backdrop plane: a single copy of the painting (a band of
+ * it, v from the bottom), crossfading afternoon -> dusk with a top-down wipe. The
+ * margins beyond the painting mirror it but dissolve into haze, so no mountain is
+ * ever seen twice.
+ */
+export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b = 'environment/sky_dusk.webp', height = 160, band = [0.32, 1.0], margin = 0.45 } = {}) {
+  const ta = await loadTexture(a); const tb = await loadTexture(b);
+  const aspectPaint = ta.image.width / (ta.image.height * (band[1] - band[0]));
+  const width = height * aspectPaint * (1 + 2 * margin);
   const mat = new THREE.ShaderMaterial({
-    uniforms: { ta: { value: ta }, tb: { value: tb }, mixv: { value: 0 }, bright: { value: 1 }, wipe: { value: 0 } },
+    uniforms: {
+      ta: { value: ta }, tb: { value: tb }, mixv: { value: 0 }, bright: { value: 1 },
+      haze: { value: new THREE.Color('#cfe0c8') }, hazeDusk: { value: new THREE.Color('#c98c86') },
+    },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
     fragmentShader: `
-      uniform sampler2D ta; uniform sampler2D tb; uniform float mixv; uniform float bright; uniform float wipe;
+      uniform sampler2D ta; uniform sampler2D tb; uniform float mixv; uniform float bright; uniform vec3 haze; uniform vec3 hazeDusk;
       varying vec2 vUv;
       void main(){
-        vec2 uv = vec2(vUv.x * ${tilesX.toFixed(1)} - ${((tilesX - 1) / 2).toFixed(2)}, ${band[0].toFixed(3)} + vUv.y * ${(band[1] - band[0]).toFixed(3)});
-        vec2 m = vec2(abs(mod(uv.x + 1.0, 2.0) - 1.0), uv.y);
-        // a soft directional wipe from the top down so the dusk "pours" in
-        float k = clamp(mixv * 1.6 - (1.0 - vUv.y) * 0.6 * wipe, 0.0, 1.0);
-        vec3 c = mix(texture2D(ta, m).rgb, texture2D(tb, m).rgb, k);
+        float m = ${margin.toFixed(3)};
+        float pu = vUv.x * (1.0 + 2.0 * m) - m;
+        float out_ = max(-pu, pu - 1.0);
+        float u = pu < 0.0 ? -pu : (pu > 1.0 ? 2.0 - pu : pu);
+        vec2 uv = vec2(clamp(u, 0.0, 1.0), ${band[0].toFixed(3)} + vUv.y * ${(band[1] - band[0]).toFixed(3)});
+        float k = clamp(mixv * 1.7 - (1.0 - vUv.y) * 0.7, 0.0, 1.0);
+        vec3 c = mix(texture2D(ta, uv).rgb, texture2D(tb, uv).rgb, k);
+        vec3 hz = mix(haze, hazeDusk, k);
+        float h = smoothstep(0.0, m * 0.55, out_) * 0.88;
         // sRGB textures are decoded to linear by the GPU on sampling
-        gl_FragColor = vec4(c * bright, 1.0);
+        gl_FragColor = vec4(mix(c, hz, h) * bright, 1.0);
       }`,
     depthWrite: true,
   });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width / aspect), mat);
-  mesh.userData = { mat, aspect };
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
+  mesh.userData = { mat, width, height, paintWidth: height * aspectPaint };
   return mesh;
 }
 
@@ -54,7 +63,7 @@ export function applyTod(dusk, env) {
     env.sun.color.copy(mixC(d.sun, n.sun, dusk));
     env.sun.intensity = lerp(d.sunI, n.sunI, dusk);
     const el = THREE.MathUtils.degToRad(lerp(d.elev, n.elev, dusk));
-    const az = THREE.MathUtils.degToRad(env.azimuth ?? -35);
+    const az = THREE.MathUtils.degToRad(lerp(env.azimuth ?? -38, env.azimuthDusk ?? -70, dusk));
     const r = env.sunDist ?? 80;
     const c = env.sunCenter || new THREE.Vector3();
     env.sun.position.set(c.x + Math.sin(az) * Math.cos(el) * r, c.y + Math.sin(el) * r, c.z + Math.cos(az) * Math.cos(el) * r);
@@ -69,7 +78,7 @@ export function applyTod(dusk, env) {
     env.sky.userData.mat.uniforms.mixv.value = dusk;
     env.sky.userData.mat.uniforms.bright.value = lerp(1.0, 0.95, dusk);
   }
-  if (env.house) env.house.setLight({ paint: lerp(1, 0.62, dusk), lamps: Math.max(0, (dusk - 0.35) / 0.65), tint: '#' + mixC(C('#ffffff'), C('#e6cfe0'), dusk).getHexString(), windowDusk: dusk, windowColor: '#B5623C' });
+  if (env.house) env.house.setLight({ paint: lerp(1, 0.82, dusk), lamps: env.lamps ?? Math.max(0, (dusk - 0.35) / 0.65), tint: '#' + mixC(C('#ffffff'), C('#efdcea'), dusk).getHexString(), windowDusk: dusk, windowColor: '#B5623C', time: env.time || 0 });
   if (env.scene && env.scene.fog) env.scene.fog.color.copy(mixC(d.fog, n.fog, dusk));
   return {
     exposure: lerp(d.exposure, n.exposure, dusk),

@@ -29,7 +29,7 @@ export function buildMoveSet(rows, moves) {
   for (const mv of moves) {
     const id = cur[mv.from][mv.letter];
     cur[mv.from] = cur[mv.from].filter((x) => x !== id);
-    timelines[mv.from].push({ at: mv.lift + 0.12, order: cur[mv.from].slice() });
+    timelines[mv.from].push({ at: mv.closeAt ?? mv.lift + 0.12, order: cur[mv.from].slice() });
     const dest = cur[mv.to].slice(); dest.splice(mv.slot, 0, id);
     // the target row opens a gap (a placeholder) before the landing
     timelines[mv.to].push({ at: mv.open, order: dest.slice(), gapFor: id });
@@ -82,34 +82,34 @@ export function buildMoveSet(rows, moves) {
           else obj.scale.set(1, 1, 1);
           continue;
         }
-        // in flight: world-space arc from the source slot to the target slot
+        // in flight: an arc in the rows' shared parent space (tile units) from the
+        // source slot to the target slot
         const src = rows[flying.from].group, dst = rows[flying.to].group;
+        const space = src.parent;
         const srcX = rowX(flying.from, tile.id, flying.lift - 1e-3) ?? 0;
         const dstX = rowX(flying.to, tile.id, Math.max(t, flying.open + 0.35)) ?? 0;
-        src.localToWorld(tmpA.set(srcX, 0, 0));
-        dst.localToWorld(tmpB.set(dstX, 0, 0));
+        tmpA.set(srcX + src.position.x, src.position.y, src.position.z);
+        tmpB.set(dstX + dst.position.x, dst.position.y, dst.position.z);
         const dur = flying.land - flying.lift;
         const u = clamp((t - flying.lift) / dur);
         // hold a beat at the top of the lift (the "pick up"), then fly
         const liftPhase = clamp(u / 0.28);
         const flyU = clamp((u - 0.22) / 0.78);
-        const A = [tmpA.x, tmpA.y + 0.0, tmpA.z];
-        const Aup = [tmpA.x, tmpA.y + 1.1, tmpA.z + 0.25];
+        const A = [tmpA.x, tmpA.y, tmpA.z];
+        const Aup = [tmpA.x, tmpA.y + (flying.liftH ?? 1.25), tmpA.z + 0.45];
         const B = [tmpB.x, tmpB.y, tmpB.z];
         let p, rot;
         if (flyU <= 0) {
           const k = ease.outBack(liftPhase, 1.2);
           p = [A[0], A[1] + (Aup[1] - A[1]) * k, A[2] + (Aup[2] - A[2]) * k];
-          rot = [0.08 * k, 0, -0.12 * k];
+          rot = [0.1 * k, 0, -0.1 * k];
         } else {
-          const f = flight(Aup, [B[0], B[1] + 0.0, B[2]], flyU, { arc: 0.9, tumble: 0.25, lift: 0 });
-          p = f.p; rot = f.rot;
+          const f = flight(Aup, B, flyU, { arc: flying.arc ?? 0.7, tumble: 0.25, lift: 0, zArc: flying.zArc ?? 1.1 });
+          p = f.p; rot = [f.rot[0] + 0.1 * (1 - flyU), 0, f.rot[2] - 0.1 * (1 - flyU)];
         }
-        const scene = src.parent ? rootOf(src) : src;
-        if (obj.parent !== scene) scene.add(obj);
+        if (obj.parent !== space) space.add(obj);
         obj.position.set(...p);
-        obj.quaternion.copy(dst.getWorldQuaternion(new THREE.Quaternion()).slerp(src.getWorldQuaternion(new THREE.Quaternion()), 1 - ease.inOutSine(flyU)));
-        obj.rotateX(rot[0]); obj.rotateZ(rot[2]);
+        obj.rotation.set(rot[0], 0, rot[2]);
         obj.scale.set(1, 1, 1);
         active = { id: tile.id, obj, pos: p, phase: flyU <= 0 ? 'lift' : 'fly', flight: flying };
       }
@@ -118,4 +118,3 @@ export function buildMoveSet(rows, moves) {
   };
 }
 
-function rootOf(o) { let r = o; while (r.parent) r = r.parent; return r; }

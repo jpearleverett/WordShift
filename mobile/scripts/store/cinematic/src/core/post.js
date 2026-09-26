@@ -254,7 +254,13 @@ export class Pipeline {
     this.pxScale = height >= width ? width / 1080 : height / 1080;
     const depthTexture = new THREE.DepthTexture(width, height);
     depthTexture.type = THREE.UnsignedIntType;
-    this.sceneRT = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, samples: 4, depthTexture });
+    const depthTexture2 = new THREE.DepthTexture(width, height);
+    depthTexture2.type = THREE.UnsignedIntType;
+    // MSAA roughly quadruples fill cost on SwiftShader, so it is chosen per shot (look.msaa)
+    this.sceneRTaa = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, samples: 4, depthTexture });
+    this.sceneRTplain = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, samples: 0, depthTexture: depthTexture2 });
+    this.sceneRT = this.sceneRTaa;
+    this.subRT = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType });
     this.dofRT = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType });
     this.dofRT2 = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType });
     this.mixRT = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType });
@@ -291,6 +297,12 @@ export class Pipeline {
       uniforms: { tA: { value: null }, tB: { value: null }, u: { value: 0 }, mode: { value: 0 }, dipColor: { value: new THREE.Vector3(0, 0, 0) }, whipDir: { value: new THREE.Vector2(1, 0) } },
     });
     this.mixScene = new THREE.Scene(); this.mixScene.add(new THREE.Mesh(this.quadGeo, this.mixMat));
+    this.accMat = new THREE.ShaderMaterial({
+      vertexShader: FULLSCREEN_VERT, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, transparent: true,
+      fragmentShader: 'precision highp float; varying vec2 vUv; uniform sampler2D t; uniform float w; void main(){ gl_FragColor = vec4(texture2D(t, vUv).rgb * w, 1.0); }',
+      uniforms: { t: { value: null }, w: { value: 1 } },
+    });
+    this.accScene = new THREE.Scene(); this.accScene.add(new THREE.Mesh(this.quadGeo, this.accMat));
     this.dofQuad = new THREE.Mesh(this.quadGeo, this.dofMat);
     this.gradeQuad = new THREE.Mesh(this.quadGeo, this.gradeMat);
     this.dofScene = new THREE.Scene(); this.dofScene.add(this.dofQuad);
@@ -300,6 +312,9 @@ export class Pipeline {
   /** Render one shot's scene through DOF and bloom into `out` (HDR). */
   renderLayer(scene, camera, look, out) {
     const r = this.renderer;
+    this.sceneRT = look.msaa === false ? this.sceneRTplain : this.sceneRTaa;
+    this.prepMat.uniforms.tColor.value = this.sceneRT.texture; this.prepMat.uniforms.tDepth.value = this.sceneRT.depthTexture;
+    this.dofMat.uniforms.tColor.value = this.sceneRT.texture; this.dofMat.uniforms.tDepth.value = this.sceneRT.depthTexture;
     r.setRenderTarget(this.sceneRT);
     r.setClearColor(scene.background && scene.background.isColor ? scene.background : new THREE.Color(0), 1);
     r.clear(true, true, true);
@@ -330,24 +345,49 @@ export class Pipeline {
   }
 
   /**
-   * layers: [{ scene, camera, look, weight }] (one, or two during a transition)
+   * Render one layer at time t into `out`. layer: { pose(t) -> { scene, camera, look }, mb, shutter }.
+   * With mb > 1 the layer is rendered at mb subframes across the shutter and averaged
+   * (true motion blur); the centre subframe is rendered last so world state ends at t.
+   */
+  renderPosedLayer(layer, t, out) {
+    const n = Math.max(1, layer.mb || 1);
+    if (n === 1) { const f = layer.pose(t); this.renderLayer(f.scene, f.camera, f.look, out); return f.look; }
+    const r = this.renderer;
+    const shutter = layer.shutter ?? 1 / 60;
+    const times = [];
+    for (let k = 0; k < n; k++) times.push(t + (k / (n - 1) - 0.5) * shutter);
+    const mid = times.splice(Math.floor(n / 2), 1)[0]; times.push(mid);
+    r.setRenderTarget(out); r.setClearColor(0x000000, 1); r.clear(true, true, true);
+    let look = null;
+    for (const ts of times) {
+      const f = layer.pose(ts);
+      look = f.look;
+      this.renderLayer(f.scene, f.camera, f.look, this.subRT);
+      this.accMat.uniforms.t.value = this.subRT.texture; this.accMat.uniforms.w.value = 1 / n;
+      r.setRenderTarget(out); r.autoClear = false; r.render(this.accScene, this.quadCam); r.autoClear = true;
+    }
+    return look;
+  }
+
+  /**
+   * layers: one layer, or two during a transition (outgoing, incoming).
    * transition: { type: 'dissolve'|'dip'|'whip', u, color?, dir? }
    * look: { exposure, whiteBalance:[r,g,b], lift, gamma, gain, saturation, contrast,
    *         vignette, vignetteSoft, aberration, grain, fadeBlack, fadeColor, fadeColorAmt,
-   *         bloom:{strength,radius,threshold}, dof:{focus, aperture, maxBlur} | null, toneMap:'agx'|'aces' }
+   *         bloom:{strength,radius,threshold}, dof:{focus, aperture, maxBlur} | null, toneMap:'agx'|'aces', msaa }
+   * afterRender(): called after the scene layers, before the overlay (to update anchored text).
    */
-  render(layers, frameIndex, overlay, transition) {
+  render(layers, t, frameIndex, overlay, transition, afterRender) {
     const r = this.renderer;
     const u = this.gradeMat.uniforms;
     let look;
     if (layers.length === 1) {
-      this.renderLayer(layers[0].scene, layers[0].camera, layers[0].look, this.dofRT);
+      look = this.renderPosedLayer(layers[0], t, this.dofRT);
       u.tColor.value = this.dofRT.texture;
-      look = layers[0].look;
     } else {
       const [A, B] = layers;
-      this.renderLayer(A.scene, A.camera, A.look, this.dofRT);
-      this.renderLayer(B.scene, B.camera, B.look, this.dofRT2);
+      const la = this.renderPosedLayer(A, t, this.dofRT);
+      const lb = this.renderPosedLayer(B, t, this.dofRT2);
       const m = this.mixMat.uniforms;
       m.tA.value = this.dofRT.texture; m.tB.value = this.dofRT2.texture; m.u.value = transition.u;
       m.mode.value = transition.type === 'dip' ? 1 : transition.type === 'whip' ? 2 : 0;
@@ -356,8 +396,9 @@ export class Pipeline {
       r.setRenderTarget(this.mixRT);
       r.render(this.mixScene, this.quadCam);
       u.tColor.value = this.mixRT.texture;
-      look = blendLooks(A.look, B.look, transition.type === 'whip' || transition.type === 'dip' ? (transition.u < 0.5 ? 0 : 1) : transition.u);
+      look = blendLooks(la, lb, transition.type === 'whip' || transition.type === 'dip' ? (transition.u < 0.5 ? 0 : 1) : transition.u);
     }
+    if (afterRender) afterRender();
     const set = (k, v) => { if (v !== undefined) { if (Array.isArray(v)) u[k].value.set(...v); else u[k].value = v; } };
     set('exposure', look.exposure ?? 1); set('whiteBalance', look.whiteBalance ?? [1, 1, 1]);
     set('lift', look.lift ?? [0, 0, 0]); set('gamma', look.gamma ?? [1, 1, 1]); set('gain', look.gain ?? [1, 1, 1]);

@@ -17,6 +17,12 @@ export const TILE_PALETTE = [
   { bg: '#99BDB5', border: '#5D827A' },
 ];
 export const TILE_INK = '#28221D';
+/** The game's locked (moved) letter, as measured on the store art. */
+export const LOCKED = { bg: '#BBC4CF', border: '#7F8A99', top: '#CACCCC' };
+/** World scale of a tile in the trailer's dollhouse (a toy block about a third of a resident's height). */
+export const TILE_SCALE = 0.45;
+
+function mixHex(a, b, t) { return '#' + new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString(); }
 
 /** The game's getTileColor: palette index = char code % 8. */
 export function tileColorFor(ch) {
@@ -57,17 +63,18 @@ function normalFromHeight(hctx, w, h, strength) {
 
 /** Face textures for one letter (color + normal), cached per letter/color. */
 export function tileFace(ch, color = tileColorFor(ch), { font = 'Epunda Slab', ink = TILE_INK } = {}) {
-  const key = ch + color.bg + ink;
+  const key = ch + color.bg + (color.top || '') + ink;
   if (faceCache.has(key)) return faceCache.get(key);
   const fw = TILE_W - 2 * RADIUS * 0.6, fh = TILE_H - 2 * RADIUS * 0.6;
   const W = 384, H = Math.round(W * fh / fw);
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const ctx = c.getContext('2d');
-  // body color with the game's soft top sweep
+  // body colour with the game's top gloss band: the upper 42% is bg mixed 0.32 toward #FFF6DB
   ctx.fillStyle = color.bg; ctx.fillRect(0, 0, W, H);
-  const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, 'rgba(255,246,219,0.20)'); g.addColorStop(0.45, 'rgba(255,246,219,0.06)'); g.addColorStop(1, 'rgba(40,20,10,0.10)');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const gloss = color.top || mixHex(color.bg, '#FFF6DB', 0.32);
+  const gb = ctx.createLinearGradient(0, 0, 0, H * 0.48);
+  gb.addColorStop(0, gloss); gb.addColorStop(0.42 / 0.48 - 0.06, gloss); gb.addColorStop(1, color.bg);
+  ctx.fillStyle = gb; ctx.fillRect(0, 0, W, H * 0.48);
   // inset border ring
   ctx.strokeStyle = color.border; ctx.globalAlpha = 0.55; ctx.lineWidth = W * 0.022;
   roundRect(ctx, W * 0.07, H * 0.06, W * 0.86, H * 0.88, W * 0.12); ctx.stroke(); ctx.globalAlpha = 1;
@@ -103,8 +110,8 @@ export function makeTile(ch, { color = tileColorFor(ch), emissive = 0 } = {}) {
   if (!bodyGeo) bodyGeo = new RoundedBoxGeometry(TILE_W, TILE_H, TILE_D, 10, RADIUS);
   const group = new THREE.Group();
   const bodyMat = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(color.bg), roughness: 0.46, metalness: 0,
-    clearcoat: 0.55, clearcoatRoughness: 0.28, sheen: 0.3, sheenRoughness: 0.6, sheenColor: new THREE.Color('#fff2d8'),
+    color: new THREE.Color(color.bg), roughness: 0.40, metalness: 0,
+    clearcoat: 0.8, clearcoatRoughness: 0.18, sheen: 0.3, sheenRoughness: 0.6, sheenColor: new THREE.Color('#fff2d8'),
     emissive: new THREE.Color(color.bg), emissiveIntensity: emissive,
   });
   const body = new THREE.Mesh(bodyGeo, bodyMat);
@@ -113,16 +120,57 @@ export function makeTile(ch, { color = tileColorFor(ch), emissive = 0 } = {}) {
   body.castShadow = true; body.receiveShadow = false;
   const f = tileFace(ch, color);
   const faceMat = new THREE.MeshPhysicalMaterial({
-    map: f.map, normalMap: f.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.42,
-    clearcoat: 0.55, clearcoatRoughness: 0.26, emissive: new THREE.Color('#ffffff'), emissiveMap: f.map, emissiveIntensity: emissive,
+    map: f.map, normalMap: f.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.40,
+    clearcoat: 0.8, clearcoatRoughness: 0.18, emissive: new THREE.Color('#ffffff'), emissiveMap: f.map, emissiveIntensity: emissive,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
   const face = new THREE.Mesh(new THREE.PlaneGeometry(f.fw, f.fh), faceMat);
   face.position.z = TILE_D / 2 + 0.0015;
   face.receiveShadow = true;
-  group.add(body, face);
-  group.userData = { ch, body, face, bodyMat, faceMat, color };
+  // the locked face sits just in front and fades in when the letter locks
+  const lf = tileFace(ch, LOCKED);
+  const lockMat = new THREE.MeshPhysicalMaterial({
+    map: lf.map, normalMap: lf.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.40, clearcoat: 0.8, clearcoatRoughness: 0.18,
+    transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+  });
+  const lockFace = new THREE.Mesh(face.geometry, lockMat);
+  lockFace.position.z = TILE_D / 2 + 0.003;
+  lockFace.visible = false;
+  group.add(body, face, lockFace);
+  group.userData = { ch, body, face, bodyMat, faceMat, color, lockFace, lockMat };
   return group;
+}
+
+/** Lock tint 0..1: the body and face ease to the game's locked powder blue. */
+export function setLocked(tile, k) {
+  const u = tile.userData;
+  u.bodyMat.color.set(u.color.bg).lerp(new THREE.Color(LOCKED.bg), k);
+  u.lockFace.visible = k > 0.001;
+  u.lockMat.opacity = k;
+}
+
+/** Two extruded leaves on a short stem, seated on a tile's top edge (tile units). */
+export function makeSprout() {
+  const g = new THREE.Group();
+  const c = document.createElement('canvas'); c.width = 16; c.height = 16;
+  const x = c.getContext('2d'); x.fillStyle = '#7DB36B'; x.fillRect(0, 0, 16, 16); x.fillStyle = '#A6D08A'; x.fillRect(2, 2, 6, 3); x.fillStyle = '#4E7A40'; x.fillRect(0, 13, 16, 3);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.magFilter = THREE.NearestFilter;
+  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, side: THREE.DoubleSide });
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.26, 8), new THREE.MeshStandardMaterial({ color: '#5f9150', roughness: 0.6 }));
+  stem.position.y = 0.13; g.add(stem);
+  const leafShape = new THREE.Shape();
+  leafShape.moveTo(0, 0); leafShape.quadraticCurveTo(0.14, 0.1, 0.3, 0.02); leafShape.quadraticCurveTo(0.14, -0.08, 0, 0);
+  const leafGeo = new THREE.ExtrudeGeometry(leafShape, { depth: 0.024, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 1 });
+  leafGeo.translate(0, 0, -0.012);
+  for (const s of [-1, 1]) {
+    const leaf = new THREE.Mesh(leafGeo, mat);
+    leaf.position.set(0, 0.24, 0); leaf.rotation.set(0, s > 0 ? 0 : Math.PI, s * 0.45);
+    leaf.castShadow = true;
+    g.add(leaf);
+  }
+  g.position.y = TILE_H / 2 - 0.02;
+  g.scale.setScalar(0.0001);
+  return g;
 }
 
 /** Set a warm self-glow on a tile (0 = none). */

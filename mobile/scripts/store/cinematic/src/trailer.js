@@ -1,24 +1,50 @@
-// Temporary look-development scene (macro opening); replaced by the real timeline.
-import { buildMacro } from './sets/macro.js';
-import { poseCamera } from './core/camera.js';
-import * as THREE from 'three';
+// The cinematic trailer: one persistent world, one camera, ten shots on the
+// bed's musical grid (spec: mobile/scripts/store/cinematic/README.md).
+//
+// A shot module exports `async function make(ctx)` returning one shot or an array:
+//   { id, start, end, transition?: { type: 'whip', dur, dir: [x, y] },
+//     mb?(t) -> subframes, pose(t, ctx) -> { scene, camera, look }, overlay?(t, ctx) }
+// pose() receives trailer time, must be a pure function of it, and is called
+// after world.begin() has reset shared state (so it only sets what it uses).
 
-export async function buildTrailer({ pxScale, aspect }) {
-  const holder = new URLSearchParams(location.search).get('holder') || 'tray';
-  const m = await buildMacro({ holder, pxScale, moves: [
-    { from: 0, letter: 1, to: 1, slot: 1, lift: 0.2, open: 1.0, land: 1.6 },
-  ] });
-  const camera = new THREE.PerspectiveCamera(20, 16 / 9, 0.05, 300);
+import * as THREE from 'three';
+import { buildWorld } from './sets/world.js';
+import { Timeline } from './core/timeline.js';
+import { Captions } from './core/captions.js';
+import { CAPTIONS, DURATION, FPS, E } from './timeline/events.js';
+import { SHOT_MAKERS } from './shots/index.js';
+
+export async function buildTrailer(ctx) {
+  const world = await buildWorld({ pxScale: ctx.pxScale });
+  const camera = new THREE.PerspectiveCamera(30, ctx.width / ctx.height, 0.05, 900);
+  const common = { ...ctx, world, camera, E, portrait: ctx.aspect === '9x16' };
+  const shots = [];
+  for (const make of SHOT_MAKERS) {
+    const made = await make(common);
+    for (const s of [].concat(made)) shots.push(s);
+  }
+  const timeline = new Timeline(shots);
+  const captions = new Captions(ctx.overlay, CAPTIONS, ctx);
+  const warmTimes = shots.map((s) => (s.start + s.end) / 2);
+
   return {
-    duration: 3, fps: 30,
+    duration: DURATION, fps: FPS, warmTimes, shots, world,
     update(t) {
-      const act = m.pose(t, {});
-      const L = [...m.set.tiles.values()].find((x) => x.id === '0:1').obj;
-      const p = new THREE.Vector3(); L.getWorldPosition(p);
-      const cam = poseCamera(camera, { pos: [[p.x + 3.4, p.y + 0.9, p.z + 11]], target: [[p.x + 0.3, p.y - 0.4, p.z]], fov: 20, keep916: 0.5 }, 0, { aspect, time: t });
-      m.pose(t, { focus: cam.focus, aperture: 70 });
-      void act;
-      return { scene: m.scene, camera, look: { toneMap: 'aces', dof: { focus: cam.focus, aperture: 70, maxBlur: 20 }, bloom: { strength: 0.55, threshold: 0.72, radius: 0.7 }, vignette: 0.34, grain: 0.022, saturation: 1.05, gain: [1.03, 1.0, 0.96] } };
+      const active = timeline.at(t);
+      const layers = active.map((l) => ({
+        pose: (ts) => { world.begin(); return l.shot.pose(ts, common); },
+        mb: l.shot.mb ? l.shot.mb(t) : 1,
+        shutter: 1 / 60,
+      }));
+      const tr = active.length > 1 ? { type: active[1].transition.type, u: active[1].u, dir: active[1].transition.dir, color: active[1].transition.color } : null;
+      return {
+        layers, transition: tr,
+        afterRender: () => {
+          ctx.overlay.hideAll();
+          captions.update(t);
+          for (const l of active) if (l.shot.overlay) l.shot.overlay(t, common);
+        },
+      };
     },
   };
 }
