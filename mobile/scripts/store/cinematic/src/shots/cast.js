@@ -108,7 +108,8 @@ function cloudTexture(seed, tones) {
   });
 }
 const CLOUD_DAY = ['#ffffff', '#f3f5f9', '#e1e6f0', '#cbd4e5', '#b8c3da'];
-const CLOUD_DUSK = ['#ffe6bd', '#f9bb98', '#e9a594', '#d38e95', '#b97f92'];
+// the dusk painting's own cloud colours (sampled): hot orange rims, coral bodies, rose-to-plum undersides
+const CLOUD_DUSK = ['#ffae68', '#f0825c', '#dc6a5a', '#b95466', '#96497a'];
 
 /**
  * Monotone cubic (Fritsch-Carlson) through knots [[t, v], ...], flat at both ends and
@@ -180,6 +181,9 @@ export default async function make(ctx) {
   for (const r of Object.values(R)) world.track(r.ch);
   // the lamps' glow cards swell as they pop on (begin() restores their size every frame)
   for (const rm of Object.values(house.rooms)) for (const sp of rm.lamps || []) world.track(sp);
+  // the day pollen is squeezed back toward the house for the crane: motes drifting within
+  // a few units of the lens became bokeh discs the size of a room
+  world.track(world.pollen.points);
 
   // ---------------- props (registered: hidden unless this shot shows them)
   const emoteOf = { ember: 'heart', archimedes: 'thought', chill: 'note', bamboo: 'sparkle' };
@@ -266,7 +270,9 @@ export default async function make(ctx) {
   for (let i = 0; i < 4; i++) {
     const w = 22 + rnd() * 6;
     const geo = new THREE.PlaneGeometry(w, w * 48 / 128);
-    const mk = (tones) => world.register(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: cloudTexture(900 + i, tones), transparent: true, depthWrite: false, fog: false })), world.sky);
+    // magnified with the same soft filtering as the painting behind them (it is upscaled
+    // about 2x): crisp nearest-neighbour edges made the cards read as stickers on it
+    const mk = (tones) => { const tex = cloudTexture(900 + i, tones); tex.magFilter = THREE.LinearFilter; return world.register(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: false })), world.sky); };
     clouds.push({ day: mk(CLOUD_DAY), dusk: mk(CLOUD_DUSK), half: w / 2 / world.sky.userData.paintWidth, u0: 0.3 + i * 0.17 + rnd() * 0.05, v: CLOUD_V[i], speed: 0.16 + rnd() * 0.08 });
   }
 
@@ -465,7 +471,7 @@ export default async function make(ctx) {
       for (const [m, a] of [[c.day, 1 - k], [c.dusk, k]]) {
         m.visible = on * edge > 0.001 && a > 0.001;
         m.position.set(p[0], p[1], p[2]);
-        m.material.opacity = on * edge * a * 0.92;
+        m.material.opacity = on * edge * a * 0.85;
       }
     }
     // the sun's glide: the glow takes over the painted afternoon sun as the wipe front
@@ -626,6 +632,7 @@ export default async function make(ctx) {
       meadow.update(t, 1);
       for (const m of meadow.group.children) m.material.color.set(MEADOW_EVE).lerp(MEADOW_DUSK, seg(dk, 0.4, 1));
     }
+    world.pollen.points.position.z = -4; world.pollen.points.scale.z = 0.5;
     poseCast(t);
     poseProps(t);
     return {

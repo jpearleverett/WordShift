@@ -17,7 +17,7 @@ import { makeBlueprint } from '../world/blueprint.js';
 import { makeMoths } from '../world/fire.js';
 import { makeShaft } from '../world/env.js';
 import { makeBubble } from '../world/bubble.js';
-import { makeSprout, setLocked, setTileGlow, TILE_SCALE, TILE_D } from '../core/tiles.js';
+import { makeSprout, setLocked, setTileGlow, TILE_SCALE, TILE_D, TILE_EMISSIVE_BASE } from '../core/tiles.js';
 import { ease, spring, seg, lerp, clamp, smooth, catmull, hash01 } from '../core/math.js';
 import { GROUND_Y } from '../sets/world.js';
 import { mm, wpos, add, mix3, dist, aim, setAspect, look, project, travelPx, blurFor } from './common.js';
@@ -60,6 +60,8 @@ export default async function make(ctx) {
   const tiles = rack.set.tiles;
   const L = tiles.get('0:1').obj;
   const T = tiles.get('1:3').obj;
+  // the locked powder blue self-lights a touch cool, so the golden key does not grey it
+  for (const x of [L, T]) x.userData.lockMat.emissive.set(LOCK_GLOW);
   const sprout = makeSprout();
   L.add(sprout);
   const sproutLeaves = []; sprout.traverse((o) => { if (o.isMesh) sproutLeaves.push(o); });
@@ -116,11 +118,16 @@ export default async function make(ctx) {
       airBlob.scale.setScalar(1 + away * 0.5);
       airBlob.material.opacity = 0.3 * clamp(1 - away / 1.6);
     }
-    // landing rim flash on PLANT (6 frames) and the three row flashes
-    for (const x of tiles.values()) setTileGlow(x.obj, 0);
-    const flash = (t0, ri) => { const k = seg(t, t0, t0 + 0.2); if (k > 0 && k < 1) for (const o of rowTiles(ri)) setTileGlow(o, Math.sin(Math.PI * k) * 0.9); };
-    flash(E.L_LAND, 1); flash(E.T_LAND, 2);
+    // landing rim flash on PLANT (6 frames) and the three row flashes. On the tile shots
+    // the tiles' own base light gives way to the shot's exposure (which also lifts the
+    // parchment, whose self-light is held under the bloom threshold); it returns under the boom
+    const glowBase = lerp(TILE_EMISSIVE_BASE, TILE_GLOW_BASE, 1 - smooth(seg(t, BOOM[0], BOOM[1])));
+    for (const x of tiles.values()) { x.obj.userData.glowBase = glowBase; setTileGlow(x.obj, 0); }
+    const flash = (t0, ri, dur = 0.2) => { const k = seg(t, t0, t0 + dur); if (k > 0 && k < 1) for (const o of rowTiles(ri)) setTileGlow(o, Math.sin(Math.PI * k) * 0.9); };
+    flash(E.L_LAND, 1, 0.13); flash(E.T_LAND, 2, 0.13); // the landing rims: four frames
     E.FLASH.forEach((f, i) => flash(f, i));
+    const lockLift = LOCK_LIFT * (1 - smooth(seg(t, BOOM[0], BOOM[1])));
+    for (const x of [L, T]) x.userData.lockMat.emissiveIntensity += lockLift;
     // sparkle pops: six around PLANT at the landing, then one per row flash
     sparkles.forEach((s, i) => {
       let t0, p;
@@ -168,7 +175,7 @@ export default async function make(ctx) {
   const shaft = world.register(makeShaft({ width: 1.8, height: 5.5, color: '#fff3c8', opacity: 0.16 }), jungle.group);
   const pop = await makeBillboard('ui/emote_sparkle.png', 0.9);
   world.register(pop);
-  const bubbleArt = makeBubble({ text: 'Three moths live in my fur. I call all three Gerald.', name: 'Sloane', width: Math.round((portrait ? 760 : 860) * ctx.pxScale), fontSize: Math.round((portrait ? 44 : 46) * ctx.pxScale), pixel: Math.max(2, Math.round(6 * ctx.pxScale)), tail: 'left' });
+  const bubbleArt = makeBubble({ text: 'Three moths live in my fur. I call all three Gerald.', name: 'Sloane', width: Math.round((portrait ? 760 : 860) * ctx.pxScale), fontSize: Math.round((portrait ? 44 : 46) * ctx.pxScale), pixel: Math.max(2, Math.round(6 * ctx.pxScale)), tail: portrait ? 'right' : 'left' });
   ctx.overlay.quad('bubble', { texture: bubbleArt.texture, width: bubbleArt.width, height: bubbleArt.height });
 
   // The amber route: out of PLAN, along the PANT row in front of the trays, past the
@@ -377,11 +384,11 @@ export default async function make(ctx) {
     poseEmote(pop, t - E.SLOANE_POP, { hold: 0.18, rise: 0.1, fade: 0.2 });
     moths.group.visible = t >= E.SLOANE_POP;
     moths.pose(t, camera);
-    const centre = add(head, [-0.5, 0.05, 0.15]);
+    const centre = add(head, [-0.78, 0.05, 0.15]);
     moths.group.position.set(...centre);
     moths.group.children.forEach((m, i) => {
       const a = t * (1.1 + i * 0.27) + i * 2.1;
-      m.position.set(Math.sin(a) * 0.62, MOTH_BANDS[i] + Math.sin(a * 1.7 + i) * 0.05, Math.cos(a) * 0.3);
+      m.position.set(Math.sin(a) * 0.5, MOTH_BANDS[i] + Math.sin(a * 1.7 + i) * 0.05, Math.cos(a) * 0.3);
       // appear out of her fur: grow from her head over the pop
       m.scale.setScalar(Math.max(0.001, spring(t - E.SLOANE_POP - 0.1 - i * 0.12, 2.6, 0.6)));
     });
@@ -421,14 +428,15 @@ export default async function make(ctx) {
     B = { pos: add(mid, [0.1, 1.9, 12.8]), target: add(mid, [0.1, -0.2, 0]), fov: mm(50) };
     C = { pos: [-3.6, 4.0, 23.5], target: [-4.3, 8.1, 4.0], fov: 40 };
     D = { pos: [0, 6.4, 12.4], target: [0, 6.6, 0], fov: 54 };
-    S = { pos: add(face, [-0.5, -0.2, 6.2]), target: add(face, [-0.35, -0.55, 0]), fov: 40 };
+    // Sloane lower-middle right (feet ~72 %), the L in the hammock mid-frame at left
+    S = { pos: [sloane.x0 - 0.66, JW[1] + 1.46, sloane.z0 + 8.0], target: [sloane.x0 - 0.76, JW[1] + 1.3, sloane.z0], fov: 40 };
     ORBIT = 5;
   }
   // the crane is two overlapping eased moves: a quick boom and tilt up after the amber
   // bursts (B -> C, so the rack drops out of frame by 4.9) riding on the long crane to the
   // frame (C -> D, landing on it at the drop); both start and end at rest, so the sum is
   // one continuous move with no stop between them
-  const BOOM = [E.GEMS + 0.2, E.GEMS + 0.95];
+  const BOOM = [E.GEMS + 0.28, E.GEMS + 0.98];
   const MACRO_D = 9.0;
   const smax = (a, b, k) => (a + b + Math.sqrt((a - b) * (a - b) + k * k)) / 2;
 
@@ -578,9 +586,11 @@ export default async function make(ctx) {
       const head = add(JW, [sloane.x0, sloane.h + 0.1, sloane.z0]);
       const p = project(camera, head, ctx.overlay);
       const px = ctx.pxScale;
-      let x = portrait ? ctx.overlay.width / 2 : p.x + bubbleArt.width / 2 + 30 * px;
-      let y = portrait ? p.y - bubbleArt.height / 2 - 60 * px : p.y - bubbleArt.height / 2 - 20 * px;
       const sc = 0.6 + 0.4 * open;
+      // 16:9 upper right of her head (tail at the bubble's left); 9:16 above it with the
+      // tail (at the bubble's right) over her head
+      let x = portrait ? p.x - (0.32 * bubbleArt.width + 18 * px) * sc : p.x + bubbleArt.width / 2 + 30 * px;
+      let y = portrait ? p.y - bubbleArt.height / 2 - 60 * px : p.y - bubbleArt.height / 2 - 20 * px;
       // clamp with the live scale (the pop overshoots) so the bubble never leaves the safe box
       const hw = (bubbleArt.width * sc) / 2 + 4 * px, hh = (bubbleArt.height * sc) / 2 + 4 * px;
       if (portrait) { x = Math.min(Math.max(x, 96 * px + hw), 918 * px - hw); y = Math.min(Math.max(y, 200 * px + hh), 1440 * px - hh); }
@@ -593,11 +603,14 @@ export default async function make(ctx) {
   return shot;
 }
 
-const TILE_EXPOSURE = 1.62;
-const TILE_WB = [0.96, 1.0, 1.5];
-const TILE_SAT = 1.4;
+const TILE_EXPOSURE = 1.9;
+const TILE_GLOW_BASE = 0.03;
+const TILE_WB = [0.96, 1.0, 1.56];
+const TILE_SAT = 1.46;
 const TRAY_EMISSIVE = 0.5;
-const TRAY_GLOW = '#F7D9A2';
+const TRAY_GLOW = '#F9D598';
+const LOCK_GLOW = '#7CD4FF';
+const LOCK_LIFT = 0.26;
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };

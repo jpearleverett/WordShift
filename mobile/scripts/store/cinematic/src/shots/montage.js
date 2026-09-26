@@ -13,7 +13,7 @@
 
 import * as THREE from 'three';
 import { buildMiniRack } from '../world/rack.js';
-import { slotX } from '../world/wordrow.js';
+import { slotX, PITCH } from '../world/wordrow.js';
 import { makeBillboard, poseEmote } from '../world/fx.js';
 import { makeParticles } from '../world/env.js';
 import { setLocked, setTileGlow, TILE_SCALE, TILE_H, TILE_D } from '../core/tiles.js';
@@ -181,7 +181,7 @@ export default async function make(ctx) {
   const glitter = [];
   const glitterCols = ['#fff3c0', '#ffd0ea', '#cdf2ff', '#ffe98a'];
   for (let k = 0; k < 30; k++) {
-    const s = await makeBillboard('ui/emote_sparkle.png', 0.13 + hash01(k * 5 + 2) * 0.13, { additive: true });
+    const s = await makeBillboard('ui/emote_sparkle.png', 0.09 + hash01(k * 5 + 2) * 0.08, { additive: true });
     s.material.color.set(glitterCols[k % glitterCols.length]).multiplyScalar(1.4);
     glitter.push(world.register(s, GD.rm.group));
   }
@@ -222,11 +222,12 @@ export default async function make(ctx) {
     for (const x of b.tiles.values()) setTileGlow(x.obj, 0);
     // both words flash as they become real, the moved letter carries a warm rim for 0.4 s
     const flash = (t0, ri, amp) => { const k = seg(t, t0, t0 + 0.22); if (k > 0 && k < 1) for (const o of b.rowTiles(ri)) setTileGlow(o, Math.sin(Math.PI * k) * amp); };
-    flash(b.land, 1, 0.85);
-    flash(b.land + 0.05, 0, 0.5);
+    // (ACES carries a glow further toward white than AgX did: kept low so the glyphs never wash out)
+    flash(b.land, 1, 0.55);
+    flash(b.land + 0.05, 0, 0.32);
     const rim = seg(t, b.land, b.land + 0.4);
     if (rim > 0 && rim < 1) {
-      const rowFlash = Math.sin(Math.PI * seg(t, b.land, b.land + 0.22)) * 0.85;
+      const rowFlash = Math.sin(Math.PI * seg(t, b.land, b.land + 0.22)) * 0.55;
       setTileGlow(b.moved, Math.max(rim < 0.55 ? rowFlash : 0, 0.42 * (1 - rim)));
     }
     // a ring of sparkle pops around the landed letter
@@ -290,15 +291,17 @@ export default async function make(ctx) {
       motes.points.visible = true;
       motes.uniforms.time.value = t;
     } else {
-      // glitter: specks lift off GLITTER after the landing, twinkle and drift down
+      // glitter: specks lift off GLITTER after the landing, twinkle and drift down. They
+      // rise in the gaps between the tiles (both rows share one slot lattice), never over
+      // a letter: a bright speck on a glyph turned the L of GLITTER into a "!"
       glitter.forEach((s, k) => {
         const t0 = b.land + 0.02 + hash01(k * 31 + 7) * 0.8;
         const u = (t - t0) / 1.0;
         if (u < 0 || u > 1) { s.visible = false; return; }
         s.visible = true;
-        const tileI = (k * 3) % 7;
-        const x0 = b.rx + slotX(tileI, 7) * unit + (hash01(k * 11 + 3) - 0.5) * 0.35 * RS;
-        const vx = (hash01(k * 23 + 9) - 0.5) * 0.5;
+        const tileI = (k * 3) % 7, side = hash01(k * 11 + 3) < 0.5 ? -1 : 1;
+        const x0 = b.rx + (slotX(tileI, 7) + side * PITCH / 2) * unit + (hash01(k * 17 + 5) - 0.5) * 0.03 * RS;
+        const vx = (hash01(k * 23 + 9) - 0.5) * 0.06;
         const p = [x0 + vx * u * RS, rowY + (0.12 + 0.4 * Math.sin(Math.PI * Math.min(1, u * 1.6)) - u * 0.5) * RS, RACK_Z + (0.16 + hash01(k * 13) * 0.3) * RS];
         s.position.set(p[0], p[1], p[2]);
         const tw = 0.55 + 0.45 * Math.abs(Math.sin((t - t0) * (9 + k % 5) + k));
