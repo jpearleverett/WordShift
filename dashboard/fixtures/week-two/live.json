@@ -1,0 +1,313 @@
+{
+  "ok": true,
+  "section": "live",
+  "serverNow": "2026-10-07T21:14:05Z",
+  "fetchedAt": "2026-10-07T21:13:59Z",
+  "ttlSec": 20,
+  "stale": false,
+  "error": null,
+  "notices": [],
+  "data": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-10-07T21:13:59Z",
+    "tz": "America/New_York",
+    "tzFallback": false,
+    "launchAt": "2026-09-26T13:00:00Z",
+    "launchAtIgnored": false,
+    "today": "2026-10-07",
+    "todayStart": "2026-10-07T04:00:00Z",
+    "freshness": {
+      "lastEventReceivedAt": "2026-10-07T21:13:57Z",
+      "lastPlayerEventReceivedAt": "2026-10-07T21:13:57Z"
+    },
+    "testers": {
+      "devices": 9,
+      "activeToday": 1,
+      "recentBeforeLaunch": 0
+    },
+    "now": {
+      "active5m": 61,
+      "active60m": 204,
+      "events60m": 13363,
+      "perMinuteStart": "2026-10-07T20:15:00Z",
+      "perMinute": [
+        205,
+        193,
+        230,
+        203,
+        215,
+        188,
+        220,
+        195,
+        252,
+        262,
+        251,
+        224,
+        235,
+        251,
+        231,
+        193,
+        197,
+        258,
+        256,
+        254,
+        228,
+        200,
+        228,
+        206,
+        258,
+        248,
+        198,
+        249,
+        221,
+        191,
+        188,
+        227,
+        249,
+        250,
+        238,
+        215,
+        231,
+        239,
+        240,
+        241,
+        261,
+        220,
+        193,
+        201,
+        220,
+        196,
+        244,
+        231,
+        247,
+        216,
+        202,
+        207,
+        187,
+        207,
+        211,
+        253,
+        259,
+        201,
+        252,
+        97
+      ]
+    },
+    "todayCounts": {
+      "newInstalls": 311,
+      "otherNewInstalls": 6,
+      "newInstallsFinishedTutorial": 254,
+      "activeInstalls": 1146,
+      "events": 96410,
+      "puzzlesStarted": 7982,
+      "puzzlesCompleted": 6904,
+      "installsCompletingPuzzle": 1021,
+      "dailiesCompleted": 402,
+      "onboardingCompleted": 262,
+      "storeOpens": 488,
+      "purchases": 14,
+      "purchasers": 13,
+      "dailyAmberClaims": 173,
+      "dailyAmberGranted": 10380,
+      "appErrors": 22,
+      "installsWithAppError": 15
+    },
+    "health": {
+      "databaseBytes": 612368384,
+      "activeInstalls24h": 1402,
+      "appErrors24h": 29,
+      "installsWithAppError24h": 19,
+      "appErrorsBySource": [
+        {
+          "source": "notification_schedule",
+          "events": 11,
+          "installs": 8
+        },
+        {
+          "source": "home_load",
+          "events": 7,
+          "installs": 5
+        },
+        {
+          "source": "story_record",
+          "events": 5,
+          "installs": 3
+        },
+        {
+          "source": "cloud_restore",
+          "events": 3,
+          "installs": 2
+        },
+        {
+          "source": "(other)",
+          "events": 3,
+          "installs": 3
+        }
+      ],
+      "cloudSync": [
+        {
+          "operation": "restore",
+          "result": "saved",
+          "events": 21,
+          "installs": 19
+        },
+        {
+          "operation": "upload",
+          "result": "conflict",
+          "events": 4,
+          "installs": 4
+        },
+        {
+          "operation": "upload",
+          "result": "failed",
+          "events": 2,
+          "installs": 2
+        },
+        {
+          "operation": "upload",
+          "result": "saved",
+          "events": 11204,
+          "installs": 1380
+        },
+        {
+          "operation": "upload",
+          "result": "unavailable",
+          "events": 18,
+          "installs": 12
+        }
+      ],
+      "saveFailures24h": 20,
+      "saveConflicts24h": 4,
+      "syncInstalls24h": 1399,
+      "saveFailureInstalls24h": 14,
+      "saveConflictInstalls24h": 4,
+      "puzzleGenerationFailed24h": 0
+    },
+    "ads24h": [
+      {
+        "format": "interstitial",
+        "placement": "(none)",
+        "result": "shown",
+        "events": 2104
+      },
+      {
+        "format": "interstitial",
+        "placement": "(none)",
+        "result": "suppressed",
+        "events": 5890
+      },
+      {
+        "format": "interstitial",
+        "placement": "(none)",
+        "result": "unavailable",
+        "events": 61
+      },
+      {
+        "format": "rewarded",
+        "placement": "daily_amber",
+        "result": "completed",
+        "events": 173
+      },
+      {
+        "format": "rewarded",
+        "placement": "daily_amber",
+        "result": "not_ready",
+        "events": 4
+      },
+      {
+        "format": "rewarded",
+        "placement": "hint_recovery",
+        "result": "completed",
+        "events": 402
+      },
+      {
+        "format": "rewarded",
+        "placement": "hint_recovery",
+        "result": "dismissed",
+        "events": 51
+      },
+      {
+        "format": "rewarded",
+        "placement": "hint_recovery",
+        "result": "not_ready",
+        "events": 9
+      },
+      {
+        "format": "rewarded",
+        "placement": "quest_bonus",
+        "result": "completed",
+        "events": 96
+      },
+      {
+        "format": "rewarded",
+        "placement": "quest_bonus",
+        "result": "dismissed",
+        "events": 7
+      },
+      {
+        "format": "rewarded",
+        "placement": "speed_rescue",
+        "result": "completed",
+        "events": 21
+      },
+      {
+        "format": "rewarded",
+        "placement": "speed_rescue",
+        "result": "dismissed",
+        "events": 3
+      },
+      {
+        "format": "rewarded",
+        "placement": "victory_double",
+        "result": "completed",
+        "events": 1420
+      },
+      {
+        "format": "rewarded",
+        "placement": "victory_double",
+        "result": "daily_cap",
+        "events": 12
+      },
+      {
+        "format": "rewarded",
+        "placement": "victory_double",
+        "result": "dismissed",
+        "events": 88
+      },
+      {
+        "format": "rewarded",
+        "placement": "victory_double",
+        "result": "not_ready",
+        "events": 31
+      }
+    ],
+    "versions24h": [
+      {
+        "appVersion": "1.4.7",
+        "installs": 1108,
+        "events": 88902,
+        "appErrors": 21
+      },
+      {
+        "appVersion": "1.4.6",
+        "installs": 301,
+        "events": 7480,
+        "appErrors": 8
+      }
+    ],
+    "dailyChallenge": {
+      "date": "2026-10-07",
+      "entrantsToday": 97,
+      "testerEntrantsToday": 1,
+      "entrantsYesterday": 84,
+      "submissions24h": 171,
+      "lastSubmissionAt": "2026-10-07T21:12:40Z",
+      "boardVersionsToday": [
+        {
+          "boardVersion": "daily_v2_4c1e0a9f2b7d33e1",
+          "entrants": 98
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "ok": true,
+  "section": "progress",
+  "serverNow": "2026-09-26T13:04:30Z",
+  "fetchedAt": "2026-09-26T13:04:25Z",
+  "ttlSec": 300,
+  "stale": false,
+  "error": null,
+  "notices": [],
+  "data": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-09-26T13:04:25Z",
+    "launchAt": "2026-09-26T13:00:00Z",
+    "launchAtIgnored": false,
+    "since": "2026-09-26T13:00:00Z",
+    "story": {
+      "installsOpened": 0,
+      "phases": [
+        {
+          "phase": 1,
+          "installs": 0,
+          "medianPuzzlesSolved": null
+        },
+        {
+          "phase": 2,
+          "installs": 0,
+          "medianPuzzlesSolved": null
+        },
+        {
+          "phase": 3,
+          "installs": 0,
+          "medianPuzzlesSolved": null
+        },
+        {
+          "phase": 4,
+          "installs": 0,
+          "medianPuzzlesSolved": null
+        },
+        {
+          "phase": 5,
+          "installs": 0,
+          "medianPuzzlesSolved": null
+        }
+      ],
+      "depth": [
+        {
+          "atLeast": 1,
+          "installs": 0
+        },
+        {
+          "atLeast": 3,
+          "installs": 0
+        },
+        {
+          "atLeast": 5,
+          "installs": 0
+        },
+        {
+          "atLeast": 8,
+          "installs": 0
+        },
+        {
+          "atLeast": 12,
+          "installs": 0
+        },
+        {
+          "atLeast": 20,
+          "installs": 0
+        },
+        {
+          "atLeast": 30,
+          "installs": 0
+        },
+        {
+          "atLeast": 50,
+          "installs": 0
+        },
+        {
+          "atLeast": 90,
+          "installs": 0
+        },
+        {
+          "atLeast": 120,
+          "installs": 0
+        }
+      ]
+    },
+    "store": {
+      "opens": 0,
+      "openers": 0,
+      "purchases": 0,
+      "purchasers": 0,
+      "purchasersFromStore": 0,
+      "products": []
+    }
+  }
+}

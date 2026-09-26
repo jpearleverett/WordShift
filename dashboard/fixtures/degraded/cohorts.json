@@ -1,0 +1,18 @@
+{
+  "ok": false,
+  "section": "cohorts",
+  "serverNow": "2026-09-26T22:40:20Z",
+  "fetchedAt": null,
+  "ttlSec": 300,
+  "stale": false,
+  "error": {
+    "code": "db_timeout",
+    "message": "The database query took too long. (57014)",
+    "at": "2026-09-26T22:39:40Z"
+  },
+  "notices": [
+    "db_tls_unverified",
+    "launch_at_unset"
+  ],
+  "data": null
+}

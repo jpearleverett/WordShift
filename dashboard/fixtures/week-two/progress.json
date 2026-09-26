@@ -1,0 +1,170 @@
+{
+  "ok": true,
+  "section": "progress",
+  "serverNow": "2026-10-07T21:14:05Z",
+  "fetchedAt": "2026-10-07T21:10:12Z",
+  "ttlSec": 300,
+  "stale": false,
+  "error": null,
+  "notices": [],
+  "data": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-10-07T21:10:12Z",
+    "launchAt": "2026-09-26T13:00:00Z",
+    "launchAtIgnored": false,
+    "since": "2026-09-26T13:00:00Z",
+    "story": {
+      "installsOpened": 4012,
+      "phases": [
+        {
+          "phase": 1,
+          "installs": 1388,
+          "medianPuzzlesSolved": 12
+        },
+        {
+          "phase": 2,
+          "installs": 604,
+          "medianPuzzlesSolved": 28
+        },
+        {
+          "phase": 3,
+          "installs": 97,
+          "medianPuzzlesSolved": 62
+        },
+        {
+          "phase": 4,
+          "installs": 6,
+          "medianPuzzlesSolved": 94
+        },
+        {
+          "phase": 5,
+          "installs": 0,
+          "medianPuzzlesSolved": null
+        }
+      ],
+      "depth": [
+        {
+          "atLeast": 1,
+          "installs": 3842
+        },
+        {
+          "atLeast": 3,
+          "installs": 3410
+        },
+        {
+          "atLeast": 5,
+          "installs": 2990
+        },
+        {
+          "atLeast": 8,
+          "installs": 2388
+        },
+        {
+          "atLeast": 12,
+          "installs": 1402
+        },
+        {
+          "atLeast": 20,
+          "installs": 960
+        },
+        {
+          "atLeast": 30,
+          "installs": 588
+        },
+        {
+          "atLeast": 50,
+          "installs": 231
+        },
+        {
+          "atLeast": 90,
+          "installs": 9
+        },
+        {
+          "atLeast": 120,
+          "installs": 0
+        }
+      ]
+    },
+    "store": {
+      "opens": 3904,
+      "openers": 1512,
+      "purchases": 118,
+      "purchasers": 97,
+      "purchasersFromStore": 84,
+      "products": [
+        {
+          "productId": "com.wordshift.starter",
+          "kind": "starter",
+          "initiated": 162,
+          "purchased": 51,
+          "purchasers": 51,
+          "cancelled": 104,
+          "failed": 7
+        },
+        {
+          "productId": "com.wordshift.remove_ads",
+          "kind": "adfree",
+          "initiated": 88,
+          "purchased": 29,
+          "purchasers": 29,
+          "cancelled": 56,
+          "failed": 3
+        },
+        {
+          "productId": "com.wordshift.amber_small",
+          "kind": "amber",
+          "initiated": 41,
+          "purchased": 16,
+          "purchasers": 14,
+          "cancelled": 23,
+          "failed": 2
+        },
+        {
+          "productId": "com.wordshift.supporter_monthly",
+          "kind": "supporter",
+          "initiated": 37,
+          "purchased": 9,
+          "purchasers": 9,
+          "cancelled": 27,
+          "failed": 1
+        },
+        {
+          "productId": "com.wordshift.hints_small",
+          "kind": "hints",
+          "initiated": 22,
+          "purchased": 8,
+          "purchasers": 7,
+          "cancelled": 13,
+          "failed": 1
+        },
+        {
+          "productId": "com.wordshift.amber_medium",
+          "kind": "amber",
+          "initiated": 12,
+          "purchased": 3,
+          "purchasers": 3,
+          "cancelled": 9,
+          "failed": 0
+        },
+        {
+          "productId": "com.wordshift.keepers_edition",
+          "kind": "keepers_edition",
+          "initiated": 6,
+          "purchased": 2,
+          "purchasers": 2,
+          "cancelled": 4,
+          "failed": 0
+        },
+        {
+          "productId": "com.wordshift.season_premium",
+          "kind": "season_premium",
+          "initiated": 5,
+          "purchased": 0,
+          "purchasers": 0,
+          "cancelled": 5,
+          "failed": 0
+        }
+      ]
+    }
+  }
+}

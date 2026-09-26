@@ -1,0 +1,124 @@
+{
+  "ok": true,
+  "section": "cohorts",
+  "serverNow": "2026-09-26T16:05:10Z",
+  "fetchedAt": "2026-09-26T16:03:40Z",
+  "ttlSec": 300,
+  "stale": false,
+  "error": null,
+  "notices": [],
+  "data": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-09-26T16:03:40Z",
+    "tz": "America/New_York",
+    "tzFallback": false,
+    "launchAt": "2026-09-26T13:00:00Z",
+    "launchAtIgnored": false,
+    "windowFrom": "2026-09-26T13:00:00Z",
+    "installsByDay": [
+      {
+        "day": "2026-09-26",
+        "newInstalls": 9,
+        "otherNewInstalls": 1,
+        "activeInstalls": 10,
+        "puzzlesCompleted": 58,
+        "dailiesCompleted": 0,
+        "purchases": 0,
+        "appErrors": 0
+      }
+    ],
+    "retention": {
+      "utcToday": "2026-09-26",
+      "cohorts": [
+        {
+          "cohortDay": "2026-09-26",
+          "installs": 9,
+          "otherInstalls": 1,
+          "d1": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d7": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        }
+      ],
+      "pooled": {
+        "d1": {
+          "installs": 0,
+          "retained": 0
+        },
+        "d7": {
+          "installs": 0,
+          "retained": 0
+        },
+        "d14": {
+          "installs": 0,
+          "retained": 0
+        }
+      }
+    },
+    "funnel": {
+      "installs": 9,
+      "startedLastHour": 3,
+      "steps": [
+        {
+          "step": "app_open",
+          "installs": 9
+        },
+        {
+          "step": "cold_open_puzzle",
+          "installs": 9
+        },
+        {
+          "step": "first_puzzle_completed",
+          "installs": 9
+        },
+        {
+          "step": "home_empty",
+          "installs": 8
+        },
+        {
+          "step": "fox_invited",
+          "installs": 8
+        },
+        {
+          "step": "going_to_pit",
+          "installs": 8
+        },
+        {
+          "step": "pit_intro",
+          "installs": 8
+        },
+        {
+          "step": "pit_offering",
+          "installs": 7
+        },
+        {
+          "step": "returning_home",
+          "installs": 7
+        },
+        {
+          "step": "unlock_explained",
+          "installs": 7
+        },
+        {
+          "step": "onboarding_complete",
+          "installs": 6
+        },
+        {
+          "step": "second_puzzle_completed",
+          "installs": 6
+        }
+      ]
+    }
+  }
+}

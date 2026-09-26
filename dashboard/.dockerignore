@@ -1,0 +1,12 @@
+node_modules/
+test/
+scripts/
+fixtures/
+*.md
+.deploy*
+*.pem
+*.crt
+*.key
+.env*
+.git*
+deploy.sh

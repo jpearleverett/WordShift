@@ -1,0 +1,454 @@
+{
+  "ok": true,
+  "section": "cohorts",
+  "serverNow": "2026-10-07T21:14:05Z",
+  "fetchedAt": "2026-10-07T21:10:12Z",
+  "ttlSec": 300,
+  "stale": false,
+  "error": null,
+  "notices": [],
+  "data": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-10-07T21:10:12Z",
+    "tz": "America/New_York",
+    "tzFallback": false,
+    "launchAt": "2026-09-26T13:00:00Z",
+    "launchAtIgnored": false,
+    "windowFrom": "2026-09-26T13:00:00Z",
+    "installsByDay": [
+      {
+        "day": "2026-09-26",
+        "newInstalls": 142,
+        "otherNewInstalls": 3,
+        "activeInstalls": 151,
+        "puzzlesCompleted": 1034,
+        "dailiesCompleted": 12,
+        "purchases": 2,
+        "appErrors": 6
+      },
+      {
+        "day": "2026-09-27",
+        "newInstalls": 298,
+        "otherNewInstalls": 5,
+        "activeInstalls": 402,
+        "puzzlesCompleted": 3120,
+        "dailiesCompleted": 35,
+        "purchases": 5,
+        "appErrors": 9
+      },
+      {
+        "day": "2026-09-28",
+        "newInstalls": 356,
+        "otherNewInstalls": 4,
+        "activeInstalls": 611,
+        "puzzlesCompleted": 4870,
+        "dailiesCompleted": 88,
+        "purchases": 9,
+        "appErrors": 12
+      },
+      {
+        "day": "2026-09-29",
+        "newInstalls": 330,
+        "otherNewInstalls": 6,
+        "activeInstalls": 760,
+        "puzzlesCompleted": 6010,
+        "dailiesCompleted": 140,
+        "purchases": 11,
+        "appErrors": 15
+      },
+      {
+        "day": "2026-09-30",
+        "newInstalls": 301,
+        "otherNewInstalls": 5,
+        "activeInstalls": 842,
+        "puzzlesCompleted": 6450,
+        "dailiesCompleted": 191,
+        "purchases": 10,
+        "appErrors": 18
+      },
+      {
+        "day": "2026-10-01",
+        "newInstalls": 287,
+        "otherNewInstalls": 7,
+        "activeInstalls": 910,
+        "puzzlesCompleted": 6880,
+        "dailiesCompleted": 240,
+        "purchases": 13,
+        "appErrors": 14
+      },
+      {
+        "day": "2026-10-02",
+        "newInstalls": 342,
+        "otherNewInstalls": 8,
+        "activeInstalls": 1012,
+        "puzzlesCompleted": 7310,
+        "dailiesCompleted": 280,
+        "purchases": 15,
+        "appErrors": 20
+      },
+      {
+        "day": "2026-10-03",
+        "newInstalls": 401,
+        "otherNewInstalls": 9,
+        "activeInstalls": 1150,
+        "puzzlesCompleted": 8120,
+        "dailiesCompleted": 331,
+        "purchases": 17,
+        "appErrors": 19
+      },
+      {
+        "day": "2026-10-04",
+        "newInstalls": 388,
+        "otherNewInstalls": 6,
+        "activeInstalls": 1204,
+        "puzzlesCompleted": 8390,
+        "dailiesCompleted": 362,
+        "purchases": 12,
+        "appErrors": 22
+      },
+      {
+        "day": "2026-10-05",
+        "newInstalls": 336,
+        "otherNewInstalls": 5,
+        "activeInstalls": 1188,
+        "puzzlesCompleted": 8010,
+        "dailiesCompleted": 371,
+        "purchases": 14,
+        "appErrors": 17
+      },
+      {
+        "day": "2026-10-06",
+        "newInstalls": 318,
+        "otherNewInstalls": 7,
+        "activeInstalls": 1170,
+        "puzzlesCompleted": 7760,
+        "dailiesCompleted": 388,
+        "purchases": 16,
+        "appErrors": 25
+      },
+      {
+        "day": "2026-10-07",
+        "newInstalls": 311,
+        "otherNewInstalls": 6,
+        "activeInstalls": 1146,
+        "puzzlesCompleted": 6904,
+        "dailiesCompleted": 402,
+        "purchases": 14,
+        "appErrors": 22
+      }
+    ],
+    "retention": {
+      "utcToday": "2026-10-07",
+      "cohorts": [
+        {
+          "cohortDay": "2026-10-07",
+          "installs": 306,
+          "otherInstalls": 6,
+          "d1": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d7": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-10-06",
+          "installs": 322,
+          "otherInstalls": 7,
+          "d1": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d7": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-10-05",
+          "installs": 339,
+          "otherInstalls": 5,
+          "d1": {
+            "matured": true,
+            "retained": 128,
+            "rate": 0.378
+          },
+          "d7": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-10-04",
+          "installs": 392,
+          "otherInstalls": 6,
+          "d1": {
+            "matured": true,
+            "retained": 146,
+            "rate": 0.372
+          },
+          "d7": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-10-03",
+          "installs": 398,
+          "otherInstalls": 9,
+          "d1": {
+            "matured": true,
+            "retained": 161,
+            "rate": 0.405
+          },
+          "d7": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-10-02",
+          "installs": 335,
+          "otherInstalls": 8,
+          "d1": {
+            "matured": true,
+            "retained": 128,
+            "rate": 0.382
+          },
+          "d7": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-10-01",
+          "installs": 290,
+          "otherInstalls": 7,
+          "d1": {
+            "matured": true,
+            "retained": 104,
+            "rate": 0.359
+          },
+          "d7": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-09-30",
+          "installs": 305,
+          "otherInstalls": 5,
+          "d1": {
+            "matured": true,
+            "retained": 112,
+            "rate": 0.367
+          },
+          "d7": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-09-29",
+          "installs": 327,
+          "otherInstalls": 6,
+          "d1": {
+            "matured": true,
+            "retained": 121,
+            "rate": 0.37
+          },
+          "d7": {
+            "matured": true,
+            "retained": 51,
+            "rate": 0.156
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-09-28",
+          "installs": 351,
+          "otherInstalls": 4,
+          "d1": {
+            "matured": true,
+            "retained": 138,
+            "rate": 0.393
+          },
+          "d7": {
+            "matured": true,
+            "retained": 58,
+            "rate": 0.165
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-09-27",
+          "installs": 301,
+          "otherInstalls": 5,
+          "d1": {
+            "matured": true,
+            "retained": 116,
+            "rate": 0.385
+          },
+          "d7": {
+            "matured": true,
+            "retained": 52,
+            "rate": 0.173
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        },
+        {
+          "cohortDay": "2026-09-26",
+          "installs": 131,
+          "otherInstalls": 3,
+          "d1": {
+            "matured": true,
+            "retained": 51,
+            "rate": 0.389
+          },
+          "d7": {
+            "matured": true,
+            "retained": 24,
+            "rate": 0.183
+          },
+          "d14": {
+            "matured": false,
+            "retained": 0,
+            "rate": null
+          }
+        }
+      ],
+      "pooled": {
+        "d1": {
+          "installs": 3169,
+          "retained": 1205
+        },
+        "d7": {
+          "installs": 1110,
+          "retained": 185
+        },
+        "d14": {
+          "installs": 0,
+          "retained": 0
+        }
+      }
+    },
+    "funnel": {
+      "installs": 3797,
+      "startedLastHour": 14,
+      "steps": [
+        {
+          "step": "app_open",
+          "installs": 3793
+        },
+        {
+          "step": "cold_open_puzzle",
+          "installs": 3797
+        },
+        {
+          "step": "first_puzzle_completed",
+          "installs": 3653
+        },
+        {
+          "step": "home_empty",
+          "installs": 3626
+        },
+        {
+          "step": "fox_invited",
+          "installs": 3497
+        },
+        {
+          "step": "going_to_pit",
+          "installs": 3391
+        },
+        {
+          "step": "pit_intro",
+          "installs": 3383
+        },
+        {
+          "step": "pit_offering",
+          "installs": 3303
+        },
+        {
+          "step": "returning_home",
+          "installs": 3231
+        },
+        {
+          "step": "unlock_explained",
+          "installs": 3212
+        },
+        {
+          "step": "onboarding_complete",
+          "installs": 3159
+        },
+        {
+          "step": "second_puzzle_completed",
+          "installs": 2927
+        }
+      ]
+    }
+  }
+}

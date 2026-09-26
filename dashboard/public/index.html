@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+<meta name="robots" content="noindex, nofollow">
+<title>WordShift live</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/app.css">
+<script type="module" src="/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the numbers</a>
+<header class="top">
+  <div class="top-inner">
+    <div class="top-text">
+      <h1>WordShift live</h1>
+      <p class="fresh" id="fresh">Loading</p>
+    </div>
+    <form method="post" action="/logout" class="signout">
+      <button type="submit" class="btn-quiet" title="Signs out this device only">Sign out</button>
+    </form>
+  </div>
+</header>
+
+<main id="main" class="page">
+  <div id="notices" class="notices" role="region" aria-label="Setup notices" hidden></div>
+
+  <section class="status-strip" aria-labelledby="h-status">
+    <h2 id="h-status" class="sr-only">Status at a glance</h2>
+    <div id="status-chips" class="chips">
+      <div class="chip chip-neutral"><div class="chip-text"><p class="chip-kicker">Data</p><p class="chip-title">Loading</p></div></div>
+      <div class="chip chip-neutral"><div class="chip-text"><p class="chip-kicker">Players</p><p class="chip-title">Loading</p></div></div>
+      <div class="chip chip-neutral"><div class="chip-text"><p class="chip-kicker">Problems</p><p class="chip-title">Loading</p></div></div>
+    </div>
+  </section>
+
+  <div class="columns">
+    <div class="col">
+      <section class="card" id="sec-now" aria-labelledby="h-now">
+        <h2 id="h-now">Right now</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-today" aria-labelledby="h-today">
+        <h2 id="h-today">Today</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-installs" aria-labelledby="h-installs">
+        <h2 id="h-installs">New installs by day</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-funnel" aria-labelledby="h-funnel">
+        <h2 id="h-funnel">Tutorial funnel</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-retention" aria-labelledby="h-retention">
+        <h2 id="h-retention">Retention</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-story" aria-labelledby="h-story">
+        <h2 id="h-story">Story progress</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+    </div>
+    <div class="col">
+      <section class="card" id="sec-money" aria-labelledby="h-money">
+        <h2 id="h-money">Money</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-health" aria-labelledby="h-health">
+        <h2 id="h-health">Health</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-daily" aria-labelledby="h-daily">
+        <h2 id="h-daily">Daily Challenge</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-builds" aria-labelledby="h-builds">
+        <h2 id="h-builds">Builds, 24&nbsp;h</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-links" aria-labelledby="h-links">
+        <h2 id="h-links">Other dashboards</h2>
+        <div class="body"><p class="loading">Loading</p></div>
+      </section>
+      <section class="card" id="sec-glossary" aria-labelledby="h-glossary">
+        <h2 id="h-glossary">What these numbers mean</h2>
+        <details class="glossary">
+          <summary>Read the definitions</summary>
+          <dl>
+            <dt>Install, or device</dt>
+            <dd>An anonymous install id that sent telemetry to the database. This is not the Play Console install count. A phone that never uploads, because it stays offline or its telemetry failed, is invisible here.</dd>
+            <dt>Pre-launch tester</dt>
+            <dd>A device whose first event reached the server before the launch time (DASHBOARD_LAUNCH_AT, shown in the Today card). Testers are left out of every count except the last event time and the test device counts. If the launch time is not set, nobody is a tester and a notice says so. If 5 or more test devices first appeared in the 24 hours before the launch time, a notice warns that the launch time is probably too late. A phone you clear or reinstall after launch gets a new id and counts as a new player.</dd>
+            <dt>First seen</dt>
+            <dd>The first time the server received anything from the device, by the server clock, never the phone clock.</dd>
+            <dt>New install</dt>
+            <dd>First seen in the period and shown the opening puzzle. For cohorts, the opening puzzle has to come within a day of first seen.</dd>
+            <dt>Other new device</dt>
+            <dd>First seen in the period without the opening puzzle. For example a returning player restoring onto a new phone, or a first session whose telemetry was lost. Counted on its own, never in retention or the funnel.</dd>
+            <dt>Active</dt>
+            <dd>Sent at least one event in the window. The app uploads at most once a minute while it is open, and an offline session counts when its batch lands.</dd>
+            <dt>Today</dt>
+            <dd>From local midnight in DASHBOARD_TZ to now, by the time the server received each event.</dd>
+            <dt>Retention cohorts</dt>
+            <dd>New installs grouped by the UTC day they were first seen. D1, D7 and D14 mean the device sent at least one event on exactly that day plus 1, 7 or 14, not any day since. A first session that runs past 00:00 UTC (8 pm New York) already counts toward D1, so D1 reads a little high for evening players. A rate stays pending until that day has fully ended in UTC.</dd>
+            <dt>Small sample</dt>
+            <dd>Any rate built on fewer than 30 devices is marked too small to judge.</dd>
+            <dt>Purchases</dt>
+            <dd>Checkouts the app reported, leaving out the old amber season unlock. They are not revenue. RevenueCat and Play hold the money truth.</dd>
+            <dt>Problems</dt>
+            <dd>App errors and failed cloud saves are judged by the share of devices they hit, never by a bare count: a problem needs at least 3 devices and 1% of active devices with an app error, or 5% of syncing devices with a failed save. Server unavailable includes players who are offline. Crashes reach only Sentry, so without Sentry connected the Problems chip cannot say nothing is broken.</dd>
+            <dt>Daily Challenge dates</dt>
+            <dd>Each player's Daily follows their own local date. A player whose date is already ahead of yours counts under tomorrow's Daily.</dd>
+            <dt>How fresh</dt>
+            <dd>This page asks for live numbers every 30 seconds and for the rest every minute, and pauses while it is hidden. The server reuses live numbers for 20 seconds and the heavier ones for 5 minutes; those cards say "As of" the time they were counted.</dd>
+            <dt>Signing out</dt>
+            <dd>Sign out ends the session on this device only. A session copied elsewhere stays valid for up to 30 days. To sign out every device, run bash deploy.sh --rotate-session or change the password.</dd>
+          </dl>
+        </details>
+      </section>
+    </div>
+  </div>
+</main>
+<div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+<noscript><p class="page">This dashboard needs JavaScript.</p></noscript>
+</body>
+</html>

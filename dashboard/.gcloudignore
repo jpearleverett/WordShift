@@ -1,0 +1,15 @@
+# Files `gcloud run deploy --source .` does NOT upload. Only package.json,
+# package-lock.json, Dockerfile, .dockerignore, src/ and public/ are needed.
+.gcloudignore
+node_modules/
+test/
+scripts/
+fixtures/
+*.md
+.deploy*
+*.pem
+*.crt
+*.key
+.env*
+.git*
+deploy.sh

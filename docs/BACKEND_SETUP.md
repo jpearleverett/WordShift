@@ -86,13 +86,27 @@ For a new project, apply the following as `postgres`, in order:
 11. [`event_retention_v2.sql`](supabase/event_retention_v2.sql) (raw events kept
     180 days, a permanent daily count rollup written before pruning; the
     existing cron job picks it up with no re-scheduling).
+12. Optional: [`dashboard_reader_v1.sql`](supabase/dashboard_reader_v1.sql), only
+    if you deploy the private launch dashboard ([`dashboard/README.md`](../dashboard/README.md)).
+    It creates the `dashboard_reader` role WITHOUT a login, three
+    aggregate-only functions it alone may execute, and one index on
+    `events (type, received_at)`. It is not part of `apply_upgrade.sql`. Run it
+    after file 11, then run the single `alter role dashboard_reader with login
+    password '<SCRAM verifier>'` line that `dashboard/deploy.sh` prints (a hash,
+    never the password). Re-running the file keeps the login and password; it
+    changes no object from files 1 to 11. Offline rehearsal (PGlite, no
+    network): `npm --prefix /tmp/wordshift-sql install @electric-sql/pglite@0.5.8`,
+    then `node docs/supabase/rehearse_dashboard.mjs /tmp/wordshift-sql/package.json`.
+    Read-only checks after applying are in the dashboard README, "Checking the
+    database side".
 
 For the existing WordShift project, skip the base schema and run
 `psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f docs/supabase/apply_upgrade.sql`,
 or run files 2–11 above in the dashboard SQL editor, in order (every file is
 transactional and rerunnable, so re-running the already-applied 2 to 8 is
 harmless; files 9 to 11 were applied on 2026-09-22, so on the hosted project
-the whole run is now a no-op).
+the whole run is now a no-op). Optional file 12 is separate and was added on
+2026-09-26 (launch day); it has not been applied to the hosted project yet.
 **Order matters on any partial re-run:** files 9 and 11 replace functions that
 files 8 and 7 define, so re-running `rate_limits_v1.sql` or
 `event_retention.sql` on its own reverts them; re-run 9 to 11 afterwards. The

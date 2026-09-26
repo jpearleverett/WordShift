@@ -1,0 +1,173 @@
+{
+  "ok": true,
+  "section": "live",
+  "serverNow": "2026-09-26T16:05:10Z",
+  "fetchedAt": "2026-09-26T16:05:02Z",
+  "ttlSec": 20,
+  "stale": false,
+  "error": null,
+  "notices": [],
+  "data": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-09-26T16:05:02Z",
+    "tz": "America/New_York",
+    "tzFallback": false,
+    "launchAt": "2026-09-26T13:00:00Z",
+    "launchAtIgnored": false,
+    "today": "2026-09-26",
+    "todayStart": "2026-09-26T04:00:00Z",
+    "freshness": {
+      "lastEventReceivedAt": "2026-09-26T16:04:58Z",
+      "lastPlayerEventReceivedAt": "2026-09-26T16:04:58Z"
+    },
+    "testers": {
+      "devices": 9,
+      "activeToday": 1,
+      "recentBeforeLaunch": 1
+    },
+    "now": {
+      "active5m": 3,
+      "active60m": 7,
+      "events60m": 221,
+      "perMinuteStart": "2026-09-26T15:06:00Z",
+      "perMinute": [
+        2,
+        7,
+        5,
+        0,
+        0,
+        7,
+        3,
+        0,
+        1,
+        8,
+        8,
+        4,
+        4,
+        4,
+        5,
+        6,
+        6,
+        0,
+        4,
+        7,
+        3,
+        4,
+        1,
+        6,
+        7,
+        3,
+        1,
+        8,
+        1,
+        4,
+        0,
+        0,
+        1,
+        5,
+        6,
+        1,
+        5,
+        7,
+        2,
+        5,
+        3,
+        3,
+        4,
+        6,
+        0,
+        1,
+        7,
+        5,
+        3,
+        8,
+        4,
+        1,
+        2,
+        7,
+        5,
+        4,
+        1,
+        3,
+        1,
+        2
+      ]
+    },
+    "todayCounts": {
+      "newInstalls": 9,
+      "otherNewInstalls": 1,
+      "newInstallsFinishedTutorial": 6,
+      "activeInstalls": 10,
+      "events": 1184,
+      "puzzlesStarted": 71,
+      "puzzlesCompleted": 58,
+      "installsCompletingPuzzle": 9,
+      "dailiesCompleted": 0,
+      "onboardingCompleted": 6,
+      "storeOpens": 2,
+      "purchases": 0,
+      "purchasers": 0,
+      "dailyAmberClaims": 0,
+      "dailyAmberGranted": 0,
+      "appErrors": 0,
+      "installsWithAppError": 0
+    },
+    "health": {
+      "databaseBytes": 41943040,
+      "activeInstalls24h": 10,
+      "appErrors24h": 0,
+      "installsWithAppError24h": 0,
+      "appErrorsBySource": [],
+      "cloudSync": [
+        {
+          "operation": "upload",
+          "result": "saved",
+          "events": 74,
+          "installs": 10
+        }
+      ],
+      "saveFailures24h": 0,
+      "saveConflicts24h": 0,
+      "syncInstalls24h": 10,
+      "saveFailureInstalls24h": 0,
+      "saveConflictInstalls24h": 0,
+      "puzzleGenerationFailed24h": 0
+    },
+    "ads24h": [
+      {
+        "format": "interstitial",
+        "placement": "(none)",
+        "result": "suppressed",
+        "events": 52
+      },
+      {
+        "format": "rewarded",
+        "placement": "hint_recovery",
+        "result": "completed",
+        "events": 1
+      }
+    ],
+    "versions24h": [
+      {
+        "appVersion": "1.4.6",
+        "installs": 10,
+        "events": 1184,
+        "appErrors": 0
+      }
+    ],
+    "dailyChallenge": {
+      "date": "2026-09-26",
+      "entrantsToday": 0,
+      "testerEntrantsToday": 1,
+      "entrantsYesterday": 0,
+      "submissions24h": 1,
+      "lastSubmissionAt": "2026-09-26T14:02:11Z",
+      "boardVersionsToday": [
+        {
+          "boardVersion": "daily_v2_b18ea5e220d9fa7b",
+          "entrants": 1
+        }
+      ]
+    }
+  }
+}

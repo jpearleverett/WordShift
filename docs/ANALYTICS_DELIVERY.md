@@ -81,6 +81,13 @@ install-based views. **Status: applied by the owner on 2026-09-22 and verified
 with the read-only probes in backend setup.** They need no client change; the current build is app
 1.4.5 / versionCode 110.
 
+The private launch dashboard ([`dashboard/README.md`](../dashboard/README.md), added
+2026-09-26) shows the same tutorial funnel, D1/D7/D14 retention, phases and store
+funnel on a phone, refreshed every 30 seconds to 5 minutes. It reads them through
+its own aggregate-only functions ([`supabase/dashboard_reader_v1.sql`](supabase/dashboard_reader_v1.sql),
+optional file 12 in backend setup), never these service-role views, and it also
+leaves out devices first seen before the launch time.
+
 ### Applying
 
 As `postgres`, after the files already live and after

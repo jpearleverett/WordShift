@@ -1,0 +1,174 @@
+{
+  "ok": true,
+  "section": "external",
+  "serverNow": "2026-10-07T21:14:05Z",
+  "fetchedAt": "2026-10-07T21:11:03Z",
+  "ttlSec": 300,
+  "stale": false,
+  "error": null,
+  "notices": [],
+  "data": {
+    "revenuecat": {
+      "status": "ok",
+      "fetchedAt": "2026-10-07T21:11:02Z",
+      "lastTriedAt": "2026-10-07T21:11:02Z",
+      "error": null,
+      "currency": "USD",
+      "metrics": [
+        {
+          "id": "active_trials",
+          "name": "Active Trials",
+          "value": 0,
+          "unit": "#",
+          "period": "P0D",
+          "lastUpdatedAt": "2026-10-07T21:05:44Z"
+        },
+        {
+          "id": "active_subscriptions",
+          "name": "Active Subscriptions",
+          "value": 9,
+          "unit": "#",
+          "period": "P0D",
+          "lastUpdatedAt": "2026-10-07T21:05:44Z"
+        },
+        {
+          "id": "mrr",
+          "name": "MRR",
+          "value": 35.91,
+          "unit": "$",
+          "period": "P0D",
+          "lastUpdatedAt": "2026-10-07T21:05:44Z"
+        },
+        {
+          "id": "revenue",
+          "name": "Revenue",
+          "value": 1284.37,
+          "unit": "$",
+          "period": "P28D",
+          "lastUpdatedAt": "2026-10-07T21:05:44Z"
+        },
+        {
+          "id": "new_customers",
+          "name": "New Customers",
+          "value": 3904,
+          "unit": "#",
+          "period": "P28D",
+          "lastUpdatedAt": "2026-10-07T19:48:10Z"
+        },
+        {
+          "id": "active_users",
+          "name": "Active Users",
+          "value": 1688,
+          "unit": "#",
+          "period": "P28D",
+          "lastUpdatedAt": "2026-10-07T19:48:10Z"
+        },
+        {
+          "id": "num_tx_last_28_days",
+          "name": "Transactions",
+          "value": 118,
+          "unit": "#",
+          "period": "P28D",
+          "lastUpdatedAt": "2026-10-07T21:05:44Z"
+        }
+      ],
+      "dashboardUrl": "https://app.revenuecat.com/"
+    },
+    "sentry": {
+      "status": "ok",
+      "fetchedAt": "2026-10-07T21:11:03Z",
+      "lastTriedAt": "2026-10-07T21:11:03Z",
+      "error": null,
+      "environment": "production",
+      "crashFreeSessionRate24h": 0.9938,
+      "sessions24h": 9812,
+      "unresolvedIssues24h": 5,
+      "unresolvedIssuesIsLowerBound": true,
+      "newestIssues": [
+        {
+          "shortId": "WORDSHIFT-5K",
+          "title": "Error: Journal replay rejected a stale write",
+          "level": "error",
+          "events": 7,
+          "users": 5,
+          "firstSeen": "2026-10-07T18:22:41Z",
+          "lastSeen": "2026-10-07T20:58:13Z",
+          "url": "https://iridescent-games-9n.sentry.io/issues/6851120441/"
+        },
+        {
+          "shortId": "WORDSHIFT-5J",
+          "title": "TypeError: Cannot read property 'uri' of null",
+          "level": "error",
+          "events": 3,
+          "users": 3,
+          "firstSeen": "2026-10-07T11:04:09Z",
+          "lastSeen": "2026-10-07T19:30:55Z",
+          "url": "https://iridescent-games-9n.sentry.io/issues/6850733120/"
+        },
+        {
+          "shortId": "WORDSHIFT-5H",
+          "title": "ANR: Input dispatching timed out (MainActivity)",
+          "level": "fatal",
+          "events": 12,
+          "users": 9,
+          "firstSeen": "2026-10-06T22:17:30Z",
+          "lastSeen": "2026-10-07T21:01:02Z",
+          "url": "https://iridescent-games-9n.sentry.io/issues/6849902257/"
+        },
+        {
+          "shortId": "WORDSHIFT-5G",
+          "title": "Error: Notification schedule refused: exact alarm permission missing",
+          "level": "warning",
+          "events": 11,
+          "users": 8,
+          "firstSeen": "2026-10-06T14:40:51Z",
+          "lastSeen": "2026-10-07T20:49:37Z",
+          "url": "https://iridescent-games-9n.sentry.io/issues/6848811093/"
+        },
+        {
+          "shortId": "WORDSHIFT-5F",
+          "title": "Error: Unreadable story record set aside",
+          "level": "error",
+          "events": 2,
+          "users": 2,
+          "firstSeen": "2026-10-06T09:12:18Z",
+          "lastSeen": "2026-10-07T08:03:44Z",
+          "url": "https://iridescent-games-9n.sentry.io/issues/6847520019/"
+        }
+      ],
+      "issuesUrl": "https://iridescent-games-9n.sentry.io/issues/?project=4511612372844544&environment=production&statsPeriod=24h"
+    },
+    "links": [
+      {
+        "id": "play_console",
+        "label": "Google Play Console",
+        "url": "https://play.google.com/console/",
+        "note": "Installs, uninstalls, ratings, reviews and Android vitals (crash and ANR rates). Usually 1 to 3 days behind, so this dashboard sees players first."
+      },
+      {
+        "id": "admob",
+        "label": "AdMob",
+        "url": "https://admob.google.com/",
+        "note": "Ad requests, fill, impressions and estimated earnings. Most numbers arrive within about 4 hours; earnings are final at the end of the month."
+      },
+      {
+        "id": "revenuecat",
+        "label": "RevenueCat",
+        "url": "https://app.revenuecat.com/",
+        "note": "Real revenue, subscriptions, trials and refunds. The money truth for purchases."
+      },
+      {
+        "id": "sentry",
+        "label": "Sentry",
+        "url": "https://iridescent-games-9n.sentry.io/issues/?project=4511612372844544&environment=production&statsPeriod=24h",
+        "note": "Crash and error reports with stack traces."
+      },
+      {
+        "id": "supabase",
+        "label": "Supabase",
+        "url": "https://supabase.com/dashboard/project/rsppoarumebdrsbfrqdi",
+        "note": "Database health, disk usage and the SQL editor."
+      }
+    ]
+  }
+}

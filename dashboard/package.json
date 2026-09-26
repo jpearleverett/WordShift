@@ -1,0 +1,17 @@
+{
+  "name": "wordshift-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private launch dashboard for WordShift, served from Google Cloud Run.",
+  "type": "module",
+  "engines": { "node": ">=22 <23" },
+  "scripts": {
+    "start": "node src/server.js",
+    "demo": "node scripts/demo.mjs",
+    "dev:fixtures": "node scripts/demo.mjs",
+    "test": "node --test \"test/**/*.test.js\"",
+    "test:ui": "node --test \"test/ui/*.smoke.js\""
+  },
+  "dependencies": { "pg": "8.23.0" },
+  "devDependencies": { "@electric-sql/pglite": "0.5.8", "playwright-core": "1.63.0" }
+}

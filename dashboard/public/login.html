@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f9f9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0d0d" media="(prefers-color-scheme: dark)">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign in: WordShift live</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body class="login-page">
+<main class="login">
+  <div class="login-card">
+    <img class="login-mark" src="/favicon.svg" alt="" width="40" height="40">
+    <h1>WordShift live</h1>
+    <form method="post" action="/login" class="login-form">
+      <input type="text" name="username" value="owner" autocomplete="username" hidden>
+      <label for="password">Password</label>
+      <input id="password" type="password" name="password" autocomplete="current-password" required maxlength="256" autofocus>
+      <button type="submit" class="btn-primary">Sign in</button>
+    </form>
+    <p class="login-message" role="status">{{MESSAGE}}</p>
+    <p class="footnote">Private dashboard.</p>
+  </div>
+</main>
+</body>
+</html>

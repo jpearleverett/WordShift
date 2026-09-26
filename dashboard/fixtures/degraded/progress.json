@@ -1,0 +1,132 @@
+{
+  "ok": false,
+  "section": "progress",
+  "serverNow": "2026-09-26T22:40:20Z",
+  "fetchedAt": "2026-09-26T22:21:30Z",
+  "ttlSec": 300,
+  "stale": true,
+  "error": {
+    "code": "db_unreachable",
+    "message": "Could not reach the database pooler. (ECONNRESET)",
+    "at": "2026-09-26T22:38:10Z"
+  },
+  "notices": [
+    "db_tls_unverified",
+    "launch_at_unset"
+  ],
+  "data": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-09-26T22:21:30Z",
+    "launchAt": null,
+    "launchAtIgnored": false,
+    "since": "2026-08-27T22:21:30Z",
+    "story": {
+      "installsOpened": 214,
+      "phases": [
+        {
+          "phase": 1,
+          "installs": 19,
+          "medianPuzzlesSolved": 12
+        },
+        {
+          "phase": 2,
+          "installs": 1,
+          "medianPuzzlesSolved": 29
+        },
+        {
+          "phase": 3,
+          "installs": 0,
+          "medianPuzzlesSolved": null
+        },
+        {
+          "phase": 4,
+          "installs": 0,
+          "medianPuzzlesSolved": null
+        },
+        {
+          "phase": 5,
+          "installs": 0,
+          "medianPuzzlesSolved": null
+        }
+      ],
+      "depth": [
+        {
+          "atLeast": 1,
+          "installs": 190
+        },
+        {
+          "atLeast": 3,
+          "installs": 171
+        },
+        {
+          "atLeast": 5,
+          "installs": 140
+        },
+        {
+          "atLeast": 8,
+          "installs": 92
+        },
+        {
+          "atLeast": 12,
+          "installs": 20
+        },
+        {
+          "atLeast": 20,
+          "installs": 3
+        },
+        {
+          "atLeast": 30,
+          "installs": 1
+        },
+        {
+          "atLeast": 50,
+          "installs": 0
+        },
+        {
+          "atLeast": 90,
+          "installs": 0
+        },
+        {
+          "atLeast": 120,
+          "installs": 0
+        }
+      ]
+    },
+    "store": {
+      "opens": 60,
+      "openers": 44,
+      "purchases": 3,
+      "purchasers": 3,
+      "purchasersFromStore": 2,
+      "products": [
+        {
+          "productId": "com.wordshift.starter",
+          "kind": "starter",
+          "initiated": 5,
+          "purchased": 2,
+          "purchasers": 2,
+          "cancelled": 3,
+          "failed": 0
+        },
+        {
+          "productId": "com.wordshift.remove_ads",
+          "kind": "adfree",
+          "initiated": 2,
+          "purchased": 1,
+          "purchasers": 1,
+          "cancelled": 1,
+          "failed": 0
+        },
+        {
+          "productId": "(other)",
+          "kind": "(other)",
+          "initiated": 1,
+          "purchased": 0,
+          "purchasers": 0,
+          "cancelled": 0,
+          "failed": 1
+        }
+      ]
+    }
+  }
+}
