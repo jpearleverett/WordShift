@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { makeTile, TILE_W, TILE_H, TILE_D } from '../core/tiles.js';
-import { clamp, ease, spring } from '../core/math.js';
+import { clamp, ease, spring, hash01 } from '../core/math.js';
 import { pixelWood } from './house.js';
 
 export const GAP = 0.12;
@@ -80,7 +80,76 @@ export function landSquash(s) {
   return [1 + 0.1 * k, sy, 1 + 0.1 * k];
 }
 
-/** A parchment tray with a wooden rim, sized for n tiles. */
+/** Art pixels per tile unit on a tray face: 1 art px = 0.05 tile units = 0.0225 world, the house's art pixel. */
+const TRAY_PX = 20;
+/** The parchment (spec 2.2). The face's texture and its self-light both keep this as their mean. */
+const TRAY_BASE = '#F3E2BF';
+/** Contact shade: how much darker the parchment gets right at a tile's edge, how far it reaches, and its cap. */
+const TRAY_CONTACT = { dark: 0.14, reach: 0.22, cap: 0.15 };
+/** At most this many tiles shade one tray (a row's tiles plus one arriving in flight). */
+const TRAY_MAX_TILES = 8;
+
+/**
+ * The tray face's parchment, one texel per art pixel: #F3E2BF with a +-4 luma grain, a
+ * 2 px #D8C29E ring where the parchment meets the wooden rim and a 1 px light lip inside it.
+ * Deterministic (hashed per texel) and NearestFilter, so it stays pixel art up close.
+ */
+function trayFaceTexture(w, h) {
+  const W = Math.max(8, Math.round(w * TRAY_PX)), H = Math.max(8, Math.round(h * TRAY_PX));
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, H);
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const base = rgb(TRAY_BASE), ring = rgb('#D8C29E'), lip = rgb('#F9ECCD');
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const e = Math.min(x, y, W - 1 - x, H - 1 - y);
+      const col = e < 2 ? ring : e < 3 ? lip : base;
+      // a triangular grain in -4..4 (two hashes), the same step on every channel (a luma step)
+      const k = x * 7919 + y * 104729 + W * 31;
+      const o = Math.round((hash01(k) + hash01(k + 1) - 1) * 4);
+      const i = (y * W + x) * 4;
+      for (let ch = 0; ch < 3; ch++) img.data[i + ch] = Math.min(255, Math.max(0, col[ch] + o));
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.anisotropy = 8;
+  return { tex: t, W, H };
+}
+
+const TRAY_FRAGMENT_HEAD = `
+uniform vec4 uTrayTiles[${TRAY_MAX_TILES}];
+uniform vec2 uTraySize;
+uniform vec2 uTrayTexels;
+uniform vec3 uTrayInvBase;
+// contact shade under the tiles, evaluated at the art pixel's centre so it steps like the art:
+// a rounded-rect falloff around each tile (x, y, strength, scale in face units), nudged down a
+// touch toward the side away from the light, combined and capped
+float trayContact( vec2 uv ) {
+  vec2 p = ( ( floor( uv * uTrayTexels ) + 0.5 ) / uTrayTexels - 0.5 ) * uTraySize;
+  float keep = 1.0;
+  for ( int i = 0; i < ${TRAY_MAX_TILES}; i++ ) {
+    vec4 tl = uTrayTiles[ i ];
+    if ( tl.z <= 0.0 ) continue;
+    vec2 q = max( abs( p - tl.xy - vec2( 0.02, -0.07 ) ) - vec2( 0.5, 0.61 ) * tl.w, 0.0 );
+    keep *= 1.0 - tl.z * ( 1.0 - smoothstep( 0.0, ${TRAY_CONTACT.reach.toFixed(3)}, length( q ) ) );
+  }
+  return max( keep, ${(1 - TRAY_CONTACT.cap).toFixed(3)} );
+}
+`;
+
+/**
+ * A parchment tray with a wooden rim, sized for n tiles. The face is the game's parchment in
+ * pixel-art grain with a ring bevel (trayFaceTexture), and each tile grounds itself on it with a
+ * stepped contact shade that follows the tile wherever it sits (the rows reflow between 3 and
+ * 5 letters in a 7-slot tray, and MOSTLY is 6 in 7, so a shade baked at fixed slots would sit
+ * between tiles or under empty ones). The texture is also the emissive map, divided by the
+ * parchment, so a shot's self-light on the tray (oner's TRAY_EMISSIVE, emissive #F3E2BF)
+ * keeps its level and gains the grain. Everything is read from the current frame's pose.
+ */
 export function makeTray(n, { depth = 0.7 } = {}) {
   const w = n * PITCH + 0.5, h = TILE_H + 0.42;
   const group = new THREE.Group();
@@ -89,9 +158,44 @@ export function makeTray(n, { depth = 0.7 } = {}) {
   const rim = new THREE.Mesh(new THREE.BoxGeometry(w + 0.24, h + 0.24, depth), new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.7 }));
   rim.position.z = -depth / 2 - TILE_D / 2 + 0.06;
   rim.castShadow = true; rim.receiveShadow = true;
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ color: '#F3E2BF', roughness: 0.85 }));
+  const { tex, W, H } = trayFaceTexture(w, h);
+  const faceMat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, roughness: 0.85 });
+  const base = new THREE.Color(TRAY_BASE);
+  const tilesU = { value: Array.from({ length: TRAY_MAX_TILES }, () => new THREE.Vector4()) };
+  faceMat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTrayTiles = tilesU;
+    sh.uniforms.uTraySize = { value: new THREE.Vector2(w, h) };
+    sh.uniforms.uTrayTexels = { value: new THREE.Vector2(W, H) };
+    sh.uniforms.uTrayInvBase = { value: new THREE.Vector3(1 / base.r, 1 / base.g, 1 / base.b) };
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\n' + TRAY_FRAGMENT_HEAD)
+      .replace('#include <map_fragment>', '#include <map_fragment>\n  float trayAO = trayContact( vMapUv );\n  diffuseColor.rgb *= trayAO;')
+      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= texture2D( emissiveMap, vEmissiveMapUv ).rgb * uTrayInvBase * trayAO;');
+  };
+  faceMat.customProgramCacheKey = () => 'tray-face';
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(w, h), faceMat);
   face.position.z = -TILE_D / 2 + 0.065;
   face.receiveShadow = true;
+  // the tiles near this face, in its own units: seated tiles shade fully, a lifted or
+  // flying one fades out as it leaves the parchment
+  const inv = new THREE.Matrix4(), v = new THREE.Vector3(), sv = new THREE.Vector3(), fs = new THREE.Vector3();
+  face.onBeforeRender = () => {
+    const root = group.parent?.parent || group.parent;
+    for (const u of tilesU.value) u.set(0, 0, 0, 1);
+    if (!root) return;
+    inv.copy(face.matrixWorld).invert();
+    fs.setFromMatrixScale(face.matrixWorld);
+    let k = 0;
+    root.traverseVisible((o) => {
+      if (k >= TRAY_MAX_TILES || !o.userData?.faceMat || !o.userData.lockMat) return;
+      v.setFromMatrixPosition(o.matrixWorld).applyMatrix4(inv);
+      if (Math.abs(v.x) > w / 2 + 0.6 || Math.abs(v.y) > h / 2 + 0.6) return;
+      const lift = Math.max(0, v.z - (TILE_D / 2 - 0.065));
+      const s = TRAY_CONTACT.dark * (1 - clamp(lift / 0.45));
+      if (s <= 0) return;
+      sv.setFromMatrixScale(o.matrixWorld);
+      tilesU.value[k++].set(v.x, v.y, s, sv.x / fs.x);
+    });
+  };
   group.add(rim, face);
   group.userData = { w, h };
   return group;

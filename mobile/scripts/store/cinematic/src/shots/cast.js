@@ -147,10 +147,10 @@ export default async function make(ctx) {
   const ACT = (r, c) => ROW_T[r] + c * SIXTEENTH;
   const SKY_END = E.DUSK_START + 1.45;          // ~19.35 the painted sky has turned (a time-lapse: ahead of the light)
   const CRANE_END = E.ROOF_CLEAR + 0.5;          // the crane eases out while the camera tips up
-  const TIP_END = E.S06 + 0.7;                   // ~18.45 tipped up into the sky
+  const TIP_END = E.S06 + (portrait ? 0.7 : 0.42); // ~18.45 (18.17 in 16:9) tipped up into the sky
   const DESC0 = E.S06 + 0.78;                    // ~18.53 the camera comes down and back
   const DESC1 = E.LAMPS[0] - 0.04;               // ~19.48 settled on the hero wide
-  const L_HIDE = E.S06 + 0.7;                    // the L on the chimney leaves with the roof
+  const L_HIDE = DESC0 + 0.3;                    // the L on the chimney leaves as the camera comes down and back
 
   const dusk = (t) => smooth(seg(t, E.DUSK_START, E.DUSK_END));
   // the wipe front's progress (tod.js skyWipe), through knots set below where the sun hands over
@@ -220,10 +220,10 @@ export default async function make(ctx) {
   const SKY_BAND = [0.32, 1.0];
   const skyLocal = (u, v, z = 0) => [(u - 0.5) * world.sky.userData.paintWidth, ((v - SKY_BAND[0]) / (SKY_BAND[1] - SKY_BAND[0]) - 0.5) * world.sky.userData.height, z];
 
-  // the sun glides from its afternoon place down to where the dusk painting has it, just
-  // over the ridge, while the painting wipes to dusk: an additive sun (a disc the size of
-  // the painted ones, and its halo) on the backdrop, which takes over from one painted sun
-  // and hands over to the other, so the wipe reads as the sun going down
+  // the afternoon sun goes down with the light: an additive warm glow (a disc the size of
+  // the painted one, and its halo) on the backdrop takes over the painted afternoon sun as
+  // the wipe front reaches it, so the front never slices a hard sun, then slips down toward
+  // the ridge where the dusk painting has its sun, fading out before that one is uncovered
   const sunTex = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
@@ -236,29 +236,24 @@ export default async function make(ctx) {
   const SUN_UV_A = [0.840, 0.848], SUN_UV_B = [0.379, 0.744];
   const bandY = (v) => (v - SKY_BAND[0]) / (SKY_BAND[1] - SKY_BAND[0]);
   const SUN_R = 0.05; // the painted suns' radius with their bright core, in band heights
-  // The front's progress where it has just wiped the afternoon sun away, and where it is
-  // about to uncover the dusk one: it crawls between the two (0.35 s) while the glow
-  // carries the sun across, and runs quickly everywhere else.
-  const mAt = (uv, dy, level) => {
-    let a = 0, b = 1;
-    for (let i = 0; i < 40; i++) { const m = (a + b) / 2; if (skyWipe(m, uv[0], bandY(uv[1]) + dy) < level) a = m; else b = m; }
-    return (a + b) / 2;
-  };
-  const SKY_KNOTS = [[E.DUSK_START, 0], [E.DUSK_START + 0.3, mAt(SUN_UV_A, -SUN_R, 0.98)], [E.DUSK_START + 0.65, mAt(SUN_UV_B, SUN_R, 0.02)], [SKY_END, 1]];
-  const SUN_A = skyLocal(...SUN_UV_A, 1.5), SUN_B = skyLocal(...SUN_UV_B, 1.5);
-  const SUN_C = [lerp(SUN_A[0], SUN_B[0], 0.45), Math.max(SUN_A[1], SUN_B[1]) + 6, 1.5]; // the arc's control point, above the peaks
+  // One clean sweep of the wipe front, top to bottom (a crawl between the two suns
+  // stalled the front across the sky, and its rippled edge broke into pink-over-blue islands)
+  const SKY_KNOTS = [[E.DUSK_START, 0], [SKY_END, 1]];
+  // the glow's path: from the afternoon sun toward the ridge just above the dusk sun
+  const SUN_A = skyLocal(...SUN_UV_A, 1.5), SUN_RIDGE = skyLocal(SUN_UV_B[0], SUN_UV_B[1] + 0.03, 1.5);
   // Only one sun at a time, timed on the wipe front: the glow comes up over the painted
-  // afternoon sun just before the front reaches it, starts its glide only once the front
-  // has wiped that sun away, lands on the dusk sun's place before the front uncovers the
-  // painted one, and fades once the painted dusk sun is fully in.
+  // afternoon sun just before the front reaches it, holds there while the front wipes that
+  // sun away, and only then slips toward the ridge, gone before the front uncovers the
+  // painted dusk sun.
   const wipeAt = (uv, dy, level) => {
     let a = E.DUSK_START - 0.5, b = SKY_END + 0.5;
     for (let i = 0; i < 40; i++) { const m = (a + b) / 2; if (skyWipe(skyMix(m), uv[0], bandY(uv[1]) + dy) < level) a = m; else b = m; }
     return (a + b) / 2;
   };
   const A_TOUCH = wipeAt(SUN_UV_A, SUN_R, 0.02), A_GONE = wipeAt(SUN_UV_A, -SUN_R, 0.98);
-  const B_TOUCH = wipeAt(SUN_UV_B, SUN_R, 0.02), B_FULL = wipeAt(SUN_UV_B, -SUN_R, 0.98);
-  const SUN_T = [A_TOUCH - 0.14, A_GONE, B_TOUCH, B_FULL + 0.18];
+  const B_TOUCH = wipeAt(SUN_UV_B, SUN_R, 0.02);
+  const SUN_T = [A_TOUCH - 0.14, A_TOUCH, A_GONE - 0.05, B_TOUCH - 0.01];
+  const SUN_GLIDE = 0.3; // how far toward the ridge it slips while it fades
 
   // racing pixel clouds in the painted sky over the mountains (a day card and a dusk card
   // per cloud, crossfaded as the wipe front passes); cards on the backdrop, flying at a
@@ -285,14 +280,14 @@ export default async function make(ctx) {
   // painted meadow it runs into, so the hero wide showed a hard, bright horizon line. A
   // decal on the far ground takes on the painting's own (blurred) dusk colours just above
   // the line where the ground meets it, column by column as the backdrop shows them
-  // (mirrored margins included, see tod.js), and fades out toward the house, so the real
+  // (its out-of-focus margins included, see tod.js SKY_EDGE), and fades out toward the house, so the real
   // meadow runs on into the painted one.
   const SKY = world.sky.userData, SKY_Y0 = world.sky.position.y - SKY.height / 2;
   const seamV = SKY_BAND[0] + ((GROUND_Y + 1.5 - SKY_Y0) / SKY.height) * (SKY_BAND[1] - SKY_BAND[0]);
   const FAR_Z = world.ground.position.z - 180, SEAM_DEPTH = 120, SEAM_W = 640;
   const seamMap = (() => {
     const read = (tex) => { const img = tex.image; return { img, d: img.getContext('2d').getImageData(0, 0, img.width, img.height).data }; };
-    const blur = read(SKY.mat.uniforms.blurB.value), row = read(SKY.mat.uniforms.rowB.value);
+    const mid = read(SKY.mat.uniforms.midB.value), heavy = read(SKY.mat.uniforms.blurB.value), row = read(SKY.mat.uniforms.rowB.value);
     const at = ({ img, d }, u, v) => { const x = Math.min(img.width - 1, Math.max(0, Math.round(u * (img.width - 1)))), y = Math.min(img.height - 1, Math.max(0, Math.round((1 - v) * (img.height - 1)))); const o = (y * img.width + x) * 4; return [d[o], d[o + 1], d[o + 2]]; };
     const mixA = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
     const sstep = (a, b, x) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
@@ -305,11 +300,16 @@ export default async function make(ctx) {
     for (let i = 0; i < 256; i++) {
       const xb = ((i + 0.5) / 256 - 0.5) * SEAM_W * spread;
       const pu = (xb / SKY.width + 0.5) * (1 + 2 * margin) - margin;
-      const out = Math.max(-pu, pu - 1);
-      // the backdrop's own edge treatment (tod.js SKY_EDGE): outside the painting its
-      // blurred edge column carries on, melting into the row colours and then the haze
-      let col = at(blur, Math.min(1, Math.max(0, pu)), seamV);
-      if (out > 0) { col = mixA(col, at(row, 0.5, seamV), sstep(0, SKY_EDGE.rowBlend, out)); col = mixA(col, hz, sstep(0.3, 1, out) * 0.18); }
+      const out = Math.max(-pu, pu - 1), uc = Math.min(1, Math.max(0, pu));
+      // the backdrop's own edge treatment (tod.js SKY_EDGE): the painting's edge out of
+      // focus, and beyond it its blurred edge column carried on, softening into the
+      // heavier copy, the row colours and the haze
+      let col = at(mid, uc, seamV);
+      if (out > 0) {
+        col = mixA(col, at(heavy, uc, seamV), sstep(0, SKY_EDGE.heavy, out));
+        col = mixA(col, at(row, 0.5, seamV), sstep(0, SKY_EDGE.rowBlend, out));
+        col = mixA(col, hz, sstep(0, SKY_EDGE.hazeEnd, out) * SKY_EDGE.haze);
+      }
       g.fillStyle = `rgb(${col.map((v) => Math.round(v)).join(',')})`; g.fillRect(i, 0, 1, 1);
     }
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false;
@@ -404,7 +404,7 @@ export default async function make(ctx) {
   /** World position of a room-local point of a resident's room. */
   const inRoom = (name, lx, ly, lz) => { const rm = R[name].rm; return [rm.x + lx, rm.y + ly, lz]; };
 
-  function poseProps(t) {
+  function poseProps(t, aperture) {
     // emote pops above the head
     for (const [name, sp] of Object.entries(emotes)) {
       const r = R[name];
@@ -466,31 +466,32 @@ export default async function make(ctx) {
     // front passes them (the backdrop's own wipe, tod.js skyWipe)
     const sm = skyMix(t);
     const on = seg(t, E.S06 - 0.5, E.S06) * (1 - seg(t, DESC1 - 0.3, DESC1 + 0.4));
+    // while the lens is wide open (aperture under 5) the white day cards read as a haze:
+    // they stay at half strength until it stops down
+    const dayCap = lerp(0.5, 1, smooth(seg(aperture, 4.5, 5.5)));
     for (const c of clouds) {
       const u = c.u0 + c.speed * (t - E.S06);
       const p = skyLocal(u, c.v, 2 + c.u0);
       const k = skyWipe(sm, u, bandY(c.v));
       const edge = seg(u - c.half, 0.3, 0.4) * (1 - seg(u + c.half, 1.0, 1.08)); // clear of the tree, and of the painting's edge
-      for (const [m, a] of [[c.day, 1 - k], [c.dusk, k]]) {
+      for (const [m, a] of [[c.day, (1 - k) * dayCap], [c.dusk, k]]) {
         m.visible = on * edge > 0.001 && a > 0.001;
         m.position.set(p[0], p[1], p[2]);
         m.material.opacity = on * edge * a * 0.85;
       }
     }
-    // the sun's glide: the glow takes over the painted afternoon sun as the wipe front
-    // reaches it, slides over the peaks while the front crawls between the two suns, and
-    // hands over to the painted dusk sun as the front uncovers it (SUN_T above)
-    const gIn = seg(t, SUN_T[0], A_TOUCH), gOut = seg(t, B_FULL, SUN_T[3]);
-    const gk = ease.inOutSine(seg(t, SUN_T[1], SUN_T[2]));
-    const g1 = 1 - gk;
-    const sp = [0, 1].map((i) => g1 * g1 * SUN_A[i] + 2 * g1 * gk * SUN_C[i] + gk * gk * SUN_B[i]);
-    const ga = ease.inOutSine(gIn) * (1 - ease.inOutSine(gOut));
+    // the sun going down: the glow takes over the painted afternoon sun as the wipe front
+    // reaches it, then slips toward the ridge and fades before the dusk sun shows (SUN_T)
+    const gIn = ease.inOutSine(seg(t, SUN_T[0], SUN_T[1]));
+    const gl = seg(t, SUN_T[2], SUN_T[3]);
+    const gk = SUN_GLIDE * ease.inQuad(gl);
+    const ga = gIn * (1 - ease.inOutSine(gl));
     sunGlow.visible = ga > 0.01;
-    sunGlow.position.set(sp[0], sp[1], 1.5);
-    const gs = lerp(24, 19, gk);
+    sunGlow.position.set(lerp(SUN_A[0], SUN_RIDGE[0], gk), lerp(SUN_A[1], SUN_RIDGE[1], gk), 1.5);
+    const gs = lerp(24, 20, gl);
     sunGlow.scale.set(gs, gs, 1);
     sunGlow.material.opacity = ga;
-    sunGlow.material.color.set('#ffffff').lerp(new THREE.Color('#ffb070'), gk);
+    sunGlow.material.color.set('#ffd08a').lerp(new THREE.Color('#ffb070'), gl);
   }
 
   // ---------------- camera: a direction rig (position, yaw, pitch) so the crane can tip up
@@ -505,23 +506,24 @@ export default async function make(ctx) {
   });
   const fromAim = (pos, target, fov, extra = {}) => ({ pos, ...angles(pos, target), fov, focus: dist(pos, target), aperture: 10, roll: 0, ...extra });
 
-  // Per-aspect rig values. 16:9 tips up into a 65 mm view of the painted sky (the widest
-  // lens that stays inside the painting); 9:16 rises past the roof and takes in the
-  // whole painted vista. The hero wide is low, the house standing against the sunset.
+  // Per-aspect rig values. The crane settles at the ridge while it tips up, so the roof and
+  // chimney stay in the bottom of frame under the time-lapse sky (16:9 on a 45 mm, whose
+  // wider view shows the soft painted margins, tod.js SKY_EDGE); 9:16 takes in the whole
+  // painted vista over the roof. The hero wide is low, the house standing against the sunset.
   const P = portrait ? {
     craneX: [0, 0], craneY: [3.4, 31], craneZ: 21, lookDrop: 0.5, fov: 54,
-    tipPitch: 9, tipFov: 40, skyRise: 2.5, skyBack: 4,
+    tipPitch: 7, tipFov: 40, skyRise: -2.5, skyBack: 4,
     hero: fromAim([0, 9, 40], [0, 13.5, 0], 53, { aperture: 7 }),
     heroDrift: [0, 0, 0],
     kitchen: fromAim([0.2, 2.9, 15.5], [0, 2.35, 0], 38, { aperture: 8 }),
   } : {
     craneX: [-2.5, 0], craneY: [2.0, 29], craneZ: 24, lookDrop: 0.5, fov: mm(40),
-    tipPitch: 18, tipFov: mm(65), skyRise: 2.5, skyBack: 4,
+    tipPitch: 11, tipFov: mm(42), skyRise: -3.0, skyBack: 4,
     hero: fromAim([0, 6.2, 58], [0, 13.4, 0], mm(40), { aperture: 6.5 }),
     heroDrift: [0.35, 0, 0],
     kitchen: fromAim([0.5, 3.5, 14], [0, 2.3, 0], mm(50), { aperture: 8 }),
   };
-  const HERO_PUSH = 0.5;
+  const HERO_PUSH = 2.0;
   const residentsZ = -kitchen.roomD / 2 + 0.75;
 
   function rig(t) {
@@ -566,7 +568,7 @@ export default async function make(ctx) {
     if (t < DESC1) {
       // come down and back from the sky to the hero wide
       const s0 = rig(DESC0 - 1e-4);
-      return mixRig(s0, heroAt(0), ease.inOutCubic(seg(t, DESC0, DESC1)));
+      return mixRig(s0, heroAt(0), ease.inOutSine(seg(t, DESC0, DESC1)));
     }
     if (t < E.PUSH_KITCHEN) return heroAt(seg(t, DESC1, E.PUSH_KITCHEN));
     // push toward the kitchen, arriving on it at the cut. The distance to the house
@@ -610,15 +612,18 @@ export default async function make(ctx) {
     const hot = 1 + 0.9 * (1 - ease.inOutSine(seg(t, E.PUSH_KITCHEN, E.S07)));
     for (const [id, rm] of Object.entries(house.rooms)) {
       if (!rm.light) continue;
-      rm.light.intensity *= hot;
-      const swell = 1 + 0.35 * bump(lampPop(t, id), 0.3);
+      // each lamp catches with a flash that reads room by room from the wide: the room
+      // light, the glow card and its size all swell past their settled level and back
+      const pop = bump(lampPop(t, id), 0.3);
+      rm.light.intensity *= hot * (1 + 1.6 * pop);
       for (const sp of rm.lamps) {
-        sp.material.opacity = Math.min(1, sp.material.opacity * (0.5 + 0.5 * hot));
-        sp.scale.multiplyScalar(swell);
+        sp.material.opacity = Math.min(1, sp.material.opacity * (0.5 + 0.5 * hot) * (1 + 1.2 * pop));
+        sp.scale.multiplyScalar(1 + 0.8 * pop);
       }
     }
-    // the chimney smoke thins while the lens looks up through it (it reads as a smear)
-    const thin = 1 - 0.75 * seg(t, E.S06 - 0.1, E.S06 + 0.4) * (1 - seg(t, DESC0 + 0.2, DESC1));
+    // the chimney smoke thins while the lens looks up through it (it reads as a smear), and
+    // only comes back once the camera has settled on the wide
+    const thin = 1 - 0.75 * seg(t, E.S06 - 0.1, E.S06 + 0.4) * (1 - seg(t, DESC1, DESC1 + 0.5));
     for (const p of world.puffs) p.s.material.opacity *= thin;
     // our fireflies rise out of the grass from their cue
     const fk = ease.outCubic(seg(t, E.FIREFLIES, E.FIREFLIES + 1.1));
@@ -637,7 +642,7 @@ export default async function make(ctx) {
     }
     world.pollen.points.position.z = -4; world.pollen.points.scale.z = 0.5;
     poseCast(t);
-    poseProps(t);
+    poseProps(t, r.aperture);
     return {
       scene: world.scene, camera,
       look: look(grade, dk, { msaa: false, exposure: grade.exposure * (1 + 0.07 * dk + 0.08 * ease.inOutSine(seg(t, E.PUSH_KITCHEN, E.S07))), dof: { focus: r.focus, aperture: r.aperture, maxBlur: 14 } }),

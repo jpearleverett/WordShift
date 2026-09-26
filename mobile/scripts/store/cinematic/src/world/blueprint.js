@@ -1,8 +1,9 @@
-// The blueprint: a parchment sheet whose chalk lines draw a room outline, with a
-// tiny title block that reads PLAN. The drawing progresses with `draw` (0..1);
+// The blueprint: a grained parchment sheet whose chalk lines draw a room outline, with an
+// inked title cartouche that reads PLAN. The drawing progresses with `draw` (0..1);
 // the canvas is only re-rasterized when the progress changes.
 
 import * as THREE from 'three';
+import { hash01 } from '../core/math.js';
 
 // The sheet is landscape (2:1, like a room): S02 lays it on the empty frame at 90% of
 // the room's width, and a taller sheet ran past the floor and the ceiling there, so the
@@ -40,15 +41,41 @@ export function makeBlueprint({ width = 1.6 } = {}) {
   mesh.castShadow = true;
   let last = -1;
 
-  function paperBase(ctx) {
-    ctx.fillStyle = '#F3E2BF'; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#E4CC9C';
-    for (let i = 0; i < 6; i++) ctx.fillRect(0, i * 52 + 24, W, 1);
-    ctx.strokeStyle = '#3B2416'; ctx.globalAlpha = 0.35; ctx.lineWidth = 6; ctx.strokeRect(3, 3, W - 6, H - 6); ctx.globalAlpha = 1;
-    // title block, in the strip under the drawing (the front floor line is at y 256)
-    ctx.fillStyle = '#E4CC9C'; ctx.fillRect(W - 176, H - 54, 146, 38);
-    ctx.fillStyle = '#3B2416'; ctx.font = '700 28px "Figtree"'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.fillText('PLAN', W - 103, H - 34); ctx.textAlign = 'left';
+  // the paper, drawn once: parchment with a deterministic pixel grain (+-5 luma) and a
+  // 6 px vignette that darkens its edges, so it reads as a sheet against the pine boards
+  const paper = document.createElement('canvas'); paper.width = W; paper.height = H;
+  {
+    const pg = paper.getContext('2d');
+    const img = pg.createImageData(W, H);
+    const [r0, g0, b0] = [0xF3, 0xE2, 0xBF];
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const n = (hash01(x * 7 + y * 7919) - 0.5) * 10; // +-5
+        const d = Math.min(x, y, W - 1 - x, H - 1 - y);
+        const v = d < 6 ? 0.8 + 0.2 * (d / 6) ** 1.5 : 1; // the vignette
+        const i = (y * W + x) * 4;
+        img.data[i] = Math.round((r0 + n) * v); img.data[i + 1] = Math.round((g0 + n) * v); img.data[i + 2] = Math.round((b0 + n) * v * (d < 6 ? 0.95 : 1));
+        img.data[i + 3] = 255;
+      }
+    }
+    pg.putImageData(img, 0, 0);
+    // the title cartouche, in the strip under the drawing (the front floor line is at
+    // y 256), 20 px in from where it was so the right return never clips it: a 2 px ink
+    // frame with chamfered corners and PLAN in full ink (the ruled lines stop short of it)
+    const [cx0, cy0, cx1, cy1, c] = [446, 264, 590, 303, 6];
+    pg.fillStyle = '#E4CC9C';
+    for (let i = 0; i < 6; i++) {
+      const y = i * 52 + 24;
+      if (y > cy0 - 4 && y < cy1 + 4) { pg.fillRect(8, y, cx0 - 12, 1); pg.fillRect(cx1 + 4, y, W - 8 - cx1 - 4, 1); } else pg.fillRect(8, y, W - 16, 1);
+    }
+    pg.strokeStyle = '#3B2416'; pg.lineWidth = 2; pg.lineJoin = 'miter';
+    pg.beginPath();
+    pg.moveTo(cx0 + c, cy0); pg.lineTo(cx1 - c, cy0); pg.lineTo(cx1, cy0 + c); pg.lineTo(cx1, cy1 - c); pg.lineTo(cx1 - c, cy1);
+    pg.lineTo(cx0 + c, cy1); pg.lineTo(cx0, cy1 - c); pg.lineTo(cx0, cy0 + c); pg.closePath(); pg.stroke();
+    pg.fillStyle = '#3B2416'; pg.font = '700 36px "Figtree"'; pg.textBaseline = 'middle'; pg.textAlign = 'center';
+    pg.fillText('PLAN', (cx0 + cx1) / 2, (cy0 + cy1) / 2 + 1);
   }
+  function paperBase(ctx) { ctx.drawImage(paper, 0, 0); }
 
   function draw(k) {
     k = Math.max(0, Math.min(1, k));

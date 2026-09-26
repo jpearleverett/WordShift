@@ -70,7 +70,6 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
   const used = new Set();
   const sparks = [];
   const lengths = [];
-  const topY = Math.max(...strokes.flat().map((p) => p[1])) * scale;
   strokes.forEach((pts, k) => {
     const cells = rasterise(pts, scale, cell).filter(([x, y]) => { const key = `${x},${y}`; if (used.has(key)) return false; used.add(key); return true; });
     lengths.push(cells.length);
@@ -85,9 +84,12 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
       sparks.push({
         k, f: (j + 0.5) / cells.length, target, from, c1, c2,
         flight: Math.min(0.45, 0.36 + len * 0.1 + h(3) * 0.08),
-        // the drawing lifts away from the top down, each spark well apart from its neighbours
-        // (a loose rising cloud: rows that let go together read as letters)
-        release: (1 - clamp(target[1] / topY)) * 0.1 + h(5) * 0.35, drift: (h(6) - 0.5) * 0.5, tw: h(7) * 50,
+        // each spark lets go on its own, well apart from its neighbours (a loose rising cloud;
+        // a row or a line that lets go together, or stays behind together, reads as a letter)
+        release: h(5) * 0.25, tw: h(7) * 50,
+        // once free it kicks off sideways (never straight up its own wall, which would keep a
+        // dotted column) and climbs at its own speed, so neighbours part at once
+        drift: (h(6) < 0.5 ? -1 : 1) * (0.1 + 0.16 * h(9)), climb: 0.8 + h(8) * 1.0,
       });
     });
   });
@@ -132,11 +134,16 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
       a = 1 + 1.6 * Math.exp(-(t - arrive) * 12) + 0.12 * noise1(t * 7 + s.tw, 3);
       const r = clamp((t - o.holdEnd - s.release) / o.release);
       if (r > 0) {
-        // drift up the chimney as ordinary sparks, each on its own sideways wander, fading as
-        // soon as it lets go (never a moving copy of the outline)
-        y += r * r * 1.3 + r * 0.3;
-        x += s.drift * 0.6 * ease.inOutSine(r) + Math.sin(t * 5 + s.tw) * 0.035 * r;
+        // drift up the chimney as ordinary sparks: each leaves its cell at once, on its own
+        // sideways kick and at its own speed, fading as it goes (never a moving copy of the outline)
+        const kick = ease.outQuad(r);
+        y += (0.2 + 0.3 * s.climb) * kick + r * r * 0.8 * s.climb;
+        x += s.drift * kick + Math.sin(t * 5 + s.tw) * 0.035 * r;
         a *= 1 - ease.outQuad(r);
+      } else {
+        // what is still in place dims as a whole once the drawing starts to let go, so its
+        // leftover pieces of line never read as letters while the rest rises
+        a *= 1 - 0.88 * ease.inOutSine(clamp((t - o.holdEnd) / 0.15));
       }
     }
     return { x, y, a };

@@ -73,11 +73,13 @@ function spiceLabel(word, band) {
   // the lettering, drawn soft and then snapped to ink / paper per pixel
   const tc = document.createElement('canvas'); tc.width = W; tc.height = H;
   const tg = tc.getContext('2d');
-  tg.font = '700 22px "Figtree"';
+  // (26 px caps on a 32 px label: DILL SAGE MINT read at about 28 px in 16:9's payoff frame;
+  // squeezed a little so the words stay on the jar's front)
+  tg.font = '700 26px "Figtree"';
   tg.textAlign = 'center'; tg.textBaseline = 'alphabetic';
   const m = tg.measureText(word);
   const base = H / 2 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-  tg.save(); tg.translate(W / 2, 0); tg.scale(0.92, 1); tg.fillStyle = '#000'; tg.fillText(word, 0, Math.round(base)); tg.restore();
+  tg.save(); tg.translate(W / 2, 0); tg.scale(0.84, 1); tg.fillStyle = '#000'; tg.fillText(word, 0, Math.round(base)); tg.restore();
   const ink = tg.getImageData(0, 0, W, H).data;
   return pixelTexture(W, H, (g) => {
     g.fillStyle = '#F3E2BF'; g.fillRect(0, 0, W, H);
@@ -379,7 +381,9 @@ export default async function make(ctx) {
     J0: F(1.36, 2.93, 4.3, 1), J1: F(1.8, 2.93, 4.3, 1),
     R1: F(1.5, 1.6, 4.8, -1), R: F(0.7, 1.3, 5.2, -2), R2: F(0.68, 1.3, 5.18, -2),
     D: F(0.2, 1.05, 5.3, -3.5), D2: F(0.18, 1.03, 5.28, -3.5),
-    B: F(1.0, 2.4, 5.2, 0), B2: F(0.98, 2.4, 5.12, 0),
+    // the payoff: the jars and the L top right, Panko's whole head (chin clear of the bottom
+    // edge through her hop) and the "?" left of centre
+    B: F(1.05, 2.22, 5.6, 0), B2: F(1.03, 2.22, 5.52, 0),
   };
   // both cuts settle on Panko while the focus racks to her, then hold until she sets off
   const T_J1 = E.JARS_RACK + 0.1, T_R = E.JARS_AWAY + 0.04, T_RA = E.JARS_RACK + (portrait ? 0.55 : 0.66), T_D = E.JARS_AWAY + 0.78;
@@ -539,8 +543,12 @@ export default async function make(ctx) {
   //   9:16  the fire and the drawing, Ember wholly out of frame to the right; the pan finds her
   //         full figure right of centre as she smiles, the heart above her.
   const vfov8 = portrait ? 30 : mm(85);
-  const A8 = portrait ? [-2.75, 2.32, DRAW_O[2], 2.6, 3, 2] : [-1.3, 2.45, DRAW_O[2], 5.3, 2, 1];
-  const A8b = portrait ? [-2.75, 2.34, DRAW_O[2], 2.46, 3, 2] : [-1.32, 2.47, DRAW_O[2], 5.15, 2, 1];
+  //   16:9  the frame's left edge on the den wall (-3.95), the drawing at about 20% x / 22% y
+  //         with ~110 px of headroom, the L on the mantel, and Ember (52%) cropped at the thigh,
+  //         so her look up (a lean back, a lift) reads with her whole torso. (Ember at 59% would
+  //         need a frame no wider than 5.3, which crops her at the neck under the drawing.)
+  const A8 = portrait ? [-2.75, 2.32, DRAW_O[2], 2.6, 3, 2] : [-0.95, 2.29, DRAW_O[2], 6.0, 2, 1];
+  const A8b = portrait ? [-2.75, 2.34, DRAW_O[2], 2.46, 3, 2] : [-0.97, 2.31, DRAW_O[2], 5.85, 2, 1];
   const PAN_TO = portrait ? [EM_X - 0.35, 1.6, EM_Z] : [EM_X + 0.4, 1.2, EM_Z];
   const TRUCK = portrait ? 2.1 : 0.55;
   //   16:9  the pan starts as the heart pops and runs on past the cut (T_PAN_END > E.S09): S09

@@ -39,10 +39,11 @@ function softCopy(img, cw, ch) {
  * light rather than reading as a ruled line. Above the front the dusk painting shows,
  * below it the afternoon one: the two paintings only blend inside the front itself, so
  * the two painted suns (and the two colourings of every mountain) are never seen
- * together. Returns the dusk weight at painting u (0..1 across) and band height y
+ * together. The ripple stays small: a deeper one broke the front into islands of dusk
+ * pink over afternoon blue. Returns the dusk weight at painting u (0..1 across) and band height y
  * (0 bottom .. 1 top); the shader below runs the same formula.
  */
-export const SKY_WIPE = { half: 0.05, tilt: 0.2, ripple: 0.045 };
+export const SKY_WIPE = { half: 0.05, tilt: 0.2, ripple: 0.015 };
 const ripple = (u, y) => 0.5 * (Math.sin(u * 14.45 + y * 5.1) + Math.sin(u * 29.5 - y * 9.3 + 2.1));
 export function skyWipe(mixv, u, y) {
   const { half, tilt, ripple: r } = SKY_WIPE;
@@ -55,38 +56,46 @@ export function skyWipe(mixv, u, y) {
 
 /**
  * How the painting ends at its left and right edges (spec 8.3: haze-veiled edges, no
- * repeat). Sharp paint never shows outside the painting: its last `melt` of width
- * softens into the blurred copy, and beyond the edge that blurred copy's edge column
- * simply carries on (clamped, never mirrored: a mirror paired the big tree's lit leaves
- * with their own reflection into a face with two warm eyes, and a longer mirror brought
- * back a second, blurred sun), giving way to the painting's own row colours over
- * `rowBlend` and to the haze further out. cast.js (the horizon decal) samples the same way.
+ * repeat), as a lens would render a painting that runs out of frame: out of focus.
+ * - Inside, its last `melt` of width melts into an evenly blurred copy (`mid`, about 26
+ *   source px each way; the old 12-column copy smeared the edge trees sideways).
+ * - Outside, sharp paint never shows. The blurred edge column carries on (clamped, never
+ *   mirrored: a mirror paired the big tree's lit leaves with their own reflection into a
+ *   face with two warm eyes, and even a mirrored blur with a vertical offset left a wavy
+ *   symmetric seam), softening into a heavier, vertically smoothed copy over `heavy`,
+ *   into the painting's own row colours (its sky gradient, tree line and meadow) over
+ *   `rowBlend`, and into the evening haze (up to `haze` by `hazeEnd`).
+ * cast.js (the horizon decal) samples the same way.
  */
-export const SKY_EDGE = { melt: 0.06, rowBlend: 0.4 };
+export const SKY_EDGE = { melt: 0.12, heavy: 0.06, rowBlend: 0.3, haze: 0.3, hazeEnd: 0.5, mid: [36, 76], heavyRes: [12, 16], rowRes: 24 };
 
 /**
  * The painted sky as one backdrop plane: a single copy of the painting (a band of
  * it, v from the bottom), wiping afternoon -> dusk top-down (skyWipe). The
- * margins beyond the painting continue it softly (SKY_EDGE): its blurred edge
- * melting into the painting's own row colours (its sky gradient, tree line and
- * meadow) and a haze, so wide shots never show an edge, no mountain is ever seen
- * twice and nothing is ever reflected.
+ * margins beyond the painting continue it softly (SKY_EDGE): its edges go out of
+ * focus and melt into the painting's own row colours (its sky gradient, tree line
+ * and meadow) and a haze, so wide shots never show an edge, no mountain is ever
+ * seen twice and nothing is ever reflected.
  */
 export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b = 'environment/sky_dusk.webp', height = 160, band = [0.32, 1.0], margin = 0.45 } = {}) {
   const ta = await loadTexture(a); const tb = await loadTexture(b);
   const aspectPaint = ta.image.width / (ta.image.height * (band[1] - band[0]));
   const width = height * aspectPaint * (1 + 2 * margin);
-  const blurA = softCopy(ta.image, 12, 96), blurB = softCopy(tb.image, 12, 96);
-  const rowA = softCopy(ta.image, 1, 128), rowB = softCopy(tb.image, 1, 128);
+  const E_ = SKY_EDGE;
+  const midA = softCopy(ta.image, ...E_.mid), midB = softCopy(tb.image, ...E_.mid);
+  const blurA = softCopy(ta.image, ...E_.heavyRes), blurB = softCopy(tb.image, ...E_.heavyRes);
+  const rowA = softCopy(ta.image, 1, E_.rowRes), rowB = softCopy(tb.image, 1, E_.rowRes);
+  const f = (v) => v.toFixed(4);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
-      ta: { value: ta }, tb: { value: tb }, blurA: { value: blurA }, blurB: { value: blurB }, rowA: { value: rowA }, rowB: { value: rowB },
+      ta: { value: ta }, tb: { value: tb }, midA: { value: midA }, midB: { value: midB }, blurA: { value: blurA }, blurB: { value: blurB }, rowA: { value: rowA }, rowB: { value: rowB },
       mixv: { value: 0 }, bright: { value: 1 },
       haze: { value: new THREE.Color('#cfe0c8') }, hazeDusk: { value: new THREE.Color('#c98c86') },
     },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
     fragmentShader: `
-      uniform sampler2D ta; uniform sampler2D tb; uniform sampler2D blurA; uniform sampler2D blurB; uniform sampler2D rowA; uniform sampler2D rowB;
+      uniform sampler2D ta; uniform sampler2D tb; uniform sampler2D midA; uniform sampler2D midB;
+      uniform sampler2D blurA; uniform sampler2D blurB; uniform sampler2D rowA; uniform sampler2D rowB;
       uniform float mixv; uniform float bright; uniform vec3 haze; uniform vec3 hazeDusk;
       varying vec2 vUv;
       void main(){
@@ -97,23 +106,27 @@ export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b 
         // canvas copies are stored top-down; flipY on the loaded textures makes v run bottom-up everywhere
         vec2 uv = vec2(clamp(pu, 0.0, 1.0), ${band[0].toFixed(3)} + vUv.y * ${(band[1] - band[0]).toFixed(3)});
         float hw = ${SKY_WIPE.half.toFixed(4)}, tl = ${SKY_WIPE.tilt.toFixed(4)}, rp = ${SKY_WIPE.ripple.toFixed(4)};
-        float uc = clamp(pu, 0.0, 1.0), T = 0.5 * tl + rp;
+        float uc = uv.x, T = 0.5 * tl + rp;
         float front = 1.0 + hw + T - mixv * (1.0 + 2.0 * hw + 2.0 * T) - tl * (uc - 0.5);
         float rip = 0.5 * (sin(uc * 14.45 + vUv.y * 5.1) + sin(uc * 29.5 - vUv.y * 9.3 + 2.1));
         float k = smoothstep(front - hw, front + hw, vUv.y + rp * rip);
+        // ahead of the front the afternoon's lower band (its green trees and meadow) already
+        // takes the evening, so no bright green stands under the pink sky
+        vec3 dim = mix(vec3(1.0), vec3(0.78, 0.62, 0.58), smoothstep(0.0, 0.55, mixv) * (1.0 - smoothstep(0.55, 0.85, vUv.y)));
+        vec3 soft = mix(texture2D(midA, uv).rgb * dim, texture2D(midB, uv).rgb, k);
         vec3 c;
         if (out_ > 0.0) {
-          // outside: the blurred copy's edge column carried on, then the row colours and haze
-          vec3 soft = mix(texture2D(blurA, uv).rgb, texture2D(blurB, uv).rgb, k);
-          vec3 row = mix(texture2D(rowA, vec2(0.5, uv.y)).rgb, texture2D(rowB, vec2(0.5, uv.y)).rgb, k);
-          c = mix(soft, row, smoothstep(0.0, ${SKY_EDGE.rowBlend.toFixed(4)}, out_));
-          vec3 hz = mix(haze, hazeDusk, k);
-          c = mix(c, hz, smoothstep(0.3, 1.0, out_) * 0.18);
+          // outside: the blurred edge column carried on, softening into the heavy copy,
+          // the row colours and the haze
+          vec3 heavy = mix(texture2D(blurA, uv).rgb * dim, texture2D(blurB, uv).rgb, k);
+          vec3 row = mix(texture2D(rowA, vec2(0.5, uv.y)).rgb * dim, texture2D(rowB, vec2(0.5, uv.y)).rgb, k);
+          c = mix(soft, heavy, smoothstep(0.0, ${f(E_.heavy)}, out_));
+          c = mix(c, row, smoothstep(0.0, ${f(E_.rowBlend)}, out_));
+          c = mix(c, mix(haze, hazeDusk, k), smoothstep(0.0, ${f(E_.hazeEnd)}, out_) * ${f(E_.haze)});
         } else {
-          // inside: the painting, its last few percent melting into the blurred copy
-          vec3 sharp = mix(texture2D(ta, uv).rgb, texture2D(tb, uv).rgb, k);
-          vec3 soft = mix(texture2D(blurA, uv).rgb, texture2D(blurB, uv).rgb, k);
-          c = mix(soft, sharp, smoothstep(0.0, ${SKY_EDGE.melt.toFixed(4)}, min(pu, 1.0 - pu)));
+          // inside: the painting, its last few percent going out of focus
+          vec3 sharp = mix(texture2D(ta, uv).rgb * dim, texture2D(tb, uv).rgb, k);
+          c = mix(soft, sharp, smoothstep(0.0, ${f(E_.melt)}, min(pu, 1.0 - pu)));
         }
         // sRGB textures are decoded to linear by the GPU on sampling
         gl_FragColor = vec4(c * bright, 1.0);

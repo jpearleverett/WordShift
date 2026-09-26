@@ -12,14 +12,15 @@ import * as THREE from 'three';
 import { buildRack } from '../world/rack.js';
 import { slotX } from '../world/wordrow.js';
 import { makeCharacter, poseCharacter } from '../world/sprites.js';
-import { makeBillboard, poseEmote, makeContactShadow } from '../world/fx.js';
+import { makeBillboard, poseEmote, makeContactShadow, makeDustPuff } from '../world/fx.js';
 import { makeBlueprint } from '../world/blueprint.js';
 import { makeMoths } from '../world/fire.js';
 import { makeShaft } from '../world/env.js';
 import { makeBubble } from '../world/bubble.js';
 import { makeSprout, setLocked, setTileGlow, TILE_SCALE, TILE_D, TILE_EMISSIVE_BASE, LOCKED } from '../core/tiles.js';
-import { ease, spring, seg, lerp, clamp, smooth, catmull, hash01 } from '../core/math.js';
+import { ease, spring, seg, lerp, clamp, smooth, smoother, catmull, hash01 } from '../core/math.js';
 import { GROUND_Y } from '../sets/world.js';
+import { pixelWood } from '../world/house.js';
 import { mm, wpos, add, mix3, dist, aim, setAspect, look, project, travelPx, blurFor } from './common.js';
 
 export const RACK_POS = [-3.4, GROUND_Y, 12];
@@ -143,11 +144,23 @@ export default async function make(ctx) {
     const flash = (t0, ri, dur = 0.2) => { const k = seg(t, t0, t0 + dur); if (k > 0 && k < 1) for (const o of rowTiles(ri)) setTileGlow(o, Math.sin(Math.PI * k) * 0.9); };
     flash(E.L_LAND, 1, 0.13); flash(E.T_LAND, 2, 0.13); // the landing rims: four frames
     E.FLASH.forEach((f, i) => flash(f, i));
-    // sparkle pops: six around PLANT at the landing, then one per row flash
+    // sparkle pops: six around PLANT at the landing (small, on fixed points of the tray's
+    // margin in the gaps between tiles, never over a letter, gone in six frames), then one
+    // per row flash
     sparkles.forEach((s, i) => {
       let t0, p;
-      if (i < 6) { t0 = E.L_LAND + i * 0.02; const a = (i / 6) * Math.PI * 2 + 0.3; p = add(RACK_POS, [Math.cos(a) * 1.3, 1.75 + Math.sin(a) * 0.35, 0.3]); }
-      else { t0 = E.FLASH[i - 6]; p = add(RACK_POS, [1.25, [2.5, 1.75, 1.0][i - 6] + 0.25, 0.3]); }
+      if (i < 6) {
+        t0 = E.L_LAND + i * 0.02;
+        const [gx, side, sz] = PLANT_SPARKS[i];
+        s.userData.base = sz;
+        // (an emote hangs from its base: centre it on the margin line)
+        p = add(RACK_POS, [gx, 1.75 + side * 0.38 - sz / 2, 0.12]); // just in front of the tile faces
+        s.position.set(p[0], p[1], p[2]); s.userData.y0 = p[1];
+        poseEmote(s, t - t0, { hold: 0.1, rise: 0, fade: 0.1 });
+        return;
+      }
+      t0 = E.FLASH[i - 6]; p = add(RACK_POS, [1.25, [2.5, 1.75, 1.0][i - 6] + 0.25, 0.3]);
+      s.userData.base = 0.34;
       s.position.set(p[0], p[1], p[2]); s.userData.y0 = p[1];
       poseEmote(s, t - t0, { hold: 0.35, rise: 0.2, fade: 0.25 });
     });
@@ -170,19 +183,49 @@ export default async function make(ctx) {
   world.register(blueprint.mesh);
   const hero = new THREE.Group(); hero.scale.setScalar(TILE_SCALE);
   world.register(hero);
-  // timber that snaps in on the six knocks: floor, two returns (tracked house parts)
-  // plus a ceiling beam and two front trims (registered props in the cell)
+  // Timber that snaps in on the six knocks: the floor (a tracked house part), then new
+  // pine, brighter than anything else on the facade: two side returns, a ceiling beam and
+  // two front trims (registered props in the cell). The pine returns are stand-ins for the
+  // room's real (dark) returns, which they hand over to under the unroll at the drop.
+  const { roomW, roomH, roomD } = jungle;
   world.track(jungle.floor); jungle.returns.forEach((r) => world.track(r));
   world.track(jungle.painting); if (jungle.windowMesh) world.track(jungle.windowMesh);
-  const trimMat = new THREE.MeshStandardMaterial({ color: '#8a5f3e', roughness: 0.8 });
-  const beam = world.register(new THREE.Mesh(new THREE.BoxGeometry(jungle.roomW, 0.22, 0.3), trimMat), jungle.group);
-  const trims = [-1, 1].map(() => world.register(new THREE.Mesh(new THREE.BoxGeometry(0.22, jungle.roomH, 0.26), trimMat), jungle.group));
-  for (const m of [beam, ...trims]) { m.castShadow = true; m.receiveShadow = true; }
-  const puffs = [];
-  for (let i = 0; i < 6; i++) puffs.push(world.register(await makeBillboard('ui/emote_sparkle.png', 0.6)));
+  const pineTex = pixelWood({ base: '#e9c58c', planks: 2, seed: 81 });
+  const pine = (rx, ry, vertical = false) => {
+    const tx = vertical ? pixelWood({ base: '#e9c58c', planks: 2, seed: 81, vertical: true }) : pineTex.clone();
+    tx.repeat.set(rx, ry); tx.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ map: tx, emissive: new THREE.Color('#ffe0b0'), emissiveMap: tx, emissiveIntensity: 0.12, roughness: 0.8 });
+  };
+  const beam = world.register(new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.22, 0.3), pine(roomW / 2.2, 0.5)), jungle.group);
+  const trimMat = pine(0.25, roomH / 2.2, true);
+  const trims = [-1, 1].map(() => world.register(new THREE.Mesh(new THREE.BoxGeometry(0.22, roomH, 0.26), trimMat), jungle.group));
+  // the pine returns: just inside the real ones, and cut away from the top down as the
+  // wallpaper unrolls (the same reveal as the painting, with its bright seam), so the room's
+  // own returns take over under the unroll
+  const standMat = pine(roomD / 2.2, roomH / 1.1);
+  standMat.onBeforeCompile = (sh) => {
+    sh.uniforms.uReveal = jungle.reveal;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vRUv;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvRUv = uv;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vRUv;\nuniform float uReveal;')
+      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\nif (uReveal > 0.001) { float edge = 1.0 - uReveal; if (vRUv.y > edge) discard; float seam = 1.0 - smoothstep(0.0, 0.03, edge - vRUv.y); gl_FragColor.rgb += vec3(1.0, 0.92, 0.7) * seam * 1.5 * (1.0 - smoothstep(0.75, 1.0, uReveal)); }');
+  };
+  standMat.customProgramCacheKey = () => 'pine-return-reveal';
+  const standIns = [-1, 1].map(() => world.register(new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), standMat), jungle.group));
+  for (const m of [beam, ...trims, ...standIns]) { m.castShadow = true; m.receiveShadow = true; }
+  // where each piece lands (room-local) and where its dust puffs (left and right ones at
+  // different heights, so no two ever pair up)
+  const LAND = [[0, 0.003, 0], [-(roomW / 2 - 0.07), roomH / 2, 0], [roomW / 2 - 0.07, roomH / 2, 0], [0, roomH - 0.11, roomD / 2 - 0.2], [-(roomW / 2 - 0.12), roomH / 2, roomD / 2 - 0.2], [roomW / 2 - 0.12, roomH / 2, roomD / 2 - 0.2]];
+  const PUFF_AT = [[-0.9, 0.14, 1.05], [-(roomW / 2 - 0.35), 0.3, 1.1], [roomW / 2 - 0.35, 0.62, 0.9], [0.55, roomH - 0.42, 1.5], [-(roomW / 2 - 0.4), 1.2, 1.55], [roomW / 2 - 0.4, 2.25, 1.55]];
+  const puffTex = makeDustPuff();
+  // (depth-written, so the depth of field sees each at its piece)
+  const puffs = PUFF_AT.map(() => world.register(new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, alphaTest: 0.1 })), jungle.group));
+  // the amber's gold burst: warm sparks that fly from the frame's centre to the six landing
+  // points and wait there, twinkling, for their piece
   const burst = [];
-  for (let i = 0; i < 16; i++) burst.push(world.register(await makeBillboard('ui/emote_sparkle.png', 0.28)));
-  const moths = makeMoths({ px: 0.05, radius: 0.42 });
+  for (let i = 0; i < 16; i++) burst.push(world.register(await makeBillboard('ui/emote_sparkle.png', 0.65)));
+  for (const b of burst) b.material.color.set('#ffb347');
+  // (px is one art pixel: 0.017 makes a moth about 65 px wide at Sloane's distance)
+  const moths = makeMoths({ px: 0.017, radius: 0.42 });
   world.register(moths.group);
   // the two wing frames of moth 0 (open, folded), read back from the flap cycle
   moths.pose(0, null); const mothOpen = moths.group.children[0].material;
@@ -249,46 +292,70 @@ export default async function make(ctx) {
 
   function poseBuild(t) {
     // before the drop the jungle is an empty frame being built; after it, the room
-    const building = t >= E.GEMS && t < E.DROP + 0.4;
     if (t < E.GEMS) { house.setBuilt('jungle', false); return; }
     house.setBuilt('jungle', true);
     sloane.ch.visible = t >= E.SLOANE_POP; sloane.shadow.visible = t >= E.SLOANE_POP;
     jungle.painting.visible = t >= E.DROP;
     if (jungle.windowMesh) jungle.windowMesh.visible = t >= E.DROP;
     jungle.reveal.value = ease.inOutSine(seg(t, E.DROP, E.DROP + 0.4));
-    if (!building) return;
-    const piece = (i) => seg(t, E.KNOCKS[i] - 0.2, E.KNOCKS[i]);
-    const settle = (i) => (t < E.KNOCKS[i] ? 1 : 1 - 0.1 * Math.exp(-(t - E.KNOCKS[i]) * 14) * Math.cos((t - E.KNOCKS[i]) * 40));
-    // 0 floor drops in
-    const f0 = ease.inQuad(piece(0));
-    jungle.floor.visible = t >= E.KNOCKS[0] - 0.2; jungle.floor.position.y = 0.003 + (1 - f0) * 2.2; jungle.floor.scale.set(1, 1, settle(0));
-    // 1, 2 returns swing in
-    jungle.returns.forEach((w, k) => {
-      const f = ease.inQuad(piece(1 + k)); const sd = k === 0 ? -1 : 1;
-      w.visible = t >= E.KNOCKS[1 + k] - 0.2;
-      w.rotation.y = -sd * Math.PI / 2 + sd * (1 - f) * 1.3;
-      w.scale.set(1, settle(1 + k), 1);
+    // the room's own (dark) returns come in under the unroll, behind the pine stand-ins
+    for (const w of jungle.returns) w.visible = t >= E.DROP;
+    const K = E.KNOCKS;
+    // each piece flies for 0.36 s and lands on its knock, with a squash and a rebound
+    const piece = (i) => ease.inQuad(seg(t, K[i] - 0.36, K[i]));
+    const flying = (i) => t >= K[i] - 0.36;
+    const squash = (i, amp = 0.22) => (t < K[i] ? 1 : 1 - amp * Math.exp(-(t - K[i]) * 16) * Math.cos((t - K[i]) * 38));
+    // 0 the floor drops in and rebounds a hair
+    if (t < E.DROP) {
+      const f = piece(0), a = t - K[0];
+      jungle.floor.visible = flying(0);
+      jungle.floor.position.y = 0.003 + (1 - f) * 2.2 + (a > 0 ? 0.06 * Math.max(0, Math.exp(-a * 16) * Math.sin(a * 38)) : 0);
+    }
+    // 1, 2 the pine returns swing in from outside the frame (up and toward the lens),
+    // arcing over and turning flush with the posts; cut away under the unroll
+    standIns.forEach((w, k) => {
+      const i = 1 + k, sd = k === 0 ? -1 : 1;
+      if (!flying(i) || t >= E.DROP + 0.4) return;
+      const f = piece(i);
+      w.visible = true;
+      w.position.set(LAND[i][0] + sd * (1 - f) * 3.0, LAND[i][1] + (1 - f) * 2.2 + Math.sin(Math.PI * f) * 0.8, LAND[i][2] + (1 - f) * 3.5);
+      w.rotation.set(0, -sd * Math.PI / 2 + sd * (1 - f) * 1.3, 0);
+      w.scale.set(1, squash(i, 0.1), 1);
     });
-    // 3 ceiling beam drops, 4-5 trims slide in
-    const fb = ease.inQuad(piece(3));
-    beam.visible = t >= E.KNOCKS[3] - 0.2; beam.position.set(0, jungle.roomH - 0.11 + (1 - fb) * 1.5, jungle.roomD / 2 - 0.2);
+    // 3 the ceiling beam drops from well above; 4, 5 the trims fly in from off frame with
+    // an up-arc. They stay for the rest of the oner (out of frame once inside the room).
+    if (flying(3)) {
+      const f = piece(3);
+      beam.visible = true;
+      beam.position.set(LAND[3][0], LAND[3][1] + (1 - f) * 3.0, LAND[3][2]);
+      beam.scale.set(1, squash(3), 1);
+    }
     trims.forEach((m, k) => {
-      const f = ease.inQuad(piece(4 + k)); const sd = k === 0 ? -1 : 1;
-      m.visible = t >= E.KNOCKS[4 + k] - 0.2;
-      m.position.set(sd * (jungle.roomW / 2 - 0.12) + sd * (1 - f) * 1.8, jungle.roomH / 2, jungle.roomD / 2 - 0.2);
+      const i = 4 + k, sd = k === 0 ? -1 : 1;
+      if (!flying(i)) return;
+      const f = piece(i);
+      m.visible = true;
+      m.position.set(LAND[i][0] + sd * (1 - f) * 4.0, LAND[i][1] + Math.sin(Math.PI * f) * 0.8, LAND[i][2]);
+      m.scale.set(squash(i), 1, 1);
     });
-    // a sparkle puff on each knock (left and right ones at different heights, so no two
-    // ever pair up)
+    // a pixel dust puff where each piece lands: stepped growth (15 fps), 0.6 -> 1.5 of its
+    // size over 0.4 s, four alpha steps, drifting out from the room's centre
     puffs.forEach((pp, i) => {
-      const at = [add(JW, [0, 0.2, 0.8]), add(JW, [-3.6, 1.35, 0]), add(JW, [3.6, 1.85, 0]), add(JW, [0, 3.8, 1.2]), add(JW, [-3.8, 1.8, 1.4]), add(JW, [3.8, 2.5, 1.4])][i];
-      pp.position.set(...at); pp.userData.y0 = at[1];
-      poseEmote(pp, t - E.KNOCKS[i], { hold: 0.12, rise: 0.15, fade: 0.2 });
+      const a = t - K[i];
+      if (a < 0 || a >= 0.4) return;
+      const u = Math.floor(a * 15) / 15 / 0.4;
+      const e = ease.outCubic(u);
+      const at = PUFF_AT[i], out = at[0] === 0 ? 0 : Math.sign(at[0]);
+      pp.visible = true;
+      pp.scale.setScalar(1.2 * lerp(0.6, 1.5, e));
+      pp.position.set(at[0] + (out || -0.5) * 0.35 * e, at[1] + 0.12 * e, at[2]);
+      pp.material.opacity = Math.ceil((1 - u) * 4) / 4 * 0.85;
     });
   }
 
   function poseBlueprint(t) {
     const bp = blueprint.mesh;
-    if (t < E.GEMS || t > E.DROP + 0.45) return;
+    if (t < E.GEMS || t >= E.DROP + 0.22) return;
     bp.visible = true;
     const onBoard = add(JW, [0, jungle.roomH / 2, -jungle.roomD / 2 + 0.06]);
     if (t < E.BLUEPRINT_LAY) {
@@ -302,6 +369,7 @@ export default async function make(ctx) {
       const grow = g0 + (1 - g0) * ease.inOutSine(seg(t, E.GEMS + (portrait ? 0.6 : 0.35), E.GEMS + (portrait ? 1.15 : 0.9)));
       bp.scale.set(Math.max(0.05, unf) * grow, Math.max(0.05, unf) * grow, 1);
       blueprint.draw(0);
+      blueprint.mat.opacity = 1;
     } else {
       const k = ease.inOutCubic(seg(t, E.BLUEPRINT_LAY, E.BLUEPRINT_LAY + 0.35));
       const from = bpRide(0.97);
@@ -310,7 +378,8 @@ export default async function make(ctx) {
       const full = jungle.roomW * 0.9 / 1.6;
       bp.scale.setScalar(1 + (full - 1) * k);
       blueprint.draw(seg(t, E.BLUEPRINT_LAY + 0.2, E.GEM_BURST + 0.25));
-      blueprint.mat.opacity = 1 - seg(t, E.DROP, E.DROP + 0.4);
+      // it fades as the wallpaper starts to unroll over it
+      blueprint.mat.opacity = 1 - smooth(seg(t, E.DROP, E.DROP + 0.22));
     }
   }
 
@@ -380,23 +449,34 @@ export default async function make(ctx) {
     }
   }
 
+  // The gold burst (6.29): the gems' sparks fly out of the frame's centre on bowed paths to
+  // the six landing points, three or two to a point in a short diagonal (never a level
+  // pair), wait there twinkling, and pop as their piece lands.
+  const BURST_AT = add(JC, [0, 0, 0.4]);
   function poseBurst(t) {
-    const k = seg(t, E.GEM_BURST, E.GEM_BURST + 0.7);
     burst.forEach((b, i) => {
-      if (k <= 0 || k >= 1) { b.visible = false; return; }
+      const p = i % 6, m = Math.floor(i / 6), K = E.KNOCKS[p];
+      const t0 = E.GEM_BURST + 0.04 * hash01(i * 5 + 1);
+      const ta = Math.max(E.GEM_BURST + 0.45, K - 0.3);
+      if (t < t0 || t >= K + 0.1) { b.visible = false; return; }
       b.visible = true;
-      const a = (i / burst.length) * Math.PI * 2;
-      const r = ease.outCubic(k) * (2.4 + (i % 3) * 0.5);
-      b.position.set(JC[0] + Math.cos(a) * r, JC[1] + Math.sin(a) * r * 0.55, JC[2] + 0.4);
-      b.material.opacity = 1 - k;
-      b.scale.setScalar(0.28 * (1 - k * 0.5));
+      const target = add(add(JW, PUFF_AT[p]), [(m - 1) * 0.28, (m - 1) * 0.22, 0.1]);
+      const bow = add(mix3(BURST_AT, target, 0.35), [(hash01(i * 13 + 7) - 0.5) * 1.4, 1.3 + hash01(i * 11 + 3) * 0.6, 0.6]);
+      const u = ease.outCubic(seg(t, t0, ta));
+      b.position.set(...[0, 1, 2].map((k) => (1 - u) * (1 - u) * BURST_AT[k] + 2 * u * (1 - u) * bow[k] + u * u * target[k]));
+      const pop = t >= K ? 1 + 0.6 * seg(t, K, K + 0.1) : 1;
+      const tw = u >= 1 ? 1 + 0.18 * Math.sin((t - ta) * 26 + i) : 1;
+      b.scale.setScalar(0.65 * Math.max(0.001, spring(t - t0, 3.2, 0.45)) * tw * pop);
+      b.material.rotation = hash01(i * 3 + 2) * 6 + (t - t0) * 3 * (hash01(i * 19 + 1) - 0.5);
+      b.material.opacity = t >= K ? 1 - seg(t, K, K + 0.1) : 1;
     });
   }
 
-  // Moths: each keeps its own height band around her head (never two side by side at
-  // one height, so they cannot pair into eyes), loop centred up-left of her head, away
-  // from the bubble's tail; at MOTH_LAND moth 0 settles on the L's sprout.
-  const MOTH_BANDS = [0.6, 0.28, -0.02];
+  // Moths: each keeps its own height band (never two side by side at one height, so they
+  // cannot pair into eyes); the loops are centred left of her and below her crown, over the
+  // dark foliage and the hammock rather than the bright window (and, in 9:16, below the
+  // bubble); at MOTH_LAND moth 0 settles on the L's sprout.
+  const MOTH_BANDS = [0.35, 0.05, -0.25];
   function poseS03(t) {
     // Sloane pops in, talks while her line types; moths loop around her head
     if (t < E.DROP) return;
@@ -408,7 +488,7 @@ export default async function make(ctx) {
     poseEmote(pop, t - E.SLOANE_POP, { hold: 0.18, rise: 0.1, fade: 0.2 });
     moths.group.visible = t >= E.SLOANE_POP;
     moths.pose(t, camera);
-    const centre = add(head, [-0.78, 0.05, 0.15]);
+    const centre = add(head, [-0.55, -0.45, 0.2]);
     moths.group.position.set(...centre);
     moths.group.children.forEach((m, i) => {
       const a = t * (1.1 + i * 0.27) + i * 2.1;
@@ -425,8 +505,9 @@ export default async function make(ctx) {
       const k = ease.inOutSine(mk);
       // it swings wide to the left on the way down, never alongside another moth
       m0.position.set(lerp(m0.position.x, land[0], k) - Math.sin(Math.PI * k) * 0.45, lerp(m0.position.y, land[1], k) + Math.sin(Math.PI * k) * 0.25, lerp(m0.position.z, land[2], k));
-      if (t >= E.MOTH_LAND) m0.material = t < E.MOTH_LAND + 0.12 ? mothOpen : mothFolded;
-      m0.scale.setScalar(lerp(1, 0.8, k));
+      // it lands with its wings open, holds them 0.2 s, then folds
+      if (t >= E.MOTH_LAND) m0.material = t < E.MOTH_LAND + 0.2 ? mothOpen : mothFolded;
+      m0.scale.setScalar(1);
     }
   }
 
@@ -457,14 +538,19 @@ export default async function make(ctx) {
     S = { pos: [sloane.x0 - 0.66, JW[1] + 1.46, sloane.z0 + 8.0], target: [sloane.x0 - 0.76, JW[1] + 1.3, sloane.z0], fov: 40 };
     ORBIT = 5;
   }
-  // the crane is two overlapping eased moves: a quick boom and tilt up after the amber
-  // bursts (B -> C, so the rack drops out of frame by 4.9) riding on the long crane to the
-  // frame (C -> D, landing on it at the drop); both start and end at rest, so the sum is
-  // one continuous move with no stop between them
-  const BOOM = [E.GEMS + 0.28, E.GEMS + 0.98];
+  // The crane is two overlapping moves. A boom and tilt up after the amber bursts
+  // (B -> C: it ramps in softly, peaks early and has a long tail, so there is no lurch
+  // and the rack is out of frame by about 5.2) rides on the long crane to the frame
+  // (C -> D). The long crane starts at rest and gathers speed all the way to the drop: it
+  // passes dead centre on the frame at exactly the drop and carries that momentum
+  // straight into the push to Sloane (D -> S), so the oner never stops or lurches between
+  // the burst and the room. Measured with travelPx every 1/30 s: peak 31 px (16:9) / 45
+  // (9:16), never below 8 px from 5.1 to 7.9, no frame above 2.5x its neighbours.
+  const BOOM = [E.GEMS + 0.15, E.GEMS + 2.3];
+  const PUSH = 1.25; // the push to Sloane after the drop
   const MACRO_D = 10.5;
-  /** 1 on the macro and rack shots, easing to 0 under the boom. */
-  const tileShot = (t) => 1 - smooth(seg(t, BOOM[0], BOOM[1]));
+  /** 1 on the macro and rack shots, easing to 0 as the boom lifts off them. */
+  const tileShot = (t) => 1 - smooth(seg(t, E.GEMS + 0.28, E.GEMS + 0.98));
   const smax = (a, b, k) => (a + b + Math.sqrt((a - b) * (a - b) + k * k)) / 2;
 
   /** Rig A: the macro follow of the L as it falls into PANT, whole words in frame. */
@@ -488,32 +574,45 @@ export default async function make(ctx) {
     return { pos: add(B.pos, [0, up * 0.5, 0]), target: add(B.target, [0, up, 0]), fov: B.fov };
   }
 
+  // The velocities the move carries through the drop (world units a second): the mean of
+  // the crane's and the push's average velocities (a Catmull-Rom tangent), a little more on
+  // the aim so the frame keeps travelling into the hit. The zoom settles at the drop (it
+  // widens on the crane and narrows on the push, so any carried rate would reverse it).
+  const T1 = E.DROP - E.CRANE;
+  const CREEP = [0, 0, -0.35 / (E.S04 - E.DROP - PUSH)]; // the slow drift in on Sloane after the push
+  const through = (c, d, s, k) => c.map((_, i) => k * ((d[i] - c[i]) / T1 + (s[i] - d[i]) / PUSH) / 2);
+  const V_POS = through(C.pos, D.pos, S.pos, 1), V_AIM = through(C.target, D.target, S.target, 1.3);
   function onerCamera(t) {
     let r, roll = 0;
     if (t < E.L_LAND + 0.12) r = rigA(t);
     else if (t < E.CRANE) r = blend(rigA(t), B, ease.inOutSine(seg(t, E.L_LAND + 0.12, E.L_LAND + 0.8)));
     else if (t < E.DROP) {
-      const e1 = ease.inOutSine(seg(t, BOOM[0], BOOM[1]));
-      const e2 = ease.inOutSine(seg(t, E.CRANE, E.DROP));
-      const kt2 = Math.pow(e2, portrait ? 1.1 : 0.9); // the aim leads the long crane a little (9:16 holds on the climb)
-      const w = Math.sin(Math.PI * e2);
-      const pos = B.pos.map((v, i) => v + e1 * (C.pos[i] - v) + e2 * (D.pos[i] - C.pos[i]));
+      const sb = seg(t, BOOM[0], BOOM[1]);
+      const e1 = 1 - Math.pow(1 - sb, 3) * (1 + 3 * sb); // speed 12 s (1 - s)^2: soft in, peak at a third, long tail
+      const s = seg(t, E.CRANE, E.DROP);
+      const w = 16 * s * s * (1 - s) * (1 - s); // the orbit and Dutch tilt: in and out at rest
+      const pos = add(hermite3(C.pos, ZERO3, D.pos, V_POS, s, T1), B.pos.map((v, i) => (1 - e1) * (v - C.pos[i])));
       const orbit = THREE.MathUtils.degToRad(ORBIT * w);
       const rel = [pos[0] - D.target[0], pos[2] - D.target[2]];
       r = {
         pos: [D.target[0] + rel[0] * Math.cos(orbit) - rel[1] * Math.sin(orbit), pos[1], D.target[2] + rel[0] * Math.sin(orbit) + rel[1] * Math.cos(orbit)],
-        target: B.target.map((v, i) => v + e1 * (C.target[i] - v) + kt2 * (D.target[i] - C.target[i])),
-        fov: B.fov + e1 * (C.fov - B.fov) + e2 * (D.fov - C.fov),
+        target: add(hermite3(C.target, ZERO3, D.target, V_AIM, s, T1), B.target.map((v, i) => (1 - e1) * (v - C.target[i]))),
+        fov: lerp(C.fov, D.fov, smooth(s)) + (1 - e1) * (B.fov - C.fov),
       };
       roll = 1.5 * w;
     } else {
-      // push through the open front to Sloane, a 4 deg arc right
-      const k = ease.inOutCubic(seg(t, E.DROP, E.DROP + 1.25));
-      r = blend(D, S, k);
-      const arc = THREE.MathUtils.degToRad(4 * k);
-      const rel = [r.pos[0] - face[0], r.pos[2] - face[2]];
-      r.pos = [face[0] + rel[0] * Math.cos(arc) - rel[1] * Math.sin(arc), r.pos[1], face[2] + rel[0] * Math.sin(arc) + rel[1] * Math.cos(arc)];
-      r.pos = add(r.pos, [0, 0, -0.35 * seg(t, E.DROP + 1.25, E.S04)]);
+      // the push through the open front to Sloane: it leaves the drop at the crane's speed
+      // and settles (with no jerk) into the slow drift on her, with a 4 deg arc right
+      const s = seg(t, E.DROP, E.DROP + PUSH);
+      const pos = add(quintic3(D.pos, V_POS, S.pos, CREEP, s, PUSH), CREEP.map((v) => v * Math.max(0, t - E.DROP - PUSH)));
+      const target = quintic3(D.target, V_AIM, S.target, ZERO3, s, PUSH);
+      const arc = THREE.MathUtils.degToRad(4 * smooth(s));
+      const rel = [pos[0] - face[0], pos[2] - face[2]];
+      r = {
+        pos: [face[0] + rel[0] * Math.cos(arc) - rel[1] * Math.sin(arc), pos[1], face[2] + rel[0] * Math.sin(arc) + rel[1] * Math.cos(arc)],
+        target,
+        fov: lerp(D.fov, S.fov, smoother(s)),
+      };
     }
     return { ...r, roll };
   }
@@ -596,10 +695,14 @@ export default async function make(ctx) {
       // focus: the aim, but ride the hero L (and the amber around it) up the facade
       const kRide = seg(t, E.GEMS - 0.1, E.GEMS + 0.4) * (1 - seg(t, E.BLUEPRINT_LAY - 0.3, E.BLUEPRINT_LAY + 0.3));
       const focus = lerp(focusD, dist(cam.pos, heroPos(t)), kRide);
-      const interior = t >= E.DROP + 0.6;
       const grade = world.pose(t, { dusk: 0, focus, aperture: 40, camera, behaviours: sloaneBehaviour(t) });
-      world.sun.castShadow = !interior;
-      world.pollen.points.visible = !interior;
+      // inside the room the sun's shadows and the meadow pollen fade out over half a second
+      // (a hard switch popped the whole frame by a few luma codes)
+      const sh = 1 - smooth(seg(t, E.DROP + 0.35, E.DROP + 0.85));
+      world.sun.shadow.intensity = sh;
+      world.sun.castShadow = sh > 0.001;
+      world.pollen.uniforms.opacity.value *= sh;
+      world.pollen.points.visible = sh > 0.001;
       // lens: the macro's shallow focus opens up through the crane and settles for the room
       const kc = smooth(seg(t, E.CRANE, E.CRANE + 1.2));
       const aperture = lerp(lerp(40, 12, kc), 30, smooth(seg(t, E.DROP, E.DROP + 0.8)));
@@ -648,3 +751,22 @@ const GEM_TINT = 0.65; // the gems' sprite colour under the day grade (see poseA
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const ZERO3 = [0, 0, 0];
+// PLANT's landing sparkles: [x from the rack centre, margin (+1 above the tiles, -1 below),
+// size]. The x values are the gaps between PLANT's tiles (slot pitch 0.504, tiles 0.45
+// wide); the margins sit between PLANT and its neighbour rows, and the sprout's side of
+// the top margin is left clear so nothing pairs up around it.
+const PLANT_SPARKS = [[-0.756, -1, 0.18], [0.252, 1, 0.17], [0.756, -1, 0.16], [-0.252, -1, 0.17], [0.756, 1, 0.18], [0.252, -1, 0.16]];
+/** Cubic Hermite from a (velocity va) to b (velocity vb) over T seconds, at s in 0..1. */
+function hermite3(a, va, b, vb, s, T) {
+  const s2 = s * s, s3 = s2 * s;
+  const h00 = 2 * s3 - 3 * s2 + 1, h10 = s3 - 2 * s2 + s, h01 = -2 * s3 + 3 * s2, h11 = s3 - s2;
+  return a.map((_, i) => h00 * a[i] + h10 * va[i] * T + h01 * b[i] + h11 * vb[i] * T);
+}
+/** Quintic Hermite (zero acceleration at both ends): a (velocity va) to b (velocity vb) over T seconds. */
+function quintic3(a, va, b, vb, s, T) {
+  const s3 = s * s * s, s4 = s3 * s, s5 = s4 * s;
+  const h0 = 1 - 10 * s3 + 15 * s4 - 6 * s5, h1 = s - 6 * s3 + 8 * s4 - 3 * s5;
+  const h4 = -4 * s3 + 7 * s4 - 3 * s5, h5 = 10 * s3 - 15 * s4 + 6 * s5;
+  return a.map((_, i) => h0 * a[i] + h1 * va[i] * T + h4 * vb[i] * T + h5 * b[i]);
+}

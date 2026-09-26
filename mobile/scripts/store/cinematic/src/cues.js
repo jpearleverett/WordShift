@@ -125,21 +125,24 @@ add({
 });
 
 // ============================================================================ S01 the first move
-at('E.S01 + 0.03 (frame 1)', E.S01 + 0.03, { file: 'letter_select', db: -4, pan: -0.25 });
-at('E.S01 + 0.03 (frame 1)', E.S01 + 0.03, { synth: 'resinClick', params: { pan: -0.25 }, db: -7 });
+// The hook's tactile cues (the pick-ups, whooshes, slot zips, landings and tocks) carry the
+// first three seconds over a bed held at -5 dB (spec 5.1), so they are mixed 3 dB hot: at
+// their earlier gains the hook measured as the quietest stretch of the programme.
+at('E.S01 + 0.03 (frame 1)', E.S01 + 0.03, { file: 'letter_select', db: -1, pan: -0.25 });
+at('E.S01 + 0.03 (frame 1)', E.S01 + 0.03, { synth: 'resinClick', params: { pan: -0.25 }, db: -4 });
 // the L arcs down-right from PLAY into PANT: whoosh panned left to centre
-whooshAt('L mid-flight (E.L_LIFT..E.L_LAND)', (E.L_LIFT + E.L_LAND) / 2 + 0.06, { dur: 0.7, from: 500, to: 2600, q: 1.8, pan: [-0.55, 0], gain: 0.3, seed: 201, shape: 0.9, top: 7000, db: -14 });
-at('E.PANT_OPEN', E.PANT_OPEN, { synth: 'slotZip', params: { dur: 0.2, pan: 0.05 }, db: -15 }, 'start');
-at('E.L_LAND', E.L_LAND, { file: 'valid_move', db: -3 });
-at('E.L_LAND', E.L_LAND, { synth: 'ceramicTock', params: { freq: hz('A6'), pan: 0 }, db: -12 });
+whooshAt('L mid-flight (E.L_LIFT..E.L_LAND)', (E.L_LIFT + E.L_LAND) / 2 + 0.06, { dur: 0.7, from: 500, to: 2600, q: 1.8, pan: [-0.55, 0], gain: 0.3, seed: 201, shape: 0.9, top: 7000, db: -11 });
+at('E.PANT_OPEN', E.PANT_OPEN, { synth: 'slotZip', params: { dur: 0.2, pan: 0.05 }, db: -12 }, 'start');
+at('E.L_LAND', E.L_LAND, { file: 'valid_move', db: 0 });
+at('E.L_LAND', E.L_LAND, { synth: 'ceramicTock', params: { freq: hz('A6'), pan: 0 }, db: -9 });
 at('E.SPROUT', E.SPROUT, { synth: 'sproutPluck', params: { notes: [hz('A5'), hz('D6')], pan: -0.05 }, db: -13, verb: 0.15 });
 at('E.L_LOCK', E.L_LOCK, { synth: 'lockTink', params: { freq: hz('G7') }, db: -18 });
-at('E.T_LIFT', E.T_LIFT, { file: 'letter_select', db: -6, pan: 0.05 });
+at('E.T_LIFT', E.T_LIFT, { file: 'letter_select', db: -3, pan: 0.05 });
 at('E.EMBER_TALK', E.EMBER_TALK, { file: 'star_pop_1', db: -14, pan: 0.45 });
-whooshAt('T mid-flight (E.T_LIFT..E.T_LAND)', (E.T_LIFT + E.T_LAND) / 2, { dur: 1.15, from: 450, to: 2200, q: 1.8, pan: [0.05, -0.1], gain: 0.3, seed: 202, shape: 1.1, top: 6500, db: -17 });
-at('E.HEAR_OPEN', E.HEAR_OPEN, { synth: 'slotZip', params: { dur: 0.2, pan: 0, seed: 122 }, db: -16 }, 'start');
-at('E.T_LAND', E.T_LAND, { file: 'valid_move_2', db: -4 });
-at('E.T_LAND', E.T_LAND, { synth: 'ceramicTock', params: { freq: hz('B6'), seed: 112 }, db: -13 });
+whooshAt('T mid-flight (E.T_LIFT..E.T_LAND)', (E.T_LIFT + E.T_LAND) / 2, { dur: 1.15, from: 450, to: 2200, q: 1.8, pan: [0.05, -0.1], gain: 0.3, seed: 202, shape: 1.1, top: 6500, db: -14 });
+at('E.HEAR_OPEN', E.HEAR_OPEN, { synth: 'slotZip', params: { dur: 0.2, pan: 0, seed: 122 }, db: -13 }, 'start');
+at('E.T_LAND', E.T_LAND, { file: 'valid_move_2', db: -1 });
+at('E.T_LAND', E.T_LAND, { synth: 'ceramicTock', params: { freq: hz('B6'), seed: 112 }, db: -10 });
 at('E.T_LOCK', E.T_LOCK, { synth: 'lockTink', params: { freq: hz('G7') }, db: -19 });
 ['star_pop_1', 'star_pop_2', 'star_pop_3'].forEach((f, i) => at(`E.FLASH[${i}]`, E.FLASH[i], { file: f, db: -10 - i * 0.5, pan: 0.1 }));
 // the amber bursts from the rack's centre, PLAN unfurls into the blueprint
