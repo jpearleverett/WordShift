@@ -17,6 +17,8 @@ module.exports = defineConfig([
       'src/data/*Bank*.ts',
       'src/dictionary.ts',
       'scripts/tools/**/*.mjs',
+      // Vendored three.js for the cinematic trailer, copied verbatim from npm.
+      'scripts/store/cinematic/vendor/**',
     ],
   },
   {
@@ -50,6 +52,14 @@ module.exports = defineConfig([
       '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       'no-unused-vars': 'off',
+    },
+  },
+  {
+    // The cinematic trailer's browser modules resolve 'three' through the
+    // page's import map (vendored copy), which the node resolver cannot see.
+    files: ['scripts/store/cinematic/src/**/*.js'],
+    rules: {
+      'import/no-unresolved': ['error', { ignore: ['^three(/|$)'] }],
     },
   },
   {

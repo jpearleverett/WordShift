@@ -1,0 +1,5 @@
+{
+  "//": "The cinematic trailer is plain ES modules shared by the browser page and the Node render/score scripts.",
+  "private": true,
+  "type": "module"
+}
