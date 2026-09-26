@@ -1,6 +1,6 @@
 // The QA gates of spec 7.2 over the delivered files, written to out/trailer-report.json.
 //
-//   node scripts/store/cinematic/qa/report.mjs [--draft] [--skip=determinism,overlay]
+//   node scripts/store/cinematic/qa/report.mjs [--draft] [--skip=determinism,overlay,probes]
 //
 // Gates: copy/words/assets/determinism-source (qa/lint.mjs), overlay safe zones (every
 // frame, both aspects, from the overlay's inked boxes), luma from 20.4 s (YAVG >= 72 and
@@ -56,6 +56,65 @@ if (!skip.has('overlay')) {
       }, [TOTAL, FPS, aspect === '9x16']);
       const names = [...new Set(bad.map((b) => b.name))];
       gate(`overlay-${aspect}`, bad.length === 0, { frames: new Set(bad.map((b) => b.f)).size, items: names, first: bad.slice(0, 6) });
+      await page.close();
+    }
+  } finally { await browser.close(); server.close(); }
+}
+
+// ---- 5 and 4c: tile swatches (dE2000 vs spec 2.2) and room windows (luma >= 40), sampled on
+// the encoded files at points the page projects for that frame
+if (!skip.has('probes')) {
+  const { deltaE2000 } = await import('./swatch.mjs');
+  const sharp = (await import('sharp')).default;
+  const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const lin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const lab = ([r, g, b]) => {
+    const [R, G, B] = [lin(r), lin(g), lin(b)];
+    const f = (t) => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+    const X = (0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047, Y = 0.2126 * R + 0.7152 * G + 0.0722 * B, Z = (0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883;
+    return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
+  };
+  const TILE_T = [15, 87], TILE_INFO = [369, 402, 432, 1167], WIN_T = [615, 915, 1005];
+  const server = await serve(); const port = server.address().port;
+  const browser = await launch();
+  try {
+    for (const [aspect, file] of Object.entries(MP4)) {
+      if (!fs.existsSync(file)) continue;
+      const page = await openTrailer(browser, port, aspect, 1);
+      const frameAt = async (f) => {
+        const png = execFileSync('ffmpeg', ['-hide_banner', '-v', 'error', '-ss', String(f / FPS + 0.001), '-i', file, '-frames:v', '1', '-f', 'image2pipe', '-vcodec', 'png', '-'], { maxBuffer: 1 << 28 });
+        return sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      };
+      const patch = ({ data, info }, x, y, r) => {
+        const sum = [0, 0, 0]; let n = 0;
+        for (let j = y - r; j <= y + r; j++) for (let i = x - r; i <= x + r; i++) {
+          if (i < 0 || j < 0 || i >= info.width || j >= info.height) continue;
+          const o = (j * info.width + i) * info.channels; sum[0] += data[o]; sum[1] += data[o + 1]; sum[2] += data[o + 2]; n++;
+        }
+        return sum.map((v) => v / Math.max(1, n));
+      };
+      const tileRows = [];
+      for (const f of [...TILE_T, ...TILE_INFO]) {
+        const pr = await page.evaluate((t) => window.TRAILER.probesAt(t), f / FPS);
+        const img = await frameAt(f);
+        for (const tl of pr.tiles) {
+          const got = patch(img, tl.x, tl.y, Math.min(6, tl.px));
+          tileRows.push({ f, gate: TILE_T.includes(f), ch: tl.ch, locked: tl.locked, want: tl.hex, got: '#' + got.map((v) => Math.round(v).toString(16).padStart(2, '0')).join(''), dE: +deltaE2000(lab(got), lab(hexRgb(tl.hex))).toFixed(2) });
+        }
+      }
+      const gated = tileRows.filter((r) => r.gate).map((r) => r.dE).sort((a, b) => a - b);
+      const med = gated.length ? gated[Math.floor(gated.length / 2)] : NaN;
+      gate(`swatch-${aspect}`, gated.length > 0 && med <= 6 && gated[gated.length - 1] <= 10, { tilesAtGate: gated.length, medianDE: med, maxDE: gated[gated.length - 1], samples: tileRows });
+      const winRows = [];
+      for (const f of WIN_T) {
+        const pr = await page.evaluate((t) => window.TRAILER.probesAt(t), f / FPS);
+        const img = await frameAt(f);
+        for (const w of pr.windows) {
+          const [r, g, b] = patch(img, w.x, w.y, 3);
+          winRows.push({ f, room: w.room, luma: +(0.2126 * r + 0.7152 * g + 0.0722 * b).toFixed(1) });
+        }
+      }
+      gate(`windows-${aspect}`, winRows.length > 0 && winRows.every((w) => w.luma >= 40), { minLuma: Math.min(...winRows.map((w) => w.luma)), below40: winRows.filter((w) => w.luma < 40), count: winRows.length });
       await page.close();
     }
   } finally { await browser.close(); server.close(); }

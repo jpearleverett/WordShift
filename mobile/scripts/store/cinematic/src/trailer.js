@@ -30,7 +30,7 @@ export async function buildTrailer(ctx) {
   const warmTimes = shots.map((s) => (s.start + s.end) / 2);
 
   return {
-    duration: DURATION, fps: FPS, warmTimes, shots, world,
+    duration: DURATION, fps: FPS, warmTimes, shots, world, camera,
     update(t) {
       const active = timeline.at(t);
       const layers = active.map((l) => ({
