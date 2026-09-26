@@ -437,13 +437,15 @@ export default async function make(ctx) {
       b.scale.set(b.userData.w * s, b.userData.h * s, 1);
       b.material.opacity = Math.min(1, u * 10) * (1 - seg(u, 0.75, 1));
     });
-    // Sloane's moths (all three called Gerald) flutter out of her fur and loop
+    // Sloane's moths (all three called Gerald) flutter out of her fur and loop over the
+    // hammock side of her head, above her eyes (looping at eye height, two pale moths at
+    // her face read as a second pair of eyes under the crane's blur)
     const sl = R.sloane;
     const mk = t < A.sloane ? 0 : clamp(spring(t - A.sloane, 2.2, 0.55), 0, 1.2);
     moths.group.visible = mk > 0.02;
     if (moths.group.visible) {
       moths.pose(t, camera);
-      const hp = inRoom('sloane', sl.ch.position.x - 0.1, sl.h * 0.86, sl.z0 + 0.15);
+      const hp = inRoom('sloane', sl.ch.position.x - 0.4, sl.h * 1.08, sl.z0 + 0.15);
       moths.group.position.set(hp[0], hp[1], hp[2]);
       moths.group.scale.setScalar(Math.max(0.001, mk));
     }

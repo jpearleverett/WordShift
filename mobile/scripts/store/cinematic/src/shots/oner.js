@@ -185,10 +185,10 @@ export default async function make(ctx) {
   world.register(blueprint.mesh);
   const hero = new THREE.Group(); hero.scale.setScalar(TILE_SCALE);
   world.register(hero);
-  // Timber that snaps in on the six knocks: the floor (a tracked house part), then new
-  // pine, brighter than anything else on the facade: two side returns, a ceiling beam and
-  // two front trims (registered props in the cell). The pine returns are stand-ins for the
-  // room's real (dark) returns, which they hand over to under the unroll at the drop.
+  // Timber that snaps in on the six knocks, all new pine, brighter than anything else on the
+  // facade: the floor, two side returns, a ceiling beam and two front trims (registered
+  // props in the cell). The pine floor and returns are stand-ins for the room's own (darker)
+  // floor and returns, which they hand over to under the unroll at the drop.
   const { roomW, roomH, roomD } = jungle;
   world.track(jungle.floor); jungle.returns.forEach((r) => world.track(r));
   world.track(jungle.painting); if (jungle.windowMesh) world.track(jungle.windowMesh);
@@ -501,6 +501,9 @@ export default async function make(ctx) {
   // dark foliage and the hammock rather than the bright window (and, in 9:16, below the
   // bubble); at MOTH_LAND moth 0 settles on the L's sprout.
   const MOTH_BANDS = [0.35, 0.05, -0.25];
+  // (phased so that when moth 0 lands on the sprout the other two are at the far, right end
+  // of their loops: nothing hovers beside it at its height)
+  const MOTH_PHASE = [0, Math.PI / 2 - E.MOTH_LAND * 1.37, Math.PI / 2 - E.MOTH_LAND * 1.64];
   function poseS03(t) {
     // Sloane pops in, talks while her line types; moths loop around her head
     if (t < E.DROP) return;
@@ -515,7 +518,7 @@ export default async function make(ctx) {
     const centre = add(head, [-0.95, -0.45, 0.25]);
     moths.group.position.set(...centre);
     moths.group.children.forEach((m, i) => {
-      const a = t * (1.1 + i * 0.27) + i * 2.1;
+      const a = t * (1.1 + i * 0.27) + MOTH_PHASE[i];
       // (a loop 0.7 wide: its right end stays a hand's width left of her face)
       m.position.set(Math.sin(a) * 0.35, MOTH_BANDS[i] + Math.sin(a * 1.7 + i) * 0.05, Math.cos(a) * 0.3);
       // appear out of her fur: grow from her head over the pop
@@ -572,8 +575,9 @@ export default async function make(ctx) {
   //   M -> D, the long crane to the frame, passing dead centre on it at exactly the drop
   //     and still moving;
   //   D -> S (below), the push to Sloane, which carries that momentum straight in.
-  // Measured with travelPx every 1/30 s: peak 31 px (16:9) / 53 (9:16), at least 8 px
-  // from 5.1 to 7.9 (11 in 9:16), no frame above 2.5x its neighbours.
+  // Measured with travelPx every 1/30 s: peak 30 px (16:9; 34 in the push after the drop)
+  // and 55 (9:16), at least 8 px from 5.1 to 7.9 (12 in 9:16), no frame above 2.5x its
+  // neighbours; PAY is out of frame by 4.77 (16:9) / 4.83 (9:16).
   const T_TOP = E.GEMS + 1.1;
   const PUSH = 1.4; // the push to Sloane after the drop (the drop's carried velocity is set for 1.25 s: a slightly longer push keeps its peak under the crane's)
   const MACRO_D = 10.5;
