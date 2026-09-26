@@ -22,7 +22,7 @@ const w = Number(opt.w || (aspect === '9x16' ? 200 : 320));
 const labels = opt.labels !== '0';
 const frames = [];
 for (let t = from; t < to - 1e-6; t += every) frames.push(Math.min(meta.total - 1, Math.round(t * meta.fps)));
-const first = await sharp(path.join(dir, '00000.jpg')).metadata();
+const first = await sharp(path.join(dir, String(frames[0]).padStart(5, '0') + '.jpg')).metadata();
 const h = Math.round(w * first.height / first.width);
 const lab = labels ? 22 : 0;
 const rows = Math.ceil(frames.length / cols);

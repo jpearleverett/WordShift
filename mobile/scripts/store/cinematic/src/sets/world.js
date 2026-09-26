@@ -58,13 +58,14 @@ export async function buildWorld({ pxScale = 1 } = {}) {
   const hemi = new THREE.HemisphereLight('#9db8ff', '#7fa85a', 1.05);
   scene.add(hemi);
 
-  const sky = await makeSkyBackdrop({ height: 190, band: [0.32, 1.0] });
+  const sky = await makeSkyBackdrop({ height: 190, band: [0.32, 1.0], margin: 1.0 });
   sky.position.set(0, 58, -170);
   scene.add(sky);
 
   const mt = await meadowFromPainting('environment/sky_afternoon.webp');
   mt.repeat.set(36, 60);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(460, 360), new THREE.MeshStandardMaterial({ map: mt, roughness: 1 }));
+  // at dusk the meadow keeps a little of its own colour (the low sun alone leaves it near black)
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(460, 360), new THREE.MeshStandardMaterial({ map: mt, roughness: 1, emissive: new THREE.Color('#000000') }));
   ground.rotation.x = -Math.PI / 2; ground.position.set(0, GROUND_Y, 20); ground.receiveShadow = true;
   scene.add(ground);
   const contact = makeContactShadow(house.width + 3, house.roomD + 5, 0.45);
@@ -146,6 +147,9 @@ export async function buildWorld({ pxScale = 1 } = {}) {
       env.lamps = lamps; env.time = t;
       const grade = applyTod(dusk, env);
       scene.background.set('#9dc0ea').lerp(new THREE.Color('#b18ab8'), dusk);
+      ground.material.emissive.set('#4a3f26').multiplyScalar(0.55 * dusk);
+      // dusk haze: the far meadow melts into the painted horizon instead of ending in a dark band
+      scene.fog.near = 120 - 55 * dusk; scene.fog.far = 300 - 70 * dusk;
       if (grass.group.visible) grass.update(t, wind);
       if (grassFar.group.visible) grassFar.update(t, wind);
       for (const p of [pollen, flies]) { p.uniforms.time.value = t; p.uniforms.focus.value = focus; p.uniforms.aperture.value = aperture; }
