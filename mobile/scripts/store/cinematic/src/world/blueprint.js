@@ -6,16 +6,19 @@ import * as THREE from 'three';
 
 const W = 640, H = 440;
 
-// A room seen from the front: back wall rectangle, perspective lines to the
-// front corners, floorboards, a hammock curve and a window, as chalk strokes.
+// A room seen from the front: back wall rectangle, perspective lines to the front
+// corners, floorboards, ONE cross-paned window up at the left and a hammock slung
+// between two posts at the lower right. Deliberately asymmetric: nothing in the
+// drawing may pair up into eyes above a curve (spec 7.1, no faces).
 const STROKES = [
   [[70, 60], [570, 60], [570, 330], [70, 330], [70, 60]],
   [[70, 60], [20, 20]], [[570, 60], [620, 20]], [[70, 330], [20, 410]], [[570, 330], [620, 410]],
   [[20, 410], [620, 410]],
   [[40, 370], [600, 370]],
-  [[240, 110], [400, 110], [400, 220], [240, 220], [240, 110]],
-  [[320, 110], [320, 220]],
-  [[130, 170], [220, 270], [320, 295], [420, 270], [510, 170]],
+  [[105, 95], [225, 95], [225, 200], [105, 200], [105, 95]],
+  [[165, 95], [165, 200]], [[105, 147], [225, 147]],
+  [[330, 330], [330, 205]], [[540, 330], [540, 205]],
+  [[330, 215], [390, 262], [435, 272], [480, 262], [540, 215]],
 ];
 
 function strokeLen(s) { let l = 0; for (let i = 1; i < s.length; i++) l += Math.hypot(s[i][0] - s[i - 1][0], s[i][1] - s[i - 1][1]); return l; }

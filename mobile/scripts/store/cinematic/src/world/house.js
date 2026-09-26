@@ -231,15 +231,20 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
     gshape.moveTo(-rw / 2, 0); gshape.lineTo(0, rise); gshape.lineTo(rw / 2, 0); gshape.lineTo(-rw / 2, 0);
     const gable = new THREE.Mesh(new THREE.ExtrudeGeometry(gshape, { depth: depth - 0.4, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: '#7a3632', roughness: 0.85 }));
     gable.position.set(0, 0, -depth / 2 + 0.2); gable.castShadow = true; roofGroup.add(gable);
-    // brick chimney (left, as in the game's roof)
+    // brick chimney: a 3D body standing just behind the chimney painted on roof.png
+    // (its cap at 202/792 across the art, 95% up the gable), so front views show one
+    // chimney and high angles still see its depth
+    const cx = (202 / 792 - 0.5) * cardW, cz = card.position.z - 0.85;
+    const capY = (rise + 0.4) * 0.954 - 0.1;
     const brick = pixelWood({ base: '#9b5a3c', planks: 8, seed: 21 });
-    const ch = new THREE.Mesh(new THREE.BoxGeometry(1.1, rise * 0.9, 1.1), mk(brick, 1, 2, '#ffffff'));
-    ch.position.set(-rw * 0.3, rise * 0.62, -0.4); ch.castShadow = true; roofGroup.add(ch);
-    const capM = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.22, 1.35), new THREE.MeshStandardMaterial({ color: '#c9a77e', roughness: 0.9 }));
-    capM.position.set(-rw * 0.3, rise * 0.62 + rise * 0.45 + 0.1, -0.4); roofGroup.add(capM);
+    const bottom = rise * (1 - Math.abs(cx) / (rw / 2)) - 0.6, topY = capY - 0.25;
+    const ch = new THREE.Mesh(new THREE.BoxGeometry(1.4, topY - bottom, 1.2), mk(brick, 1, 2, '#ffffff'));
+    ch.position.set(cx, (topY + bottom) / 2, cz); ch.castShadow = true; roofGroup.add(ch);
+    const capM = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.2, 1.42), new THREE.MeshStandardMaterial({ color: '#c9a77e', roughness: 0.9 }));
+    capM.position.set(cx, topY + 0.1, cz); roofGroup.add(capM);
     roofGroup.position.y = height;
     group.add(roofGroup);
-    chimneyTop = new THREE.Vector3(-rw * 0.3, height + rise * 1.1 + 0.25, -0.4);
+    chimneyTop = new THREE.Vector3(cx, height + capY + 0.2, cz);
   }
 
   let foundationGroup = null;

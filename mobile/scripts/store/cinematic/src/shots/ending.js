@@ -18,6 +18,7 @@ import { buildRack, RACK_ROWS_WORLD } from '../world/rack.js';
 import { pixelWood } from '../world/house.js';
 import { makeWordmarkSign } from '../world/logo.js';
 import { makeBillboard, poseEmote } from '../world/fx.js';
+import { makeParticles } from '../world/env.js';
 import { drawText } from '../core/text.js';
 import { ease, spring, seg, lerp } from '../core/math.js';
 import { GROUND_Y, LAYOUT, RESIDENTS } from '../sets/world.js';
@@ -67,6 +68,20 @@ export default async function make(ctx) {
     w('chill', rx('chill') + 0.5, rx('chill'), E.S09 + 3.3, 1.1);
     return beh;
   }
+
+  // fireflies sized for the wide (the world's are ~1 px at 50 units), with the same pair
+  // separation as S06: no two resting points share a height within 1.2 units while
+  // standing within 2.6 of each other across, so no two can read as a pair of eyes
+  const wideFlies = makeParticles({ count: 56, boxMin: [-21, -0.5, 4], boxMax: [21, 10, 40], color: '#ffd76a', size: 40, intensity: 4.2, drift: [1.0, 0.45, 1.0], seed: 613 });
+  wideFlies.uniforms.pxScale.value = px;
+  {
+    const a = wideFlies.points.geometry.attributes.position.array;
+    const tooClose = (i) => { for (let j = 0; j < i; j++) if (Math.abs(a[i * 3 + 1] - a[j * 3 + 1]) < 1.2 && Math.hypot(a[i * 3] - a[j * 3], a[i * 3 + 2] - a[j * 3 + 2]) < 2.6) return true; return false; };
+    for (let i = 0; i < a.length / 3; i++) {
+      for (let k = 0; k < 24 && tooClose(i); k++) { a[i * 3] = -21 + ((a[i * 3] + 21 + 7.3) % 42); a[i * 3 + 1] = -0.5 + ((a[i * 3 + 1] + 0.5 + 2.9) % 10.5); }
+    }
+  }
+  world.register(wideFlies.points);
 
   // ---------------------------------------------------------------- S10 props
   // The end card stands in the meadow left of the path, turned toward the camera so
@@ -258,6 +273,11 @@ export default async function make(ctx) {
       });
       const grade = world.pose(t, { dusk: 1, lamps: 1, focus, aperture: cam.aperture, camera, behaviours: chatter(t) });
       world.sun.castShadow = wide;
+      // the wide's fireflies fade in once the camera is out of the den
+      const fk = seg(cam.k, 0.55, 1);
+      wideFlies.points.visible = fk > 0.001;
+      Object.assign(wideFlies.uniforms.time, { value: t }); wideFlies.uniforms.focus.value = focus;
+      wideFlies.uniforms.aperture.value = cam.aperture; wideFlies.uniforms.opacity.value = fk;
       return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1.04, exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: 0.24, dof: { focus, aperture: cam.aperture, maxBlur: 10 } }) };
     },
   };

@@ -16,7 +16,7 @@ import { makeTile, setLocked, makeSprout, TILE_SCALE } from '../core/tiles.js';
 import { ease, spring, seg, lerp, clamp, smooth, mulberry32 } from '../core/math.js';
 import { bar, SIXTEENTH } from '../grid.js';
 import { LAYOUT, GROUND_Y } from '../sets/world.js';
-import { makeGrass } from '../world/env.js';
+import { makeGrass, makeParticles } from '../world/env.js';
 import { mm, dist, aim, setAspect, look } from './common.js';
 
 const D2R = Math.PI / 180;
@@ -112,10 +112,10 @@ export default async function make(ctx) {
   // starting on the off-eighth so the whip settles first.
   const ROW_T = [0, 1, 2, 3].map((r) => bar(9, 1 + r, 1));
   const ACT = (r, c) => ROW_T[r] + c * SIXTEENTH;
-  const SKY_END = E.LAMPS[0] + 0.08;            // the painted sky has turned (spec 17.9-19.6)
+  const SKY_END = E.DUSK_START + 1.4;           // ~19.30 the painted sky has turned (a time-lapse: ahead of the light)
   const CRANE_END = E.ROOF_CLEAR + 0.5;          // the crane eases out while the camera tips up
   const TIP_END = E.S06 + 0.7;                   // ~18.45 tipped up into the sky
-  const DESC0 = bar(11, 1);                      // ~18.63 the camera comes down and back, on the bar
+  const DESC0 = E.S06 + 0.78;                    // ~18.53 the camera comes down and back
   const DESC1 = E.LAMPS[0] - 0.04;               // ~19.48 settled on the hero wide
   const L_HIDE = E.S06 + 0.7;                    // the L on the chimney leaves with the roof
 
@@ -173,9 +173,10 @@ export default async function make(ctx) {
   const SKY_BAND = [0.32, 1.0];
   const skyLocal = (u, v, z = 0) => [(u - 0.5) * world.sky.userData.paintWidth, ((v - SKY_BAND[0]) / (SKY_BAND[1] - SKY_BAND[0]) - 0.5) * world.sky.userData.height, z];
 
-  // the painted sun glides from its afternoon place down to where the dusk painting
-  // has it, just over the ridge, while the painting wipes to dusk (an additive glow on
-  // the backdrop, no disc of its own, so the two painted suns stay the hero)
+  // the sun glides from its afternoon place down to where the dusk painting has it, just
+  // over the ridge, while the painting wipes to dusk: an additive sun (a disc the size of
+  // the painted ones, and its halo) on the backdrop, which takes over from one painted sun
+  // and hands over to the other, so the wipe reads as the sun going down
   const sunTex = (() => {
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
@@ -188,7 +189,7 @@ export default async function make(ctx) {
   const SUN_A = skyLocal(0.840, 0.848, 1.5), SUN_B = skyLocal(0.379, 0.744, 1.5);
   const SUN_C = [lerp(SUN_A[0], SUN_B[0], 0.45), Math.max(SUN_A[1], SUN_B[1]) + 6, 1.5]; // the arc's control point, above the peaks
   // glow in (over the fading afternoon sun), glide, glow out (over the dusk sun)
-  const SUN_T = [E.DUSK_START + 0.3, E.DUSK_START + 0.6, E.DUSK_START + 1.05, E.DUSK_START + 1.4];
+  const SUN_T = [E.DUSK_START + 0.25, E.DUSK_START + 0.5, E.DUSK_START + 0.9, E.DUSK_START + 1.2];
 
   // racing pixel clouds high in the painted sky (a day card and a dusk card per cloud,
   // crossfaded with the wipe); cards on the backdrop, so they never cross a mountain
@@ -198,19 +199,34 @@ export default async function make(ctx) {
     const w = 20 + rnd() * 8;
     const geo = new THREE.PlaneGeometry(w, w * 40 / 112);
     const mk = (tones) => world.register(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: cloudTexture(900 + i, tones), transparent: true, depthWrite: false, fog: false })), world.sky);
-    clouds.push({ day: mk(CLOUD_DAY), dusk: mk(CLOUD_DUSK), u0: -0.35 + i * 0.3 + rnd() * 0.08, v: 0.9 + rnd() * 0.06, speed: 0.24 + rnd() * 0.1, w });
+    clouds.push({ day: mk(CLOUD_DAY), dusk: mk(CLOUD_DUSK), u0: -0.35 + i * 0.3 + rnd() * 0.08, v: 0.9 + rnd() * 0.06, speed: 0.24 + rnd() * 0.1 });
   }
 
   // a denser meadow in front of the house for the hero wide: from 55 units away the
-  // world's grass reads as a bare plane with a few tufts
-  // (unlit cards tinted to the dusk light: lit, 3000 alpha-tested cards under the twelve
-  // room lights cost 3.5 s a frame on SwiftShader)
+  // world's grass reads as a bare plane with a few tufts. Unlit cards tinted to the
+  // evening light (lit, 3000 alpha-tested cards under the twelve room lights more than
+  // doubled the frame cost on SwiftShader).
   const meadow = makeGrass({ count: 2400, height: 0.8, area: { x0: -24, x1: 24, z0: 3.6, z1: 16, y: GROUND_Y }, seed: 77 });
   for (const m of meadow.group.children) {
     m.material = new THREE.MeshBasicMaterial({ map: m.material.map, alphaTest: 0.5, side: THREE.DoubleSide, color: '#8a7272' });
     m.receiveShadow = false;
   }
   world.register(meadow.group);
+  const MEADOW_EVE = new THREE.Color('#a79d84'), MEADOW_DUSK = new THREE.Color('#8a7272');
+
+  // fireflies for the wide: the world's are sized for close shots and vanish at 55 units.
+  // Pair separation (spec 6.2): no two resting points share a height within 1.2 units
+  // while standing within 2.6 of each other across, so no two ever read as a pair of eyes.
+  const flies = makeParticles({ count: 60, boxMin: [-21, -0.5, 4], boxMax: [21, 10, 42], color: '#ffd76a', size: 40, intensity: 4.2, drift: [1.0, 0.45, 1.0], seed: 612 });
+  flies.uniforms.pxScale.value = ctx.pxScale;
+  {
+    const a = flies.points.geometry.attributes.position.array;
+    const tooClose = (i) => { for (let j = 0; j < i; j++) if (Math.abs(a[i * 3 + 1] - a[j * 3 + 1]) < 1.2 && Math.hypot(a[i * 3] - a[j * 3], a[i * 3 + 2] - a[j * 3 + 2]) < 2.6) return true; return false; };
+    for (let i = 0; i < a.length / 3; i++) {
+      for (let k = 0; k < 24 && tooClose(i); k++) { a[i * 3] = -21 + ((a[i * 3] + 21 + 7.3) % 42); a[i * 3 + 1] = -0.5 + ((a[i * 3 + 1] + 0.5 + 2.9) % 10.5); }
+    }
+  }
+  world.register(flies.points);
 
   // ---------------- behaviour of the cast at time t (world.pose + post-pose tweaks)
   function castBehaviours(t) {
@@ -367,7 +383,7 @@ export default async function make(ctx) {
   // whole painted vista. The hero wide is low, the house standing against the sunset.
   const P = portrait ? {
     craneX: [0, 0], craneY: [3.4, 31], craneZ: 21, lookDrop: 0.5, fov: 54,
-    tipPitch: 10, tipFov: 40, skyRise: 6.5, skyBack: 4,
+    tipPitch: 10, tipFov: 40, skyRise: 2.5, skyBack: 4,
     hero: fromAim([0, 9, 40], [0, 13.5, 0], 53, { aperture: 7 }),
     heroDrift: [0, 0, 0],
     kitchen: fromAim([0.2, 2.9, 15.5], [0, 2.35, 0], 38, { aperture: 8 }),
@@ -382,8 +398,10 @@ export default async function make(ctx) {
   const residentsZ = -kitchen.roomD / 2 + 0.75;
 
   function rig(t) {
-    // S05 crane: y rises on an inOut ease that is still easing out when the camera tips up
-    const kc = ease.inOutSine(seg(t, E.S05, CRANE_END));
+    // S05 crane: y rises on an inOut ease that is still easing out when the camera tips up,
+    // bent (power 1.4) so it lingers on the rooms and passes the roof quicker; each row
+    // is entering the upper frame on its beat and stays in view while its actions play
+    const kc = Math.pow(ease.inOutSine(seg(t, E.S05, CRANE_END)), 1.4);
     const ko = ease.inOutSine(seg(t, E.S05, E.ROOF_CLEAR));
     let y = lerp(P.craneY[0], P.craneY[1], kc);
     const x = lerp(P.craneX[0], P.craneX[1], ko);
@@ -398,9 +416,11 @@ export default async function make(ctx) {
       y += 4.5 * w; z += 2 * w; pitch += 11 * D2R * w;
     }
     // tip up into the sky and lengthen the lens, still drifting up and back
-    const tip = ease.inOutSine(seg(t, E.ROOF_CLEAR - 0.3, TIP_END));
-    const zoom = ease.inOutSine(seg(t, E.ROOF_CLEAR, TIP_END));
-    const drift = ease.inOutSine(seg(t, E.ROOF_CLEAR - 0.3, DESC0 + 0.2));
+    // (9:16 tips sooner: its tall frame would otherwise look down past the roof onto
+    // the plain behind the house)
+    const tip = ease.inOutSine(seg(t, E.ROOF_CLEAR - (portrait ? 0.75 : 0.3), TIP_END));
+    const zoom = ease.inOutSine(seg(t, E.ROOF_CLEAR - (portrait ? 0.45 : 0), TIP_END));
+    const drift = ease.inOutSine(seg(t, E.ROOF_CLEAR - 0.3, DESC0));
     pitch = lerp(pitch, P.tipPitch * D2R, tip);
     y += P.skyRise * drift; z += P.skyBack * drift;
     const sky = {
@@ -434,7 +454,7 @@ export default async function make(ctx) {
   /**
    * Motion-blur subframes from the camera's image-space speed over the shutter
    * (rotation, lateral travel against the subject distance, dolly and zoom): 1 when
-   * still, 3 for the crane (spec), 5 for the fastest frames of the descent and the push.
+   * still, 3 for the crane (spec), 5-7 for the fastest frames of the descent and the push.
    */
   function subframes(t) {
     if (t < E.S05) return 3;
@@ -446,7 +466,7 @@ export default async function make(ctx) {
     const lat = Math.hypot(dp[0] - along * f[0], dp[1] - along * f[1], dp[2] - along * f[2]);
     const d = Math.min(Math.max(b.focus, 6), 40);
     const px = Math.hypot(a.yaw - b.yaw, a.pitch - b.pitch) * pxPerRad + lat / d * pxPerRad + Math.abs(along) / d * 960 + Math.abs(a.fov - b.fov) / b.fov * 960;
-    return px < 3 ? 1 : px < 30 || t < DESC0 ? 3 : 5;
+    return px < 3 ? 1 : px < 30 || t < DESC0 ? 3 : px < 70 ? 5 : 7;
   }
 
   function pose(t) {
@@ -456,18 +476,36 @@ export default async function make(ctx) {
     aim(camera, r.pos, target, r.fov, r.roll);
     const dk = dusk(t);
     const grade = world.pose(t, { dusk: dk, lamps: lampsAt(t), focus: r.focus, aperture: r.aperture, camera, behaviours: castBehaviours(t) });
-    // the painted sky runs a little ahead of the light (spec: the wipe 17.9-19.6)
+    // the painted sky runs ahead of the light, a time-lapse seen while the lens is up there
+    // (17.9-19.3; the house and ground keep the spec's 17.9-20.6 dusk ramp)
     const sm = skyMix(t);
     world.sky.userData.mat.uniforms.mixv.value = sm;
     world.sky.userData.mat.uniforms.bright.value = lerp(1.0, 0.95, sm);
     // fireflies rise from their cue (the dusk ramp alone would bring them in early)
     const fu = world.flies.uniforms.opacity;
     fu.value = Math.min(fu.value, ease.outCubic(seg(t, E.FIREFLIES, E.FIREFLIES + 0.7)));
+    // on the wide the lamps have to read room by room from 55 units away: their light and
+    // glow cards run hotter there, back to the house's own level by the end of the push
+    // (so the kitchen matches S07 at the cut); every lamp only ever rises
+    const hot = 1 + 0.9 * (1 - ease.inOutSine(seg(t, E.PUSH_KITCHEN, E.S07)));
+    for (const rm of Object.values(house.rooms)) {
+      if (!rm.light) continue;
+      rm.light.intensity *= hot;
+      for (const sp of rm.lamps) sp.material.opacity = Math.min(1, sp.material.opacity * (0.5 + 0.5 * hot));
+    }
     // the chimney smoke thins while the lens looks up through it (it reads as a smear)
     const thin = 1 - 0.75 * seg(t, E.S06 - 0.1, E.S06 + 0.4) * (1 - seg(t, DESC0 + 0.2, DESC1));
     for (const p of world.puffs) p.s.material.opacity *= thin;
+    // our fireflies rise out of the grass from their cue
+    const fk = ease.outCubic(seg(t, E.FIREFLIES, E.FIREFLIES + 1.1));
+    flies.points.visible = fk > 0.001;
+    flies.points.position.y = -1.6 * (1 - fk);
+    flies.uniforms.time.value = t; flies.uniforms.focus.value = r.focus; flies.uniforms.aperture.value = r.aperture; flies.uniforms.opacity.value = fk;
     meadow.group.visible = t >= DESC0;
-    if (meadow.group.visible) meadow.update(t, 1);
+    if (meadow.group.visible) {
+      meadow.update(t, 1);
+      for (const m of meadow.group.children) m.material.color.set(MEADOW_EVE).lerp(MEADOW_DUSK, seg(dk, 0.4, 1));
+    }
     poseCast(t);
     poseProps(t);
     return {
