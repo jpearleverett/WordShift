@@ -68,45 +68,47 @@ const dirtTexture = () => pixelTexture(3, 3, (g) => {
 });
 
 /**
- * A pixel cumulus card: one tall dome with two shoulders and two small ends over a
- * soft, slightly bellied base, shaded as a single silhouette in five tones: a lit
- * top-left rim, the body, a side shade, and a rounded underside that darkens toward
- * its lowest pixels (a card with a flat, clipped bottom read as a sticker). No outline:
- * the painting's clouds have none.
+ * A pixel cumulus card: a lumpy dome of overlapping lobes whose bottoms all sit near
+ * one base line, so the underside is a row of soft, shallow lobes (a clipped, ruler-flat
+ * bottom read as a sticker). Shaded as one volume in five tones: a lit rim where the
+ * light comes over the top, the body, a shade band, then an underside that deepens to
+ * its lowest pixels. No outline: the painting's clouds have none.
  */
 function cloudTexture(seed, tones) {
-  const W = 112, H = 44;
+  const W = 128, H = 48;
   const rnd = mulberry32(seed);
-  const cx = W * (0.4 + rnd() * 0.2);
-  const B = H - 6; // the base line, bellied down a little under the dome
+  const cx = W * (0.44 + rnd() * 0.12);
+  const B = H - 3; // the base line the lobes rest on
+  const lobe = (x, r) => [x, B - r + rnd() * 1.6, r];
   const discs = [
-    [cx, B - 12, 13 + rnd() * 3],
-    [cx - 17 - rnd() * 4, B - 7, 9 + rnd() * 2], [cx + 17 + rnd() * 4, B - 6, 8 + rnd() * 2],
-    [cx - 32 - rnd() * 4, B - 3, 5 + rnd() * 2], [cx + 33 + rnd() * 4, B - 3, 5 + rnd() * 2],
+    lobe(cx, 15 + rnd() * 3),
+    lobe(cx - 17 - rnd() * 3, 11 + rnd() * 2), lobe(cx + 18 + rnd() * 3, 10 + rnd() * 2),
+    lobe(cx - 32 - rnd() * 3, 7 + rnd() * 1.5), lobe(cx + 32 + rnd() * 3, 7 + rnd() * 1.5),
+    lobe(cx - 44 - rnd() * 2, 4.5 + rnd()), lobe(cx + 43 + rnd() * 2, 4.5 + rnd()),
+    [cx + 7 + rnd() * 4, B - 25 - rnd() * 3, 8 + rnd() * 2], [cx - 9 - rnd() * 3, B - 20 - rnd() * 2, 8 + rnd() * 2],
   ];
-  if (rnd() < 0.7) discs.push([cx + 7 + rnd() * 5, B - 18, 7 + rnd() * 2]);
-  const span = [Math.min(...discs.map(([dx, , r]) => dx - r)), Math.max(...discs.map(([dx, , r]) => dx + r))];
-  const base = (x) => { const k = (x + 0.5 - (span[0] + span[1]) / 2) / ((span[1] - span[0]) / 2); return B + 3.5 * Math.sqrt(Math.max(0, 1 - k * k)); };
   const inside = (x, y) => {
-    if (x < 0 || y < 0 || x >= W || y >= H || y + 0.5 > base(x)) return false;
-    for (const [dx, dy, r] of discs) if (Math.hypot(x + 0.5 - dx, (y + 0.5 - dy) * 1.12) < r) return true;
+    if (x < 0 || y < 0 || x >= W || y >= H) return false;
+    for (const [dx, dy, r] of discs) if (Math.hypot(x + 0.5 - dx, (y + 0.5 - dy) * 1.1) < r) return true;
     return false;
   };
+  // the lowest filled pixel of each column: the underside is shaded up from it
+  const bottom = Array.from({ length: W }, (_, x) => { for (let y = H - 1; y >= 0; y--) if (inside(x, y)) return y; return -1; });
   return pixelTexture(W, H, (g) => {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       if (!inside(x, y)) continue;
-      const under = base(x) - (y + 0.5); // pixels above the base
+      const under = bottom[x] - y; // 0 on the lowest pixel
       let c = tones[1];
-      if (under < 2) c = tones[4];
-      else if (under < 5 || (under < 7 && (x + y) % 2 === 0)) c = tones[3];
-      else if (under < 9 || !inside(x + 2, y + 1)) c = tones[2];
-      if (!inside(x - 1, y - 2) || !inside(x, y - 2)) c = tones[0];
+      if (under < 1) c = tones[4];
+      else if (under < 4) c = tones[3];
+      else if (under < 7 || !inside(x + 2, y + 2)) c = tones[2];
+      if (!inside(x - 1, y - 2) || !inside(x + 1, y - 2)) c = tones[0];
       g.fillStyle = c; g.fillRect(x, y, 1, 1);
     }
   });
 }
-const CLOUD_DAY = ['#ffffff', '#f1f4f8', '#dde3ee', '#c6d0e2', '#b3bfd6'];
-const CLOUD_DUSK = ['#ffe0b0', '#f7b193', '#e2a097', '#c98597', '#a8778f'];
+const CLOUD_DAY = ['#ffffff', '#f3f5f9', '#e1e6f0', '#cbd4e5', '#b8c3da'];
+const CLOUD_DUSK = ['#ffe6bd', '#f9bb98', '#e9a594', '#d38e95', '#b97f92'];
 
 /**
  * Monotone cubic (Fritsch-Carlson) through knots [[t, v], ...], flat at both ends and
@@ -231,14 +233,14 @@ export default async function make(ctx) {
   const bandY = (v) => (v - SKY_BAND[0]) / (SKY_BAND[1] - SKY_BAND[0]);
   const SUN_R = 0.05; // the painted suns' radius with their bright core, in band heights
   // The front's progress where it has just wiped the afternoon sun away, and where it is
-  // about to uncover the dusk one: it crawls between the two (0.4 s) while the glow
+  // about to uncover the dusk one: it crawls between the two (0.35 s) while the glow
   // carries the sun across, and runs quickly everywhere else.
   const mAt = (uv, dy, level) => {
     let a = 0, b = 1;
     for (let i = 0; i < 40; i++) { const m = (a + b) / 2; if (skyWipe(m, uv[0], bandY(uv[1]) + dy) < level) a = m; else b = m; }
     return (a + b) / 2;
   };
-  const SKY_KNOTS = [[E.DUSK_START, 0], [E.DUSK_START + 0.3, mAt(SUN_UV_A, -SUN_R, 0.98)], [E.DUSK_START + 0.7, mAt(SUN_UV_B, SUN_R, 0.02)], [SKY_END, 1]];
+  const SKY_KNOTS = [[E.DUSK_START, 0], [E.DUSK_START + 0.3, mAt(SUN_UV_A, -SUN_R, 0.98)], [E.DUSK_START + 0.65, mAt(SUN_UV_B, SUN_R, 0.02)], [SKY_END, 1]];
   const SUN_A = skyLocal(...SUN_UV_A, 1.5), SUN_B = skyLocal(...SUN_UV_B, 1.5);
   const SUN_C = [lerp(SUN_A[0], SUN_B[0], 0.45), Math.max(SUN_A[1], SUN_B[1]) + 6, 1.5]; // the arc's control point, above the peaks
   // Only one sun at a time, timed on the wipe front: the glow comes up over the painted
@@ -254,15 +256,18 @@ export default async function make(ctx) {
   const B_TOUCH = wipeAt(SUN_UV_B, SUN_R, 0.02), B_FULL = wipeAt(SUN_UV_B, -SUN_R, 0.98);
   const SUN_T = [A_TOUCH - 0.14, A_GONE, B_TOUCH, B_FULL + 0.18];
 
-  // racing pixel clouds high in the painted sky (a day card and a dusk card per cloud,
-  // crossfaded with the wipe); cards on the backdrop, so they never cross a mountain
+  // racing pixel clouds in the painted sky over the mountains (a day card and a dusk card
+  // per cloud, crossfaded as the wipe front passes); cards on the backdrop, flying at a
+  // height between the peaks and the top of the frame, and only right of the big painted
+  // tree: each one forms as it clears the canopy (u ~0.3) and thins out at the far edge
   const rnd = mulberry32(505);
   const clouds = [];
+  const CLOUD_V = [0.872, 0.858, 0.884, 0.866];
   for (let i = 0; i < 4; i++) {
-    const w = 20 + rnd() * 8;
-    const geo = new THREE.PlaneGeometry(w, w * 44 / 112);
+    const w = 22 + rnd() * 6;
+    const geo = new THREE.PlaneGeometry(w, w * 48 / 128);
     const mk = (tones) => world.register(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: cloudTexture(900 + i, tones), transparent: true, depthWrite: false, fog: false })), world.sky);
-    clouds.push({ day: mk(CLOUD_DAY), dusk: mk(CLOUD_DUSK), u0: -0.35 + i * 0.3 + rnd() * 0.08, v: 0.9 + rnd() * 0.06, speed: 0.24 + rnd() * 0.1 });
+    clouds.push({ day: mk(CLOUD_DAY), dusk: mk(CLOUD_DUSK), half: w / 2 / world.sky.userData.paintWidth, u0: 0.3 + i * 0.17 + rnd() * 0.05, v: CLOUD_V[i], speed: 0.16 + rnd() * 0.08 });
   }
 
   // a denser meadow in front of the house for the hero wide: from 55 units away the
@@ -456,7 +461,7 @@ export default async function make(ctx) {
       const u = c.u0 + c.speed * (t - E.S06);
       const p = skyLocal(u, c.v, 2 + c.u0);
       const k = skyWipe(sm, u, bandY(c.v));
-      const edge = clamp(Math.min(u + 0.1, 1.1 - u) / 0.15); // fade out over the painting's edges
+      const edge = seg(u - c.half, 0.3, 0.4) * (1 - seg(u + c.half, 1.0, 1.08)); // clear of the tree, and of the painting's edge
       for (const [m, a] of [[c.day, 1 - k], [c.dusk, k]]) {
         m.visible = on * edge > 0.001 && a > 0.001;
         m.position.set(p[0], p[1], p[2]);
@@ -502,7 +507,7 @@ export default async function make(ctx) {
     kitchen: fromAim([0.2, 2.9, 15.5], [0, 2.35, 0], 38, { aperture: 8 }),
   } : {
     craneX: [-2.5, 0], craneY: [2.0, 29], craneZ: 24, lookDrop: 0.5, fov: mm(40),
-    tipPitch: 17, tipFov: mm(65), skyRise: 2.5, skyBack: 4,
+    tipPitch: 18, tipFov: mm(65), skyRise: 2.5, skyBack: 4,
     hero: fromAim([0, 6.2, 58], [0, 13.4, 0], mm(40), { aperture: 6.5 }),
     heroDrift: [0.35, 0, 0],
     kitchen: fromAim([0.5, 3.5, 14], [0, 2.3, 0], mm(50), { aperture: 8 }),

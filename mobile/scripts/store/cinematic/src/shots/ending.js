@@ -28,6 +28,8 @@ import { poseCharacter } from '../world/sprites.js';
 
 /** Native facing of each sprite's idle/talk art (+1 faces right). Fennick's portraits face left. */
 const NATIVE = { fennick: -1 };
+/** Emote pops that must stand clear of the painting: the Star Loft's portholes sit over Vesper's head. */
+const EMOTE_OFFSET = { observatory: [1.6, -0.25] };
 /** S10: exposure, and how far the aquarium's painted light is held down beside the logo. */
 const EXPOSURE_S10 = 1.16;
 const AQUARIUM_S10 = 0.42;
@@ -55,7 +57,8 @@ export default async function make(ctx) {
   const cascade = [];
   const order = LAYOUT.flat();
   for (let i = 0; i < order.length; i++) {
-    const kind = EMOTES[i % EMOTES.length];
+    // the Star Loft gets a note: a sparkle there sat in a porthole and read as a glint in an eye
+    const kind = order[i] === 'observatory' ? 'note' : EMOTES[i % EMOTES.length];
     cascade.push(world.register(await makeBillboard(`ui/emote_${kind}.png`, portrait ? 1.1 : 1.45)));
   }
   // Conversation pairs: each resident talks toward a neighbour through the shared wall.
@@ -286,7 +289,8 @@ export default async function make(ctx) {
     { at: [postX(-1), 0.14, POST_Z + 0.12], dir: [-0.6, 0.2], size: 0.42, foot: true },
     { at: [postX(1), 0.14, POST_Z + 0.12], dir: [0.6, 0.2], size: 0.42, foot: true },
   ];
-  const puffs = PUFFS.map(() => world.register(new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, depthWrite: false })), end));
+  // (they write depth, so the depth of field sees them at the sign and keeps them crisp)
+  const puffs = PUFFS.map(() => world.register(new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, alphaTest: 0.1 })), end));
   const footInFrame = PUFFS.map((p) => !p.foot || null); // decided once from the locked camera (below)
 
   // the end line, anchored under the sign
@@ -307,7 +311,7 @@ export default async function make(ctx) {
     // a drop straight back into the slot that clicks on the bed's final hit.
     const L = heroL;
     const base = [slotX(4, n), 0, 0];
-    const REST = [-0.02, 0.12, 0.35], ROLL = 0.18, AWAY = Math.PI + 0.1;
+    const REST = [-0.05, 0.12, 0.35], ROLL = 0.18, AWAY = Math.PI + 0.1;
     const tremble = t >= E.TREMBLE && t < E.TREMBLE + 0.07 ? Math.sin((t - E.TREMBLE) * 180) * 0.05 : 0;
     const rock = t >= E.ROCK ? Math.sin((t - E.ROCK) * 14) * Math.exp(-(t - E.ROCK) * 4) * 0.22 : 0;
     if (t < E.CLICK) {
@@ -470,7 +474,8 @@ export default async function make(ctx) {
       order.forEach((room, i) => {
         const r = world.residents[RESIDENTS[room].name];
         const rm = house.rooms[room];
-        const head = [rm.x + r.ch.position.x, rm.y + r.ch.position.y + r.h + 0.55, r.z0 + 0.1];
+        const off = EMOTE_OFFSET[room] || [0, 0];
+        const head = [rm.x + r.ch.position.x + off[0], rm.y + r.ch.position.y + r.h + 0.55 + off[1], r.z0 + 0.1];
         const e = cascade[i];
         e.position.set(...head); e.userData.y0 = head[1];
         poseEmote(e, t - E.CASCADE[i], { hold: 1.3, rise: 0.35, fade: 0.4 });

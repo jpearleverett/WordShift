@@ -34,19 +34,22 @@ function softCopy(img, cw, ch) {
 
 /**
  * The afternoon -> dusk wipe of the painted sky: a narrow, soft front that falls from
- * above the painting to below it as mixv goes 0 -> 1, tilted so the east (right) side,
- * away from the setting sun, turns first. Above the front the dusk painting shows,
+ * above the painting to below it as mixv goes 0 -> 1, tilted a little so the east
+ * (right) side, away from the setting sun, turns first, and rippled so it drains like
+ * light rather than reading as a ruled line. Above the front the dusk painting shows,
  * below it the afternoon one: the two paintings only blend inside the front itself, so
  * the two painted suns (and the two colourings of every mountain) are never seen
  * together. Returns the dusk weight at painting u (0..1 across) and band height y
  * (0 bottom .. 1 top); the shader below runs the same formula.
  */
-export const SKY_WIPE = { half: 0.05, tilt: 0.3 };
+export const SKY_WIPE = { half: 0.05, tilt: 0.2, ripple: 0.045 };
+const ripple = (u, y) => 0.5 * (Math.sin(u * 14.45 + y * 5.1) + Math.sin(u * 29.5 - y * 9.3 + 2.1));
 export function skyWipe(mixv, u, y) {
-  const { half, tilt } = SKY_WIPE;
-  const T = tilt / 2;
-  const p = 1 + half + T - mixv * (1 + 2 * half + 2 * T) - tilt * (Math.min(1, Math.max(0, u)) - 0.5);
-  const x = Math.min(1, Math.max(0, (y - (p - half)) / (2 * half)));
+  const { half, tilt, ripple: r } = SKY_WIPE;
+  const T = tilt / 2 + r;
+  const uc = Math.min(1, Math.max(0, u));
+  const p = 1 + half + T - mixv * (1 + 2 * half + 2 * T) - tilt * (uc - 0.5);
+  const x = Math.min(1, Math.max(0, (y + r * ripple(uc, y) - (p - half)) / (2 * half)));
   return x * x * (3 - 2 * x);
 }
 
@@ -82,9 +85,11 @@ export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b 
         float u = pu < 0.0 ? -pu : (pu > 1.0 ? 2.0 - pu : pu);
         // canvas copies are stored top-down; flipY on the loaded textures makes v run bottom-up everywhere
         vec2 uv = vec2(clamp(u, 0.0, 1.0), ${band[0].toFixed(3)} + vUv.y * ${(band[1] - band[0]).toFixed(3)});
-        float hw = ${SKY_WIPE.half.toFixed(4)}, tl = ${SKY_WIPE.tilt.toFixed(4)};
-        float front = 1.0 + hw + 0.5 * tl - mixv * (1.0 + 2.0 * hw + tl) - tl * (clamp(pu, 0.0, 1.0) - 0.5);
-        float k = smoothstep(front - hw, front + hw, vUv.y);
+        float hw = ${SKY_WIPE.half.toFixed(4)}, tl = ${SKY_WIPE.tilt.toFixed(4)}, rp = ${SKY_WIPE.ripple.toFixed(4)};
+        float uc = clamp(pu, 0.0, 1.0), T = 0.5 * tl + rp;
+        float front = 1.0 + hw + T - mixv * (1.0 + 2.0 * hw + 2.0 * T) - tl * (uc - 0.5);
+        float rip = 0.5 * (sin(uc * 14.45 + vUv.y * 5.1) + sin(uc * 29.5 - vUv.y * 9.3 + 2.1));
+        float k = smoothstep(front - hw, front + hw, vUv.y + rp * rip);
         vec3 c = mix(texture2D(ta, uv).rgb, texture2D(tb, uv).rgb, k);
         if (out_ > 0.0) {
           vec3 soft = mix(texture2D(blurA, uv).rgb, texture2D(blurB, uv).rgb, k);

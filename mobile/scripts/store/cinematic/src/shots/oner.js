@@ -17,7 +17,7 @@ import { makeBlueprint } from '../world/blueprint.js';
 import { makeMoths } from '../world/fire.js';
 import { makeShaft } from '../world/env.js';
 import { makeBubble } from '../world/bubble.js';
-import { makeSprout, setLocked, setTileGlow, TILE_SCALE, TILE_D } from '../core/tiles.js';
+import { makeSprout, setLocked, setTileGlow, TILE_SCALE, TILE_D, TILE_EMISSIVE_BASE } from '../core/tiles.js';
 import { ease, spring, seg, lerp, clamp, smooth, catmull, hash01 } from '../core/math.js';
 import { GROUND_Y } from '../sets/world.js';
 import { mm, wpos, add, mix3, dist, aim, setAspect, look, project, travelPx, blurFor } from './common.js';
@@ -54,6 +54,9 @@ export default async function make(ctx) {
   });
   rack.group.position.set(...RACK_POS);
   world.register(rack.group);
+  // the trays self-light like the tiles (core/tiles TILE_EMISSIVE_BASE), so parchment and
+  // tile faces keep the game's relative values under the grade (spec 2.2 swatches)
+  for (const tr of rack.trays) tr.traverse((o) => { if (o.isMesh && o.geometry.type === 'PlaneGeometry') { o.material.emissive = new THREE.Color(TRAY_GLOW); o.material.emissiveIntensity = TRAY_EMISSIVE; } });
   const tiles = rack.set.tiles;
   const L = tiles.get('0:1').obj;
   const T = tiles.get('1:3').obj;
@@ -114,7 +117,10 @@ export default async function make(ctx) {
       airBlob.material.opacity = 0.3 * clamp(1 - away / 1.6);
     }
     // landing rim flash on PLANT (6 frames) and the three row flashes
-    for (const x of tiles.values()) setTileGlow(x.obj, 0);
+    // on the tile shots the tiles carry more of their own light, so the warm golden key
+    // does not grey the cool letters (purple A, the locked powder blue); eases back on the crane
+    const glowBase = lerp(TILE_EMISSIVE_BASE, TILE_SELF_LIGHT, 1 - smooth(seg(t, E.CRANE, E.CRANE + 0.8)));
+    for (const x of tiles.values()) { x.obj.userData.glowBase = glowBase; setTileGlow(x.obj, 0); }
     const flash = (t0, ri) => { const k = seg(t, t0, t0 + 0.2); if (k > 0 && k < 1) for (const o of rowTiles(ri)) setTileGlow(o, Math.sin(Math.PI * k) * 0.9); };
     flash(E.L_LAND, 1); flash(E.T_LAND, 2);
     E.FLASH.forEach((f, i) => flash(f, i));
@@ -426,7 +432,7 @@ export default async function make(ctx) {
   // frame (C -> D, landing on it at the drop); both start and end at rest, so the sum is
   // one continuous move with no stop between them
   const BOOM = [E.GEMS + 0.2, E.GEMS + 0.95];
-  const MACRO_D = 7.6;
+  const MACRO_D = 9.0;
   const smax = (a, b, k) => (a + b + Math.sqrt((a - b) * (a - b) + k * k)) / 2;
 
   /** Rig A: the macro follow of the L as it falls into PANT, whole words in frame. */
@@ -437,11 +443,12 @@ export default async function make(ctx) {
     rack.set.pose(tt);
     const WX = RACK_POS[0];
     if (!portrait) {
-      // PLAY and PANT whole, above the caption; tilt up only as far as the L's top needs
+      // PLAY and PANT whole and right of centre, clear of the caption's column at the
+      // left; tilt up only as far as the L's top needs
       const halfH = MACRO_D * Math.tan(THREE.MathUtils.degToRad(mm(85)) / 2);
-      const need = Math.max(Lp[1], Lc[1]) + 0.27 + 0.1 - halfH;
-      const ty = smax(0.92, need, 0.3);
-      return { pos: [WX + 0.5, ty + 0.5, RACK_POS[2] + MACRO_D], target: [WX - 0.02, ty, RACK_POS[2]], fov: mm(85) };
+      const need = Math.max(Lp[1], Lc[1]) + 0.27 + 0.12 - halfH;
+      const ty = smax(1.12, need, 0.3);
+      return { pos: [WX - 0.1, ty + 0.5, RACK_POS[2] + MACRO_D], target: [WX - 0.55, ty, RACK_POS[2]], fov: mm(85) };
     }
     // portrait: B's stack, tilting up with the L while it is above PLAY and down with it
     const up = 0.35 * smax(0, Math.max(Lp[1], Lc[1]) - 1.3, 0.2);
@@ -483,9 +490,10 @@ export default async function make(ctx) {
   const CAM0 = onerCamera(0);
   const L0 = lPath(0);
   rack.set.pose(0);
-  const toCam = [CAM0.pos[0] - L0[0], CAM0.pos[1] - L0[1], CAM0.pos[2] - L0[2]];
+  const GLINT = add(L0, [-0.1, 0.16, TILE_D * TILE_SCALE / 2]); // the face's upper left, above the glyph
+  const toCam = [CAM0.pos[0] - GLINT[0], CAM0.pos[1] - GLINT[1], CAM0.pos[2] - GLINT[2]];
   const nrm = Math.hypot(...toCam);
-  const PING_POS = add(L0, [-toCam[0] / nrm * 1.4, -toCam[1] / nrm * 1.4, toCam[2] / nrm * 1.4]);
+  const PING_POS = add(GLINT, [-toCam[0] / nrm * 1.4, -toCam[1] / nrm * 1.4, toCam[2] / nrm * 1.4]);
 
   /** Screen travel (output px per 1/60 s) of a moving world point, seen through the moving rig. */
   function pointTravel(fn, t) {
@@ -586,9 +594,12 @@ export default async function make(ctx) {
   return shot;
 }
 
-const TILE_EXPOSURE = 1.6;
-const TILE_WB = [0.97, 1.0, 1.45];
-const TILE_SAT = 1.12;
+const TILE_EXPOSURE = 1.62;
+const TILE_WB = [0.96, 1.0, 1.5];
+const TILE_SAT = 1.4;
+const TRAY_EMISSIVE = 0.5;
+const TRAY_GLOW = '#F7D9A2';
+const TILE_SELF_LIGHT = 0.15;
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };

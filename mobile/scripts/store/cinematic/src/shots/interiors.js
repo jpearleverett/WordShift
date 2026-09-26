@@ -6,7 +6,9 @@
 //      painted shelf and its jars holds the sprouted L and three glass jars labelled
 //      SAGE, MINT, DILL. A small pixel fire burns in the painted oven; her pot
 //      steams. The camera slides along the jars, racks to Panko at her stove, then
-//      drifts down and right with her as she goes to the oven, so the shelf leaves
+//      drifts down with her as she trots off (9:16: right, short of the oven, whose
+//      flame must never stand on her head; 16:9: left, to the herbs on the counter, so
+//      the lower-centre caption never crosses her face or chest), and the shelf leaves
 //      the frame for the bed's bass-out break. When it slides back, the jars stand
 //      DILL, SAGE, MINT and the L sits at the right end. Nothing moves on camera: the
 //      swap happens only while the shelf is out of frame. Panko turns toward the
@@ -17,12 +19,13 @@
 //      floor, left roof, right roof, door, chimney; no window, nothing inside), it
 //      hangs in front of the chimney breast, then drifts up the chimney. Ember looks
 //      up, smiles (her stock talk frame), a heart pops, and the camera pans right to
-//      take in her whole figure (S09's pull-back starts exactly there).
+//      take in her whole figure. She stands at her S08/S09 spot (handoff.js) from the
+//      first frame: S09's pull-back starts exactly where this shot ends.
 //
 // Interior framings keep at least about half a room of painting across a 16:9 frame
-// (4.3+ units; 9:16 frames 2.2+ units), so the room art never magnifies past ~2.8
-// output px per painting px, and every camera stays within 12 degrees of the
-// painting normal.
+// (4.3+ units; 9:16 frames 2.1+ units), so the room art never magnifies past ~2.8
+// output px per painting px, every camera stays within 12 degrees of the painting
+// normal, and no frame reaches past the room's side walls (the dark side wall shows).
 
 import * as THREE from 'three';
 import { makeJar } from '../world/props.js';
@@ -82,6 +85,19 @@ function spiceLabel(word, band) {
     g.fillStyle = band; g.fillRect(0, 2, W, 1); g.fillRect(0, H - 3, W, 1);
     g.fillStyle = '#3B2416'; g.fillRect(0, 0, W, 2); g.fillRect(0, H - 2, W, 2);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (ink[(y * W + x) * 4 + 3] > 120) g.fillRect(x, y, 1, 1);
+  });
+}
+
+/** Dried herbs seen through a jar: flecks on the herb colour, 48 x 16 so the pixels come out
+ *  about square round the jar (its visible front shows ~24 of them). A fixed hash, no noise. */
+function herbTexture(base, fleck) {
+  const hash = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+  return pixelTexture(48, 16, (g) => {
+    g.fillStyle = base; g.fillRect(0, 0, 48, 16);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 48; x++) {
+      const h = hash(x, y);
+      if (h < 0.18) { g.fillStyle = fleck; g.fillRect(x, y, 1, 1); } else if (h > 0.9) { g.fillStyle = 'rgba(40,24,12,0.32)'; g.fillRect(x, y, 1, 1); }
+    }
   });
 }
 
@@ -239,6 +255,17 @@ export default async function make(ctx) {
     label.geometry = new THREE.CylinderGeometry(lr, lr, lh, 32, 1, true, -arc / 2, arc);
     label.material = new THREE.MeshStandardMaterial({ map: spiceLabel(sp.word, sp.lid), roughness: 0.85 });
     label.position.y = JAR_H * 0.44;
+    // Read as glass with dried herbs in it: the spice fills the jar to the shoulder (it shows
+    // above and below the label, in a two-tone pixel dither), and the glass itself is nearly
+    // clear, a dark low-albedo shell whose rough clearcoat gives one soft sheen (a whitish
+    // albedo at dusk turns the whole jar milky pink, like a ceramic pot)
+    const [content, , , glass] = jar.children;
+    content.scale.y = 0.7 / 0.55;
+    content.position.y = JAR_H * 0.39;
+    content.material = new THREE.MeshStandardMaterial({ map: herbTexture(sp.fill, sp.lid), roughness: 0.95 });
+    glass.material = glass.material.clone();
+    glass.material.color.set('#6a6672');
+    glass.material.opacity = 0.36;
     world.register(jar, shelf);
     return jar;
   });
@@ -273,15 +300,19 @@ export default async function make(ctx) {
   world.register(question, kit.builtG);
   question.name = 'P.question';
   // lamplight and the oven's glow pooled on the floor boards (they read near black at dusk otherwise)
-  const kitPool = world.register(lightPool(6.4, 2.8, '#ffb25c'), kit.builtG);
-  kitPool.position.set(0.9, 0.008, -0.2);
+  const kitPool = world.register(lightPool(6.4, 3.2, '#ffb25c'), kit.builtG);
+  kitPool.position.set(0.9, 0.008, 0.0);
   const ovenPool = world.register(lightPool(2.4, 1.8, '#ff9447'), kit.builtG);
   ovenPool.position.set(paintX(kit, 0.908), 0.009, -1.0);
 
-  // Panko stirs her pot from its right, trots to the oven for the break (the camera goes
-  // with her, down and right, so the shelf leaves the frame) and at the end turns back
-  // toward the shelf. In 16:9 she stays out of the lower-centre caption: her face is high
-  // in the frame while she is low, and at the frame's right edge when the jars come back.
+  // Panko stirs her pot, trots off for the break (the camera goes with her and down, so the
+  // shelf leaves the frame) and at the end turns back toward the shelf.
+  //   9:16  she stirs from the pot's right and stops short of the oven: her head stays left
+  //         of its flame (at 2.35+ the fire stands on her head).
+  //   16:9  she stirs from the pot's left and trots to the herbs on the left counter. At 100 mm
+  //         a frame holding the jars and her whole face is at least ~6.6 units wide, and the
+  //         flip moves her face ~1.2 units, so only a spot left of the lower-centre caption
+  //         (x 20-80%) keeps it off her face and chest while she turns under the jars' frame.
   const STAGE = portrait ? { from: 1.3, fromFacing: -1, to: 1.85, turn: -1 } : { from: -0.6, fromFacing: 1, to: -2.3, turn: 1 };
   const P_Z = -0.5, STRIDE = 0.72;
   const T_WALK0 = E.JARS_AWAY + 0.02, T_WALK1 = E.JARS_AWAY + 1.22;
@@ -324,26 +355,28 @@ export default async function make(ctx) {
   };
 
   // The camera: framings [x, y, z, width, yaw, pitch] in the kitchen (room-local).
-  //   J   the jars (a slow slide right along them)
-  //   R   jars at the top, Panko at her stove below (16:9: she enters from the frame's left
-  //       edge on a curved path, above the caption's corner; her face never under it)
-  //   D   down and right with her for the break: the shelf and its jars leave the frame
-  //   B   back up along the shelf: jars at the top, Panko under them
+  //   J   the jars (a slow slide right along them), Panko out of frame
+  //   R   Panko at her stove (16:9: she enters from the frame's left edge on a curved path,
+  //       above the caption; low enough that it crosses only her legs)
+  //   D   down with her for the break: the shelf and its jars leave the frame
+  //   B   back up to the shelf: the jars and Panko, who turns (16:9: she at the left edge,
+  //       the jars top right, her face and the "?" left of the caption)
   const FZ = ITEM_Z;
   const F = (x, y, w, pitch = 0) => [x, y, FZ, w, 0, pitch];
   const RIG7 = portrait ? {
     // the jars sit below the caption band; Panko (soft) stays out of the jar macro
     J0: F(1.8, 3.03, 2.1, -1), J1: F(2.12, 3.03, 2.1, -1),
-    R1: F(1.9, 2.8, 2.5, -1.2), R: F(1.32, 2.55, 2.8, -1.5), R2: F(1.3, 2.54, 2.82, -1.5),
+    // (frame tops stay under ~4.9 here: higher, the view clears the ceiling slab into the room above)
+    R1: F(1.9, 2.65, 2.5, -1.2), R: F(1.32, 2.5, 2.7, -1.5), R2: F(1.3, 2.49, 2.72, -1.5),
     D: F(1.85, 0.75, 2.5, -9), D2: F(1.89, 0.73, 2.48, -9),
     B: F(1.85, 2.57, 2.7, -1.5), B2: F(1.83, 2.56, 2.72, -1.5),
   } : {
     // 16:9 blocks the break to the left counter: the caption (lower centre, x 20-80%) then never
     // crosses her face or chest, and when the jars come back she turns at the frame's left edge
-    J0: F(1.62, 2.93, 4.3, 1), J1: F(2.02, 2.93, 4.3, 1),
-    R1: F(2.3, 1.45, 4.9, -1), R: F(0.7, 1.3, 5.2, -2), R2: F(0.68, 1.3, 5.18, -2),
+    J0: F(1.36, 2.93, 4.3, 1), J1: F(1.8, 2.93, 4.3, 1),
+    R1: F(1.5, 1.6, 4.8, -1), R: F(0.7, 1.3, 5.2, -2), R2: F(0.68, 1.3, 5.18, -2),
     D: F(-1.3, 1.05, 5.3, -3.5), D2: F(-1.34, 1.03, 5.28, -3.5),
-    B: F(0.62, 1.93, 6.7, 0), B2: F(0.6, 1.94, 6.64, 0),
+    B: F(0.58, 1.93, 6.7, 0), B2: F(0.56, 1.94, 6.64, 0),
   };
   // both cuts settle on Panko while the focus racks to her, then hold until she sets off
   const T_J1 = E.JARS_RACK + 0.1, T_R = E.JARS_AWAY + 0.04, T_RA = E.JARS_RACK + (portrait ? 0.55 : 0.66), T_D = E.JARS_AWAY + 0.78;
@@ -436,7 +469,7 @@ export default async function make(ctx) {
   world.register(hearth.group, den.builtG);
   // the drawing hangs in front of the stone chimney breast (image u 0.089-0.240, v 0.708-0.965)
   const DRAW_SCALE = 1.35;
-  const DRAW_O = [paintX(den, 0.165), paintY(den, 0.82) - 0.3 * DRAW_SCALE, DEN_WALL + 0.34];
+  const DRAW_O = [paintX(den, 0.165), paintY(den, 0.82) - 0.3 * DRAW_SCALE - 0.05, DEN_WALL + 0.34];
   const MOUTH = [FIRE[0] - DRAW_O[0], FIRE[1] + 0.62 - DRAW_O[1]];
   const draw = makeStrokeSparks({ strokes: HOUSE_STROKES, scale: DRAW_SCALE, cell: 0.05, mouth: MOUTH, embers: 9, seed: 11 });
   draw.group.position.set(...DRAW_O);
@@ -492,16 +525,18 @@ export default async function make(ctx) {
     poseEmote(heart, t - E.EMBER_HEART, { hold: 0.58, rise: 0.22, fade: 0.26 }); // gone before the cut
   }
 
-  // camera: a slow push toward the drawing (16:9 holds the fire mouth, the whole drawing and
-  // Ember three-quarter at the right; 9:16 holds the fire and the drawing, Ember just out of
-  // frame), then a pan right (with a small truck) onto Ember as she smiles and the heart pops
+  // camera: a slow push toward the drawing, then a pan right (with a small truck) onto Ember.
+  //   16:9  the fire mouth, the whole drawing and Ember three-quarter (knees up) beside it, so
+  //         her look-up and smile play in frame; the frame's left edge stays inside the room.
+  //         The pan waits until the finished drawing lets go.
+  //   9:16  the fire and the drawing, Ember wholly out of frame to the right; the pan finds her
+  //         full figure right of centre as she smiles, the heart above her.
   const vfov8 = portrait ? 30 : mm(85);
-  // (16:9 keeps the frame's left edge inside the room: past x -4 the dark side wall shows)
-  const A8 = portrait ? [-2.75, 2.32, DRAW_O[2], 2.6, 3, 2] : [-0.98, 2.11, DRAW_O[2], 6.05, 2, 1];
-  const A8b = portrait ? [-2.75, 2.34, DRAW_O[2], 2.46, 3, 2] : [-0.97, 2.15, DRAW_O[2], 5.85, 2, 1];
+  const A8 = portrait ? [-2.75, 2.32, DRAW_O[2], 2.6, 3, 2] : [-0.7, 1.98, DRAW_O[2], 6.3, 2, 1];
+  const A8b = portrait ? [-2.75, 2.34, DRAW_O[2], 2.46, 3, 2] : [-0.75, 2.02, DRAW_O[2], 6.1, 2, 1];
   const PAN_TO = portrait ? [EM_X - 0.35, 1.6, EM_Z] : [EM_X + 0.4, 1.2, EM_Z];
   const TRUCK = portrait ? 2.1 : 0.55;
-  const T_PAN = portrait ? E.EMBER_SMILE : HOLD_END - 0.04; // 16:9 holds the whole drawing until it lets go
+  const T_PAN = portrait ? E.EMBER_SMILE : HOLD_END - 0.04;
   const T_PAN_END = portrait ? E.EMBER_HEART + 0.2 : E.S09;
   function rig8(t) {
     const k = ease.inOutSine(seg(t, E.S08, T_PAN));
