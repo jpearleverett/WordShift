@@ -201,6 +201,12 @@ export default async function make(ctx) {
   const { world, camera, E, portrait } = ctx;
   const { house, residents } = world;
   const aspect = portrait ? 9 / 16 : 16 / 9;
+  // The interiors' grade (spec 2.6's dusk, tuned): a little less exposure and more contrast than
+  // the wides, so the painted rooms keep their darks instead of reading flat pink, and a
+  // neutral-warm painting tint for the interior only (tod's dusk tint is a pink #f7ecea).
+  const GRADE7 = { exposure: 1.12, contrast: 1.14 };
+  const GRADE8 = { exposure: portrait ? 1.10 : 1.14, contrast: 1.14 };
+  const INTERIOR_TINT = '#F6EFE4';
 
   // ================================================================ S07 Panko's jars
   const kit = house.rooms.kitchen;
@@ -310,7 +316,7 @@ export default async function make(ctx) {
   //         a frame holding the jars and her whole face is at least ~6.6 units wide, and the
   //         flip moves her face ~1.2 units, so only a spot left of the lower-centre caption
   //         (x 20-80%) keeps it off her face and chest while she turns under the jars' frame.
-  const STAGE = portrait ? { from: 1.3, fromFacing: -1, to: 1.85, turn: -1 } : { from: -0.6, fromFacing: 1, to: -2.3, turn: 1 };
+  const STAGE = portrait ? { from: 1.3, fromFacing: -1, to: 1.85, turn: 1 } : { from: -0.6, fromFacing: 1, to: 0.35, turn: 1 };
   const P_Z = -0.5, STRIDE = 0.72;
   const T_WALK0 = E.JARS_AWAY + 0.02, T_WALK1 = E.JARS_AWAY + 1.22;
   const T_FLIP = midFrame(E.PANKO_TURN);
@@ -372,12 +378,13 @@ export default async function make(ctx) {
     // crosses her face or chest, and when the jars come back she turns at the frame's left edge
     J0: F(1.36, 2.93, 4.3, 1), J1: F(1.8, 2.93, 4.3, 1),
     R1: F(1.5, 1.6, 4.8, -1), R: F(0.7, 1.3, 5.2, -2), R2: F(0.68, 1.3, 5.18, -2),
-    D: F(-1.3, 1.05, 5.3, -3.5), D2: F(-1.34, 1.03, 5.28, -3.5),
-    B: F(0.58, 1.93, 6.7, 0), B2: F(0.56, 1.94, 6.64, 0),
+    D: F(0.2, 1.05, 5.3, -3.5), D2: F(0.18, 1.03, 5.28, -3.5),
+    B: F(1.0, 2.4, 5.2, 0), B2: F(0.98, 2.4, 5.12, 0),
   };
   // both cuts settle on Panko while the focus racks to her, then hold until she sets off
   const T_J1 = E.JARS_RACK + 0.1, T_R = E.JARS_AWAY + 0.04, T_RA = E.JARS_RACK + (portrait ? 0.55 : 0.66), T_D = E.JARS_AWAY + 0.78;
-  const T_B = E.JARS_BACK + (portrait ? 0.35 : 0.42); // settled on the jars (and her) just before she turns
+  const T_B = E.JARS_BACK + (portrait ? 0.35 : 0.15); // settled on the jars (and her) just before she turns
+  const backEase = portrait ? ease.inOutCubic : ease.outCubic; // 16:9 lands early, so the payoff holds still
   const vfov7 = portrait ? 25 : mm(100);
   const mixF = (a, b, k) => a.map((v, i) => lerp(v, b[i], k));
   function framing7(t) {
@@ -386,7 +393,7 @@ export default async function make(ctx) {
     if (t < T_R) return mixF(RIG7.R, RIG7.R2, seg(t, T_RA, T_R));
     if (t < T_D) return mixF(RIG7.R2, RIG7.D, ease.inOutSine(seg(t, T_R, T_D)));
     if (t < E.JARS_BACK) return mixF(RIG7.D, RIG7.D2, seg(t, T_D, E.JARS_BACK));
-    if (t < T_B) return mixF(RIG7.D2, RIG7.B, ease.inOutCubic(seg(t, E.JARS_BACK, T_B)));
+    if (t < T_B) return mixF(RIG7.D2, RIG7.B, backEase(seg(t, E.JARS_BACK, T_B)));
     return mixF(RIG7.B, RIG7.B2, seg(t, T_B, E.S08));
   }
   function rig7(t) {
@@ -403,8 +410,10 @@ export default async function make(ctx) {
     const st = pankoState(t);
     const dp = depthOf(cam, toWorld(kit, [st.x, 1.25, P_Z]));
     // jars, rack to Panko, stay with her through the break, jars again on the slide back, Panko at the turn
+    // (16:9 holds the jars sharp a beat longer, so DILL SAGE MINT reads before the rack)
+    const r2 = portrait ? [E.PANKO_TURN - 0.02, E.PANKO_TURN + 0.22] : [E.PANKO_TURN + 0.15, E.PANKO_TURN + 0.35];
     const toP = ease.inOutSine(seg(t, E.JARS_RACK, E.JARS_RACK + 0.5)) * (1 - ease.inOutSine(seg(t, E.JARS_BACK + 0.08, E.JARS_BACK + 0.34)))
-      + ease.inOutSine(seg(t, E.PANKO_TURN - 0.02, E.PANKO_TURN + 0.22));
+      + ease.inOutSine(seg(t, r2[0], r2[1]));
     return lerp(dj, dp, clamp(toP));
   }
 
@@ -448,7 +457,8 @@ export default async function make(ctx) {
       posePanko(t);
       interiorOnly();
       soloRoomLight(kit);
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure: 1.2, dof: { focus, aperture, maxBlur: 16 } }) };
+      kit.mat.color.set(INTERIOR_TINT);
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, ...GRADE7, dof: { focus, aperture, maxBlur: 16 } }) };
     },
   };
 
@@ -475,7 +485,7 @@ export default async function make(ctx) {
   const STROKE_START = E.STROKES.map((x) => x - E.EIGHTH);
   const STROKE_DUR = E.EIGHTH * 0.94;
   const HOLD_END = E.STROKES[4] + 0.67;  // ~26.80 (spec: hangs 26.15-26.80)
-  const RELEASE = 0.45;                  // drifts up the chimney until ~27.4
+  const RELEASE = 0.45;                  // each spark drifts up for 0.45 s; the cloud dims out with the fire by E.S09 - 0.05
   // the sprouted L at the right end of the mantel (its top edge at image v ~0.706 there)
   const mantelL = makeHeroL();
   const ML_X = paintX(den, 0.285);
@@ -491,11 +501,12 @@ export default async function make(ctx) {
   const hearthPool = world.register(lightPool(3.6, 2.4, '#ff8a3a'), den.builtG);
   hearthPool.position.set(FIRE[0] + 0.3, 0.008, -0.7);
   // Ember stands at her S08/S09 spot (handoff.js: u 0.40, between the hearth and the window),
-  // turned toward the fire. As the camera settles on her she turns to chat through the wall,
-  // which is exactly where S09 (a continuous pull-back) has her: same place, same facing,
-  // same talk frame.
+  // turned toward the fire. As the camera settles on her she starts chatting (talk and idle
+  // alternating) still facing the fire, exactly as S09 (a continuous pull-back) has her: same
+  // place, same facing, same frames. S09 turns her only once she is small and soft
+  // (E.S09 + 0.75), so no sideways pop lands on a close frame.
   const EM_X = emberDenX(den), EM_Z = ember.z0;
-  const T_TURN = midFrame(E.S09 - 0.15);
+  const T_TURN = midFrame(E.S09 - 0.15); // she settles from the look-up and starts to chat
   // the painted fire's own dusk glow card would wash the 3D fire out to white
   const fireGlow = den.lamps[0];
   world.track(fireGlow);
@@ -508,11 +519,13 @@ export default async function make(ctx) {
     ember.shadow.position.set(EM_X, 0.012, EM_Z);
     // she looks up at the drawing (a lean back, drawn up a little) and settles before she turns
     const up = clamp(spring(t - E.EMBER_LOOK, 2.2, 0.62), 0, 1.15) * (1 - ease.inOutSine(seg(t, T_TURN - 0.4, T_TURN)));
-    ch.rotation.z = -0.075 * up; // facing left: leaning back moves the top to the right
+    ch.rotation.z = -0.16 * up; // facing left: leaning back moves the top to the right
+    ch.position.y += 0.05 * up; // and she rises onto her toes a little, so the look up reads
     const breath = 1 + 0.013 * Math.sin(t * 2.5 + 0.4) * handoff(t);
     ch.scale.set(1, breath * (1 + 0.025 * up), 1);
     const tc = frameT(t);
-    if (t >= T_TURN) poseCharacter(ch, { pose: Math.floor(tc * 6) % 2 === 0 ? 'talk' : 'idle', facing: 1 }); // S09's chatter
+    // she keeps facing the fire through the cut (S09 turns her once she is small and soft)
+    if (t >= T_TURN) poseCharacter(ch, { pose: Math.floor(tc * 6) % 2 === 0 ? 'talk' : 'idle', facing: -1 }); // S09's chatter
     else poseCharacter(ch, { pose: tc >= E.EMBER_SMILE ? 'talk' : 'idle', facing: -1 }); // the soft smile, held
     const head = [EM_X - 0.1, ember.h + 0.14, EM_Z + 0.15];
     heart.position.set(...head); heart.userData.y0 = head[1];
@@ -526,21 +539,36 @@ export default async function make(ctx) {
   //   9:16  the fire and the drawing, Ember wholly out of frame to the right; the pan finds her
   //         full figure right of centre as she smiles, the heart above her.
   const vfov8 = portrait ? 30 : mm(85);
-  const A8 = portrait ? [-2.75, 2.32, DRAW_O[2], 2.6, 3, 2] : [-0.7, 1.98, DRAW_O[2], 6.3, 2, 1];
-  const A8b = portrait ? [-2.75, 2.34, DRAW_O[2], 2.46, 3, 2] : [-0.75, 2.02, DRAW_O[2], 6.1, 2, 1];
+  const A8 = portrait ? [-2.75, 2.32, DRAW_O[2], 2.6, 3, 2] : [-1.3, 2.45, DRAW_O[2], 5.3, 2, 1];
+  const A8b = portrait ? [-2.75, 2.34, DRAW_O[2], 2.46, 3, 2] : [-1.32, 2.47, DRAW_O[2], 5.15, 2, 1];
   const PAN_TO = portrait ? [EM_X - 0.35, 1.6, EM_Z] : [EM_X + 0.4, 1.2, EM_Z];
   const TRUCK = portrait ? 2.1 : 0.55;
-  const T_PAN = portrait ? E.EMBER_SMILE : HOLD_END - 0.04;
-  const T_PAN_END = portrait ? E.EMBER_HEART + 0.2 : E.S09;
+  //   16:9  the pan starts as the heart pops and runs on past the cut (T_PAN_END > E.S09): S09
+  //         samples this rig (s08.rig) up to E.S09 + 0.3 and blends it into the pull-back, so
+  //         the pan decelerates while the pull-back accelerates and the camera never stops.
+  //   9:16  a snappy pan (she is half-cut for only a couple of frames), settled before the heart
+  //         pops, then a slow 2% drift in that S09 carries on.
+  const T_PAN = portrait ? E.EMBER_SMILE : E.EMBER_HEART + 0.02;
+  const T_PAN_END = portrait ? E.EMBER_SMILE + 0.45 : E.S09 + 0.3;
+  const panEase = portrait ? ease.inOutCubic : ease.inOutSine;
+  const DRIFT = 0.02; // 9:16: the hold's push, as a fraction of the frame width per second
+  /** S08's camera, a pure function of t, valid (and smooth) up to E.S09 + 0.3 for S09's hand-off. */
   function rig8(t) {
     const k = ease.inOutSine(seg(t, E.S08, T_PAN));
     const f = A8.map((v, i) => lerp(v, A8b[i], k));
     const cam = frameCam(den, f, vfov8, aspect);
-    const p = ease.inOutSine(seg(t, T_PAN, T_PAN_END));
+    const p = panEase(seg(t, T_PAN, T_PAN_END));
     if (p > 0) {
       const tw = toWorld(den, PAN_TO);
       cam.target = cam.target.map((v, i) => lerp(v, tw[i], p));
       cam.pos = [cam.pos[0] + TRUCK * p, cam.pos[1], cam.pos[2]];
+    }
+    if (portrait && t > T_PAN_END) {
+      // the hold drifts in along the view axis, easing up to a steady 2%/s over 0.3 s (so the
+      // settle never steps, and S09's blend starts from a steady move)
+      const dt = t - T_PAN_END, R = 0.3;
+      const g = DRIFT * (dt < R ? (dt * dt) / (2 * R) : dt - R / 2);
+      cam.pos = cam.pos.map((v, i) => lerp(v, cam.target[i], g));
     }
     cam.frameW = f[3];
     return cam;
@@ -557,13 +585,17 @@ export default async function make(ctx) {
     hearth.pose(t, { camera, intensity: 0.5 * h });
     hearth.light.position.set(0, 0.35, 0.6);
     draw.group.visible = true;
-    draw.pose(t, { times: STROKE_START, dur: STROKE_DUR, holdEnd: HOLD_END, release: RELEASE, embers: h * (1 - 0.7 * seg(t, STROKE_START[0] - 0.3, STROKE_START[0]) * (1 - seg(t, HOLD_END, HOLD_END + 0.3))) });
+    // (the released cloud dims with the fire as S09's plain den takes over: nothing is left to
+    // vanish at the hand-off, where the drawing's props stop being posed)
+    draw.pose(t, { times: STROKE_START, dur: STROKE_DUR, holdEnd: HOLD_END, release: RELEASE, minLaunch: E.S08 + 0.05, intensity: h, embers: (1 - 0.7 * seg(t, STROKE_START[0] - 0.3, STROKE_START[0]) * (1 - seg(t, HOLD_END, HOLD_END + 0.3))) });
     mantelL.visible = true; mlShadow.visible = true;
     hearthPool.visible = h > 0.001; hearthPool.material.opacity = (0.3 + 0.06 * Math.sin(t * 9.7) * Math.sin(t * 3.3)) * h;
   }
 
   const s08 = {
     id: 'S08', start: E.S08, end: E.S09,
+    rig: rig8, // S09's pull-back continues this camera (ending.js s09Camera)
+    handoffLook: { ...GRADE8, tint: INTERIOR_TINT }, // and eases its grade and the den's tint from these
     ...adaptiveBlur(rig8, portrait ? 1920 : 1080),
     pose(t) {
       setAspect(camera, portrait);
@@ -577,8 +609,10 @@ export default async function make(ctx) {
       fireGlow.material.opacity *= lerp(1, 0.35, handoff(t));
       interiorOnly();
       soloRoomLight(den, 10);
-      // S09 (a continuous pull-back) starts from this camera and look, so S08 shares its grade
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure: portrait ? 1.16 : 1.24, dof: { focus, aperture, maxBlur: 16 } }) };
+      den.mat.color.set(INTERIOR_TINT);
+      // S09 (a continuous pull-back) starts from this camera and look, and eases its grade (and
+      // the den's tint) from GRADE8 / INTERIOR_TINT to the wide's
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, ...GRADE8, dof: { focus, aperture, maxBlur: 16 } }) };
     },
   };
 

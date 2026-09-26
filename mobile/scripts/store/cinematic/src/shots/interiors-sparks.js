@@ -84,9 +84,10 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
       const len = Math.hypot(c1[0] - from[0], c1[1] - from[1]) + Math.hypot(c2[0] - c1[0], c2[1] - c1[1]) + Math.hypot(target[0] - c2[0], target[1] - c2[1]);
       sparks.push({
         k, f: (j + 0.5) / cells.length, target, from, c1, c2,
-        flight: 0.36 + len * 0.1 + h(3) * 0.08,
-        // the drawing lifts away from the top down, each spark a little on its own
-        release: (1 - clamp(target[1] / topY)) * 0.1 + h(5) * 0.08, drift: (h(6) - 0.5) * 0.5, tw: h(7) * 50,
+        flight: Math.min(0.45, 0.36 + len * 0.1 + h(3) * 0.08),
+        // the drawing lifts away from the top down, each spark well apart from its neighbours
+        // (a loose rising cloud: rows that let go together read as letters)
+        release: (1 - clamp(target[1] / topY)) * 0.1 + h(5) * 0.35, drift: (h(6) - 0.5) * 0.5, tw: h(7) * 50,
       });
     });
   });
@@ -109,29 +110,33 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
   const snap = (v) => Math.round(v / cell) * cell;
   const emb = Array.from({ length: embers }, (_, i) => ({ ph: hash01(i * 31 + seed), per: 0.9 + hash01(i * 17 + 3) * 0.6, x: (hash01(i * 7 + 11) - 0.5) * 0.3, sw: hash01(i * 5 + 2) * 6 }));
 
-  /** Where spark s is at time t (local), and its brightness; null before launch. */
+  /** Where spark s is at time t (local), and its brightness; null before launch.
+   *  o.minLaunch: no spark leaves the fire before it (the shot's first frames show only embers),
+   *  so an early stroke's sparks fly a shorter, quicker path and still land on their cue. */
   function sparkAt(s, t, o) {
     const arrive = o.times[s.k] + s.f * o.dur;
-    const launch = arrive - s.flight;
+    const launch = Math.max(arrive - s.flight, o.minLaunch ?? -Infinity);
     if (t < launch) return null;
     let x, y, a;
     if (t < arrive) {
-      // rise out of the fire and come at the cell from outside the drawing, easing in
-      const u = ease.outQuad((t - launch) / s.flight), v = 1 - u;
+      // rise out of the fire and come at the cell from outside the drawing, speeding up into
+      // it, faint in flight: the line itself only lights on the stroke's own cue
+      const u = ease.inQuad((t - launch) / Math.max(1e-3, arrive - launch)), v = 1 - u;
       const b0 = v * v * v, b1 = 3 * v * v * u, b2 = 3 * v * u * u, b3 = u * u * u;
       x = b0 * s.from[0] + b1 * s.c1[0] + b2 * s.c2[0] + b3 * s.target[0];
       y = b0 * s.from[1] + b1 * s.c1[1] + b2 * s.c2[1] + b3 * s.target[1];
-      a = 0.5 + 0.5 * u;
+      a = 0.2 + 0.3 * u;
     } else {
       x = s.target[0]; y = s.target[1];
       // a flare as the cell lights, then a steady glow with a faint shimmer
       a = 1 + 1.6 * Math.exp(-(t - arrive) * 12) + 0.12 * noise1(t * 7 + s.tw, 3);
       const r = clamp((t - o.holdEnd - s.release) / o.release);
       if (r > 0) {
-        // drift up the chimney as ordinary sparks, gathering toward its middle, fading
+        // drift up the chimney as ordinary sparks, each on its own sideways wander, fading as
+        // soon as it lets go (never a moving copy of the outline)
         y += r * r * 1.3 + r * 0.3;
-        x += (-x * 0.5 + s.drift * 0.35) * ease.inOutSine(r) + Math.sin(t * 5 + s.tw) * 0.035 * r;
-        a *= 1 - ease.inQuad(r);
+        x += s.drift * 0.6 * ease.inOutSine(r) + Math.sin(t * 5 + s.tw) * 0.035 * r;
+        a *= 1 - ease.outQuad(r);
       }
     }
     return { x, y, a };
@@ -141,7 +146,7 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
     group, light, count: sparks.length, lengths,
     /**
      * o: { times: [start of each stroke], dur: how long a stroke takes (s), holdEnd, release (s),
-     *      intensity, embers (0..1, the everyday embers' brightness) }
+     *      intensity, embers (0..1, the everyday embers' brightness), minLaunch (s, optional) }
      */
     pose(t, o) {
       const I = o.intensity ?? 1;
@@ -161,7 +166,7 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
           }
           m.compose(p3, q, s3);
           mesh.setMatrixAt(idx, m);
-          const amp = show ? p.a * (k === 0 ? 1 : 0.55 / k) : 0;
+          const amp = show ? p.a * (k === 0 ? 1 : 0.35 / k) : 0;
           col.copy(show && !flying ? LINE : HOT).multiplyScalar(2.3 * amp * I);
           mesh.setColorAt(idx, col);
           idx++;

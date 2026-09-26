@@ -133,7 +133,9 @@ export default async function make(ctx) {
       const k = Math.floor((t + p.r * 0.37 * 2 + p.clock) / turnLen);
       const mine = (k + p.turn) % 2 === 0;
       const talking = mine && Math.floor(t * 6 + p.phase * 10) % 2 === 0;
-      const facing = p.dir * (NATIVE[name] || 1);
+      // Ember keeps S08's facing (toward the fire) until the pull-back has made her small
+      // and soft, and only then turns to her chat partner: never a sideways pop at the cut
+      const facing = name === 'ember' && t < E.S09 + 0.75 ? -1 : p.dir * (NATIVE[name] || 1);
       const st = strollAt(name, t);
       // a gentle bob of 0.10 (about 5 px in the wide), each at its own rate and phase;
       // Ember's eases in so S08's hand-off does not jump
@@ -153,7 +155,9 @@ export default async function make(ctx) {
   // fireflies sized for the wide (the world's are ~1 px at 50 units), with the same pair
   // separation as S06: no two resting points share a height within 1.2 units while
   // standing within 2.6 of each other across, so no two can read as a pair of eyes
-  const wideFlies = makeParticles({ count: 56, boxMin: [-21, -0.5, 4], boxMax: [21, 10, 28], color: '#ffd76a', size: 40, intensity: 4.2, drift: [1.0, 0.45, 1.0], seed: 613 });
+  // (the box runs out to z 38: the 16:9 hold now stands at z ~50, so the meadow in front
+  // of the house is deeper and needs its own flies)
+  const wideFlies = makeParticles({ count: 56, boxMin: [-21, -0.5, 4], boxMax: [21, 10, 38], color: '#ffd76a', size: 40, intensity: 4.2, drift: [1.0, 0.45, 1.0], seed: 613 });
   wideFlies.uniforms.pxScale.value = px;
   {
     const a = wideFlies.points.geometry.attributes.position.array;
@@ -361,46 +365,82 @@ export default async function make(ctx) {
   }
 
   const SKY_S10 = portrait ? [-80, 22, -170] : [-120, 20, -170];
-  world.track(world.sky); // S10 moves the painted sun behind the sign; begin() restores it
+  /** S09 16:9: the backdrop re-seated for the hold (scale, position); see s09.pose. */
+  const SKY_S09 = { scale: 3.2, pos: [-70, -37.5, -170] };
+  world.track(world.sky); // S09 (16:9) re-seats it and S10 moves the painted sun behind the sign; begin() restores it
 
   // ---------------------------------------------------------------- cameras
-  // S08 -> S09 is one continuous move: the pull-back starts exactly where S08's camera
-  // ends (sampled once from S08 itself; the same value whatever frame asks first).
-  let handoff = null;
-  function s08End() {
-    if (handoff !== null) return handoff;
-    handoff = false;
-    const s08 = (ctx.shots || []).find((s) => s.id === 'S08');
-    if (!s08) return handoff;
+  // S08 -> S09 is one continuous move. S08 exposes its camera rig (`rig`, a pure function
+  // of time) and, in 16:9, keeps panning until E.S09 + 0.3: the pull-back starts from that
+  // still-decelerating pan, so the pan hands its speed to the pull-back with no stop in
+  // between. S08's final look (exposure, contrast, aperture) is sampled once, here at
+  // construction (S08 is made before this module), so every process sees the same values
+  // and the grade and depth of field ease out of S08's instead of stepping at the cut.
+  const s08Shot = (ctx.shots || []).find((s) => s.id === 'S08') || null;
+  const s08Rig = s08Shot && typeof s08Shot.rig === 'function' ? s08Shot.rig : null;
+  const handoff = (() => {
+    if (!s08Shot) return null;
     world.begin();
-    const f = s08.pose(E.S09 - 1e-4, ctx);
+    const f = s08Shot.pose(E.S09 - 1e-4, ctx);
     const dir = new THREE.Vector3(); f.camera.getWorldDirection(dir);
     const d = f.look?.dof?.focus ?? 6;
     const p = f.camera.position;
-    handoff = { pos: [p.x, p.y, p.z], target: [p.x + dir.x * d, p.y + dir.y * d, p.z + dir.z * d], fov: f.camera.fov, aperture: f.look?.dof?.aperture ?? 26 };
+    const h = {
+      pos: [p.x, p.y, p.z], target: [p.x + dir.x * d, p.y + dir.y * d, p.z + dir.z * d], fov: f.camera.fov,
+      aperture: f.look?.dof?.aperture ?? (portrait ? 60 : 70), exposure: f.look?.exposure, contrast: f.look?.contrast,
+    };
     world.begin();
-    return handoff;
-  }
+    return h;
+  })();
+  const s08End = () => handoff;
+  /** Where the pull-back starts at t: S08's own rig while its pan is still running, else its last frame. */
+  const pullFrom = (t) => (s08Rig ? s08Rig(Math.min(t, E.S09 + 0.3)) : s08End());
 
-  // The hold: 16:9 fills about 70-75% of the height with the room grid (a visible 2-unit
-  // push over 28.4-33.9), placed so the tease captions (bottom centre, baseline 918) sit on
-  // the grass below the ground-floor residents' chins, from a little above so no floor's
-  // front edge hides the feet of the residents above it. 9:16 keeps the whole house, with
-  // the ground floor above the Shorts/Reels UI (y 1440).
+  // The hold. 16:9 (spec 3.2, lowered so the roof fits above the captions): the whole house
+  // from ground to chimney smoke, the dusk sky beside the gable, with a perceptible 5-unit
+  // push over 28.4-33.9; the tease captions (bottom centre, baseline 918) sit on the grass
+  // below the ground-floor residents' feet. 9:16 keeps the whole house, with the ground
+  // floor above the Shorts/Reels UI (y 1440).
+  const WIDE = portrait
+    ? (push) => ({ pos: [0, 13.4, 44 - 1.2 * push], target: [0, 12.1, 0], fov: mm(24) })
+    : (push) => ({ pos: [0, 10.5, 56 - 5.0 * push], target: [0, 9.6 + 0.9 * push, 0], fov: mm(35) });
+  const pushAt = (t) => ease.inOutSine(seg(t, E.S09 + 0.9, E.S10));
   function s09Camera(t) {
     const ember = world.residents.ember;
     const face = [den.x + EM_X, den.y + ember.h * 0.7, ember.z0];
-    const k = ease.inOutCubic(seg(t, E.S09, E.S09 + 0.9));
-    const push = ease.inOutSine(seg(t, E.S09 + 0.9, E.S10));
-    const from = s08End();
+    // inOutSine peaks at 1.57x its mean speed (inOutCubic peaked at 3x), over the same 0.9 s
+    const k = ease.inOutSine(seg(t, E.S09, E.S09 + 0.9));
+    const from = pullFrom(t);
     const a = from || (portrait ? { pos: add(face, [0.5, 0.1, 6.2]), target: face, fov: mm(35) } : { pos: add(face, [0.8, 0.3, 5]), target: face, fov: mm(50) });
-    const b = portrait
-      ? { pos: [0, 13.4, 44 - 1.2 * push], target: [0, 12.1, 0], fov: mm(24) }
-      : { pos: [0, 11.5, 36.5 - 2.0 * push], target: [0, 6.0, 0], fov: mm(35) };
-    return { pos: mix3(a.pos, b.pos, k), target: mix3(a.target, b.target, k), fov: lerp(a.fov, b.fov, k), k, aperture: lerp(from ? from.aperture : 26, 9, k) };
+    const b = WIDE(pushAt(t));
+    const ap0 = handoff ? handoff.aperture : (portrait ? 60 : 70);
+    return { pos: mix3(a.pos, b.pos, k), target: mix3(a.target, b.target, k), fov: lerp(a.fov, b.fov, k), k, aperture: lerp(ap0, 9, k) };
   }
-  /** Adaptive motion blur for the pull-back: enough subframes that copies sit <= 2.5 px apart. */
-  const s09Blur = (t) => blurFor(travelPx((ts) => s09Camera(ts), t, portrait ? 1920 : 1080));
+  /**
+   * Adaptive motion blur for the pull-back: up to 32 subframes, and never a shutter shorter
+   * than 0.75 of 1/60 s, so the fastest frames smear into a streak instead of stepping.
+   */
+  const s09Blur = (t) => blurFor(travelPx((ts) => s09Camera(ts), t, portrait ? 1920 : 1080), { maxN: 32, minShutterFrac: 0.75 });
+
+  // 16:9 hold checks (construction time, like the S10 feet check below): the chimney stays
+  // in frame, and the ground-floor residents' heads stay clear of the tease captions
+  // (two lines from about y 790 until 31.17, then "Probably." from about y 855).
+  if (!portrait) {
+    const cam = new THREE.PerspectiveCamera(30, 16 / 9, 0.05, 900);
+    const yPx = (p) => { const v = new THREE.Vector3(...p).project(cam); return { ndcY: v.y, y: (1 - (v.y * 0.5 + 0.5)) * 1080 }; };
+    const heads = LAYOUT[0].map((id) => { const rm = house.rooms[id], r = world.residents[RESIDENTS[id].name]; return [rm.x + r.x0, rm.y + 0.12 + r.h, r.z0]; });
+    for (const [label, push, maxY] of [['start', 0, 780], ['31.17', pushAt(E.BREATH - 0.01), 780], ['end', 1, 855]]) {
+      const c = WIDE(push);
+      cam.fov = c.fov; cam.updateProjectionMatrix();
+      cam.position.set(...c.pos); cam.lookAt(...c.target); cam.updateMatrixWorld();
+      const ch = house.chimneyTop ? yPx([house.chimneyTop.x, house.chimneyTop.y, house.chimneyTop.z]) : null;
+      if (ch && ch.ndcY > 0.9) console.warn(`[S09 16:9 CHECK FAILED] chimney top at NDC y ${ch.ndcY.toFixed(3)} (> 0.9) at push ${label}`);
+      for (const hd of heads) {
+        const y = yPx(hd).y;
+        if (y > maxY) console.warn(`[S09 16:9 CHECK FAILED] a ground-floor head top at y ${y.toFixed(0)} px (> ${maxY}) at push ${label}`);
+      }
+    }
+  }
 
   function s10Camera(t) {
     const push = seg(t, E.S10, E.END) * 0.015; // locked off, with a 1.5% push to the end
@@ -448,6 +488,13 @@ export default async function make(ctx) {
       const focus = aim(camera, cam.pos, cam.target, cam.fov);
       const wide = cam.k > 0.6;
       const ch = chatter(t);
+      // 16:9: the portrait-shaped painting (133 units wide at its home seat) leaves the
+      // wide's sides on margin fill, so here it is re-seated larger and lower, before
+      // world.pose (whose sky.lookAt sees it): the painting spans both frame edges for the
+      // whole hold (its mirror seams off frame), the painted dusk sun and ridge sit beside
+      // the gable, and the 3D horizon meets the painted tree line. S08 never shows the
+      // backdrop, and begin() restores its home seat every frame (world.track, below).
+      if (!portrait) { world.sky.scale.setScalar(SKY_S09.scale); world.sky.position.set(...SKY_S09.pos); }
       const grade = world.pose(t, { dusk: 1, lamps: 1, focus, aperture: cam.aperture, camera, behaviours: ch.beh });
       applyWalks(ch.walks);
       uprightResidents();
@@ -475,7 +522,12 @@ export default async function make(ctx) {
       wideFlies.points.visible = fk > 0.001;
       Object.assign(wideFlies.uniforms.time, { value: t }); wideFlies.uniforms.focus.value = focus;
       wideFlies.uniforms.aperture.value = cam.aperture; wideFlies.uniforms.opacity.value = fk;
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure: portrait ? 1.16 : 1.24, dof: { focus, aperture: cam.aperture, maxBlur: 10 } }) };
+      // the grade eases out of S08's interior look (its exposure and contrast) into the wide's
+      // over the pull-back, so nothing steps at the cut
+      const exWide = portrait ? 1.16 : 1.24;
+      const ex0 = handoff?.exposure ?? exWide, ct0 = handoff?.contrast ?? grade.contrast;
+      const exposure = lerp(ex0, exWide, cam.k), contrast = lerp(ct0, grade.contrast, cam.k);
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure, contrast, dof: { focus, aperture: cam.aperture, maxBlur: 10 } }) };
     },
   };
 

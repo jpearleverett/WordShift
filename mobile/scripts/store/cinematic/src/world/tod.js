@@ -54,12 +54,23 @@ export function skyWipe(mixv, u, y) {
 }
 
 /**
+ * How the painting ends at its left and right edges (spec 8.3: haze-veiled edges, no
+ * repeat). Sharp paint never shows outside the painting: its last `melt` of width
+ * softens into the blurred copy, and beyond the edge that blurred copy's edge column
+ * simply carries on (clamped, never mirrored: a mirror paired the big tree's lit leaves
+ * with their own reflection into a face with two warm eyes, and a longer mirror brought
+ * back a second, blurred sun), giving way to the painting's own row colours over
+ * `rowBlend` and to the haze further out. cast.js (the horizon decal) samples the same way.
+ */
+export const SKY_EDGE = { melt: 0.06, rowBlend: 0.4 };
+
+/**
  * The painted sky as one backdrop plane: a single copy of the painting (a band of
  * it, v from the bottom), wiping afternoon -> dusk top-down (skyWipe). The
- * margins beyond the painting continue it softly: a short mirrored strip that
- * melts into a blurred copy and then into the painting's own row colours (its sky
- * gradient, tree line and meadow), so wide shots never show an edge and no
- * mountain is ever seen twice.
+ * margins beyond the painting continue it softly (SKY_EDGE): its blurred edge
+ * melting into the painting's own row colours (its sky gradient, tree line and
+ * meadow) and a haze, so wide shots never show an edge, no mountain is ever seen
+ * twice and nothing is ever reflected.
  */
 export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b = 'environment/sky_dusk.webp', height = 160, band = [0.32, 1.0], margin = 0.45 } = {}) {
   const ta = await loadTexture(a); const tb = await loadTexture(b);
@@ -82,22 +93,27 @@ export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b 
         float m = ${margin.toFixed(3)};
         float pu = vUv.x * (1.0 + 2.0 * m) - m;
         float out_ = max(-pu, pu - 1.0);
-        float u = pu < 0.0 ? -pu : (pu > 1.0 ? 2.0 - pu : pu);
+        // outside the painting u holds at its edge (SKY_EDGE: clamped, never mirrored);
         // canvas copies are stored top-down; flipY on the loaded textures makes v run bottom-up everywhere
-        vec2 uv = vec2(clamp(u, 0.0, 1.0), ${band[0].toFixed(3)} + vUv.y * ${(band[1] - band[0]).toFixed(3)});
+        vec2 uv = vec2(clamp(pu, 0.0, 1.0), ${band[0].toFixed(3)} + vUv.y * ${(band[1] - band[0]).toFixed(3)});
         float hw = ${SKY_WIPE.half.toFixed(4)}, tl = ${SKY_WIPE.tilt.toFixed(4)}, rp = ${SKY_WIPE.ripple.toFixed(4)};
         float uc = clamp(pu, 0.0, 1.0), T = 0.5 * tl + rp;
         float front = 1.0 + hw + T - mixv * (1.0 + 2.0 * hw + 2.0 * T) - tl * (uc - 0.5);
         float rip = 0.5 * (sin(uc * 14.45 + vUv.y * 5.1) + sin(uc * 29.5 - vUv.y * 9.3 + 2.1));
         float k = smoothstep(front - hw, front + hw, vUv.y + rp * rip);
-        vec3 c = mix(texture2D(ta, uv).rgb, texture2D(tb, uv).rgb, k);
+        vec3 c;
         if (out_ > 0.0) {
+          // outside: the blurred copy's edge column carried on, then the row colours and haze
           vec3 soft = mix(texture2D(blurA, uv).rgb, texture2D(blurB, uv).rgb, k);
           vec3 row = mix(texture2D(rowA, vec2(0.5, uv.y)).rgb, texture2D(rowB, vec2(0.5, uv.y)).rgb, k);
-          c = mix(c, soft, smoothstep(0.0, 0.14, out_));
-          c = mix(c, row, smoothstep(0.08, 0.6, out_));
+          c = mix(soft, row, smoothstep(0.0, ${SKY_EDGE.rowBlend.toFixed(4)}, out_));
           vec3 hz = mix(haze, hazeDusk, k);
           c = mix(c, hz, smoothstep(0.3, 1.0, out_) * 0.18);
+        } else {
+          // inside: the painting, its last few percent melting into the blurred copy
+          vec3 sharp = mix(texture2D(ta, uv).rgb, texture2D(tb, uv).rgb, k);
+          vec3 soft = mix(texture2D(blurA, uv).rgb, texture2D(blurB, uv).rgb, k);
+          c = mix(soft, sharp, smoothstep(0.0, ${SKY_EDGE.melt.toFixed(4)}, min(pu, 1.0 - pu)));
         }
         // sRGB textures are decoded to linear by the GPU on sampling
         gl_FragColor = vec4(c * bright, 1.0);

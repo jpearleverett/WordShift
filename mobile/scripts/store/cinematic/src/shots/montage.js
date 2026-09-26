@@ -29,8 +29,8 @@ const UP = new THREE.Vector3(0, 1, 0);
  */
 const BOARDS = [
   { room: 'aquarium', who: 'axel', words: ['SNAP', 'MILE'], letter: 0, slot: 0, rx: 0.2, wide: [-2.55, -0.35, 0, 1], tall: [1.55, -0.8, 0.45, -1] },
-  { room: 'desert', who: 'fennick', words: ['SPOON', 'SUPER'], letter: 1, slot: 2, rx: -0.55, wide: [2.35, -0.45, 0, -1], tall: [0.5, -0.8, 0, -1] },
-  { room: 'garden', who: 'thyme', words: ['GLOVES', 'LITTER'], letter: 0, slot: 0, rx: 0.71, wide: [-3.15, -0.4, 0, 1], tall: [1.6, -0.8, 0, -1] },
+  { room: 'desert', who: 'fennick', words: ['SPOON', 'SUPER'], letter: 1, slot: 2, rx: -0.55, wide: [2.35, -0.45, 0, -1], tall: [0.2, -0.8, 0.6, -1] },
+  { room: 'garden', who: 'thyme', words: ['GLOVES', 'LITTER'], letter: 0, slot: 0, rx: 0.71, wide: [-3.15, -0.4, 0, 1], tall: [1.7, -0.8, 0.6, -1] },
 ];
 /** Rack depth in the cell: the tiles' faces sit just behind the floor's front edge (z = +1.6). */
 const RACK_Z = 1.3;
@@ -70,8 +70,12 @@ const FLY = { liftH: 0.6, arc: 0.3, zArc: 1.2, tumble: 0.25 };
  * pinned slot cannot keep SUPPER and GLITTER both inside the frame at a readable size.
  * The tall frame spans almost two floors, so 9:16 sits the trays low (target row at
  * 68%, inside the 1440 px safe line) on a longer lens from a gentler height: the room
- * below (Ember, Archimedes and Fennick facing the lens) stays under the frame while the
- * resident behind the rack still shows head and shoulders above it.
+ * below (Ember, Archimedes and Fennick facing the lens) stays under the frame. Each
+ * resident stands behind the right part of the rack (inside its width, so the feet stay
+ * hidden behind the lower tray), lifted by the tall `lift` so the head and shoulders clear
+ * the upper tray's rail (about y 1030) by well over 40 px at the lowest bob or hop landing:
+ * a head that only just clears the rail reads as peering over it, eyes to the lens. The
+ * heads stay inside x 96-918 (ear tips included) and below the caption band.
  */
 const RIG_WIDE = { yaw: 8, pitch: 1.5, fov: mm(65), ndc: [-0.17, -0.3], dist: 10.4, push: 0.6, anchor: 'slot' };
 const RIG_TALL = { yaw: 5, pitch: -7, fov: 28, ndc: [-0.06, -0.37], dist: 12.5, push: 0.9, anchor: 'row' };

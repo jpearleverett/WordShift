@@ -55,7 +55,7 @@ export const LAMPS = {
  *   and which are never edited, so the cut is done here.
  */
 const WINDOW_LOOK = {
-  observatory: { day: ['#F4DDB0', 0.3], dusk: ['#7A5244', 0.85], right: { day: ['#54383F', 0], dusk: ['#54383F', 0.95] }, split: 0.512 },
+  observatory: { day: ['#F4DDB0', 0.55], dusk: ['#7A5244', 0.7], right: { day: ['#4A3238', 0], dusk: ['#4A3238', 0.85] }, split: 0.512 },
   rainforest: { day: ['#C6DCCF', 0.15], dusk: ['#B5623C', 0.3], blur: [0.0012, 0.0025], cut: 0.4833 },
 };
 
@@ -234,13 +234,16 @@ function leafPixels(put, b, a, L, W, pal) {
 /**
  * A sprig of ivy for the Star Loft, in the room's own pixel style (one art pixel = 0.0225
  * units, about four painting pixels): it grows out from behind the RIGHT porthole's frame
- * low on its left, follows the ring round its lower-left quarter and spills a few backlit
- * leaves onto the glass. Two equal round windows side by side above a curved cushion read
- * as a face at a glance; one leafy rim makes them two different windows. Returns the card
- * in room-local units (drawn over the painting, lit like it).
+ * low on its left (about seven o'clock) and runs diagonally across the glass to the frame's
+ * upper right (about two o'clock), leafy the whole way, with leaves spilling over the ring at
+ * both ends. Two equal round windows side by side above a curved cushion read as a face at
+ * a glance: with the curtain making the left one a lopsided crescent, the right one is now a
+ * pane crossed by a leafy band, never its twin. Nothing grows in the gap between the panes
+ * (leaves there read as a nose). Returns the card in room-local units (drawn over the
+ * painting, lit like it).
  */
 function starLoftIvy() {
-  const px = 0.0225, X0 = -0.1, Y1 = 2.96, W = 54, H = 58;
+  const px = 0.0225, X0 = -0.1, Y1 = 3.7, W = 91, H = 93;
   const rgba = new Uint8Array(W * H * 4);
   const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   const put = (x, y, col) => {
@@ -252,12 +255,16 @@ function starLoftIvy() {
   // the right porthole, room-local: centre (1.02, 2.75), glass radius 0.75, frame 0.75-0.89
   const C = [1.02, 2.75];
   const at = (deg, r) => [C[0] + r * Math.cos(deg * Math.PI / 180), C[1] + r * Math.sin(deg * Math.PI / 180)];
-  // ivy grows out from behind the frame low on its left and follows the ring up to about
-  // eight o'clock, with one tendril curling a little way onto the glass
-  const stems = [
-    [262, 254, 246, 238, 230, 222, 214, 206, 198, 190].map((d) => at(d, 0.81)),
-    [230, 227, 225, 224, 224, 226].map((d, k) => at(d, 0.81 - k * 0.075)),
-  ].map((s) => s.map(toPx));
+  // the main stem: from behind the frame at about seven o'clock, across the glass with a
+  // slight sag, over the ring at about two o'clock; a short hanging tendril off its middle
+  const A = at(218, 0.9), B = at(36, 0.9);
+  const dir = [B[0] - A[0], B[1] - A[1]], len = Math.hypot(dir[0], dir[1]);
+  const nrm = [dir[1] / len, -dir[0] / len]; // perpendicular, pointing down-right
+  const SAG = 0.09;
+  const P = (s) => [A[0] + dir[0] * s + nrm[0] * SAG * Math.sin(Math.PI * s), A[1] + dir[1] * s + nrm[1] * SAG * Math.sin(Math.PI * s)];
+  const main = [at(232, 0.98), ...Array.from({ length: 21 }, (_, k) => P(k / 20)), at(44, 0.99)];
+  const tendril = [0.56, 0.6, 0.64, 0.66, 0.67].map((s, k) => { const p = P(s); return [p[0] + 0.02 * k, p[1] - 0.09 * k]; });
+  const stems = [main, tendril].map((s) => s.map(toPx));
   const line = (pts, col, brush) => {
     for (let k = 1; k < pts.length; k++) {
       const [ax, ay] = pts[k - 1], [bx, by] = pts[k];
@@ -273,16 +280,29 @@ function starLoftIvy() {
   const pal = { outline: '#1c2811', mid: '#557a26', light: '#79a036', hl: '#a3c653', rib: '#3a5a1c' };
   for (const s of stems) line(s, '#2a2412', [[0, 0], [1, 0], [0, 1], [1, 1], [-1, 0], [0, -1]]);
   for (const s of stems) line(s, '#7b7a2c', [[0, 0]]);
-  // [angle on the ring, radius, leaf direction, length, width]: alternately out over the
-  // wall and in over the glass's lower-left edge
-  const leaves = [
-    [260, 0.81, 250, 0.2, 0.11], [252, 0.81, 236, 0.22, 0.12], [236, 0.81, 214, 0.24, 0.13], [219, 0.81, 196, 0.23, 0.12],
-    [203, 0.81, 160, 0.22, 0.12], [192, 0.81, 128, 0.2, 0.11],
-    [256, 0.78, 80, 0.24, 0.13], [246, 0.78, 70, 0.28, 0.15], [229, 0.77, 42, 0.3, 0.16], [212, 0.78, 18, 0.27, 0.14], [197, 0.79, 4, 0.22, 0.12],
-    [222, 0.62, 58, 0.2, 0.12], [236, 0.6, 88, 0.2, 0.11],
-    [220, 0.5, 20, 0.2, 0.12], [232, 0.47, 70, 0.21, 0.12], [225, 0.44, 40, 0.16, 0.1],
+  const stemDeg = Math.atan2(dir[1], dir[0]) * 180 / Math.PI;
+  // along the stem: [s, side (+1 up-left, -1 down-right), splay from the stem, length, width];
+  // big enough and close enough that the pane reads as crossed by a leafy band in a wide
+  const along = [
+    [0.03, -1, 70, 0.26, 0.14], [0.08, 1, 75, 0.28, 0.15], [0.14, -1, 55, 0.32, 0.17], [0.2, 1, 60, 0.34, 0.18],
+    [0.26, -1, 45, 0.34, 0.18], [0.32, 1, 50, 0.35, 0.19], [0.38, -1, 65, 0.34, 0.18], [0.44, 1, 40, 0.36, 0.19],
+    [0.5, -1, 50, 0.35, 0.19], [0.56, 1, 65, 0.34, 0.18], [0.62, -1, 40, 0.34, 0.18], [0.68, 1, 55, 0.33, 0.18],
+    [0.74, -1, 60, 0.32, 0.17], [0.8, 1, 45, 0.31, 0.17], [0.86, -1, 55, 0.29, 0.16], [0.92, 1, 65, 0.27, 0.15],
+    [0.23, 1, 15, 0.26, 0.14], [0.47, -1, 15, 0.26, 0.14], [0.71, 1, 15, 0.25, 0.14],
   ];
-  for (const [d, r, a, L, Wd] of leaves) leafPixels(put, toPx(at(d, r)), a, L / px, Wd / px, pal);
+  for (const [s, side, splay, L, Wd] of along) leafPixels(put, toPx(P(s)), stemDeg + side * splay, L / px, Wd / px, pal);
+  // over the ring at both ends, so neither end leaves the disc's outline whole: out over the
+  // wall and in over the glass (the lower end's leaves point down and in, never into the gap)
+  const ends = [
+    [232, 0.95, 290, 0.24, 0.13], [224, 0.86, 265, 0.22, 0.12], [214, 0.78, 20, 0.22, 0.12],
+    [36, 0.95, 70, 0.26, 0.14], [44, 0.9, 5, 0.25, 0.13], [30, 0.84, 340, 0.24, 0.13], [52, 0.82, 110, 0.22, 0.12],
+  ];
+  for (const [d, r, a, L, Wd] of ends) leafPixels(put, toPx(at(d, r)), a, L / px, Wd / px, pal);
+  // the tendril's leaves hang down into the glass
+  for (const [s, a] of [[0.63, 250], [0.67, 300]]) {
+    const p = P(s);
+    leafPixels(put, toPx([p[0] + 0.05, p[1] - 0.3]), a, 0.2 / px, 0.11 / px, pal);
+  }
   const tex = pixelDataTexture(rgba, W, H);
   return { tex, x: X0 + W * px / 2, y: Y1 - H * px / 2, w: W * px, h: H * px };
 }
@@ -303,11 +323,14 @@ function starLoftCurtain() {
     const o = (j * W + i) * 4; const c = hex(col);
     rgba[o] = c[0]; rgba[o + 1] = c[1]; rgba[o + 2] = c[2]; rgba[o + 3] = 255;
   };
-  const ROD_Y = 3.72, OUT = -1.8, TIE_Y = 2.5, BOTTOM = 1.9;
-  // the panel's inner edge: from the rod it sweeps across the glass, gathers at the tieback, then flares a little
+  const ROD_Y = 3.72, OUT = -1.8, TIE_Y = 2.3, BOTTOM = 1.9;
+  // the panel's inner edge: from the rod (near the frame's right edge) it sweeps across the
+  // glass, covering about half its width at the centre height, gathers at the tieback low on
+  // the pane, then flares a little. What shows is a lopsided crescent of glass on the right.
+  const ROD_IN = -0.15, TIE_IN = -0.9;
   const inner = (y) => {
-    if (y >= TIE_Y) { const k = (ROD_Y - y) / (ROD_Y - TIE_Y); return -0.42 + (-1.36 + 0.42) * (1 - (1 - k) * (1 - k)); }
-    const k = (TIE_Y - y) / (TIE_Y - BOTTOM); return -1.36 + 0.2 * k;
+    if (y >= TIE_Y) { const k = (ROD_Y - y) / (ROD_Y - TIE_Y); return ROD_IN + (TIE_IN - ROD_IN) * (1 - (1 - k) * (1 - k)); }
+    const k = (TIE_Y - y) / (TIE_Y - BOTTOM); return TIE_IN + 0.2 * k;
   };
   const pal = { dark: '#5e4424', mid: '#9a7440', light: '#c19a55', hl: '#dcbc74', star: '#f1dc93', edge: '#3b2416', tie: '#7a3b2c', tieHi: '#a45a3f', rod: '#4a2f1c', rodHi: '#7a5230' };
   for (let j = 0; j < H; j++) {

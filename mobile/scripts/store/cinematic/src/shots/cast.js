@@ -17,7 +17,7 @@ import { ease, spring, seg, lerp, clamp, smooth, mulberry32 } from '../core/math
 import { bar, SIXTEENTH } from '../grid.js';
 import { LAYOUT, GROUND_Y } from '../sets/world.js';
 import { makeGrass, makeParticles } from '../world/env.js';
-import { skyWipe } from '../world/tod.js';
+import { skyWipe, SKY_EDGE } from '../world/tod.js';
 import { mm, dist, aim, setAspect, look, travelPx, blurFor } from './common.js';
 
 const D2R = Math.PI / 180;
@@ -306,9 +306,10 @@ export default async function make(ctx) {
       const xb = ((i + 0.5) / 256 - 0.5) * SEAM_W * spread;
       const pu = (xb / SKY.width + 0.5) * (1 + 2 * margin) - margin;
       const out = Math.max(-pu, pu - 1);
-      const u = pu < 0 ? -pu : pu > 1 ? 2 - pu : pu;
-      let col = at(blur, u, seamV);
-      if (out > 0) { col = mixA(col, at(row, 0.5, seamV), sstep(0.08, 0.6, out)); col = mixA(col, hz, sstep(0.3, 1, out) * 0.18); }
+      // the backdrop's own edge treatment (tod.js SKY_EDGE): outside the painting its
+      // blurred edge column carries on, melting into the row colours and then the haze
+      let col = at(blur, Math.min(1, Math.max(0, pu)), seamV);
+      if (out > 0) { col = mixA(col, at(row, 0.5, seamV), sstep(0, SKY_EDGE.rowBlend, out)); col = mixA(col, hz, sstep(0.3, 1, out) * 0.18); }
       g.fillStyle = `rgb(${col.map((v) => Math.round(v)).join(',')})`; g.fillRect(i, 0, 1, 1);
     }
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false;

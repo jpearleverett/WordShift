@@ -52,6 +52,35 @@ function scrimTexture() {
 }
 
 /**
+ * Line breaks for one caption: every way to break its words (a caption is a handful of words)
+ * scored by line count, then breaks after "." or "," (more is better), then the longest line.
+ * A line wider than maxW only passes when it is a single word. Returns [{ words, width }].
+ */
+function wrapWords(words, space, maxW) {
+  const n = words.length;
+  const lineW = (a, b) => { let w = 0; for (let i = a; i < b; i++) w += words[i].advance + (i > a ? space : 0); return w; };
+  let best = null;
+  for (let mask = 0; mask < 1 << Math.max(0, n - 1); mask++) {
+    const cuts = [0];
+    for (let i = 0; i < n - 1; i++) if (mask & (1 << i)) cuts.push(i + 1);
+    cuts.push(n);
+    let ok = true, longest = 0, punct = 0;
+    for (let k = 0; k < cuts.length - 1; k++) {
+      const w = lineW(cuts[k], cuts[k + 1]);
+      if (w > maxW && cuts[k + 1] - cuts[k] > 1) { ok = false; break; }
+      longest = Math.max(longest, w);
+      if (k > 0 && /[.,]$/.test(words[cuts[k] - 1].text)) punct++;
+    }
+    if (!ok) continue;
+    const score = [cuts.length - 1, -punct, longest];
+    if (!best || score[0] < best.score[0] || (score[0] === best.score[0] && (score[1] < best.score[1] || (score[1] === best.score[1] && score[2] < best.score[2])))) best = { score, cuts };
+  }
+  const out = [];
+  for (let k = 0; k < best.cuts.length - 1; k++) out.push({ words: words.slice(best.cuts[k], best.cuts[k + 1]), width: lineW(best.cuts[k], best.cuts[k + 1]) });
+  return out;
+}
+
+/**
  * captions: [{ id, text, voice: 'claim'|'tease', size?: 'big', in, out, line }]
  * Captions whose in/out overlap and share a voice form one block, ordered by `line`.
  */
@@ -77,15 +106,10 @@ export class Captions {
         const words = c.text.split(' ').map((w, gi) => ({ ...wordCanvas(w, st, size), text: w, gi }));
         const space = size * 0.28;
         const maxW = (aspect === '9x16' ? SAFE9.x1 - SAFE9.x0 - 2 * HALO : 1500) * this.px;
-        // wrap
-        let cur = [], curW = 0;
-        const push = () => { if (cur.length) lines.push({ cap: c, words: cur, width: curW, size }); cur = []; curW = 0; };
-        for (const w of words) {
-          const add = (cur.length ? space : 0) + w.advance;
-          if (curW + add > maxW && cur.length) push();
-          cur.push(w); curW += (cur.length > 1 ? space : 0) + w.advance;
-        }
-        push();
+        // wrap: the fewest lines that fit maxW; among those, breaks after a word ending in
+        // "." or "," first ("Animal friends. / Each with a room."), then the most even lines,
+        // i.e. the shortest longest line ("Over 4,000 / word puzzles.", never an orphan)
+        for (const seg of wrapWords(words, space, maxW)) lines.push({ cap: c, words: seg.words, width: seg.width, size });
         for (const ln of lines.filter((l) => l.cap === c)) ln.space = space;
       }
       // vertical layout
@@ -135,7 +159,8 @@ export class Captions {
           const t0 = c.in + it.i * 0.06;
           const a = clamp((t - t0) / 0.3);
           const k = ease.outCubic(a);
-          const out = 1 - clamp((t - c.out) / 0.22);
+          // `out` is when the caption is gone (spec 3.4): it fades over the 0.22 s before it
+          const out = 1 - clamp((t - (c.out - 0.22)) / 0.22);
           const op = t < t0 ? 0 : k * out;
           this.overlay.place(it.name, { x: it.cx, y: it.cy + (1 - k) * rise, opacity: op });
           blockOp = Math.max(blockOp, op);

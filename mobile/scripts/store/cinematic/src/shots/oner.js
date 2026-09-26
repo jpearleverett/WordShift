@@ -80,12 +80,14 @@ export default async function make(ctx) {
   const TRAY_FACE_Z = -TILE_D / 2 + 0.08;
 
   // Ember waits by the rack in the meadow (the den's Ember is hidden meanwhile):
-  // 16:9 beside the right upright, fully in frame; 9:16 a soft foreground figure at
-  // lower right, her head below HEAR and clear of the T's path.
-  const emberOut = await makeCharacter('ember', { height: 1.75, poses: ['idle', 'talk'] });
-  emberOut.position.set(...add(RACK_POS, portrait ? [0.5, 0, 5.8] : [2.75, 0, 0.3]));
+  // 16:9 beside the right upright, fully in frame; 9:16 a small figure in the grass just
+  // in front of the rack's right end (about 11 units from the lens against the ~12.8 focus:
+  // soft, but a character, not bokeh), her head just under HEAR's tray and clear of the
+  // platform UI band at the bottom of a phone screen.
+  const emberOut = await makeCharacter('ember', { height: portrait ? 1.0 : 1.75, poses: ['idle', 'talk'] });
+  emberOut.position.set(...add(RACK_POS, portrait ? [0.95, 0, 1.8] : [2.75, 0, 0.3]));
   world.register(emberOut);
-  const heart = await makeBillboard('ui/emote_heart.png', portrait ? 0.24 : 0.5);
+  const heart = await makeBillboard('ui/emote_heart.png', portrait ? 0.3 : 0.5);
   world.register(heart);
   const sparkles = [];
   for (let i = 0; i < 9; i++) sparkles.push(world.register(await makeBillboard('ui/emote_sparkle.png', 0.34)));
@@ -192,23 +194,24 @@ export default async function make(ctx) {
   ctx.overlay.quad('bubble', { texture: bubbleArt.texture, width: bubbleArt.width, height: bubbleArt.height });
 
   // The amber route: out of PLAN, along the PANT row in front of the trays, past the
-  // rack's LEFT end (so nothing ever rises out of PAY), up beside it, then over the
-  // facade to the empty frame.
-  // (9:16's narrow frame cannot hold the rack's end, so there the amber rises just left of
-  // PAY's P instead, inside the frame and still clear of the word)
-  const SIDE = portrait ? add(RACK_POS, [-0.92, 1.66, 0.6]) : add(RACK_POS, [-(halfRack + 0.3), 1.66, 0.55]);
-  const CLIMB = portrait ? add(RACK_POS, [-1.05, 3.9, 0.45]) : add(RACK_POS, [-(halfRack + 0.4), 3.9, 0.2]);
-  const LANE_X = portrait ? 0.36 : 0.7;
+  // rack's LEFT end (so nothing ever rises out of PAY, spec 8 trap 9), up beside it, then
+  // over the facade to the empty frame. 9:16's narrow frame cannot hold the rack's end, so
+  // there the gems leave the frame left along the PLAN row and the boom picks them up again
+  // above the rack.
+  const SIDE = add(RACK_POS, [-(halfRack + (portrait ? 0.35 : 0.3)), 1.66, portrait ? 0.6 : 0.55]);
+  const CLIMB = add(RACK_POS, [-(halfRack + (portrait ? 0.45 : 0.4)), 3.9, portrait ? 0.45 : 0.2]);
+  const LANE_X = portrait ? 0.5 : 0.7;
   const UPPER = [[-3.2, 5.2, 7.6], [-0.6, 6.6, 3.6], [0, 6.6, -0.6]];
   const L_RACK = add(RACK_POS, [slotX(1, 4) * TILE_SCALE, 1.75, 0]);
   const heroRide = arcPath([L_RACK, add(L_RACK, [-0.35, -0.08, 0.55]), SIDE, CLIMB, ...UPPER]);
   const BP_SRC = add(RACK_POS, [-0.25, 1.62, 0.25]);
-  const bpRide = arcPath([BP_SRC, add(SIDE, portrait ? [-0.3, -0.1, 0.1] : [0.1, -0.1, 0.1]), add(CLIMB, portrait ? [-0.3, 0, 0] : [0, 0, 0]), ...UPPER]);
+  const bpRide = arcPath([BP_SRC, add(SIDE, [0.1, -0.1, 0.1]), CLIMB, ...UPPER]);
   // each gem rides its own lane of the route (a ribbon, not a single file)
   const BURST_O = add(rackCentre, [0, -0.06, 0.4]);
   const gemPlan = gems.map((g, i) => {
     const h1 = hash01(i * 17 + 3), h2 = hash01(i * 29 + 11), h3 = hash01(i * 7 + 5);
-    const lane = (k) => [(hash01(i * 13 + k) - 0.5) * (k < 3 ? LANE_X : 0.7), (hash01(i * 31 + k) - 0.5) * 0.5, (hash01(i * 37 + k) - 0.5) * 0.7];
+    // (little depth jitter: the trailing gems stay near the focus plane, sharp and amber)
+    const lane = (k) => [(hash01(i * 13 + k) - 0.5) * (k < 3 ? LANE_X : 0.7), (hash01(i * 31 + k) - 0.5) * 0.5, (hash01(i * 37 + k) - 0.5) * 0.2];
     const a = (i / N_GEMS) * Math.PI * 2 + h3 * 0.25, r = 0.55 + 0.45 * h2;
     const out = add(BURST_O, [Math.cos(a) * 1.25 * r, Math.sin(a) * 0.22 * r, 0.25 * h1]);
     // the gems nearest the left end leave first, so the burst peels off into the stream
@@ -349,6 +352,7 @@ export default async function make(ctx) {
   }
   function poseAmber(t, cam) {
     const vh = 2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+    const gk = GEM_TINT / lerp(1, TILE_EXPOSURE, tileShot(t));
     let lit = 0; const c = [0, 0, 0];
     gems.forEach((g, i) => {
       const gp = gemPlan[i];
@@ -361,6 +365,9 @@ export default async function make(ctx) {
       const sz = gp.size * dist(cam.pos, p) * vh * pk * (1 - 0.5 * seg(ride, 0.85, 1));
       g.scale.set(sz, sz, 1);
       g.material.rotation = gp.h2 * 6 + t * 2.4 * (gp.h1 - 0.5);
+      // deep amber: undo the tile shots' exposure lift (it pushed the gems past AgX's
+      // shoulder into cream) and warm the sprite, so the gold keeps its hue and dark rim
+      g.material.color.setRGB(gk, gk * 0.84, gk * 0.6);
       g.material.opacity = Math.min(1, u * 12) * (1 - seg(ride, 0.9, 1));
       if (ride > 0) { lit++; c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; }
     });
@@ -573,11 +580,13 @@ export default async function make(ctx) {
       poseS03(t);
       emberOut.visible = t < E.DROP;
       poseCharacter(emberOut, { pose: t > E.EMBER_TALK && t < E.EMBER_TALK + 1.2 && Math.floor(t * 6) % 2 === 0 ? 'talk' : 'idle', facing: -1 });
-      // the heart: above her head in 16:9; at her head's upper right in 9:16 (below HEAR)
-      if (portrait) heart.position.set(emberOut.position.x + 0.14, emberOut.position.y + 1.56, emberOut.position.z);
+      // the heart: above her head in 16:9; in 9:16 over her right ear, on HEAR's tray just
+      // after the R (her head sits just under the tray), inside x 918, and gone by 2.35, before
+      // HEAR opens its end slot and the T comes down into that spot
+      if (portrait) heart.position.set(emberOut.position.x + 0.04, emberOut.position.y + 1.05, emberOut.position.z);
       else heart.position.set(emberOut.position.x, emberOut.position.y + 1.95, emberOut.position.z);
       heart.userData.y0 = heart.position.y;
-      poseEmote(heart, t - E.EMBER_TALK, portrait ? { hold: 0.9, rise: 0.08 } : { hold: 0.9 });
+      poseEmote(heart, t - E.EMBER_TALK, portrait ? { hold: 0.55, rise: 0.06, fade: 0.25 } : { hold: 0.9 });
       // the ping: full to 0.3 s, gone by 0.7 s
       const pk = 1 - smooth(seg(t, 0.3, 0.7));
       ping.visible = pk > 0;
@@ -623,7 +632,7 @@ export default async function make(ctx) {
     },
   };
   // QA handles (read by probe scripts only)
-  shot.probe = { rack, L, T, gems, blueprint, hero, emberOut, heart, ping, sprout, moths };
+  shot.probe = { rack, L, T, gems, blueprint, hero, emberOut, heart, ping, sprout, moths, camera: onerCamera, heroPos, gemPos };
   return shot;
 }
 
@@ -635,6 +644,7 @@ const TILE_SELF = 0.25;
 const CHROMA_PUSH = 3.0;
 const TRAY_EMISSIVE = 0.5;
 const TRAY_GLOW = '#F3E2BF';
+const GEM_TINT = 0.65; // the gems' sprite colour under the day grade (see poseAmber)
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
