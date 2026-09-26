@@ -128,10 +128,7 @@ export default async function make(ctx) {
   signRim.position.set(-8, SIGN_Y + 6, -14);
   signRim.target.position.set(0, SIGN_Y, 0);
   end.add(signRim, signRim.target);
-  // dust puff and two wood chips on the impact
-  const puffTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(235,215,190,0.9)'); gr.addColorStop(1, 'rgba(235,215,190,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
-  const dust = [];
-  for (let i = 0; i < 5; i++) dust.push(world.register(new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, depthWrite: false })), end));
+  // two wood chips spring off the sign's ends on the impact
   const chips = [0, 1].map(() => world.register(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.05), new THREE.MeshStandardMaterial({ color: '#8a5f3e' })), end));
 
   // the end line, anchored under the sign
@@ -187,21 +184,13 @@ export default async function make(ctx) {
     sign.scale.set(2 - sq, sq, 1);
     sign.position.y = SIGN_Y - (1 - sq) * 0.9 + (s < 0 ? 3 : 0);
     glint.value = lerp(-0.25, 1.35, seg(t, E.GLINT, E.GLINT + 0.5));
-    // dust puff at the posts' feet and two chips
-    const puffK = seg(t, E.S10, E.S10 + 0.9);
-    dust.forEach((d, i) => {
-      d.visible = puffK > 0 && puffK < 1;
-      const a = (i / dust.length) * Math.PI - Math.PI / 2;
-      const r = ease.outCubic(puffK) * 1.4;
-      d.position.set(Math.sin(a) * r * 1.6, 0.25 + ease.outCubic(puffK) * 0.4, SIGN_Z + Math.cos(a) * r * 0.4);
-      const sz = 0.5 + puffK * 1.6; d.scale.set(sz, sz, 1);
-      d.material.opacity = (1 - puffK) * 0.55;
-    });
+    // two chips spring off the sign's ends (the posts' feet are hidden in the grass)
+    const W2 = (signBox.max.x - signBox.min.x) / 2;
     chips.forEach((c, i) => {
-      const k = seg(t, E.S10, E.S10 + 0.6);
+      const k = seg(t, E.S10, E.S10 + 0.7);
       c.visible = k > 0 && k < 1;
       const dir = i ? 1 : -1;
-      c.position.set(dir * (1.3 + k * 1.1), 0.1 + Math.sin(Math.PI * k) * 0.9, SIGN_Z + 0.2 + k * 0.4);
+      c.position.set(dir * (W2 * 0.92 + k * 0.9), SIGN_Y + 0.2 + Math.sin(Math.PI * k * 0.8) * 0.7 - k * k * 1.6, SIGN_Z + 0.3 + k * 0.3);
       c.rotation.set(k * 9, k * 7, k * 11 * dir);
     });
   }
