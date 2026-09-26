@@ -331,6 +331,8 @@ export default async function make(ctx) {
   const seam = world.register(new THREE.Mesh(new THREE.PlaneGeometry(SEAM_W, SEAM_DEPTH), new THREE.MeshBasicMaterial({ map: seamMap, alphaMap: seamAlpha, color: new THREE.Color(0.95, 0.95, 0.95), transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
   seam.rotation.x = -Math.PI / 2;
   seam.position.set(0, GROUND_Y + 0.08, FAR_Z + SEAM_DEPTH / 2);
+  // shared with S09's dusk wide, which looks at the same horizon
+  world.duskSeam = { mesh: seam, mean: seamMap.userData.mean };
   for (const m of meadow.group.children) {
     m.material = new THREE.MeshBasicMaterial({ map: m.material.map, alphaTest: 0.5, side: THREE.DoubleSide, color: '#8a7272' });
     m.receiveShadow = false;

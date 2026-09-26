@@ -481,6 +481,12 @@ export default async function make(ctx) {
         poseEmote(e, t - E.CASCADE[i], { hold: 1.3, rise: 0.35, fade: 0.4 });
       });
       world.sun.castShadow = wide;
+      // the dusk horizon decal and haze from S06 (cast.js), so the far meadow runs into the painting
+      if (world.duskSeam) {
+        const sk = seg(cam.k, 0.5, 1);
+        world.duskSeam.mesh.visible = sk > 0;
+        world.scene.fog.color.lerp(world.duskSeam.mean, sk);
+      }
       // the wide's fireflies fade in once the camera is out of the den
       const fk = seg(cam.k, 0.55, 1);
       wideFlies.points.visible = fk > 0.001;

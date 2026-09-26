@@ -287,6 +287,70 @@ function starLoftIvy() {
   return { tex, x: X0 + W * px / 2, y: Y1 - H * px / 2, w: W * px, h: H * px };
 }
 
+/**
+ * A half-drawn curtain over the Star Loft's LEFT porthole, in the room's pixel style
+ * (one art pixel = 0.0225 units). Two equal round windows above a round cushion read as
+ * a face in a wide; a cloth panel gathered at a tieback leaves the left window a
+ * lopsided crescent, so the pair is gone at any size and in any light. Room-local card.
+ */
+function starLoftCurtain() {
+  const px = 0.0225, X0 = -1.95, X1 = 0.05, Y0 = 1.8, Y1 = 3.84;
+  const W = Math.round((X1 - X0) / px), H = Math.round((Y1 - Y0) / px);
+  const rgba = new Uint8Array(W * H * 4);
+  const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const put = (i, j, col) => {
+    if (i < 0 || j < 0 || i >= W || j >= H) return;
+    const o = (j * W + i) * 4; const c = hex(col);
+    rgba[o] = c[0]; rgba[o + 1] = c[1]; rgba[o + 2] = c[2]; rgba[o + 3] = 255;
+  };
+  const ROD_Y = 3.72, OUT = -1.8, TIE_Y = 2.5, BOTTOM = 1.9;
+  // the panel's inner edge: from the rod it sweeps across the glass, gathers at the tieback, then flares a little
+  const inner = (y) => {
+    if (y >= TIE_Y) { const k = (ROD_Y - y) / (ROD_Y - TIE_Y); return -0.42 + (-1.36 + 0.42) * (1 - (1 - k) * (1 - k)); }
+    const k = (TIE_Y - y) / (TIE_Y - BOTTOM); return -1.36 + 0.2 * k;
+  };
+  const pal = { dark: '#5e4424', mid: '#9a7440', light: '#c19a55', hl: '#dcbc74', star: '#f1dc93', edge: '#3b2416', tie: '#7a3b2c', tieHi: '#a45a3f', rod: '#4a2f1c', rodHi: '#7a5230' };
+  for (let j = 0; j < H; j++) {
+    const y = Y1 - (j + 0.5) * px;
+    if (y > ROD_Y || y < BOTTOM) continue;
+    const xin = inner(y), w = xin - OUT;
+    for (let i = 0; i < W; i++) {
+      const x = X0 + (i + 0.5) * px;
+      if (x < OUT || x > xin) continue;
+      // five soft folds across the panel's width, lit from the window side (the right)
+      const f = ((x - OUT) / w) * 5;
+      const ph = f - Math.floor(f);
+      let col = ph < 0.22 ? pal.dark : ph < 0.55 ? pal.mid : ph < 0.85 ? pal.light : pal.hl;
+      if (xin - x < px * 1.5 || y - BOTTOM < px * 1.5 || x - OUT < px * 1.2) col = pal.edge;
+      // a sparse sprinkle of little stars (it is the star loft)
+      else if ((i * 7 + j * 13) % 41 === 0 && ph > 0.3) col = pal.star;
+      put(i, j, col);
+    }
+  }
+  // the tieback: a rust band around the gathered cloth, with a highlight
+  for (let j = 0; j < H; j++) {
+    const y = Y1 - (j + 0.5) * px;
+    if (Math.abs(y - TIE_Y) > px * 2.2) continue;
+    for (let i = 0; i < W; i++) {
+      const x = X0 + (i + 0.5) * px;
+      if (x < OUT - px || x > inner(y) + px * 1.5) continue;
+      put(i, j, Math.abs(y - TIE_Y) < px * 0.8 ? pal.tieHi : pal.tie);
+    }
+  }
+  // the rod with two knob finials
+  for (let j = 0; j < H; j++) {
+    const y = Y1 - (j + 0.5) * px;
+    for (let i = 0; i < W; i++) {
+      const x = X0 + (i + 0.5) * px;
+      const onRod = Math.abs(y - ROD_Y - px) < px * 1.3 && x > OUT - 0.06 && x < 0.0;
+      const knob = (Math.hypot(x - (OUT - 0.08), y - ROD_Y - px) < 0.05) || (Math.hypot(x - 0.02, y - ROD_Y - px) < 0.05);
+      if (onRod || knob) put(i, j, y > ROD_Y + px * 1.2 ? pal.rodHi : pal.rod);
+    }
+  }
+  const tex = pixelDataTexture(rgba, W, H);
+  return { tex, x: (X0 + X1) / 2, y: (Y0 + Y1) / 2, w: W * px, h: H * px };
+}
+
 /** Procedural pixel shingles in the roof art's palette. */
 function pixelShingles(seed = 9) {
   const size = 64;
@@ -416,6 +480,11 @@ export async function buildHouse(layout, { roomW = 8, roomD = 3.2, post = 0.34, 
         const card = new THREE.Mesh(new THREE.PlaneGeometry(ivy.w, ivy.h), imat);
         card.position.set(ivy.x, ivy.y, -roomD / 2 + 0.012); card.receiveShadow = true; builtG.add(card);
         card.onBeforeRender = () => { imat.emissiveIntensity = mat.emissiveIntensity; imat.color.copy(mat.color); };
+        const cur = starLoftCurtain();
+        const cmat = new THREE.MeshStandardMaterial({ map: cur.tex, emissive: new THREE.Color('#ffffff'), emissiveMap: cur.tex, emissiveIntensity: 0.62, roughness: 1, metalness: 0, alphaTest: 0.5 });
+        const ccard = new THREE.Mesh(new THREE.PlaneGeometry(cur.w, cur.h), cmat);
+        ccard.position.set(cur.x, cur.y, -roomD / 2 + 0.02); ccard.receiveShadow = true; builtG.add(ccard);
+        ccard.onBeforeRender = () => { cmat.emissiveIntensity = mat.emissiveIntensity; cmat.color.copy(mat.color); };
       }
       const light = new THREE.PointLight('#ffb25c', 0, roomW * 1.3, 1.6);
       light.position.set(0, roomH * 0.75, roomD * 0.1); builtG.add(light);
