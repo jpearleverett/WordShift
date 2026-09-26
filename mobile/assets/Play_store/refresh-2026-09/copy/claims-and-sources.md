@@ -73,17 +73,20 @@ running the audit (see row 8).
 | Slot 08 | "Stay for supper." | Row 29 (supper page 2 only). |
 | FG-A | "Your words keep this house warm." | Picture-only art `assets/story/pages/witness-05.webp`; the line is a tone line, not a feature claim. |
 | FG-B | "Every letter counts." | Row 4. |
+| Trailer | "One letter. Two real words." | Rows 1 and 3: the shot is the curated opener (L from PLAY into PANT, T from PLANT into HEAR), and every move must leave two real words. "real", not "new", which the copy rules ban. |
+| Trailer | "Solve puzzles. Build them a home." | Row 16: solved puzzles earn the amber that builds the rooms. Imperatives describing the loop, not a call to install or play. |
+| Trailer | "13 friends to welcome." | Row 16 (13 animal housemates, each welcomed with amber); the shot is the real invite card for Axel. |
 | Trailer | "Over 4,000 puzzles." | Row 8. |
-| Trailer | "Drop it in. Two real words." | Row 3 (both words must stay real). |
-| Trailer | "Your wins build the house." | Row 16: wins earn the amber that builds rooms. Was "Every win grows the house.", which overstated the loop (rooms are bought with amber and some are level-gated, so a single win rarely adds a room). |
-| Trailer | "Everyone has something to say." | Rows 23 to 25 (every resident talks). |
-| Trailer | "Reverse. Double. Race the clock." | Rows 10, 11 and the Speed Shift clock (row 7); the third sub-shot is a Speed Shift board whose countdown ticks on screen. |
-| Trailer | "Your answers stay with them." | Row 30. |
-| Trailer end card | "The house is very fond of you." | Tone tease (boundary 8). |
+| Trailer | "More rooms. More neighbors." | Row 16 (rooms and residents unlock alternately); the shot is the Jungle Hammock being built. "More", not "new". |
+| Trailer | "Three moths. All named Gerald." | Sloane's introduction, shown in the same shot: "Three moths live in my fur. I call all three Gerald." (`src/services/dialogue/animalDialogueIntro.ts:44`). A paraphrase of on-screen dialogue, not a feature claim. |
+| Trailer | "Who moved the spice jars?" | Row 31 (`pg_1_1`). Panko answers it on screen in the same shot ("I must have moved them in my sleep. I must have."), so the question stays a tease at the level of "keeps secrets" (boundary 8) and never names or places anyone. Keep the two together. |
+| Trailer | "Where did the day go?" | Tone tease only (boundary 8), over the cut from the afternoon house to the same house at sunset. It claims nothing and names no stage (boundary 9). |
+| Trailer | "Ember is fond of you." | Ember's line in the same shot, "I am fond of you, whatever my fire is up to. I want you to know that." (`fx_2_17`, a phase-2 line, `animalDialogueBase.ts:793`). The shot ends before her next sentence starts. |
+| Trailer end card | "It's a lovely house." / "Isn't it?" | Tone tease (boundary 8), over the real sunset house. |
 | YouTube description | "the letter you move stays where you put it" | Row 4. |
 | YouTube description | "a pixel-art house you build with the amber your puzzles earn" | Row 16. Was "a house that grows with every puzzle you solve", which overstated the loop. |
 | YouTube description | "They remember what you tell them." | Row 30. |
-| YouTube description | "All gameplay in this trailer is captured from WordShift." | Brief section 6 and boundary 17: real UI fills the trailer except the 2.4 s end card. Recheck against the finished video before upload. |
+| YouTube description | "All gameplay in this trailer is captured from WordShift." | Brief section 6 and boundary 17: every frame of the trailer is a recorded frame of the game (crops, zooms, speed changes, two 0.6 s holds over the opening move's checked slots and one freeze on Ember's finished line); the only additions are the caption plaques and, on the end card, the wordmark and its two lines over the real sunset house. Rechecked against the finished video on 2026-09-25. |
 
 ## What the copy deliberately does not say
 

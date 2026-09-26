@@ -1,0 +1,41 @@
+{
+ "clip": "K7b",
+ "state": "BUILD24",
+ "recordedAt": "2026-09-25T20:49:16.253Z",
+ "gitHead": "6dcd0afb43e2b36301498063086209ac6280a460",
+ "gameSourceMatchesHead": true,
+ "method": "clock-stepped capture: Playwright fake clock paused, runFor(1000/30 ms) then a CDP Page.captureScreenshot (jpeg q95) of the CSS rectangle {\"x\":0,\"y\":0,\"w\":432,\"h\":768} of a 432x768 viewport at DPR 5 = 2160x3840; reducedMotion false; sound/music/haptics off in-game; page clock pinned to 2026-10-06",
+ "fps": 30,
+ "format": "jpeg",
+ "ext": "jpg",
+ "handle": 15,
+ "pinnedDay": "2026-10-06",
+ "frameSize": {
+  "width": 2160,
+  "height": 3840
+ },
+ "viewport": {
+  "width": 432,
+  "height": 768
+ },
+ "window": {
+  "x": 0,
+  "y": 0,
+  "w": 432,
+  "h": 768
+ },
+ "dsf": 5,
+ "frames": 140,
+ "firstFrame": -15,
+ "lastFrame": 124,
+ "framesDir": "clips/K7b",
+ "fileIndex": "file f%05d.png = clip frame + handle",
+ "events": [],
+ "screening": {
+  "glitch": [],
+  "grim": [],
+  "ok": true
+ },
+ "notes": [],
+ "probesOmitted": "Per-frame DOM probes (tile, label, pill, sheet and chrome boxes) stay with the frames in $TRAILER2_WORK/events; the edit reads them there."
+}

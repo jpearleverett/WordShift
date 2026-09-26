@@ -51,7 +51,7 @@ http://localhost:8081 (no script starts or stops it), Chromium at
 ```
 node scripts/store/captureRefresh.mjs      # raw/: every capture, plus raw/provenance.json
 node scripts/store/buildRefresh.mjs        # upload/, manifest.json, alt-text.tsv, contact-sheet.png, preview.html
-TRAILER_WORK=/path/with/2GB node scripts/store/buildTrailer.mjs   # video/: both cuts, SRT, stills, report, events
+TRAILER2_WORK=/path/with/3GB node scripts/store/buildTrailer.mjs  # video/: both cuts, SRT, stills, report, events
 node scripts/store/refresh/verifyCopy.mjs  # must exit 0
 ```
 
@@ -60,10 +60,10 @@ node scripts/store/refresh/verifyCopy.mjs  # must exit 0
   screen); `buildRefresh.mjs phone tablet
   feature icon` builds only those targets (the review files are always
   rebuilt); `buildTrailer.mjs --edit-only` re-edits from recorded clips and
-  `buildTrailer.mjs R8 R9` records only those clips again.
+  `buildTrailer.mjs K1 K8` records only those clips again.
 - The brief's names `scripts/store/refresh/captureStills.mjs`,
   `buildStills.mjs` and `buildFeature.mjs` forward to the scripts above;
-  `recordTrailer.mjs` and `editTrailer.mjs` are the two trailer steps. No npm
+  the trailer steps are `trailer2/record.mjs`, `edit.mjs` and `install.mjs`. No npm
   scripts were added.
 - Captures are real renders, so a new game build, a different board served by
   the bank or drifting pit words can change a take; the scripts measure, screen

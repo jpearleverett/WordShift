@@ -1,0 +1,55 @@
+{
+ "clip": "K6",
+ "state": "H",
+ "recordedAt": "2026-09-25T20:09:11.343Z",
+ "gitHead": "8e888d608f310fda0e1e37158222f045b4197b35",
+ "gameSourceMatchesHead": true,
+ "method": "clock-stepped capture: Playwright fake clock paused, runFor(1000/30 ms) then a CDP Page.captureScreenshot (jpeg q95) of the CSS rectangle {\"x\":0,\"y\":0,\"w\":432,\"h\":960} of a 432x960 viewport at DPR 5 = 2160x4800; reducedMotion false; sound/music/haptics off in-game; page clock pinned to 2026-10-06",
+ "fps": 30,
+ "format": "jpeg",
+ "ext": "jpg",
+ "handle": 15,
+ "pinnedDay": "2026-10-06",
+ "frameSize": {
+  "width": 2160,
+  "height": 4800
+ },
+ "viewport": {
+  "width": 432,
+  "height": 960
+ },
+ "window": {
+  "x": 0,
+  "y": 0,
+  "w": 432,
+  "h": 960
+ },
+ "dsf": 5,
+ "frames": 60,
+ "firstFrame": -15,
+ "lastFrame": 44,
+ "framesDir": "clips/K6",
+ "fileIndex": "file f%05d.png = clip frame + handle",
+ "events": [
+  {
+   "frame": 0,
+   "action": "drag the L into PICKLED: press on the letter",
+   "sfx": "letter_select.wav"
+  },
+  {
+   "frame": 13,
+   "action": "drag the L into PICKLED: release into the drop zone",
+   "sfx": "valid_move.wav"
+  }
+ ],
+ "screening": {
+  "glitch": [],
+  "grim": [],
+  "ok": true
+ },
+ "notes": [],
+ "board": "std_expert de622af3dde3",
+ "rows": "FLAVOR/PICKED/CORING/DIVERS/CARING",
+ "move": "L: FAVOR and PICKLED",
+ "probesOmitted": "Per-frame DOM probes (tile, label, pill, sheet and chrome boxes) stay with the frames in $TRAILER2_WORK/events; the edit reads them there."
+}

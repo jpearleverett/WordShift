@@ -1,35 +1,43 @@
 1
-00:00:00,000 --> 00:00:01,400
-Lift a letter.
+00:00:00,000 --> 00:00:03,333
+One letter. Two real words.
 
 2
-00:00:01,400 --> 00:00:03,400
-Drop it in. Two real words.
+00:00:04,533 --> 00:00:07,200
+Solve puzzles. Build them a home.
 
 3
-00:00:05,200 --> 00:00:08,000
-Over 4,000 puzzles.
+00:00:07,200 --> 00:00:08,133
+13 friends to welcome.
 
 4
-00:00:08,000 --> 00:00:09,400
-Your wins build the house.
+00:00:08,133 --> 00:00:11,133
+Over 4,000 puzzles.
 
 5
-00:00:09,400 --> 00:00:14,100
-Everyone has something to say.
+00:00:11,133 --> 00:00:12,667
+More rooms. More neighbors.
 
 6
-00:00:14,100 --> 00:00:16,500
-Reverse. Double. Race the clock.
+00:00:12,667 --> 00:00:15,067
+Three moths. All named Gerald.
 
 7
-00:00:16,500 --> 00:00:18,900
-Your answers stay with them.
+00:00:15,067 --> 00:00:19,467
+Who moved the spice jars?
 
 8
-00:00:18,900 --> 00:00:21,100
-Where do the words go?
+00:00:19,467 --> 00:00:22,567
+Where did the day go?
 
 9
-00:00:28,200 --> 00:00:30,000
-The house is very fond of you.
+00:00:22,567 --> 00:00:25,567
+Ember is fond of you.
+
+10
+00:00:26,167 --> 00:00:27,700
+It's a lovely house.
+
+11
+00:00:27,700 --> 00:00:30,000
+It's a lovely house. Isn't it?
