@@ -17,7 +17,7 @@ import { makeBlueprint } from '../world/blueprint.js';
 import { makeMoths } from '../world/fire.js';
 import { makeShaft } from '../world/env.js';
 import { makeBubble } from '../world/bubble.js';
-import { makeSprout, setLocked, setTileGlow, TILE_SCALE, TILE_D, TILE_EMISSIVE_BASE } from '../core/tiles.js';
+import { makeSprout, setLocked, setTileGlow, TILE_SCALE, TILE_D, TILE_EMISSIVE_BASE, LOCKED } from '../core/tiles.js';
 import { ease, spring, seg, lerp, clamp, smooth, catmull, hash01 } from '../core/math.js';
 import { GROUND_Y } from '../sets/world.js';
 import { mm, wpos, add, mix3, dist, aim, setAspect, look, project, travelPx, blurFor } from './common.js';
@@ -60,8 +60,15 @@ export default async function make(ctx) {
   const tiles = rack.set.tiles;
   const L = tiles.get('0:1').obj;
   const T = tiles.get('1:3').obj;
-  // the locked powder blue self-lights a touch cool, so the golden key does not grey it
-  for (const x of [L, T]) x.userData.lockMat.emissive.set(LOCK_GLOW);
+  // Tile-local self-light for the tile shots (spec 2.2 swatches under the AgX grade):
+  // each face glows in its own hue with the chroma pushed (AgX pulls pastels toward
+  // grey), strongest on the macro and rack shots and easing back under the boom
+  const selfTint = (hex) => {
+    const c = new THREE.Color(hex), l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    return new THREE.Color(1 + CHROMA_PUSH * (c.r / l - 1), 1 + CHROMA_PUSH * (c.g / l - 1), 1 + CHROMA_PUSH * (c.b / l - 1));
+  };
+  const WHITE = new THREE.Color(1, 1, 1);
+  for (const x of tiles.values()) x.obj.userData.selfTint = { face: selfTint(x.obj.userData.color.bg), lock: selfTint(LOCKED.bg) };
   const sprout = makeSprout();
   L.add(sprout);
   const sproutLeaves = []; sprout.traverse((o) => { if (o.isMesh) sproutLeaves.push(o); });
@@ -83,7 +90,7 @@ export default async function make(ctx) {
   for (let i = 0; i < 9; i++) sparkles.push(world.register(await makeBillboard('ui/emote_sparkle.png', 0.34)));
 
   // the frame-0 specular ping on the L's clearcoat (placed once the start camera is known)
-  const ping = world.register(new THREE.PointLight('#FFF2D8', 0, 3.2, 2));
+  const ping = world.register(new THREE.PointLight('#FFF2D8', 0, 1.9, 2));
 
   // amber: 32 gems burst out of PLAN at GEMS and become the stream (continues through S02)
   const N_GEMS = 32;
@@ -118,16 +125,21 @@ export default async function make(ctx) {
       airBlob.scale.setScalar(1 + away * 0.5);
       airBlob.material.opacity = 0.3 * clamp(1 - away / 1.6);
     }
-    // landing rim flash on PLANT (6 frames) and the three row flashes. On the tile shots
-    // the tiles' own base light gives way to the shot's exposure (which also lifts the
-    // parchment, whose self-light is held under the bloom threshold); it returns under the boom
-    const glowBase = lerp(TILE_EMISSIVE_BASE, TILE_GLOW_BASE, 1 - smooth(seg(t, BOOM[0], BOOM[1])));
-    for (const x of tiles.values()) { x.obj.userData.glowBase = glowBase; setTileGlow(x.obj, 0); }
+    // tile-local self-light (see selfTint), then the landing rim flash on PLANT and the
+    // three row flashes on top of it
+    const ks = tileShot(t);
+    const glowBase = lerp(TILE_EMISSIVE_BASE, TILE_SELF, ks);
+    for (const x of tiles.values()) {
+      const u = x.obj.userData;
+      u.glowBase = glowBase;
+      u.faceMat.emissive.copy(WHITE).lerp(u.selfTint.face, ks);
+      u.lockMat.emissive.copy(WHITE).lerp(u.selfTint.lock, ks);
+      u.bodyMat.emissive.copy(u.bodyMat.color); // the body glows in its current (lock-tinted) colour
+      setTileGlow(x.obj, 0);
+    }
     const flash = (t0, ri, dur = 0.2) => { const k = seg(t, t0, t0 + dur); if (k > 0 && k < 1) for (const o of rowTiles(ri)) setTileGlow(o, Math.sin(Math.PI * k) * 0.9); };
     flash(E.L_LAND, 1, 0.13); flash(E.T_LAND, 2, 0.13); // the landing rims: four frames
     E.FLASH.forEach((f, i) => flash(f, i));
-    const lockLift = LOCK_LIFT * (1 - smooth(seg(t, BOOM[0], BOOM[1])));
-    for (const x of [L, T]) x.userData.lockMat.emissiveIntensity += lockLift;
     // sparkle pops: six around PLANT at the landing, then one per row flash
     sparkles.forEach((s, i) => {
       let t0, p;
@@ -325,20 +337,24 @@ export default async function make(ctx) {
   // --- the amber (spec S01 4.09): the gems pop outward on a flat ellipse that stays on
   // the PLAN row, then stream out past the rack's left end and up the house; each gem
   // keeps a steady on-screen size (a fraction of the frame height at its depth)
+  /** Gem i's world position at t (null while it is not out). */
+  function gemPos(i, t) {
+    const gp = gemPlan[i];
+    const u = t - gp.pop, ride = (t - gp.depart) / gp.travel;
+    if (u < 0 || ride > 1) return null;
+    // the pop out from PLAN's centre onto the row, then the ride: off the row quickly, easing into the frame
+    if (ride <= 0) return mix3(BURST_O, gp.out, ease.outCubic(clamp(u / (0.3 + 0.08 * gp.h3))));
+    return gp.path(ease.inOutSine(Math.pow(ride, 0.7)));
+  }
   function poseAmber(t, cam) {
     const vh = 2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
     let lit = 0; const c = [0, 0, 0];
     gems.forEach((g, i) => {
       const gp = gemPlan[i];
-      const u = t - gp.pop;
-      const ride = (t - gp.depart) / gp.travel;
-      if (u < 0 || ride > 1) { g.visible = false; return; }
+      const p = gemPos(i, t);
+      if (!p) { g.visible = false; return; }
+      const u = t - gp.pop, ride = (t - gp.depart) / gp.travel;
       g.visible = true;
-      let p;
-      if (ride <= 0) {
-        // the pop: out from PLAN's centre onto the row
-        p = mix3(BURST_O, gp.out, ease.outCubic(clamp(u / (0.3 + 0.08 * gp.h3))));
-      } else p = gp.path(ease.inOutSine(Math.pow(ride, 0.7))); // off the row quickly, easing into the frame
       g.position.set(...p);
       const pk = Math.max(0, spring(u, 3.4, 0.45));
       const sz = gp.size * dist(cam.pos, p) * vh * pk * (1 - 0.5 * seg(ride, 0.85, 1));
@@ -399,7 +415,8 @@ export default async function make(ctx) {
       const tip = wpos(sprout);
       const land = [tip[0] - centre[0] + 0.02, tip[1] - centre[1] + 0.2, tip[2] - centre[2] + 0.05];
       const k = ease.inOutSine(mk);
-      m0.position.set(lerp(m0.position.x, land[0], k), lerp(m0.position.y, land[1], k) + Math.sin(Math.PI * k) * 0.25, lerp(m0.position.z, land[2], k));
+      // it swings wide to the left on the way down, never alongside another moth
+      m0.position.set(lerp(m0.position.x, land[0], k) - Math.sin(Math.PI * k) * 0.45, lerp(m0.position.y, land[1], k) + Math.sin(Math.PI * k) * 0.25, lerp(m0.position.z, land[2], k));
       if (t >= E.MOTH_LAND) m0.material = t < E.MOTH_LAND + 0.12 ? mothOpen : mothFolded;
       m0.scale.setScalar(lerp(1, 0.8, k));
     }
@@ -437,7 +454,9 @@ export default async function make(ctx) {
   // frame (C -> D, landing on it at the drop); both start and end at rest, so the sum is
   // one continuous move with no stop between them
   const BOOM = [E.GEMS + 0.28, E.GEMS + 0.98];
-  const MACRO_D = 9.0;
+  const MACRO_D = 10.5;
+  /** 1 on the macro and rack shots, easing to 0 under the boom. */
+  const tileShot = (t) => 1 - smooth(seg(t, BOOM[0], BOOM[1]));
   const smax = (a, b, k) => (a + b + Math.sqrt((a - b) * (a - b) + k * k)) / 2;
 
   /** Rig A: the macro follow of the L as it falls into PANT, whole words in frame. */
@@ -448,12 +467,13 @@ export default async function make(ctx) {
     rack.set.pose(tt);
     const WX = RACK_POS[0];
     if (!portrait) {
-      // PLAY and PANT whole and right of centre, clear of the caption's column at the
-      // left; tilt up only as far as the L's top needs
+      // PLAY and PANT whole and right of centre, the rack's left end clear of the caption
+      // column (cream type on cream parchment would not read); tilt up only as far as the
+      // L's top needs
       const halfH = MACRO_D * Math.tan(THREE.MathUtils.degToRad(mm(85)) / 2);
       const need = Math.max(Lp[1], Lc[1]) + 0.27 + 0.12 - halfH;
-      const ty = smax(1.12, need, 0.3);
-      return { pos: [WX - 0.1, ty + 0.5, RACK_POS[2] + MACRO_D], target: [WX - 0.55, ty, RACK_POS[2]], fov: mm(85) };
+      const ty = smax(1.0, need, 0.3);
+      return { pos: [WX - 0.6, ty + 0.55, RACK_POS[2] + MACRO_D], target: [WX - 1.07, ty, RACK_POS[2]], fov: mm(85) };
     }
     // portrait: B's stack, tilting up with the L while it is above PLAY and down with it
     const up = 0.35 * smax(0, Math.max(Lp[1], Lc[1]) - 1.3, 0.2);
@@ -517,8 +537,15 @@ export default async function make(ctx) {
     const crane = t >= E.CRANE && t < E.DROP + 1.3;
     if (!easing && !crane) return { n: 1, shutter: 1 / 60 };
     let px = travelPx(onerCamera, t, FRAME_H);
-    // the hero L and the amber ride faster than the camera: blur for them too
+    // the hero L and the amber ride faster than the camera: blur for them too (every
+    // third gem is enough to find the fastest)
     if (t > E.GEMS && t < E.SLOANE_POP + 0.4) px = Math.max(px, pointTravel(heroPos, t));
+    if (t > E.GEMS && t < E.GEM_BURST + 0.2) {
+      for (let i = 0; i < N_GEMS; i += 3) {
+        if (!gemPos(i, t - 1 / 120) || !gemPos(i, t + 1 / 120)) continue;
+        px = Math.max(px, pointTravel((ts) => gemPos(i, ts), t));
+      }
+    }
     rack.set.pose(t);
     return blurFor(px);
   }
@@ -567,14 +594,10 @@ export default async function make(ctx) {
       const kc = smooth(seg(t, E.CRANE, E.CRANE + 1.2));
       const aperture = lerp(lerp(40, 12, kc), 30, smooth(seg(t, E.DROP, E.DROP + 0.8)));
       const maxBlur = lerp(18, 14, kc);
-      // the tile shots' grade (spec 2.2 swatches: exposure, a white balance that takes the
-      // golden key's cast off the cool letters, and back the saturation AgX takes out of
-      // the pastels) eases back to the day look under the boom, never on a still frame
-      const kx = 1 - smooth(seg(t, BOOM[0], BOOM[1]));
-      const exposure = (grade.exposure ?? 1) * lerp(1, TILE_EXPOSURE, kx);
-      const wb = TILE_WB.map((v) => lerp(1, v, kx));
-      const sat = lerp(grade.saturation ?? 1, TILE_SAT, kx);
-      return { scene: world.scene, camera, look: look(grade, 0, { exposure, whiteBalance: wb, saturation: sat, msaa: t < E.CRANE, dof: { focus, aperture, maxBlur } }) };
+      // a small exposure lift on the tile shots (with the tiles' self-light, spec 2.2
+      // swatches), easing back to the day look under the boom, never on a still frame
+      const exposure = (grade.exposure ?? 1) * lerp(1, TILE_EXPOSURE, tileShot(t));
+      return { scene: world.scene, camera, look: look(grade, 0, { exposure, msaa: t < E.CRANE, dof: { focus, aperture, maxBlur } }) };
     },
     overlay(t) {
       // Sloane's bubble, anchored above her head, typed at E.TYPE_CPS characters a second;
@@ -603,14 +626,11 @@ export default async function make(ctx) {
   return shot;
 }
 
-const TILE_EXPOSURE = 1.9;
-const TILE_GLOW_BASE = 0.03;
-const TILE_WB = [0.96, 1.0, 1.56];
-const TILE_SAT = 1.46;
+const TILE_EXPOSURE = 1.6;
+const TILE_SELF = 0.35;
+const CHROMA_PUSH = 2.6;
 const TRAY_EMISSIVE = 0.5;
-const TRAY_GLOW = '#F9D598';
-const LOCK_GLOW = '#7CD4FF';
-const LOCK_LIFT = 0.26;
+const TRAY_GLOW = '#F3E2BF';
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
