@@ -11,7 +11,7 @@ const mixC = (a, b, t) => a.clone().lerp(b, t);
 
 export const TOD = {
   day: { sun: C('#FFD49A'), sunI: 2.6, elev: 30, fillSky: C('#9DB8FF'), fillGround: C('#7FA85A'), fillI: 1.05, fog: C('#bcd2a0'), exposure: 1.0 },
-  dusk: { sun: C('#FF8E5E'), sunI: 1.25, elev: 6, fillSky: C('#8C6FC4'), fillGround: C('#4a3a4a'), fillI: 0.8, fog: C('#6e4a34'), exposure: 1.08 },
+  dusk: { sun: C('#FF8E5E'), sunI: 1.25, elev: 6, fillSky: C('#8C6FC4'), fillGround: C('#4a3a4a'), fillI: 0.8, fog: C('#6e4a34'), exposure: 1.14 },
 };
 
 /** A tiny, heavily smoothed copy of an image (cw x ch), as a linear-filtered texture. */
@@ -109,12 +109,13 @@ export function applyTod(dusk, env) {
     env.sky.userData.mat.uniforms.mixv.value = dusk;
     env.sky.userData.mat.uniforms.bright.value = lerp(1.0, 0.95, dusk);
   }
-  if (env.house) env.house.setLight({ paint: lerp(1, 0.82, dusk), lamps: env.lamps ?? Math.max(0, (dusk - 0.35) / 0.65), tint: '#' + mixC(C('#ffffff'), C('#efdcea'), dusk).getHexString(), windowDusk: dusk, windowColor: '#B5623C', time: env.time || 0 });
+  if (env.house) env.house.setLight({ paint: lerp(1, 0.82, dusk), lamps: env.lamps ?? Math.max(0, (dusk - 0.35) / 0.65), tint: '#' + mixC(C('#ffffff'), C('#f7ecea'), dusk).getHexString(), windowDusk: dusk, windowColor: '#B5623C', time: env.time || 0 });
   if (env.scene && env.scene.fog) env.scene.fog.color.copy(mixC(d.fog, n.fog, dusk));
   return {
     exposure: lerp(d.exposure, n.exposure, dusk),
     gain: [lerp(1.04, 1.05, dusk), lerp(1.0, 0.97, dusk), lerp(0.94, 0.96, dusk)],
-    lift: [lerp(0.0, 0.022, dusk), lerp(0.008, 0.012, dusk), lerp(0.006, 0.03, dusk)],
+    lift: [lerp(0.0, 0.03, dusk), lerp(0.008, 0.018, dusk), lerp(0.006, 0.04, dusk)],
+    contrast: lerp(1, 1.08, dusk),
     saturation: lerp(1.06, 1.04, dusk),
   };
 }

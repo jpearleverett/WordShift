@@ -384,7 +384,7 @@ export default async function make(ctx) {
       posePanko(t);
       interiorOnly();
       soloRoomLight(kit);
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure: 1.2, contrast: 1, vignette: 0.2, dof: { focus, aperture, maxBlur: 16 } }) };
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure: 1.2, dof: { focus, aperture, maxBlur: 16 } }) };
     },
   };
 
@@ -507,10 +507,8 @@ export default async function make(ctx) {
       fireGlow.material.opacity *= lerp(1, 0.35, handoff(t));
       interiorOnly();
       soloRoomLight(den, 10);
-      // S09 (a continuous pull-back) starts from this camera and look, so S08 eases into its
-      // grade over the pan into S09's (contrast 1.0 keeps the lifted blacks)
-      const m = 1 - handoff(t);
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1, exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: lerp(0.2, 0.24, m), dof: { focus, aperture, maxBlur: 16 } }) };
+      // S09 (a continuous pull-back) starts from this camera and look, so S08 shares its grade
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure: portrait ? 1.16 : 1.24, dof: { focus, aperture, maxBlur: 16 } }) };
     },
   };
 

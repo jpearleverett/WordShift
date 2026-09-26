@@ -190,20 +190,25 @@ void main() {
   vec3 c = aberration > 0.0 ? sampleCA(vUv) : texture2D(tColor, vUv).rgb;
   c *= exposure * whiteBalance;
   c = toneMap < 0.5 ? AgX(c) : ACES(c);
-  // grade in display-referred space
+  // AgX/ACES return linear light: gamma, gain and saturation act here...
   c = pow(max(c, 0.0), 1.0 / gamma);
-  c = c * gain + lift * (1.0 - c);
-  c = (c - 0.5) * contrast + 0.5;
+  c = c * gain;
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(vec3(l), c, saturation);
-  c = clamp(c, 0.0, 1.0);
-  vec3 s = toSRGB(c);
+  // ...while lift and contrast are display-referred (in linear light a lift became a
+  // lavender veil and a contrast pivot at 0.5 clipped every dark channel to black)
+  vec3 s = toSRGB(clamp(c, 0.0, 1.0));
+  s += lift * (1.0 - s);
+  s = (s - 0.45) * contrast + 0.45;
   // vignette (aspect-correct ellipse)
   vec2 p = vUv - 0.5;
   p.x *= resolution.x / resolution.y;
   float asp = max(resolution.x / resolution.y, resolution.y / resolution.x);
   float vd = length(p) / (0.5 * sqrt(1.0 + asp * asp) / max(1.0, resolution.y / resolution.x));
   s *= 1.0 - vignette * smoothstep(vignetteSoft, 1.05, vd);
+  // the warm floor (spec 2.2): shadows settle on dark cocoa, never on black or crimson
+  const vec3 FLOOR = vec3(0.165, 0.110, 0.078);
+  s = pow(pow(max(s, 0.0), vec3(4.0)) + pow(FLOOR, vec3(4.0)), vec3(0.25));
   // film grain, luminance-weighted, temporally varying by frame
   float g = hash(vUv * resolution / max(pxScale, 0.25) + frame * 17.13) - 0.5;
   s += g * grain * (0.6 + 0.4 * (1.0 - dot(s, vec3(0.333))));
