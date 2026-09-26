@@ -100,8 +100,12 @@ One persistent scene, built once:
 - Word racks and moves: `world/rack.js` `buildRack`, `buildMiniRack({ words, moves, slots })` (group scaled to
   TILE_SCALE; `rack.set.pose(t)` plays the moves; tiles in `rack.set.tiles` keyed `'row:index'`);
   `world/moves.js` move fields `{ from, letter, to, slot, lift, open, land, closeAt, liftH, arc, zArc }`.
+  `world/wordrow.js` `makeTray`: a pixel-parchment face texture and a live per-tile contact shade. The
+  face's emissive map is divided by `#F3E2BF`, so a shot's emissive colour on the tray keeps its level.
 - FX: `world/fx.js` `makeBillboard(rel, size)`, `poseEmote(sprite, tSincePop, {hold, rise, fade})`
-  (set `sprite.userData.y0` first), `makeAmberStream`, `makeTrail`, `makeContactShadow`.
+  (set `sprite.userData.y0` first), `makeTrail`, `makeContactShadow`, `makeDustPuff()` (the stepped
+  pixel dust-puff texture). `world/blueprint.js` `makeBlueprint()` returns `{ mesh, draw, mat, cut }`
+  (`cut.value`: the sheet height above which it is discarded).
 - `world/fire.js` `makeFire(...)` with `pose(t, { drawing, drawStart, drawEnd, holdEnd, release })`, `makeMoths`.
 - `world/props.js` `makeJar`, `makeShelf`; `world/bubble.js` `makeBubble`; `world/logo.js` `makeWordmarkSign`;
   `world/env.js` `makeParticles`, `makeShaft`, `makeGrass`; `world/sprites.js` `makeCharacter`, `poseCharacter`.
@@ -124,8 +128,9 @@ loudness-normalised in two passes (`audio/mix.mjs`) to -14 LUFS, true peak under
 
 `qa/lint.mjs` is fast and source-only. `qa/report.mjs` needs the encoded MP4s: it checks the
 overlay's inked pixels on every frame against the safe zones (via `TRAILER.overlayAt(t)`, which
-poses without rendering), luma from 20.4 s, the output format, loudness and cross-process
-determinism, and writes `out/trailer-report.json`.
+poses without rendering), the 9:16 end card's sign, tray, posts and tiles inside x 96-918, luma
+from 20.4 s, the 16:9 S09 hold's upper corners (YAVG >= 75), the output format, loudness and
+cross-process determinism, and writes `out/trailer-report.json`.
 
 ## Hard rules (from the spec and the owner's brief)
 
