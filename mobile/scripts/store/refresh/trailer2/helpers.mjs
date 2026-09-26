@@ -139,7 +139,13 @@ export async function toastVisible(page) {
  * `from` to the centre of `to`. The target is re-read at `reaimAt` (once the
  * fan has opened and the drop zones have moved). Returns an actions map.
  */
-export function dragMove(page, { start, end, from, to, approx = null, label, sfxDown = 'letter_select.wav', sfxUp = 'valid_move.wav' }) {
+/**
+ * Drags a letter from `from` to the drop zone `to`: pressed on `start`, eased
+ * along the path to arrive over the zone on `arrive` (default `end`), then,
+ * when `arrive` < `end`, hovering there with a slight drift (a finger deciding,
+ * never a still frame) until the release on `end`.
+ */
+export function dragMove(page, { start, end, arrive = end, from, to, approx = null, label, sfxDown = 'letter_select.wav', sfxUp = 'valid_move.wav' }) {
   const acts = {};
   let p0 = null, p1 = null, exact = false;
   const centre = async (loc, timeout) => { const b = await loc.boundingBox({ timeout }).catch(() => null); return b ? { x: b.x + b.width / 2, y: b.y + b.height / 2 } : null; };
@@ -162,7 +168,12 @@ export function dragMove(page, { start, end, from, to, approx = null, label, sfx
   for (let f = start + 1; f < end; f++) {
     acts[f] = async () => {
       await aim();
-      const k = ease((f - start) / (end - start));
+      if (f >= arrive) {
+        const u = f - arrive;
+        await page.mouse.move(p1.x + 1.2 * Math.sin((2 * Math.PI * u) / 40), p1.y + 0.8 * Math.sin((2 * Math.PI * u) / 53));
+        return;
+      }
+      const k = ease((f - start) / (arrive - start));
       await page.mouse.move(p0.x + (p1.x - p0.x) * k, p0.y + (p1.y - p0.y) * k);
     };
   }
@@ -242,9 +253,9 @@ export async function residents(page) {
     .filter(l => / the [a-z ]+(,|$)/.test(l) && /^[A-Z][a-z]+ the /.test(l)));
 }
 
-/** Resident emote puffs over a room or name plaque (port of emoteClashes). */
-export async function emoteClashes(page) {
-  return page.evaluate(() => {
+/** Resident emote puffs over a room or name plaque (port of emoteClashes); with `withBoxes`, each plaque's text and CSS y and height. */
+export async function emoteClashes(page, withBoxes = false) {
+  return page.evaluate(boxes => {
     const vis = el => { let op = 1, a = el; while (a && a !== document.body) { const cs = getComputedStyle(a); if (cs.display === 'none' || cs.visibility === 'hidden') return 0; op *= parseFloat(cs.opacity || '1'); a = a.parentElement; } return op; };
     const puffs = [...document.querySelectorAll('img')].filter(i => /emote_/.test(i.getAttribute('src') || '') && vis(i.parentElement) > 0.05).map(i => i.parentElement.getBoundingClientRect());
     if (!puffs.length) return [];
@@ -261,8 +272,8 @@ export async function emoteClashes(page) {
       if (r.bottom >= window.innerHeight - 2 && r.width >= window.innerWidth * 0.9) sheetTop = r.top;
     }
     const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-    return plaques.filter(p => p.r.top < sheetTop - 2 && puffs.some(q => hit(p.r, q))).map(p => p.text);
-  });
+    return plaques.filter(p => p.r.top < sheetTop - 2 && puffs.some(q => hit(p.r, q))).map(p => (boxes ? { text: p.text, y: p.r.top, h: p.r.height } : p.text));
+  }, withBoxes);
 }
 
 // ---------------------------------------------------------------- dialogue

@@ -6,8 +6,15 @@
  *
  * A timeline is a list of shots over output frames [from, to] (inclusive).
  * Each shot is a stack of layers, bottom first:
- *   { kind: 'frame', clip, src, view, place, opacity, blur, brightness }
+ *   { kind: 'frame', clip, src, view, place, opacity, blur, brightness, source, featherTop }
  *       clip:  recorded clip id (frames in $TRAILER2_WORK/clips/<clip>)
+ *       source: optional async (decoded, file) => decoded, applied to each
+ *              clip frame before it is cropped (cached per frame), e.g. to
+ *              close a bottom sheet with the game's own frame art
+ *       featherTop: optional output px over which the layer fades in from
+ *              its top edge (a soft join to whatever lies above it)
+ *       rowAlpha: optional (t, h) => Uint8Array(h), a per-row opacity for the
+ *              placed layer at output frame t (a wipe that moves down the frame)
  *       src:   { start, rate } clip frame shown at the shot's first frame, and
  *              clip frames advanced per output frame (0 freezes, 0.5 on a 60 fps
  *              clip plays at quarter speed...). Or a function (t) => clip frame.
@@ -60,6 +67,20 @@ async function decode(file) {
   const v = { data, info };
   decoded.set(file, v);
   while (decoded.size > 6) decoded.delete(decoded.keys().next().value);
+  return v;
+}
+
+// Source frames after a layer's `source` transform, small LRU keyed by frame and transform.
+const transformed = new Map();
+let sourceTags = 0;
+async function decodeFor(layer, file) {
+  if (!layer.source) return decode(file);
+  const tag = layer._sourceTag ??= `s${++sourceTags}`;
+  const key = `${file}|${tag}`;
+  if (transformed.has(key)) { const v = transformed.get(key); transformed.delete(key); transformed.set(key, v); return v; }
+  const v = await layer.source(await decode(file), file);
+  transformed.set(key, v);
+  while (transformed.size > 6) transformed.delete(transformed.keys().next().value);
   return v;
 }
 
@@ -157,7 +178,7 @@ async function renderLayer(layer, shot, t, W, H) {
   const src = layer.src ?? { start: 0, rate: 1 };
   const cf = typeof src === 'function' ? src(t - shot.from, t) : src.start + (t - shot.from) * (src.rate ?? 1);
   const file = clipFile(meta, cf);
-  const decodedFrame = await decode(file);
+  const decodedFrame = await decodeFor(layer, file);
   const view = typeof layer.view === 'function' ? layer.view(t - shot.from, t) : viewAt(layer.view ?? { x: 0, y: 0, w: meta.w, h: meta.h }, lerpKeys(layer.viewProgress, k, k));
   // Fit the view's aspect to the place's aspect (cover): widen or heighten around the centre.
   let rect = { ...view };
@@ -178,7 +199,8 @@ async function renderLayer(layer, shot, t, W, H) {
     return { raw, left: place.x, top: place.y, w: place.w, h: place.h, opacity };
   }
   const raw = await cropScaled(decodedFrame, rect, place.w, place.h);
-  return { raw, left: place.x, top: place.y, w: place.w, h: place.h, opacity, mask: layer.mask };
+  return { raw, left: place.x, top: place.y, w: place.w, h: place.h, opacity, mask: layer.mask, featherTop: layer.featherTop,
+    rowMask: layer.rowAlpha ? layer.rowAlpha(t, place.h) : null };
 }
 
 function hex(c) { const n = parseInt(c.replace('#', ''), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
@@ -195,6 +217,7 @@ function blit(canvas, W, H, L) {
       if (L.rgba) { const i = (y * w + x) * 4; r = L.rgba[i]; g = L.rgba[i + 1]; b = L.rgba[i + 2]; a *= L.rgba[i + 3] / 255; }
       else { const i = (y * w + x) * 3; r = L.raw[i]; g = L.raw[i + 1]; b = L.raw[i + 2]; }
       if (L.maskAlpha) a *= L.maskAlpha[y * w + x] / 255;
+      if (L.rowMask) a *= L.rowMask[y] / 255;
       if (a >= 0.999) { canvas[o] = r; canvas[o + 1] = g; canvas[o + 2] = b; }
       else if (a > 0.001) { canvas[o] += (r - canvas[o]) * a; canvas[o + 1] += (g - canvas[o + 1]) * a; canvas[o + 2] += (b - canvas[o + 2]) * a; }
     }
@@ -208,6 +231,19 @@ async function roundedMask(w, h, r) {
   if (maskCache.has(key)) return maskCache.get(key);
   const svg = Buffer.from(`<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg"><rect width="${w}" height="${h}" rx="${r}" ry="${r}" fill="#fff"/></svg>`);
   const m = await sharp(svg).extractChannel(3).raw().toBuffer();
+  maskCache.set(key, m);
+  return m;
+}
+
+/** A mask that ramps from 0 at the top row to 255 at row `px` (smoothstep), one byte per pixel. */
+function featherMask(w, h, px) {
+  const key = `f${w}x${h}:${px}`;
+  if (maskCache.has(key)) return maskCache.get(key);
+  const m = Buffer.alloc(w * h, 255);
+  for (let y = 0; y < Math.min(h, px); y++) {
+    const u = y / px, a = Math.round(255 * u * u * (3 - 2 * u));
+    m.fill(a, y * w, (y + 1) * w);
+  }
   maskCache.set(key, m);
   return m;
 }
@@ -237,6 +273,7 @@ async function renderShot(shot, t, W, H) {
       blit(canvas, W, H, { raw, left: L.left - o.px, top: L.top - o.px, w: ow, h: oh, opacity: L.opacity });
     }
     if (L.mask) L.maskAlpha = await roundedMask(L.w, L.h, L.mask.radius);
+    else if (L.featherTop) L.maskAlpha = featherMask(L.w, L.h, L.featherTop);
     blit(canvas, W, H, L);
   }
   return canvas;

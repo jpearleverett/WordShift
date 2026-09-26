@@ -215,7 +215,7 @@ Port `/tmp/claude-0/-home-user-WordShift/6917ae72-7c3b-5354-8c4f-83735e1b993e/sc
 **Rules that apply to every capture:**
 - The only things you may change are local progression (localStorage seeds) and real UI input through Playwright. Never edit, hide or restyle the DOM, and never change z-index.
 - Before any screenshot, wait for `document.fonts.ready` and then at least 1200 ms.
-- Stills use `reducedMotion: true`. The one exception is the pit, which uses `false` so the words drift. Trailer clips use `reducedMotion: false`.
+- Stills use `reducedMotion: true`. The one exception is the pit, which uses `false` so the words drift. Trailer clips use `reducedMotion: false`, except the two house-scroll clips (K13, K14), which turn the game's Reduced Motion setting on so every resident stands at the same rest spot in both.
 - Record each still in `raw/provenance.json` with:
   - state id, viewport, DPR, reducedMotion and git HEAD;
   - an ISO timestamp and a SHA-256 of the file;
@@ -503,7 +503,15 @@ Reference prototype for the art only: `.../scratchpad/store/final/fg_check.png`.
 
 ## 6. Trailer
 
-The trailer was replaced on 2026-09-25 by "Such a Lovely House" (trailer2), built by `mobile/scripts/store/refresh/trailer2/` from new recordings. The earlier cut (captions "Lift a letter." to "The house is very fond of you.", built by `recordTrailer.mjs` and `editTrailer.mjs`) and its two scripts remain in git history. Five rounds of a four-judge blind panel compared the two cuts, with A and B assigned at random and neutral file names. The first new cut lost 0-4. The revised cuts won 3-1, then 4-0 in each of the last three rounds. The fifth round judged the build before its last compliance fixes (listed in `video/README.md`, which records every round's scores and what each round changed).
+The trailer was replaced on 2026-09-25 by "Such a Lovely House" (trailer2), built by `mobile/scripts/store/refresh/trailer2/` from new recordings. The earlier cut (captions "Lift a letter." to "The house is very fond of you.", built by `recordTrailer.mjs` and `editTrailer.mjs`) and its two scripts remain in git history. Five rounds of a four-judge blind panel compared the two cuts, with A and B assigned at random and neutral file names. The first new cut lost 0-4. The revised cuts won 3-1, then 4-0 in each of the last three rounds.
+
+On 2026-09-26 the owner asked for four changes to the 30 s cut, and it was revised to answer them:
+- The opening move no longer freezes before each drop.
+- The tiny whole-house day and dusk shots are replaced by one phone-sized scroll up the house from the pit to the roof, with the evening coming down the house as it climbs.
+- Each dialogue sheet is closed with a bottom border matching its other borders.
+- Every caption and line stays up long enough to read.
+
+Three more rounds judged the revision (rounds 6 to 8: the first revision beat the 30 s cut 4-0, a slower 43 s version lost 1-3 to that revision, and the tightened cut beat it 4-0; `video/README.md` has every round's scores and what each round changed).
 
 ### Deliverables
 
@@ -511,62 +519,112 @@ The trailer was replaced on 2026-09-25 by "Such a Lovely House" (trailer2), buil
 - **YouTube, press and large screens: the 16:9 master**, `video/trailer-16x9-1920x1080.mp4`.
 - `video/captions-en.srt`, the burned-in captions cue for cue (and `trailer.captions` in `copy/listing-en-US.json`).
 
-Both cuts are exactly **30.0 s = 900 frames at 30 fps**, H.264 High yuv420p (BT.709) with AAC-LC 48 kHz stereo and faststart. Both use the same timeline, captions and audio mix. Every frame is a recorded frame of the game (a crop, a zoom, a speed change, two 0.6 s holds over the opening move's checked slots, and one freeze on Ember's finished line). The only additions are the caption plaques and, on the end card, the wordmark and two lines over the real sunset house. Gameplay is on screen from frame 0.
+Both cuts are exactly **39.20 s = 1,176 frames at 30 fps**, H.264 High yuv420p (BT.709) with AAC-LC 48 kHz stereo and faststart. Both use the same timeline, captions and audio mix. Play autoplays only the first 30 s. That covers the rule, the house, a housemate invited, three boards, a room built, Sloane's and Panko's lines, and the whole scroll up the house as the evening comes down it. Ember's line and the end card follow for anyone who keeps watching. Gameplay is on screen from frame 0.
+
+**What is recorded and what is added.**
+
+Every picture is built from recorded frames of the game:
+- crops, zooms and slow push-ins;
+- speed changes:
+  - the opening drags at 0.55x, with the end of each drag and the finger's pause over each checked slot at 2x;
+  - the card's dim-in at 1.5x;
+  - the day house at 0.6x;
+  - the settled victory card at 0.5x;
+- blur and dimming behind the cards;
+- two dissolves: the victory card's last confetti, and the sweep below.
+
+Some pictures are still:
+- Ember's sheet holds on her finished line (a freeze) while its push-in continues.
+- The dimmed, blurred house behind the invite card and behind each dialogue sheet is one frame of that scene from before the tap. Behind Sloane's sheet it is the Jungle Hammock just before it was built, because the build's confetti falls through every later frame of that clip.
+- The pan clips run with Reduced Motion on, so the house in the scroll and on the end card has no walking residents or smoke; once risen, the end card's house is still apart from a slow push-in (in both cuts).
+
+The additions (brief item 17) are:
+- the caption plaques, in the game's own card-frame art;
+- a bottom border closing each dialogue sheet, which is lifted off the bottom of the screen and centred. The border is drawn from the same skin's own panel art (`assets/ui/panels/<skin>/panel_bl`, `panel_bottom`, `panel_br`), with a hairline of the outline colour below it and in the new corners' notches, a 4 px outline and a soft shadow, because in the game the sheet is a bottom sheet that runs off the screen. The invite card has the same soft shadow.
+- the sweep from afternoon to sunset during the scroll, a transition between two recordings of the identical scroll:
+  - A soft band a third of the frame tall crosses the frame in 2 s, with sunset above it and afternoon below.
+  - While it crosses, the house in the sunset recording is laid out floor by floor on the afternoon one. Every room is drawn whole and unscaled; only the wooden gap between two floors (16 CSS of gap and connector at sunset) is squeezed into the afternoon's 6 CSS. The roof moves with the top floor and the foundation with the den. The scenery either side sits in the same place in both recordings and is not moved.
+  - Then, in 0.8 s while the scroll continues, each floor moves as one block to its own place and the gaps widen back to 16 CSS; the scenery follows the camera.
+  - Both recordings run with the game's Reduced Motion setting on, so every resident stands at the same rest spot in both. No room, sign, resident or cloud ever shows twice or in part, and the edit asserts that every room is drawn whole.
+- on the end card, the game's wordmark (fading in once the roof has slid below it) and two lines, over a flat colour sampled from the recorded evening sky above the roof and extended upward. In the 16:9 master that fill is inside the phone column.
+- in the 16:9 master only, the game's own sky art (day, afternoon, dusk), blurred and darkened, around the phone column and behind the invite card and dialogue sheets, and the column's two 6 px rules. The 80% real-UI floor applies to the 9:16 Play cut, which is about 85% recorded picture by area; the 16:9 master is about a third recorded picture.
 
 ### Recording method (`trailer2/capture.mjs`, `trailer2/record.mjs`, `trailer2/states2.mjs`)
 
-- Chromium drives the Expo web build under Playwright with the page clock installed and pinned to 2026-10-06 17:30. That date sits outside every full-moon window, so no event badge or moon line appears. Each frame advances the clock one frame (30 or 60 fps) and is captured over CDP as JPEG q95 at the clip's device scale (DPR 5 for 432 CSS wide phone clips).
-- Each clip starts from a seeded save that agrees with its phase, solves, rooms and story gates (`states2.mjs`). Specific boards are served by the game's own bank selection in a throwaway session, then transplanted as the game-written autosave (`record.mjs serveBoard`).
-- Input happens between frames. A drag is one mouse step per frame. Per-frame DOM probes (tiles, labels, pills, dialogue blocks and sheets, the Next sign, the ambient line, the dock) are logged with the events to `$TRAILER2_WORK/events/<clip>.json`. `video/events/` keeps the events without the probes.
-- **Screening, retaken on failure:** any `VICTORY_GLITCH_TEXTS` string or micro-beat overlay; any phase-0 darkness-seed move message (`PHASE_0_SEED_MESSAGES`, for example "A little warmth."); a grim or awkward board word; an achievement toast; an emote over a used crop. The first K1 take showed a seed pill and was retaken.
+- **Browser and clock.** Chromium drives the Expo web build under Playwright, with the page clock installed and pinned to 2026-10-06 17:30. That date sits outside every full-moon window, so no event badge or moon line appears. Each frame advances the clock one frame (30 or 60 fps) and is captured over CDP as JPEG q95 at the clip's device scale (DPR 5 for the 432 CSS wide phone clips).
+- **Seeded saves.** Each clip starts from a seeded save that agrees with its phase, solves, rooms and story gates (`states2.mjs`). Specific boards are served by the game's own bank selection in a throwaway session, then transplanted as the game-written autosave (`record.mjs serveBoard`).
+- **Input and probes.** Input happens between frames, and a drag is one mouse step per frame. Per-frame DOM probes (tiles, labels, pills, dialogue blocks and sheets, rooms, the roof, the Next sign, the ambient line, the dock) are logged with the events to `$TRAILER2_WORK/events/<clip>.json`. `video/events/` keeps the events without the probes.
+- **Screening, retaken on failure:**
+  - any `VICTORY_GLITCH_TEXTS` string or micro-beat overlay;
+  - any phase-0 darkness-seed move message (`PHASE_0_SEED_MESSAGES`, for example "A little warmth.");
+  - a grim or awkward board word;
+  - an achievement toast;
+  - an emote over a used crop.
+
+  The first K1 takes showed a seed pill and a "THANK YOU" glitch, and were retaken.
 
 ### Clips
 
 | Clip | State | What it records | Used as |
 |---|---|---|---|
-| K1 | A' (phase 0, 6 solves) | The curated opener PLAY / PANT / HEAR at 60 fps: the L dragged into PANT (PLANT), the T into HEAR (HEART), the victory card | H1, H1c |
-| K2 | I' (phase 0) | The day house at 675x1340, pushing in to the empty aquarium's invite card | H2, H3 backdrop |
+| K1 | A' (phase 0, 6 solves) | The curated opener PLAY / PANT / HEAR at 60 fps: the L dragged into PANT (PLANT), the finger pausing over the checked slot; the T into HEAR (HEART); the victory card blooming | H1, H1c |
+| K2 | I' (phase 0) | The day house, pushing in to the empty aquarium's invite card | H2, H3 backdrop |
 | K2b | I' | The "A NEW FRIEND!" invite card for Axel | H3 |
 | K4, K5, K6 | H (phase 1, 38 solves) | EASY WHIP/SING, MED+ GLAZE/COVER, EXPERT FLAVOR/PICKED: one move each | H4 |
 | K7a, K7b | BUILD24 (phase 1) | The Jungle Hammock built; Sloane's introduction page | H5 |
 | K8 | D (phase 1) | Panko's kitchen, then her spice-jar line typing in | H6 |
-| K9, K10 | B (afternoon), E' (dusk, phase 2) | The whole house from one locked camera, the same seven rooms | DAY, DUSK, END |
+| K13, K14 | B (afternoon, phase 1), E' (sunset, phase 2) | The same seven rooms in a tall 432x1040 window, Reduced Motion on, scrolled from the pit to the roof by one identical eased drag; K14 keeps recording at the roof | PAN, END |
 | K12 | P2N9E (phase 2) | Ember's den at dusk, then her line fx_2_17 typing in | H8 |
 
 ### Edit timeline (`trailer2/edit.mjs`)
 
 | Frames (time) | Shot | Picture | Caption |
 |---|---|---|---|
-| 0-99 (0.00-3.33) | H1 | The whole board (CSS 432x768 from y 60): the L in the hand over PANT's fan, held 0.6 s over the checked PLANT slot, dropped; the T dragged over HEAR, held 0.6 s over the checked HEART slot | `One letter. Two real words.` |
-| 100-135 (3.33-4.53) | H1c | Hard cut to the settled victory card: three stars, PERFECT!, FLAWLESS!, the word journey PAY, PLAN, HEART | none |
-| 136-215 (4.53-7.20) | H2 | The day house at 0.75x, pushing in to the aquarium's invite card | `Solve puzzles.` / `Build them a home.` |
-| 216-243 (7.20-8.13) | H3 | The whole invite card for Axel, pushing in, over a dim blur of the house; it ends before the Invite tap | `13 friends to welcome.` |
-| 244-333 (8.13-11.13) | H4 | Three whole boards, 1 s each: EASY and MED+ from the drag into the drop, EXPERT from its drop | `Over 4,000 puzzles.` |
-| 334-379 (11.13-12.67) | H5a, H5b | The Jungle Hammock built (a jump cut in one framing) | `More rooms. More neighbors.` |
-| 380-451 (12.67-15.07) | H5c | Sloane's introduction sheet over the dimmed house | `Three moths.` / `All named Gerald.` |
-| 452-493 (15.07-16.47) | H6a | Panko, Archimedes and Ember in their rooms | `Who moved the spice jars?` (to 583) |
-| 494-583 (16.47-19.47) | H6b | Panko's sheet: "I must have moved them in my sleep. I must have." types in | (carried) |
-| 584-601 (19.47-20.07) | DAY | The whole house in the afternoon | `Where did the day go?` (to 676) |
-| 602-676 (20.07-22.57) | DUSK | Hard cut to the same camera at sunset, pushing in on the upper house | (carried) |
-| 677-694 (22.57-23.17) | H8a | Ember by her fire at dusk | `Ember is fond of you.` (to 766) |
-| 695-766 (23.17-25.57) | H8b | Ember's sheet: "I am fond of you, whatever my fire is up to. I want you to know that." types in and holds (a freeze) before her next sentence | (carried) |
-| 767-899 (25.57-30.00) | END | The real sunset house (K10 from clip 30, before any emote), pushing in on its upper rooms; the wordmark fades in at 771 | `It's a lovely house.` from 785, `Isn't it?` from 831 |
+| 0-103 (0.00-3.47) | H1 | The whole board (CSS 432x768 from y 60), from two frames before the L lifts. The L is dragged over PANT's fan at 0.55x; the end of the drag and its pause over the checked PLANT slot play at 2x (about 0.2 s), and it drops (PAY, PLANT). The T is dragged over HEAR's fan the same way and drops on the checked HEART slot. The board dims and the victory card rises (its dim-in at 1.5x): PERFECT!, three stars, the first confetti. No frame is held. | `One letter. Two real words.` (faded by the drop, 2.57 s) |
+| 104-130 (3.47-4.37) | H1c | The settled card after the confetti has passed the word journey PAY, PLAN, HEART, at half speed; the last confetti over the stars dissolves away | none |
+| 131-229 (4.37-7.67) | H2 | The day house at 0.6x, pushing in to the empty aquarium's invite card | `Solve puzzles.` / `Build them a home.` |
+| 230-310 (7.67-10.37) | H3 | The whole "A NEW FRIEND!" invite card for Axel, cropped to its own frame, growing slowly over a dim blur of the house; it ends before the Invite tap | `13 friends to welcome.` |
+| 311-422 (10.37-14.10) | H4 | Three boards, 1.2 s each: EASY (the W out of WHIP into SWING) and MED+ (the L into CLOVER) from the drag into the drop, EXPERT (FAVOR and PICKLED) from its drop. The MED+ board's fourth row sits under the action bar and the EXPERT board's fifth runs off the frame | `Over 4,000 puzzles.` |
+| 423-504 (14.10-16.83) | H5a, H5b | The Jungle Hammock locked, then built with its invite card (a jump cut in one framing) | `More rooms. More neighbors.` |
+| 505-624 (16.83-20.83) | H5c | Sloane's introduction sheet ("Three moths live in my fur. I call all three Gerald. ...") over the dimmed house, pushing in | `Three moths.` / `All named Gerald.` |
+| 625-660 (20.83-22.03) | H6a | Panko, Archimedes and Ember in their rooms | `Who moved the spice jars?` (to 780) |
+| 661-780 (22.03-26.03) | H6b | Panko's sheet, pushing in: "I must have moved them in my sleep. I must have." types in | (carried) |
+| 781-879 (26.03-29.33) | PAN | The house as a phone sees it, from the pit well up the house. From 26.40 s the evening sweeps down the frame for 2 s while it climbs, and each sunset floor then settles into its own place as a whole block; it cuts to Ember as the roof's lower edge comes into the frame | `Where did the day go?` |
+| 880-915 (29.33-30.53) | H8a | Ember by her fire at dusk | `Ember is fond of you.` (to 1025) |
+| 916-1025 (30.53-34.20) | H8b | Ember's sheet, pushing in: "I am fond of you, whatever my fire is up to. I want you to know that." types in and holds (a freeze) before her next sentence | (carried) |
+| 1026-1175 (34.20-39.20) | END | Back on the sunset roof at rest, the camera rises past the chimney into the evening sky; the roof settles under the lines, with the locked top room and Chill's office below it. The wordmark fades in once the chimney has slid below it, and the house pushes in slowly | `It's a lovely house.` then `Isn't it?` |
 
 ### 9:16 cut layout (1080x1920)
 
-- **Boards:** the phone screen from CSS y 60, full width at 2.5x. The wordmark, the difficulty chip, every row with its PICK/DROP tag and the fan's check and cross labels all show. The caption plaque covers the move pill.
-- **Dialogue sheets:** each resident's real sheet (portrait, name, words), from its top edge (found per frame on the pixels, so a sheet that grows as it types keeps its border) to the bottom of the screen. Ember's sheet stops at CSS 745, above the screen edge that cuts her name. Sheets are at 2.42x with a 4 px `#3B2416` outline and a soft shadow, centred between the caption and the clear zone. They sit over the resident's part of the house, dimmed to 40% and lightly blurred, as the game dims it behind a sheet.
-- **Caption plaque:** the game's own card frame (`assets/ui/panels/<skin>/card_*`, bright skin, dusk skin for the two dusk captions), Figtree-Bold 76 px (68 px when a line is wider than 844 px), ink `#3B2416`, top at y 120, or at y 300 and 360 over the boards so it sits on the move pill.
-- **Bottom clear zone:** nothing added (plaques, outlines, shadows, the wordmark, end-card lines) reaches y 1440. The edit asserts it for every caption and every outlined layer.
-- **End card:** the wordmark (760x190, centred at y 300), an elliptical darkening behind the wordmark and both lines (50% at y 440, 640 x 400 px, gone by y 840), and "It's a lovely house." / "Isn't it?" in Figtree-Bold 84 px `#FFF3DC` with a 4 px `#3B2416` shadow, centred at y 510 and 620.
+- **Boards:** the phone screen from CSS y 60, full width at 2.5x. On the opening board the wordmark, the difficulty chip, every row with its PICK/DROP tag and the fan's check and cross labels all show. On the MED+ board the fourth row sits under the game's UNDO, HINT and RESTART bar, and on the EXPERT board the fifth row runs off the bottom of the frame. The caption plaque covers the move pill.
+- **Dialogue sheets:**
+  - Each resident's real sheet (portrait, name, words) runs from its top edge (found per frame on the pixels, so a sheet that grows as it types keeps its border) to the bottom of the screen. Every frame used shows the settled sheet (asserted: the rows just above the cut are the sheet's own fill), so Ember's shot starts after her sheet's opening spring. Ember's stops at CSS 764, under her name and above the screen edge that cuts its underline.
+  - Each is closed with the skin's own bottom corners and edge, laid out as the game lays out a closed panel. The skin is matched per sheet: bright for Sloane and Panko, storm for Ember (`getPixelSkin(2, hostDark)` returns storm, the real phase-2 dialogue sheet).
+  - Sheets grow from 2.30x to 2.42x over the shot, anchored at the bottom, with a 4 px `#3B2416` outline and a soft shadow, centred between the caption and the clear zone.
+  - They sit over the resident's part of the house, dimmed to 40% and lightly blurred, as the game dims it behind a sheet.
+- **House scroll:**
+  - A 376x668 CSS crop of the 432x1040 recording, between the Next sign and the PLAY dock (asserted per frame, with the ambient line and emotes).
+  - It starts as the scroll first moves (clip 33) and rises 40 CSS with it; after the sweep it moves to the sunset recording's own framing, CSS y 200 at the roof.
+  - The sweep band is a third of the frame tall.
+  - The shot cuts to Ember as the roof's lower edge comes into the frame, before it reaches the caption (asserted).
+- **Caption plaque:**
+  - The game's own card frame (`assets/ui/panels/<skin>/card_*`), in the bright skin, or the dusk skin for the two dusk captions.
+  - Figtree-Bold 76 px (68 px when a line is wider than 844 px), ink `#3B2416`.
+  - Top at y 120, or at y 300 and 360 over the boards, so it sits on the move pill.
+- **Bottom clear zone:** no overlay (caption plaques, sheet borders, outlines, shadows, the wordmark, end-card lines) reaches y 1440. The edit asserts it for every caption and every outlined layer. The sweep, a transition between the two recordings, fills the whole frame.
+- **End card:**
+  - The recorded sunset roof at rest rises 700 px, feathered at its top edge into the extended sky, then pushes in 3.5% about the top of the roof, so the roof stays under the lines.
+  - The wordmark is 760x190 with its top at y 200; it fades in once the chimney has slid below it.
+  - "It's a lovely house." and "Isn't it?" are Figtree-Bold 84 px `#FFF3DC` with a 4 px `#3B2416` shadow, centred at y 540 and 650, above the chimney (y 774).
+  - The locked Underground Burrow card and Chill in his office sit below the roof, under the lines.
 
 ### 16:9 master layout (1920x1080)
 
-- **Background:** the game's own sky art, blurred and darkened: `sky_day` to frame 243, `sky_afternoon` from the boards, `sky_dusk` from the sunset.
-- **Boards and house close-ups:** the 9:16 picture as a 608x1080 column 96 px from the right edge, between two 6 px `#3B2416` rules.
+- **Background:** the game's own sky art, blurred and darkened: `sky_day` to the boards, `sky_afternoon` from the boards, blending to `sky_dusk` with the sweep, `sky_dusk` from Ember on.
+- **Boards, house close-ups and the scroll:** the 9:16 picture as a 608x1080 column 96 px from the right edge, between two 6 px `#3B2416` rules.
 - **Cards and sheets:** the 9:16 layout scaled as one group (never above 1.2x) into the area the caption leaves free.
 - **Captions:** top-left at x 96, y 72, 68 px.
-- **DAY, DUSK and END:** native wide views of the recordings (1500x844 CSS from 260 above the roof; the end card pulls back from 1200 to 1500 wide), with the wordmark at (960, 210) and the lines at y 400 and 500.
+- **End card:** the roof rises in the column as in 9:16 (478 px, over the same sampled fill), so the locked top room settles below the lines, then the crop pushes in 3.5% about the top of the roof, inside the column; the wordmark and the two lines (76 px) sit left of the column, at y 290, 500 and 600.
 
 ### Audio
 
@@ -574,19 +632,28 @@ Both cuts are exactly **30.0 s = 900 frames at 30 fps**, H.264 High yuv420p (BT.
 
 | Trailer time | Bed | Start in file | Level and fades |
 |---|---|---|---|
-| 0.00-20.22 | `home_phase0.mp3` | 0:23.28 | segment -20 LUFS; 0.3 s crossfade out on the sunset cut |
-| 19.92-30.00 | `home_phase2.mp3` | 1:06.22 | segment -20 LUFS; 0.3 s crossfade in; fade out over the last 1.2 s |
+| 0.00-27.90 | `home_phase0.mp3` | 0:23.28 | segment -20 LUFS; 1.0 s fade out centred on the sweep |
+| 26.90-39.20 | `home_phase2.mp3` | 1:06.22 | segment -20 LUFS; 1.0 s fade in; fade out over the last 1.5 s |
 
-**SFX:** from `mobile/assets/sounds/`, only these files: `letter_select` (a letter lifts), `valid_move` (a first valid move, as the game plays it: PLANT, SWING, CLOVER, PICKLED), `valid_move_2` (HEART, the second move), `perfect` and `star_pop_3` (the victory card), `ui_tap` (the invite card), `unlock` (the Jungle Hammock built), `dialogue` (once as each sheet appears). Never a `_dark` or `_peace` variant, `glitch`, `arrival` or `phase_change*`. `video/trailer-report.json` lists every placement.
+**SFX:** from `mobile/assets/sounds/`, only these files:
+- `letter_select` (a letter lifts);
+- `valid_move` (a first valid move, as the game plays it: PLANT, SWING, CLOVER, PICKLED);
+- `valid_move_2` (HEART, the second move);
+- `perfect`, `star_pop_1`, `star_pop_2` and `star_pop_3` (the victory card and its three stars, as they appear, within a frame);
+- `ui_tap` (the invite card);
+- `unlock` (the Jungle Hammock built);
+- `dialogue` (once as each sheet appears).
 
-**Mix:** peaks held, then a two-pass linear `loudnorm` to I=-14, TP=-1, LRA=11, 48 kHz stereo. Measured: -14.0 LUFS integrated, true peak -1.4 dBTP, LRA 5.1.
+Never a `_dark` or `_peace` variant, `glitch`, `arrival` or `phase_change*`. `video/trailer-report.json` lists every placement.
+
+**Mix:** peaks held, then a two-pass linear `loudnorm` to I=-14, TP=-1, LRA=11, 48 kHz stereo. Measured: -14.0 LUFS integrated, true peak -1.4 dBTP, LRA 5.6.
 
 ### Rebuild
 
 ```
 cd mobile
 npx expo start --web --port 8081                          # the web build the recorder drives
-TRAILER2_WORK=/tmp/t2work node scripts/store/refresh/trailer2/record.mjs K1 K2 K2b K4 K5 K6 K7 K8 K9 K10 K12
+TRAILER2_WORK=/tmp/t2work node scripts/store/refresh/trailer2/record.mjs K1 K2 K2b K4 K5 K6 K7 K8 K12 K13 K14
 TRAILER2_WORK=/tmp/t2work node scripts/store/refresh/trailer2/edit.mjs      # both cuts, the mix and the SRT
 TRAILER2_WORK=/tmp/t2work node scripts/store/refresh/trailer2/install.mjs   # into video/: cuts, SRT, report, poster, events, thumbnail
 ```
@@ -662,7 +729,7 @@ Write this to `alt-text.tsv`. If a final crop shows something different, rewrite
 
 **Genuine UI and honest claims**
 
-1. Every gameplay image and every video frame except the end card is a real render of the current build. Only local progression may be seeded, and only real UI input may be used. Never edit, hide, restyle or re-layer the DOM. There are no invented words, no mocked UI and no device frames, fingers or badges.
+1. Every gameplay image and every video frame except the end card is a real render of the current build (the trailer's disclosed additions are listed in item 17). Only local progression may be seeded, and only real UI input may be used. Never edit, hide, restyle or re-layer the DOM. There are no invented words, no mocked UI and no device frames, fingers or badges.
 2. Seeds must be coherent with the game's rules:
    - solve gates, room gates and story gates agree with the phase;
    - badges agree with the dialogue sessions and the conversation read ids;
@@ -720,8 +787,15 @@ Write this to `alt-text.tsv`. If a final crop shows something different, rewrite
     - No composited house state that cannot happen in the game.
 17. The trailer:
     - The Play video is the 9:16 cut.
-    - Real UI fills at least 80% of it (every frame is a recorded frame of the game; the end card adds only the wordmark and two lines over the real sunset house), and real gameplay shows from frame 0.
-    - Nothing added sits in the bottom 25% of the 9:16 frame.
+    - Real UI fills at least 80% of the 9:16 cut by area over its runtime, and real gameplay shows from frame 0. Every picture is built from recorded frames of the game: crops, zooms and push-ins, speed changes, blur and dimming behind the cards, and dissolves. Still pictures are one freeze on Ember's finished line (its push-in continues) and the single held frame of the house behind the invite card and each dialogue sheet; the scroll and end card come from recordings made with Reduced Motion on, so their residents stand at rest and the end card's house is still apart from a slow push-in (in both cuts).
+    - The only additions are these, each disclosed in section 6 (the owner asked for the sheet border and the sweep on 2026-09-26):
+      - the caption plaques;
+      - a bottom border closing each dialogue sheet (lifted off the bottom of the screen and centred), drawn from the same skin's own panel art, since in the game the sheet runs off the bottom of the screen;
+      - the 2 s sweep from afternoon to sunset during the house scroll: a transition between two recordings of the identical scroll. The sunset house is laid out floor by floor on the afternoon one with every room drawn whole (only the wooden gaps between floors are squeezed), then its floors settle as whole blocks into their own places over 0.8 s, so that no room, sign, resident or cloud ever shows twice or in part;
+      - on the end card, the wordmark (fading in once the roof has slid below it) and two lines, over a flat colour sampled from the recorded evening sky above the roof and extended upward;
+      - in the 16:9 master only, the game's own sky art (day, afternoon, dusk), blurred and darkened, around the phone column and behind the invite card and dialogue sheets, and the column's two rules. The 80% floor applies to the 9:16 Play cut; the 16:9 master is about a third recorded picture.
+    - No composited house state is presented as a view of the game.
+    - No overlay (caption plaques, sheet borders, outlines, shadows, the wordmark, end-card lines) sits in the bottom 25% of the 9:16 frame; the sweep, a transition between the two recordings, fills the whole frame.
     - Captions are burned in and also uploaded as SRT.
 18. The live campaign `launch-2026-09`, its scripts and the `docs/` mirrors are untouched.
 

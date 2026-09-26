@@ -174,10 +174,12 @@ export async function recordClip(page, clip, { state, dsf, fps = FPS, format = '
   await page.clock.resume();
   await cdp.detach().catch(() => {});
   const frames = end + HANDLE + 1;
+  // The game's own Reduced Motion setting as this session ran (the pan clips turn it on).
+  const reducedMotion = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('wordshift_settings') || '{}').reducedMotion === true; } catch { return false; } });
   const ok = screening.glitch.length === 0 && screening.grim.length === 0 && !(screening.other ?? []).length;
   const out = {
     clip, state, recordedAt: new Date().toISOString(), gitHead: HEAD, gameSourceMatchesHead: SRC_CLEAN,
-    method: `clock-stepped capture: Playwright fake clock paused, runFor(1000/${fps} ms) then a CDP Page.captureScreenshot (${format}${format === 'jpeg' ? ' q' + quality : ''}) of the CSS rectangle ${JSON.stringify(rect)} of a ${vp.width}x${vp.height} viewport at DPR ${dsf} = ${pxW}x${pxH}; reducedMotion false; sound/music/haptics off in-game; page clock pinned to ${PINNED_DAY}`,
+    method: `clock-stepped capture: Playwright fake clock paused, runFor(1000/${fps} ms) then a CDP Page.captureScreenshot (${format}${format === 'jpeg' ? ' q' + quality : ''}) of the CSS rectangle ${JSON.stringify(rect)} of a ${vp.width}x${vp.height} viewport at DPR ${dsf} = ${pxW}x${pxH}; the game's Reduced Motion setting ${reducedMotion ? 'on' : 'off'}; sound/music/haptics off in-game; page clock pinned to ${PINNED_DAY}`,
     fps, format, ext, handle: HANDLE, pinnedDay: PINNED_DAY, frameSize: { width: pxW, height: pxH }, viewport: vp, window: rect, dsf,
     frames, firstFrame: -HANDLE, lastFrame: end, framesDir: path.relative(WORK, dir),
     fileIndex: 'file f%05d.png = clip frame + handle', events, screening: { ...screening, ok }, notes, ...meta, probes,

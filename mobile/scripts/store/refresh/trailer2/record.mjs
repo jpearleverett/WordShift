@@ -17,12 +17,12 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { dismissIntros } from '../lib.mjs';
+import { dismissIntros, panHouse } from '../lib.mjs';
 import { boot, recordClip, retake, RetakeError, WORK, HANDLE } from './capture.mjs';
 import { seed2 } from './states2.mjs';
 import {
   openBoard, boardWords, solutionStep, boardProbe, victoryProbe, victoryEvents, toastVisible, dragMove,
-  roomBox, panUntil, homeChrome, residents, emoteClashes, dialogueBlocks,
+  roomBox, panUntil, bottomClamp, homeChrome, residents, emoteClashes, dialogueBlocks,
 } from './helpers.mjs';
 
 const CLIPS = {};
@@ -54,10 +54,14 @@ function seedPillScreen(clip, out) {
 
 /**
  * The opener board PLAY / PANT / HEAR at DPR 5 and 60 fps. The L is pressed
- * at -20 and dragged frame by frame into PANT (release at 26, PLANT), then the
- * T is dragged out of PLANT into HEAR (release at 66, HEART), and the victory
- * card blooms. Frame 0 (the poster) has the L mid-air over the open fan.
+ * at -15 and dragged frame by frame over PANT's fan, arriving over the checked
+ * PLANT slot at 22 and hovering there (a slight drift, never a still frame)
+ * until the release at 44; the T is pressed at 60, arrives over HEART's slot
+ * at 97 and is released at 119; the victory card blooms. The hovers are
+ * recorded, so the edit needs no held frames to let the check read (it plays
+ * them at 2x, about 0.2 s each).
  */
+export const K1_MARKS = { lPress: -15, lArrive: 22, lDrop: 44, tPress: 60, tArrive: 97, tDrop: 119 };
 CLIPS.K1 = () => retake('K1', () => withSession("A'", { w: 432, h: 844, dsf: 5 }, async page => {
   await openBoard(page, { story: 'finish' });
   await page.getByRole('button', { name: 'RESTART', exact: true }).first().click();
@@ -68,15 +72,15 @@ CLIPS.K1 = () => retake('K1', () => withSession("A'", { w: 432, h: 844, dsf: 5 }
   // queries, resolved when used: after the first drop for step 1).
   const s0 = await solutionStep(page, 0), s1 = await solutionStep(page, 1);
   const actions = {
-    ...dragMove(page, { start: -15, end: 26, from: s0.letter, to: s0.slot, approx: page.getByTestId('puzzle-row-1'), label: 'drag the L out of PLAY', sfxUp: 'valid_move.wav' }),
-    ...dragMove(page, { start: 42, end: 66, from: s1.letter, to: s1.slot, approx: page.getByTestId('puzzle-row-2'), label: 'drag the T out of PLANT', sfxUp: 'valid_move_2.wav' }),
+    ...dragMove(page, { start: K1_MARKS.lPress, arrive: K1_MARKS.lArrive, end: K1_MARKS.lDrop, from: s0.letter, to: s0.slot, approx: page.getByTestId('puzzle-row-1'), label: 'drag the L out of PLAY', sfxUp: 'valid_move.wav' }),
+    ...dragMove(page, { start: K1_MARKS.tPress, arrive: K1_MARKS.tArrive, end: K1_MARKS.tDrop, from: s1.letter, to: s1.slot, approx: page.getByTestId('puzzle-row-2'), label: 'drag the T out of PLANT', sfxUp: 'valid_move_2.wav' }),
   };
   let won = null;
   const out = await recordClip(page, 'K1', { state: "A'", dsf: 5, fps: 60, actions,
     probe: async f => ({ board: await boardProbe(page), victory: f >= 60 ? await victoryProbe(page) : null }),
     until: (probes, f) => {
       if (won === null && probes[f]?.victory?.card >= 0.5) won = f;
-      return won !== null ? won + 90 : null;
+      return won !== null ? won + 170 : null;
     },
     afterFrame: noToast(page), meta: { board: 'PLAY/PANT/HEAR (curated opener)' } });
   seedPillScreen('K1', out);
@@ -163,7 +167,7 @@ function boardMoveClip(id, { state, key, target, words, dsf = 5, h = 844, pressA
 CLIPS.K3 = boardMoveClip('K3', { state: "I'", key: 'std_mp', target: '538afda040cf', words: 'SHUNT/FRIED/COALS/BIKER' });
 CLIPS.K4 = boardMoveClip('K4', { state: 'H', key: 'std_easy', target: '3b282a59c67d', words: 'WHIP/SING/POTS' });
 CLIPS.K5 = boardMoveClip('K5', { state: 'H', key: 'std_mp', target: '4aa3908d3703', words: 'GLAZE/COVER/LANES/CIDER' });
-CLIPS.K6 = boardMoveClip('K6', { state: 'H', key: 'std_expert', target: 'de622af3dde3', words: 'FLAVOR/PICKED/CORING/DIVERS/CARING', h: 960, pressAt: 0, drop: 13, used: 30 });
+CLIPS.K6 = boardMoveClip('K6', { state: 'H', key: 'std_expert', target: 'de622af3dde3', words: 'FLAVOR/PICKED/CORING/DIVERS/CARING', h: 960, pressAt: 0, drop: 13, used: 60 });
 CLIPS.K11 = boardMoveClip('K11', { state: 'P2N9', key: 'std_medium', target: '1f5e9fa7137d', words: 'SOLD/PANT/PASS/DUTY', pressAt: -15, drop: 0, used: 30 });
 CLIPS.K11h = boardMoveClip('K11h', { state: 'P2N9', key: 'std_medium', target: 'cfcc12783bd4', words: 'SALT/HOWS/TANK/BUNS', pressAt: -15, drop: 0, used: 30 });
 
@@ -194,7 +198,8 @@ CLIPS.K2 = () => retake('K2', () => withSession("I'", { w: 675, h: 1340, dsf: 3.
     afterFrame: combine(noToast(page), noEmote(page)) });
 }), 6);
 
-/** K2b: the "A NEW FRIEND!" card and Axel's first words, phone framing at DPR 5. */
+/** K2b: the "A NEW FRIEND!" card, held 3.5 s before the Invite tap, and Axel's first words, phone framing at DPR 5. */
+const K2B_INVITE = 105;
 const AXEL = ['Oh!', 'Hello!', 'A bubble popped and there you were.', "That's the best thing a bubble has ever done."];
 CLIPS.K2b = () => retake('K2b', () => withSession("I'", { w: 432, h: 768, dsf: 5 }, async page => {
   await settleHome(page);
@@ -202,10 +207,10 @@ CLIPS.K2b = () => retake('K2b', () => withSession("I'", { w: 432, h: 768, dsf: 5
   await page.waitForTimeout(1500);
   const acts = {
     0: async () => { await page.getByRole('button', { name: 'Invite animal to Aquarium Room for 100 amber', exact: true }).click(); return { action: 'tap the invite card', sfx: 'ui_tap.wav' }; },
-    40: async () => { await page.getByRole('button', { name: 'Invite for 100 amber', exact: true }).click(); return { action: 'Invite for 100 amber: Axel moves in', sfx: 'unlock.wav' }; },
+    [K2B_INVITE]: async () => { await page.getByRole('button', { name: 'Invite for 100 amber', exact: true }).click(); return { action: 'Invite for 100 amber: Axel moves in', sfx: 'unlock.wav' }; },
   };
-  const out = await recordClip(page, 'K2b', { state: "I'", dsf: 5, fps: 30, used: 90, actions: acts,
-    probe: async f => ({ blocks: f >= 40 ? await dialogueBlocks(page, AXEL) : null, medallion: await page.evaluate(() => {
+  const out = await recordClip(page, 'K2b', { state: "I'", dsf: 5, fps: 30, used: K2B_INVITE + 50, actions: acts,
+    probe: async f => ({ blocks: f >= K2B_INVITE ? await dialogueBlocks(page, AXEL) : null, medallion: await page.evaluate(() => {
       const r = [...document.querySelectorAll('div,span')].find(d => d.children.length === 0 && /^A NEW FRIEND!?$/i.test(d.textContent.trim()));
       const img = [...document.querySelectorAll('img')].find(i => /axolotl/i.test(i.getAttribute('src') || '') && i.getBoundingClientRect().width > 60);
       const b = el => { if (!el) return null; const q = el.getBoundingClientRect(); return { x: q.x, y: q.y, w: q.width, h: q.height }; };
@@ -216,7 +221,8 @@ CLIPS.K2b = () => retake('K2b', () => withSession("I'", { w: 432, h: 768, dsf: 5
   return out;
 }), 6);
 
-/** K7a: the Jungle Hammock is built (phase 1, afternoon), K7b: Sloane's intro page 4 (same session). */
+/** K7a: the Jungle Hammock is built (phase 1, afternoon; the card is tapped at K7_TAP), K7b: Sloane's intro page 4 (same session). */
+const K7_TAP = 30;
 const SLOANE = ['Three moths live in my fur.', 'I call all three Gerald.', 'They arrived separately, but three names would only complicate the administration.'];
 CLIPS.K7 = () => retake('K7', () => withSession('BUILD24', { w: 432, h: 768, dsf: 5 }, async page => {
   await settleHome(page);
@@ -224,17 +230,17 @@ CLIPS.K7 = () => retake('K7', () => withSession('BUILD24', { w: 432, h: 768, dsf
   await panUntil(page, async () => { const b = await card.boundingBox(); return b ? b.y + b.height / 2 : null; }, 450, 8);
   await page.waitForTimeout(1500);
   const a = {
-    0: async () => { await card.click({ force: true }); return { action: 'tap the Jungle Hammock card', sfx: 'ui_tap.wav' }; },
-    20: async () => { await page.getByRole('button', { name: 'Unlock room for 200 amber', exact: true }).click(); return { action: 'Unlock room for 200 amber: the room is built', sfx: 'unlock.wav' }; },
+    [K7_TAP]: async () => { await card.click({ force: true }); return { action: 'tap the Jungle Hammock card', sfx: 'ui_tap.wav' }; },
+    [K7_TAP + 20]: async () => { await page.getByRole('button', { name: 'Unlock room for 200 amber', exact: true }).click(); return { action: 'Unlock room for 200 amber: the room is built', sfx: 'unlock.wav' }; },
   };
-  const k7a = await recordClip(page, 'K7a', { state: 'BUILD24', dsf: 5, fps: 30, used: 50, actions: a,
+  const k7a = await recordClip(page, 'K7a', { state: 'BUILD24', dsf: 5, fps: 30, used: K7_TAP + 60, actions: a,
     probe: async () => ({ ...(await houseProbe(page)()), jungle: await roomBox(page, 'Jungle Hammock') }), afterFrame: combine(noToast(page), noEmote(page)) });
   await page.waitForTimeout(2500);
   await page.getByRole('button', { name: /^Invite animal to Jungle Hammock/ }).first().click(); await page.waitForTimeout(800);
   await page.getByRole('button', { name: 'Invite for 100 amber', exact: true }).click(); await page.waitForTimeout(1200);
   for (let i = 0; i < 3; i++) { await page.getByRole('button', { name: 'Continue intro', exact: true }).click(); await page.waitForTimeout(700); }
   await page.waitForTimeout(800);
-  const k7b = await recordClip(page, 'K7b', { state: 'BUILD24', dsf: 5, fps: 30, used: 110, probe: async () => ({ blocks: await dialogueBlocks(page, SLOANE) }), afterFrame: noToast(page) });
+  const k7b = await recordClip(page, 'K7b', { state: 'BUILD24', dsf: 5, fps: 30, used: 150, probe: async () => ({ blocks: await dialogueBlocks(page, SLOANE) }), afterFrame: noToast(page) });
   const t = k7b.probes[0]?.blocks?.text;
   if (t !== SLOANE.join(' ')) throw new RetakeError(`K7b: sheet reads ${t}`);
   return { k7a, k7b };
@@ -275,6 +281,73 @@ function wideRest(id, state, used) {
 }
 CLIPS.K9 = wideRest('K9', 'B', 40);
 CLIPS.K10 = wideRest('K10', "E'", 180);
+
+/**
+ * K13 (afternoon, state B) and K14 (sunset, state E'): the same seven rooms
+ * seen as a phone sees them, scrolled from the pit to the roof by one slow
+ * drag. Both clips run the identical gesture: PAN_HOLD frames at rest at the
+ * bottom of the house, then one eased stroke of PAN_FRAMES frames along the
+ * left edge of the screen (clear of every button), released at rest just short
+ * of the top so nothing overscrolls. The window is a tall phone (432x1040) so
+ * the edit's 9:16 crop between the Next sign and the PLAY dock has room to
+ * move: at sunset the house is 10 CSS taller per floor (the phase-2 connector
+ * between rooms), and the edit lays the sunset frames out floor by floor on
+ * the afternoon ones to line the two up.
+ * K14 keeps recording at the top for the end card.
+ */
+export const PAN = { w: 432, h: 1040, hold: 20, frames: 150, x: 8, y0: 206 };
+const PAN_ROOMS = ['Cozy Den', 'Rustic Kitchen', "Scholar's Study", 'Aquarium Room', 'Jungle Hammock', 'Desert Camp', 'Chill Office', 'Underground Burrow'];
+/**
+ * Both pan clips run with the game's Reduced Motion setting on, so every
+ * resident stands at their rest spot in their room (AnimalSprite) in both
+ * recordings: the edit's sweep from afternoon to sunset then changes only the
+ * light, never shows a resident twice.
+ */
+const stillSeed = state => {
+  const s = seed2(state);
+  return { ...s, summary: `${s.summary ?? state} Reduced Motion on: residents at their rest spots.`,
+    extra: { ...(s.extra ?? {}), wordshift_settings: { reducedMotion: true, soundEnabled: false, musicEnabled: false, hapticsEnabled: false } } };
+};
+function panClip(id, state, tail) {
+  const dsf = Number(process.env.TRAILER2_PAN_DSF ?? 5);
+  return () => retake(id, () => withSession(stillSeed(state), { w: PAN.w, h: PAN.h, dsf }, async page => {
+    if (!(await page.evaluate(() => JSON.parse(localStorage.getItem('wordshift_settings') || '{}').reducedMotion))) throw new Error(`${id}: Reduced Motion is not on`);
+    await settleHome(page);
+    const den = async () => (await roomBox(page, 'Cozy Den'))?.y ?? null;
+    await bottomClamp(page);
+    await page.waitForTimeout(1500);
+    const bottom = await den();
+    // The whole range, measured by driving to the top and back (the same
+    // clamp in both states: only the house above the den grows at sunset).
+    for (let i = 0; i < 6; i++) await panHouse(page, 300, PAN.x, 220);
+    const range = (await den()) - bottom;
+    await bottomClamp(page);
+    await page.waitForTimeout(1500);
+    if (Math.abs((await den()) - bottom) > 0.5) throw new RetakeError(`${id}: the bottom moved`);
+    // The finger travels the range plus the activation slop, less 3 CSS so
+    // the stroke ends inside the clamp.
+    const travel = range + PAN_SLOP_CSS - 3;
+    if (PAN.y0 + travel > PAN.h - 4) throw new Error(`${id}: the stroke (${travel}) does not fit the window`);
+    const ease = k => 0.5 - Math.cos(Math.PI * k) / 2;
+    const acts = {};
+    const f0 = PAN.hold, f1 = PAN.hold + PAN.frames;
+    acts[f0] = async () => { await page.mouse.move(PAN.x, PAN.y0); await page.mouse.down(); return { action: `press at the left edge (${PAN.x},${PAN.y0}): scroll up the house` }; };
+    for (let f = f0 + 1; f < f1; f++) acts[f] = async () => { await page.mouse.move(PAN.x, PAN.y0 + travel * ease((f - f0) / (f1 - f0))); };
+    acts[f1] = async () => { await page.mouse.move(PAN.x, PAN.y0 + travel); await page.mouse.up(); return { action: `release at rest (${PAN.x},${Math.round(PAN.y0 + travel)}): the roof` }; };
+    const probe = async () => {
+      const rooms = {};
+      for (const r of PAN_ROOMS) { const b = await roomBox(page, r); if (b) rooms[r] = { y: b.y, h: b.h, x: b.x, w: b.w }; }
+      const roof = await page.evaluate(() => { const i = [...document.querySelectorAll('img')].find(im => /roof/.test(im.getAttribute('src') || '')); const q = i?.getBoundingClientRect(); return q ? { x: q.x, y: q.y, w: q.width, h: q.height } : null; });
+      return { chrome: await homeChrome(page), rooms, roof, emote: await emoteClashes(page, true) };
+    };
+    const out = await recordClip(page, id, { state, dsf, fps: 30, used: f1 + 1 + tail, actions: acts, probe,
+      afterFrame: noToast(page), meta: { residents: await residents(page), motion: 'Reduced Motion on (residents at their rest spots)', pan: { ...PAN, range, travel, bottomDenY: bottom } } });
+    return out;
+  }), 6);
+}
+const PAN_SLOP_CSS = 10;
+CLIPS.K13 = panClip('K13', 'B', 20);
+CLIPS.K14 = panClip('K14', "E'", 200);
 
 /** K12: Ember at dusk (P2N9E): her line types out and holds. */
 const EMBER1 = 'I am fond of you, whatever my fire is up to.';

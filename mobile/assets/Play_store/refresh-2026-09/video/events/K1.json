@@ -1,10 +1,10 @@
 {
  "clip": "K1",
  "state": "A'",
- "recordedAt": "2026-09-25T22:58:52.066Z",
- "gitHead": "97d92c7891eed7f32796c4fa89a3a5266b9eb4e3",
+ "recordedAt": "2026-09-26T02:33:06.429Z",
+ "gitHead": "891dfccdd4baee79bf572b057c1289cba4357972",
  "gameSourceMatchesHead": true,
- "method": "clock-stepped capture: Playwright fake clock paused, runFor(1000/60 ms) then a CDP Page.captureScreenshot (jpeg q95) of the CSS rectangle {\"x\":0,\"y\":0,\"w\":432,\"h\":844} of a 432x844 viewport at DPR 5 = 2160x4220; reducedMotion false; sound/music/haptics off in-game; page clock pinned to 2026-10-06",
+ "method": "clock-stepped capture: Playwright fake clock paused, runFor(1000/60 ms) then a CDP Page.captureScreenshot (jpeg q95) of the CSS rectangle {\"x\":0,\"y\":0,\"w\":432,\"h\":844} of a 432x844 viewport at DPR 5 = 2160x4220; the game's Reduced Motion setting off; sound/music/haptics off in-game; page clock pinned to 2026-10-06",
  "fps": 60,
  "format": "jpeg",
  "ext": "jpg",
@@ -25,9 +25,9 @@
   "h": 844
  },
  "dsf": 5,
- "frames": 233,
+ "frames": 366,
  "firstFrame": -15,
- "lastFrame": 217,
+ "lastFrame": 350,
  "framesDir": "clips/K1",
  "fileIndex": "file f%05d.png = clip frame + handle",
  "events": [
@@ -37,37 +37,37 @@
    "sfx": "letter_select.wav"
   },
   {
-   "frame": 26,
+   "frame": 44,
    "action": "drag the L out of PLAY: release into the drop zone",
    "sfx": "valid_move.wav"
   },
   {
-   "frame": 42,
+   "frame": 60,
    "action": "drag the T out of PLANT: press on the letter",
    "sfx": "letter_select.wav"
   },
   {
-   "frame": 66,
+   "frame": 119,
    "action": "drag the T out of PLANT: release into the drop zone",
    "sfx": "valid_move_2.wav"
   },
   {
-   "frame": 79,
+   "frame": 132,
    "action": "star 1 pops in",
    "sfx": "star_pop_1.wav"
   },
   {
-   "frame": 90,
+   "frame": 143,
    "action": "star 2 pops in",
    "sfx": "star_pop_2.wav"
   },
   {
-   "frame": 103,
+   "frame": 156,
    "action": "star 3 pops in",
    "sfx": "star_pop_3.wav"
   },
   {
-   "frame": 74,
+   "frame": 127,
    "action": "PERFECT! title",
    "sfx": "perfect.wav"
   }
@@ -80,7 +80,7 @@
  "notes": [],
  "board": "PLAY/PANT/HEAR (curated opener)",
  "marks": {
-  "cardHalfOpaque": 112
+  "cardHalfOpaque": 165
  },
  "probesOmitted": "Per-frame DOM probes (tile, label, pill, sheet and chrome boxes) stay with the frames in $TRAILER2_WORK/events; the edit reads them there."
 }

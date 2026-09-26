@@ -2,7 +2,7 @@
 
 A complete en-US Google Play listing for WordShift: store text, eight phone
 screenshots, four tablet screenshots, a main feature graphic plus an experiment
-variant, and a 30 second trailer in two cuts. Everything is built from genuine
+variant, and a 39 second trailer in two cuts. Everything is built from genuine
 renders of the current game by scripts in `mobile/scripts/store/`. The brief
 is `brief.md`.
 
@@ -94,15 +94,15 @@ node scripts/store/refresh/verifyCopy.mjs  # must exit 0
 
 ## Hard boundaries (brief section 10), signed off
 
-Checked on 2026-09-23 against the files in this folder.
+Checked on 2026-09-23 against the files in this folder; items 1, 4, 5, 7 and 17 rechecked on 2026-09-26 for the revised trailer.
 
-- [x] 1. Every gameplay pixel is a real render of the current build (HEAD `4fc0121f`; `s07`, `s08`, `t2-board` and `t3` were recaptured on the working tree that adds the board and story-card fixes committed with this pack, which is why their provenance reads `gameSourceMatchesHead: false`, and trailer clip R7 was re-recorded on the same code). Only local progression is seeded; only real clicks, drags and the page clock (to wait out drifting clouds) are used; the DOM is never edited; no invented words, mocked UI, device frames, fingers or badges. The 16:9 master adds the brief's sky backdrop, idle sprites and caption plaques around the real frames, and the end card is not UI. (`raw/provenance.json`, `video/events/`)
+- [x] 1. Every gameplay pixel is a real render of the current build (HEAD `4fc0121f`; `s07`, `s08`, `t2-board` and `t3` were recaptured on the working tree that adds the board and story-card fixes committed with this pack, which is why their provenance reads `gameSourceMatchesHead: false`). Only local progression is seeded; only real clicks, drags and the page clock (to wait out drifting clouds) are used; the DOM is never edited; no invented words, mocked UI, device frames, fingers or badges. The trailer's additions (caption plaques, the bottom border closing each dialogue sheet, the afternoon-to-sunset sweep between two recordings of the same scroll, and the end card's wordmark, lines and extended sky) are disclosed in brief section 6 and item 17; the 16:9 master adds the game's blurred sky art around the real frames. (`raw/provenance.json`, `video/events/`)
 - [x] 2. Seeds agree with the game's rules; the two session corrections are in `raw/SUBSTITUTIONS.md`, item 4. `unlockedAnimals`, `unlockedRooms` and `introsSeen` go in every patch (`scripts/store/refresh/states.mjs`).
 - [x] 3. Claims come only from the claims table: "Over 4,000", no scene counts, "a link to a puzzle you solved", "Blind Mode", the one story and purchase line, the ads and purchases disclosure with the Supporter subscription and remove-ads purchase, the mild-horror line, no "Practice boards". (`copy/claims-and-sources.md`; `verifyCopy.mjs` bans the rest)
-- [x] 4. Nothing from phase 3 or later: no robes, shadow figure, crimson eyes, CLOSED or CLOSER, final board, Arrival, ending or New Cycle. The dusk house (slot 03, trailer S12) is phase 2.
-- [x] 5. Story pages shown: cup choice page 3/3 (slot 07, T3, trailer S9), cup-04 response (trailer S9), supper-02 (slot 08), witness-05 picture only (FG-A, and the YouTube thumbnail, see Deviations). No other scene or art.
+- [x] 4. Nothing from phase 3 or later: no robes, shadow figure, crimson eyes, CLOSED or CLOSER, final board, Arrival, ending or New Cycle. The dusk house (slot 03, the trailer's sunset scroll and end card, Ember's den) is phase 2.
+- [x] 5. Story pages shown: cup choice page 3/3 (slot 07, T3), supper-02 (slot 08), witness-05 picture only (FG-A, and the YouTube thumbnail, see Deviations). No other scene or art; the trailer shows no story page.
 - [x] 6. No Belfry, Tock's room, Unbroken Weave, Music Box, The Pattern, New Cycle or The Offering rows.
-- [x] 7. Pit captures (slot 06, tablet T4, trailer S10) are phase 0 with "Something stirs below...".
+- [x] 7. Pit captures (slot 06, tablet T4) are phase 0 with "Something stirs below...". The trailer shows only the pit's well under the house, with no pit line.
 - [x] 8. The presence is never announced or located; teases stay at "keeps secrets", "Mostly.", "very fond of you".
 - [x] 9. No phase or stage number or name.
 - [x] 10. All copy, captions, alt text and SRT: plain ASCII, straight quotes, no dashes, no "..." in the short description, no call to action, no ranking or promotional words, no prices, testimonials, awards, download counts, "no ads" or "free forever", no "composed" or "orchestral".
@@ -112,7 +112,7 @@ Checked on 2026-09-23 against the files in this folder.
 - [x] 14. Band plus seam 18.75%; letters in slot 01 and "Words" in slot 02's headline; the dusk tease at slot 03; no cute-only card in slots 01 to 03.
 - [x] 15. Tablet images carry no added text; no landscape phone screenshots.
 - [x] 16. Feature graphic: faces, the wordmark and the tagline inside x 154-870, y 76-424 (the tips of Ember's ears reach just above y 76, see Deviations); no text under the play button; mean luminance 93.7 (Rec. 601 luma); Ember is one of eight, not the hero, and there is no tile-plus-fox mark; the picture is painted story art, not a composited house state.
-- [x] 17. The Play video is the 9:16 cut; real UI fills 92% of it and gameplay shows from frame 0; nothing is added in the bottom 25%; captions are burned in and in `video/captions-en.srt`.
+- [x] 17. The Play video is the 9:16 cut; real UI fills about 85% of it and gameplay shows from frame 0; its additions are the four the item lists; nothing is added in the bottom 25%; captions are burned in and in `video/captions-en.srt`.
 - [x] 18. `launch-2026-09`, its scripts and the `docs/` mirrors are untouched.
 
 ## Deviations from the brief
@@ -186,12 +186,13 @@ Game issues found while capturing (outside the listing):
 6. **Story card text inset: fixed.** The story reader's body, page counter and
    answer trays started on the frame's last vignette ring. The card now adds
    an 8 dp reading gutter inside the panel token (`STORY_READING_GUTTER_DP` in
-   `src/components/storySceneLayout.ts`); slots 07 and 08, T3 and trailer clip
-   R7 were recaptured.
+   `src/components/storySceneLayout.ts`); slots 07 and 08, T3 and the first
+   trailer's clip R7 were recaptured.
 7. **Pit spiral at narrow widths.** The devour spiral swings a tapped word out
    by up to about 0.8 of its distance from the pit centre, so on a 432 CSS wide
    phone a word floating near the top or the edges leaves the screen mid-flight
-   (the trailer now picks a word whose spiral stays on screen).
+   (the first trailer picked a word whose spiral stayed on screen; the
+   current trailer has no pit shot).
 8. **Micro-beat visibility** (brief section 11): on web the micro-beat overlays
    render under the victory card; check the internal-testing build on a device.
 9. **Stale copy outside the listing** (brief section 11): `SupportComparison.tsx`

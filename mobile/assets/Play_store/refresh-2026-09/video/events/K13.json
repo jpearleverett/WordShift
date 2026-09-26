@@ -1,0 +1,71 @@
+{
+ "clip": "K13",
+ "state": "B",
+ "recordedAt": "2026-09-26T03:38:19.386Z",
+ "gitHead": "891dfccdd4baee79bf572b057c1289cba4357972",
+ "gameSourceMatchesHead": true,
+ "method": "clock-stepped capture: Playwright fake clock paused, runFor(1000/30 ms) then a CDP Page.captureScreenshot (jpeg q95) of the CSS rectangle {\"x\":0,\"y\":0,\"w\":432,\"h\":1040} of a 432x1040 viewport at DPR 5 = 2160x5200; the game's Reduced Motion setting on; sound/music/haptics off in-game; page clock pinned to 2026-10-06",
+ "fps": 30,
+ "format": "jpeg",
+ "ext": "jpg",
+ "handle": 15,
+ "pinnedDay": "2026-10-06",
+ "frameSize": {
+  "width": 2160,
+  "height": 5200
+ },
+ "viewport": {
+  "width": 432,
+  "height": 1040
+ },
+ "window": {
+  "x": 0,
+  "y": 0,
+  "w": 432,
+  "h": 1040
+ },
+ "dsf": 5,
+ "frames": 221,
+ "firstFrame": -15,
+ "lastFrame": 205,
+ "framesDir": "clips/K13",
+ "fileIndex": "file f%05d.png = clip frame + handle",
+ "events": [
+  {
+   "frame": 20,
+   "action": "press at the left edge (8,206): scroll up the house"
+  },
+  {
+   "frame": 170,
+   "action": "release at rest (8,921): the roof"
+  }
+ ],
+ "screening": {
+  "glitch": [],
+  "grim": [],
+  "ok": true
+ },
+ "notes": [],
+ "residents": [
+  "Chill the capybara, resting, a little longer",
+  "Fennick the fennec fox, resting, a little longer",
+  "Sloane the sloth, resting, a little longer",
+  "Axel the axolotl",
+  "Archimedes the owl, resting, a little longer",
+  "Panko the pangolin, resting, a little longer",
+  "Ember the fox, resting, a little longer"
+ ],
+ "motion": "Reduced Motion on (residents at their rest spots)",
+ "pan": {
+  "w": 432,
+  "h": 1040,
+  "hold": 20,
+  "frames": 150,
+  "x": 8,
+  "y0": 206,
+  "range": 707.72998046875,
+  "travel": 714.72998046875,
+  "bottomDenY": 611.546875
+ },
+ "probesOmitted": "Per-frame DOM probes (tile, label, pill, sheet and chrome boxes) stay with the frames in $TRAILER2_WORK/events; the edit reads them there."
+}

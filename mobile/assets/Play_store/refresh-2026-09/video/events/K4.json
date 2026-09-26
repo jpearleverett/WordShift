@@ -4,7 +4,7 @@
  "recordedAt": "2026-09-25T20:06:25.804Z",
  "gitHead": "8e888d608f310fda0e1e37158222f045b4197b35",
  "gameSourceMatchesHead": true,
- "method": "clock-stepped capture: Playwright fake clock paused, runFor(1000/30 ms) then a CDP Page.captureScreenshot (jpeg q95) of the CSS rectangle {\"x\":0,\"y\":0,\"w\":432,\"h\":844} of a 432x844 viewport at DPR 5 = 2160x4220; reducedMotion false; sound/music/haptics off in-game; page clock pinned to 2026-10-06",
+ "method": "clock-stepped capture: Playwright fake clock paused, runFor(1000/30 ms) then a CDP Page.captureScreenshot (jpeg q95) of the CSS rectangle {\"x\":0,\"y\":0,\"w\":432,\"h\":844} of a 432x844 viewport at DPR 5 = 2160x4220; the game's Reduced Motion setting off; sound/music/haptics off in-game; page clock pinned to 2026-10-06",
  "fps": 30,
  "format": "jpeg",
  "ext": "jpg",

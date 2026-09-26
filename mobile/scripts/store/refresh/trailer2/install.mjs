@@ -4,9 +4,10 @@
  *   node scripts/store/refresh/trailer2/install.mjs
  *
  * Run it after edit.mjs. It copies both cuts, the SRT and the build report
- * from $TRAILER2_WORK/out, renders the poster (frame 33 of the 9:16 cut, the
- * L held over PANT's checked PLANT slot, as a lossless composed frame rather
- * than a decoded video frame), copies each clip's events file without its
+ * from $TRAILER2_WORK/out, renders the poster (the frame edit.mjs names in
+ * report.marks.posterFrame: the L hovering over PANT's checked PLANT slot, as a
+ * lossless composed frame rather than a decoded video frame), copies each
+ * clip's events file without its
  * per-frame DOM probes, and rebuilds the YouTube thumbnail. Nothing in video/
  * is written by record.mjs or edit.mjs themselves.
  */
@@ -22,7 +23,6 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const CAMPAIGN = path.join(mobile, 'assets/Play_store/refresh-2026-09');
 const VIDEO = path.join(CAMPAIGN, 'video');
 const OUT = path.join(WORK, 'out');
-const POSTER_FRAME = 33;
 
 // ---------------------------------------------------------------- cuts, SRT, report
 
@@ -32,12 +32,13 @@ for (const [from, to] of [
   ['captions2-en.srt', 'captions-en.srt'],
 ]) await copyFile(path.join(OUT, from), path.join(VIDEO, to));
 const report = JSON.parse(await readFile(path.join(OUT, 'report.json'), 'utf8'));
+const POSTER_FRAME = report.marks?.posterFrame ?? 33;
 
 // ---------------------------------------------------------------- poster
 
 const r = spawnSync(process.execPath, [path.join(here, 'edit.mjs'), `--frames=${POSTER_FRAME}`, '9x16'], { stdio: 'inherit' });
 if (r.status !== 0) process.exit(r.status ?? 1);
-const frame = path.join(OUT, 'frames', `f${String(POSTER_FRAME).padStart(3, '0')}.png`);
+const frame = path.join(OUT, 'frames', `f${String(POSTER_FRAME).padStart(4, '0')}.png`);
 await sharp(frame).removeAlpha().png().toFile(path.join(VIDEO, 'poster-9x16-1080x1920.png'));
 
 // ---------------------------------------------------------------- events

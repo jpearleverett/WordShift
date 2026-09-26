@@ -194,110 +194,110 @@
         "shot": "H1 board",
         "frames": [
           0,
-          99
+          76
         ],
         "start": "00:00:00,000",
-        "end": "00:00:03,333",
+        "end": "00:00:02,567",
         "text": "One letter. Two real words."
       },
       {
         "shot": "H2 house",
         "frames": [
-          136,
-          215
+          131,
+          229
         ],
-        "start": "00:00:04,533",
-        "end": "00:00:07,200",
+        "start": "00:00:04,367",
+        "end": "00:00:07,667",
         "text": "Solve puzzles. Build them a home."
       },
       {
         "shot": "H3 invite",
         "frames": [
-          216,
-          243
+          230,
+          310
         ],
-        "start": "00:00:07,200",
-        "end": "00:00:08,133",
+        "start": "00:00:07,667",
+        "end": "00:00:10,367",
         "text": "13 friends to welcome."
       },
       {
         "shot": "H4 boards",
         "frames": [
-          244,
-          333
+          311,
+          422
         ],
-        "start": "00:00:08,133",
-        "end": "00:00:11,133",
+        "start": "00:00:10,367",
+        "end": "00:00:14,100",
         "text": "Over 4,000 puzzles."
       },
       {
         "shot": "H5 build",
         "frames": [
-          334,
-          379
+          423,
+          504
         ],
-        "start": "00:00:11,133",
-        "end": "00:00:12,667",
+        "start": "00:00:14,100",
+        "end": "00:00:16,833",
         "text": "More rooms. More neighbors."
       },
       {
         "shot": "H5 Sloane",
         "frames": [
-          380,
-          451
+          505,
+          624
         ],
-        "start": "00:00:12,667",
-        "end": "00:00:15,067",
+        "start": "00:00:16,833",
+        "end": "00:00:20,833",
         "text": "Three moths. All named Gerald."
       },
       {
         "shot": "H6 Panko",
         "frames": [
-          452,
-          583
+          625,
+          780
         ],
-        "start": "00:00:15,067",
-        "end": "00:00:19,467",
+        "start": "00:00:20,833",
+        "end": "00:00:26,033",
         "text": "Who moved the spice jars?"
       },
       {
-        "shot": "H7 day to dusk",
+        "shot": "PAN up the house",
         "frames": [
-          584,
-          676
+          781,
+          879
         ],
-        "start": "00:00:19,467",
-        "end": "00:00:22,567",
+        "start": "00:00:26,033",
+        "end": "00:00:29,333",
         "text": "Where did the day go?"
       },
       {
         "shot": "H8 Ember",
         "frames": [
-          677,
-          766
+          880,
+          1025
         ],
-        "start": "00:00:22,567",
-        "end": "00:00:25,567",
+        "start": "00:00:29,333",
+        "end": "00:00:34,200",
         "text": "Ember is fond of you."
       },
       {
         "shot": "End card",
         "frames": [
-          785,
-          830
+          1068,
+          1097
         ],
-        "start": "00:00:26,167",
-        "end": "00:00:27,700",
+        "start": "00:00:35,600",
+        "end": "00:00:36,600",
         "text": "It's a lovely house."
       },
       {
         "shot": "End card",
         "frames": [
-          831,
-          899
+          1098,
+          1175
         ],
-        "start": "00:00:27,700",
-        "end": "00:00:30,000",
+        "start": "00:00:36,600",
+        "end": "00:00:39,200",
         "text": "It's a lovely house. Isn't it?"
       }
     ],

@@ -1,22 +1,84 @@
 {
- "builtAt": "2026-09-25T23:33:51.748Z",
+ "builtAt": "2026-09-26T07:21:43.607Z",
+ "code": {
+  "head": "891dfccdd4baee79bf572b057c1289cba4357972",
+  "uncommitted": [
+   "mobile/scripts/store/refresh/trailer2/capture.mjs",
+   "mobile/scripts/store/refresh/trailer2/edit.mjs",
+   "mobile/scripts/store/refresh/trailer2/engine.mjs",
+   "mobile/scripts/store/refresh/trailer2/helpers.mjs",
+   "mobile/scripts/store/refresh/trailer2/install.mjs",
+   "mobile/scripts/store/refresh/trailer2/record.mjs"
+  ],
+  "md5": {
+   "edit.mjs": "3e0624bd7fef100e6a672892c9072f61",
+   "engine.mjs": "bdb09a56a9037b7d64cf6a593c702b3d",
+   "capture.mjs": "f9ae895f7326be5ad517478d900e54c5",
+   "helpers.mjs": "08c39abe29bdeacb0dead12c56e5728a",
+   "record.mjs": "acf5d22452a4fe0af061f1be66c2b08c",
+   "states2.mjs": "6d5e708dde095c46be59eb4836aa3b43",
+   "install.mjs": "eb1123289155735753c99ec362638674"
+  }
+ },
  "fps": 30,
- "frames": 900,
+ "frames": 1176,
  "marks": {
-  "kc": 76,
+  "kc": 165,
   "fc8": 131,
   "fe12": 85,
   "fe12next": 86,
   "i0": 192,
-  "END0": 767
+  "END0": 1026,
+  "posterFrame": 27,
+  "h1Map": [
+   [
+    0,
+    -9,
+    1.1
+   ],
+   [
+    23,
+    16,
+    4
+   ],
+   [
+    30,
+    45,
+    1.1
+   ],
+   [
+    69,
+    88,
+    4
+   ],
+   [
+    77,
+    119,
+    3
+   ],
+   [
+    81,
+    131,
+    2
+   ]
+  ],
+  "panSweep": [
+   11,
+   71
+  ],
+  "panSettled": 96,
+  "turnSeconds": 27.4,
+  "markAt": 1046,
+  "e1At": 1068,
+  "e2At": 1098
  },
  "shots": [
   {
    "id": "H1",
    "from": 0,
-   "to": 99,
+   "to": 103,
    "meta": {
-    "clip": "K1 -6..65"
+    "clip": "K1 -9..175"
    },
    "clips": [
     "K1"
@@ -24,8 +86,8 @@
   },
   {
    "id": "H1c",
-   "from": 100,
-   "to": 135,
+   "from": 104,
+   "to": 130,
    "meta": null,
    "clips": [
     "K1"
@@ -33,8 +95,8 @@
   },
   {
    "id": "H2",
-   "from": 136,
-   "to": 215,
+   "from": 131,
+   "to": 229,
    "meta": null,
    "clips": [
     "K2"
@@ -42,8 +104,8 @@
   },
   {
    "id": "H3",
-   "from": 216,
-   "to": 243,
+   "from": 230,
+   "to": 310,
    "meta": null,
    "clips": [
     "K2",
@@ -52,8 +114,8 @@
   },
   {
    "id": "H4a",
-   "from": 244,
-   "to": 273,
+   "from": 311,
+   "to": 348,
    "meta": null,
    "clips": [
     "K4"
@@ -61,8 +123,8 @@
   },
   {
    "id": "H4b",
-   "from": 274,
-   "to": 303,
+   "from": 349,
+   "to": 386,
    "meta": null,
    "clips": [
     "K5"
@@ -70,8 +132,8 @@
   },
   {
    "id": "H4c",
-   "from": 304,
-   "to": 333,
+   "from": 387,
+   "to": 422,
    "meta": null,
    "clips": [
     "K6"
@@ -79,8 +141,8 @@
   },
   {
    "id": "H5a",
-   "from": 334,
-   "to": 347,
+   "from": 423,
+   "to": 452,
    "meta": null,
    "clips": [
     "K7a"
@@ -88,8 +150,8 @@
   },
   {
    "id": "H5b",
-   "from": 348,
-   "to": 379,
+   "from": 453,
+   "to": 504,
    "meta": null,
    "clips": [
     "K7a"
@@ -97,17 +159,22 @@
   },
   {
    "id": "H5c",
-   "from": 380,
-   "to": 451,
+   "from": 505,
+   "to": 624,
    "meta": {
     "card": {
      "k": 2.42,
-     "bottom": 768,
-     "tops": [
-      437,
-      437
+     "push": [
+      2.305,
+      2.42
      ],
-     "highest": 479
+     "bottom": 768,
+     "skin": "bright",
+     "tops": [
+      438.79999999999995,
+      438.79999999999995
+     ],
+     "highest": 437
     }
    },
    "clips": [
@@ -117,8 +184,8 @@
   },
   {
    "id": "H6a",
-   "from": 452,
-   "to": 493,
+   "from": 625,
+   "to": 660,
    "meta": null,
    "clips": [
     "K8"
@@ -126,17 +193,22 @@
   },
   {
    "id": "H6b",
-   "from": 494,
-   "to": 583,
+   "from": 661,
+   "to": 780,
    "meta": {
     "card": {
      "k": 2.42,
-     "bottom": 768,
-     "tops": [
-      403,
-      498
+     "push": [
+      2.305,
+      2.42
      ],
-     "highest": 438
+     "bottom": 768,
+     "skin": "bright",
+     "tops": [
+      404.79999999999995,
+      499.79999999999995
+     ],
+     "highest": 396
     }
    },
    "clips": [
@@ -144,27 +216,25 @@
    ]
   },
   {
-   "id": "DAY",
-   "from": 584,
-   "to": 601,
-   "meta": null,
+   "id": "PAN",
+   "from": 781,
+   "to": 879,
+   "meta": {
+    "sweep": [
+     11,
+     71
+    ],
+    "relaxed": 96
+   },
    "clips": [
-    "K9"
-   ]
-  },
-  {
-   "id": "DUSK",
-   "from": 602,
-   "to": 676,
-   "meta": null,
-   "clips": [
-    "K10"
+    "K13",
+    "K14"
    ]
   },
   {
    "id": "H8a",
-   "from": 677,
-   "to": 694,
+   "from": 880,
+   "to": 915,
    "meta": null,
    "clips": [
     "K12"
@@ -172,17 +242,22 @@
   },
   {
    "id": "H8b",
-   "from": 695,
-   "to": 766,
+   "from": 916,
+   "to": 1025,
    "meta": {
     "card": {
      "k": 2.42,
-     "bottom": 745,
-     "tops": [
-      508,
-      510.20000000000005
+     "push": [
+      2.305,
+      2.42
      ],
-     "highest": 593
+     "bottom": 764,
+     "skin": "storm",
+     "tops": [
+      509.4,
+      512
+     ],
+     "highest": 528
     }
    },
    "clips": [
@@ -191,11 +266,13 @@
   },
   {
    "id": "END",
-   "from": 767,
-   "to": 899,
-   "meta": null,
+   "from": 1026,
+   "to": 1175,
+   "meta": {
+    "sky": "#6f4d80"
+   },
    "clips": [
-    "K10"
+    "K14"
    ]
   }
  ],
@@ -204,111 +281,111 @@
    "id": 1,
    "text": "One letter. Two real words.",
    "from": 0,
-   "to": 99
+   "to": 76
   },
   {
    "id": 2,
    "text": "Solve puzzles. Build them a home.",
-   "from": 136,
-   "to": 215
+   "from": 131,
+   "to": 229
   },
   {
    "id": 3,
    "text": "13 friends to welcome.",
-   "from": 216,
-   "to": 243
+   "from": 230,
+   "to": 310
   },
   {
    "id": 4,
    "text": "Over 4,000 puzzles.",
-   "from": 244,
-   "to": 333
+   "from": 311,
+   "to": 422
   },
   {
    "id": 5,
    "text": "More rooms. More neighbors.",
-   "from": 334,
-   "to": 379
+   "from": 423,
+   "to": 504
   },
   {
    "id": 6,
    "text": "Three moths. All named Gerald.",
-   "from": 380,
-   "to": 451
+   "from": 505,
+   "to": 624
   },
   {
    "id": 7,
    "text": "Who moved the spice jars?",
-   "from": 452,
-   "to": 583
+   "from": 625,
+   "to": 780
   },
   {
    "id": 8,
    "text": "Where did the day go?",
-   "from": 584,
-   "to": 676
+   "from": 781,
+   "to": 879
   },
   {
    "id": 9,
    "text": "Ember is fond of you.",
-   "from": 677,
-   "to": 766
+   "from": 880,
+   "to": 1025
   }
  ],
  "cues": [
   {
    "from": 0,
-   "to": 100,
+   "to": 77,
    "text": "One letter. Two real words."
   },
   {
-   "from": 136,
-   "to": 216,
+   "from": 131,
+   "to": 230,
    "text": "Solve puzzles. Build them a home."
   },
   {
-   "from": 216,
-   "to": 244,
+   "from": 230,
+   "to": 311,
    "text": "13 friends to welcome."
   },
   {
-   "from": 244,
-   "to": 334,
+   "from": 311,
+   "to": 423,
    "text": "Over 4,000 puzzles."
   },
   {
-   "from": 334,
-   "to": 380,
+   "from": 423,
+   "to": 505,
    "text": "More rooms. More neighbors."
   },
   {
-   "from": 380,
-   "to": 452,
+   "from": 505,
+   "to": 625,
    "text": "Three moths. All named Gerald."
   },
   {
-   "from": 452,
-   "to": 584,
+   "from": 625,
+   "to": 781,
    "text": "Who moved the spice jars?"
   },
   {
-   "from": 584,
-   "to": 677,
+   "from": 781,
+   "to": 880,
    "text": "Where did the day go?"
   },
   {
-   "from": 677,
-   "to": 767,
+   "from": 880,
+   "to": 1026,
    "text": "Ember is fond of you."
   },
   {
-   "from": 785,
-   "to": 831,
+   "from": 1068,
+   "to": 1098,
    "text": "It's a lovely house."
   },
   {
-   "from": 831,
-   "to": 900,
+   "from": 1098,
+   "to": 1176,
    "text": "It's a lovely house. Isn't it?"
   }
  ],
@@ -318,17 +395,17 @@
     "file": "assets/music/home_phase0.mp3",
     "startInFile": 23.28,
     "at": 0,
-    "duration": 20.216666666666665,
-    "segmentLufs": -15.1,
-    "gainDb": -4.9
+    "duration": 27.9,
+    "segmentLufs": -14.9,
+    "gainDb": -5.1
    },
    {
     "file": "assets/music/home_phase2.mp3",
     "startInFile": 66.22,
-    "at": 19.916666666666668,
-    "duration": 10.083333333333334,
-    "segmentLufs": -19.4,
-    "gainDb": -0.6
+    "at": 26.9,
+    "duration": 12.300000000000004,
+    "segmentLufs": -18.5,
+    "gainDb": -1.5
    }
   ],
   "sfx": [
@@ -341,124 +418,138 @@
    },
    {
     "file": "assets/sounds/valid_move.wav",
-    "at": 1.667,
+    "at": 1,
     "gainDb": 0,
     "trim": null,
     "why": "PLANT"
    },
    {
     "file": "assets/sounds/letter_select.wav",
-    "at": 1.933,
+    "at": 1.467,
     "gainDb": -6,
     "trim": null,
     "why": "the T lifts"
    },
    {
     "file": "assets/sounds/valid_move_2.wav",
-    "at": 3.333,
+    "at": 2.567,
     "gainDb": 0,
     "trim": null,
-    "why": "HEART"
+    "why": "HEART: the T drops"
    },
    {
     "file": "assets/sounds/perfect.wav",
-    "at": 3.333,
+    "at": 2.667,
     "gainDb": -2,
     "trim": null,
     "why": "the victory card"
    },
    {
-    "file": "assets/sounds/star_pop_3.wav",
-    "at": 3.4,
+    "file": "assets/sounds/star_pop_1.wav",
+    "at": 2.733,
     "gainDb": -6,
     "trim": null,
-    "why": "its three stars"
+    "why": "star 1"
+   },
+   {
+    "file": "assets/sounds/star_pop_2.wav",
+    "at": 2.9,
+    "gainDb": -6,
+    "trim": null,
+    "why": "star 2"
+   },
+   {
+    "file": "assets/sounds/star_pop_3.wav",
+    "at": 3.133,
+    "gainDb": -6,
+    "trim": null,
+    "why": "star 3"
    },
    {
     "file": "assets/sounds/ui_tap.wav",
-    "at": 7.2,
+    "at": 7.667,
     "gainDb": -8,
     "trim": null,
     "why": "the invite"
    },
    {
     "file": "assets/sounds/letter_select.wav",
-    "at": 8.133,
+    "at": 10.367,
     "gainDb": -8,
     "trim": null,
     "why": "the W lifts"
    },
    {
     "file": "assets/sounds/valid_move.wav",
-    "at": 8.533,
+    "at": 10.767,
     "gainDb": -2,
     "trim": null,
     "why": "SWING"
    },
    {
     "file": "assets/sounds/valid_move.wav",
-    "at": 9.467,
+    "at": 11.967,
     "gainDb": -2,
     "trim": null,
     "why": "CLOVER"
    },
    {
     "file": "assets/sounds/valid_move.wav",
-    "at": 10.133,
+    "at": 12.9,
     "gainDb": -2,
     "trim": null,
     "why": "PICKLED"
    },
    {
     "file": "assets/sounds/unlock.wav",
-    "at": 11.6,
+    "at": 15.1,
     "gainDb": 0,
     "trim": null,
     "why": "the Jungle Hammock is built"
    },
    {
     "file": "assets/sounds/dialogue.wav",
-    "at": 12.667,
+    "at": 16.833,
     "gainDb": -4,
     "trim": null,
     "why": "Sloane speaks"
    },
    {
     "file": "assets/sounds/dialogue.wav",
-    "at": 16.467,
+    "at": 22.033,
     "gainDb": -6,
     "trim": null,
     "why": "Panko speaks"
    },
    {
     "file": "assets/sounds/dialogue.wav",
-    "at": 23.167,
+    "at": 30.533,
     "gainDb": -6,
     "trim": null,
     "why": "Ember speaks"
    }
   ],
-  "rawIntegrated": -19.5,
+  "rawIntegrated": -19.6,
   "loudnormType": "Linear",
   "final": {
    "integrated": -14,
    "truePeak": -1.4,
-   "lra": 5.1
+   "lra": 5.6
   }
  },
  "out916": {
-  "duration": "00:00:30.00",
-  "video": "h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1080x1920, 4137 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
-  "audio": "aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 334 kb/s (default)"
+  "duration": "00:00:39.20",
+  "video": "h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1080x1920, 3452 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
+  "audio": "aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 339 kb/s (default)"
  },
  "out169": {
-  "duration": "00:00:30.00",
-  "video": "h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1920x1080, 2493 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
-  "audio": "aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 334 kb/s (default)"
+  "duration": "00:00:39.20",
+  "video": "h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709, progressive), 1920x1080, 2414 kb/s, 30 fps, 30 tbr, 15360 tbn (default)",
+  "audio": "aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 339 kb/s (default)"
  },
  "poster": {
   "file": "video/poster-9x16-1080x1920.png",
-  "frame": 33
+  "frame": 27
  },
  "thumbnail": {
   "file": "video/youtube-thumbnail-1280x720.png",
