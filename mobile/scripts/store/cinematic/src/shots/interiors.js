@@ -19,9 +19,10 @@
 //      up, smiles (her stock talk frame), a heart pops, and the camera pans right to
 //      take in her whole figure (S09's pull-back starts exactly there).
 //
-// Interior framings keep at least about half a room of painting across a 16:9
-// frame (the painting never magnifies past ~2.2x), and every camera stays within
-// 12 degrees of the painting normal.
+// Interior framings keep at least about half a room of painting across a 16:9 frame
+// (4.3+ units; 9:16 frames 2.2+ units), so the room art never magnifies past ~2.8
+// output px per painting px, and every camera stays within 12 degrees of the
+// painting normal.
 
 import * as THREE from 'three';
 import { makeJar } from '../world/props.js';
@@ -31,7 +32,7 @@ import { makeBillboard, poseEmote, makeContactShadow } from '../world/fx.js';
 import { poseCharacter } from '../world/sprites.js';
 import { makeTile, setLocked, makeSprout, TILE_SCALE, TILE_H } from '../core/tiles.js';
 import { ease, seg, lerp, clamp, spring, catmull } from '../core/math.js';
-import { mm, setAspect, look, project } from './common.js';
+import { mm, setAspect, look } from './common.js';
 import { makeStrokeSparks, HOUSE_STROKES } from './interiors-sparks.js';
 
 const D2R = Math.PI / 180;
@@ -42,6 +43,9 @@ const BU = 0.014, BV = 0.028;
 const paintX = (rm, u) => ((u - BU) / (1 - 2 * BU) - 0.5) * rm.roomW;
 const paintY = (rm, v) => ((v - BV) / (1 - 2 * BV)) * rm.roomH;
 const toWorld = (rm, p) => [rm.x + p[0], rm.y + p[1], p[2]];
+/** The midpoint between two 30 fps frames nearest t: an instant switch there never lands inside a
+ *  motion-blur shutter (subframes span +-1/120 s around each frame), so it never ghosts. */
+const midFrame = (t) => (Math.round(t * 30 - 0.5) + 0.5) / 30;
 
 /** A tiny canvas texture drawn pixel by pixel, crisp when magnified. */
 function pixelTexture(w, h, draw) {
@@ -88,6 +92,21 @@ const steamTexture = () => pixelTexture(12, 10, (g) => {
   }
 });
 
+/** A pool of warm light on a floor (additive radial decal, room-local, lying flat). */
+let poolTex = null;
+function lightPool(w, d, color) {
+  if (!poolTex) {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.4)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    poolTex = new THREE.CanvasTexture(c);
+  }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: poolTex, color, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2;
+  return m;
+}
+
 /** The sprouted L (locked powder, sprout grown, perfectly still). */
 function makeHeroL() {
   const g = new THREE.Group();
@@ -128,12 +147,12 @@ function aimCam(camera, cam) {
   camera.lookAt(...cam.target);
 }
 
-/** Motion-blur subframes from the frame centre's image-space travel over one shutter. */
-function blurFrames(rig, t) {
+/** Motion-blur subframes from the frame centre's travel over one shutter, in output px (1080p). */
+function blurFrames(rig, t, pxAcross) {
   const a = rig(t - 1 / 120), b = rig(t + 1 / 120);
   const w = Math.max(1, b.frameW);
-  const move = Math.hypot(b.target[0] - a.target[0], b.target[1] - a.target[1]) / w * 1920 + Math.abs(b.frameW - a.frameW) / w * 960;
-  return move < 2.5 ? 1 : move < 10 ? 2 : 3;
+  const move = (Math.hypot(b.target[0] - a.target[0], b.target[1] - a.target[1]) + Math.abs(b.frameW - a.frameW) / 2) / w * pxAcross;
+  return move < 10 ? 1 : move < 26 ? 2 : 3;
 }
 
 export default async function make(ctx) {
@@ -224,6 +243,11 @@ export default async function make(ctx) {
   });
   const question = await makeBillboard('ui/emote_question.png', portrait ? 0.5 : 0.62);
   world.register(question, kit.builtG);
+  // lamplight and the oven's glow pooled on the floor boards (they read near black at dusk otherwise)
+  const kitPool = world.register(lightPool(6.4, 2.8, '#ffb25c'), kit.builtG);
+  kitPool.position.set(0.9, 0.008, -0.2);
+  const ovenPool = world.register(lightPool(2.4, 1.8, '#ff9447'), kit.builtG);
+  ovenPool.position.set(paintX(kit, 0.908), 0.009, -1.0);
 
   // Panko stirs her pot from its right, trots to the oven for the break (the camera goes
   // with her, down and right, so the shelf leaves the frame) and at the end turns back
@@ -232,13 +256,14 @@ export default async function make(ctx) {
   const STAGE = { from: portrait ? 1.05 : 0.78, fromFacing: -1, to: 2.9, turn: -1 };
   const P_Z = -0.5, STRIDE = 0.72;
   const T_WALK0 = E.JARS_AWAY + 0.02, T_WALK1 = E.JARS_AWAY + 1.22;
+  const T_FLIP = midFrame(E.PANKO_TURN);
   // an even trot with short starts and stops, so the feet never skate
   const walkK = (t) => { const u = seg(t, T_WALK0, T_WALK1), a = 0.16; return u < a ? u * u / (2 * a * (1 - a)) : u > 1 - a ? 1 - (1 - u) * (1 - u) / (2 * a * (1 - a)) : (u - a / 2) / (1 - a); };
   function pankoState(t) {
     const x = lerp(STAGE.from, STAGE.to, walkK(t));
     const walking = t > T_WALK0 && t < T_WALK1;
     let facing = t < T_WALK0 ? STAGE.fromFacing : Math.sign(STAGE.to - STAGE.from);
-    if (t >= E.PANKO_TURN) facing = STAGE.turn;
+    if (t >= T_FLIP) facing = STAGE.turn;
     const hum = (t0, t1) => t > t0 && t < t1 && Math.floor((t - t0) * 6) % 2 === 0;
     const talking = hum(E.JARS_RACK + 0.1, T_WALK0 - 0.05) || hum(T_WALK1 + 0.3, T_WALK1 + 0.9);
     return { x, facing, walking, pose: walking ? 'walk' : talking ? 'talk' : 'idle' };
@@ -277,23 +302,25 @@ export default async function make(ctx) {
   const F = (x, y, w, pitch = 0) => [x, y, FZ, w, 0, pitch];
   const RIG7 = portrait ? {
     J0: F(1.74, 2.78, 2.32, -1), J1: F(2.04, 2.78, 2.32, -1),
-    R1: F(1.88, 2.7, 2.41, -1.2), R: F(1.72, 2.62, 2.5, -1.5),
+    R1: F(1.8, 2.7, 2.42, -1.2), R: F(1.44, 2.55, 2.62, -1.5), R2: F(1.42, 2.54, 2.64, -1.5),
     D: F(2.5, 0.72, 2.2, -10), D2: F(2.54, 0.7, 2.18, -10),
     B: F(2.15, 2.62, 2.45, -1.5), B2: F(2.12, 2.61, 2.47, -1.5),
   } : {
     // R1 lowers the frame while Panko is still left of it, so she joins from the left edge
-    J0: F(1.62, 3.0, 4.3, 2), J1: F(2.02, 3.0, 4.3, 2),
-    R1: F(2.32, 1.95, 4.45, 0), R: F(1.6, 1.55, 4.6, -3),
+    J0: F(1.62, 2.93, 4.3, 1), J1: F(2.02, 2.93, 4.3, 1),
+    R1: F(2.32, 1.95, 4.45, 0), R: F(1.6, 1.55, 4.6, -3), R2: F(1.6, 1.55, 4.6, -3),
     D: F(2.3, 1.42, 4.6, -4), D2: F(2.34, 1.4, 4.58, -4),
     B: F(0.0, 1.98, 7.0, -1), B2: F(-0.06, 1.98, 6.95, -1),
   };
-  const T_J1 = E.JARS_RACK + 0.1, T_R = E.JARS_AWAY + 0.04, T_D = E.JARS_AWAY + 0.78, T_B = E.JARS_BACK + 0.48;
+  // 9:16 settles on Panko while the focus racks to her, then holds until she sets off
+  const T_J1 = E.JARS_RACK + 0.1, T_R = E.JARS_AWAY + 0.04, T_RA = portrait ? E.JARS_RACK + 0.55 : T_R, T_D = E.JARS_AWAY + 0.78, T_B = E.JARS_BACK + 0.48;
   const vfov7 = portrait ? 25 : mm(100);
   const mixF = (a, b, k) => a.map((v, i) => lerp(v, b[i], k));
   function framing7(t) {
     if (t < T_J1) return mixF(RIG7.J0, RIG7.J1, ease.outSine(seg(t, E.S07, T_J1)));
-    if (t < T_R) return catmull([RIG7.J1, RIG7.R1, RIG7.R], ease.inOutSine(seg(t, T_J1, T_R)));
-    if (t < T_D) return mixF(RIG7.R, RIG7.D, ease.inOutSine(seg(t, T_R, T_D)));
+    if (t < T_RA) return catmull([RIG7.J1, RIG7.R1, RIG7.R], ease.inOutSine(seg(t, T_J1, T_RA)));
+    if (t < T_R) return mixF(RIG7.R, RIG7.R2, seg(t, T_RA, T_R));
+    if (t < T_D) return mixF(RIG7.R2, RIG7.D, ease.inOutSine(seg(t, T_R, T_D)));
     if (t < E.JARS_BACK) return mixF(RIG7.D, RIG7.D2, seg(t, T_D, E.JARS_BACK));
     if (t < T_B) return mixF(RIG7.D2, RIG7.B, ease.inOutCubic(seg(t, E.JARS_BACK, T_B)));
     return mixF(RIG7.B, RIG7.B2, seg(t, T_B, E.S08));
@@ -305,7 +332,7 @@ export default async function make(ctx) {
     return cam;
   }
   // The swap: the middle of the stretch where the camera sits lowest, the shelf out of frame.
-  const T_SWAP = (T_D + E.JARS_BACK) / 2;
+  const T_SWAP = midFrame((T_D + E.JARS_BACK) / 2);
   const JARS_FOCUS = toWorld(kit, [SHELF_X, PLANK_TOP + 0.24, ITEM_Z]);
   function focus7(t, cam) {
     const dj = depthOf(cam, JARS_FOCUS);
@@ -327,6 +354,8 @@ export default async function make(ctx) {
     ovenFire.group.visible = true;
     ovenFire.pose(t, { camera, intensity: 0.6 });
     ovenFire.light.intensity *= 0.55;
+    kitPool.visible = true; kitPool.material.opacity = portrait ? 0.3 : 0.2;
+    ovenPool.visible = true; ovenPool.material.opacity = 0.26 + 0.05 * Math.sin(t * 11.3) * Math.sin(t * 4.1);
     steam.forEach((s, i) => {
       const u = (((t - E.S07) / 1.8 + i / steam.length) % 1 + 1) % 1;
       s.visible = true;
@@ -343,19 +372,19 @@ export default async function make(ctx) {
 
   const s07 = {
     id: 'S07', start: E.S07, end: E.S08,
-    mb: (t) => blurFrames(rig7, t),
+    mb: (t) => blurFrames(rig7, t, portrait ? 1080 : 1920),
     pose(t) {
       setAspect(camera, portrait);
       const cam = rig7(t);
       aimCam(camera, cam);
       const focus = focus7(t, cam);
-      const aperture = portrait ? 70 : 84;
+      const aperture = portrait ? 100 : 90;
       poseS07(t);
       const grade = world.pose(t, { dusk: 1, lamps: 1, focus, aperture, camera, behaviours: behaviourS07(t) });
       posePanko(t);
       interiorOnly();
-      qaFace('S07', t, cam, toWorld(kit, [pankoState(t).x + 0.3 * pankoState(t).facing, 1.3, P_Z]));
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure: 1.2, contrast: 1.03, vignette: 0.26, dof: { focus, aperture, maxBlur: 16 } }) };
+      soloRoomLight(kit);
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure: 1.2, contrast: 1, vignette: 0.2, dof: { focus, aperture, maxBlur: 16 } }) };
     },
   };
 
@@ -382,11 +411,11 @@ export default async function make(ctx) {
   const STROKE_START = E.STROKES.map((x) => x - E.EIGHTH);
   const STROKE_DUR = E.EIGHTH * 0.94;
   const HOLD_END = E.STROKES[4] + 0.67;  // ~26.80 (spec: hangs 26.15-26.80)
-  const RELEASE = 0.5;                   // drifts up the chimney until ~27.30
+  const RELEASE = 0.45;                  // drifts up the chimney until ~27.4
   // the sprouted L at the right end of the mantel (its top edge at image v ~0.706 there)
   const mantelL = makeHeroL();
   const ML_X = paintX(den, 0.285);
-  const ML_Y = paintY(den, 0.706);
+  const ML_Y = paintY(den, 0.70);
   mantelL.position.set(ML_X, ML_Y + (TILE_H * TILE_SCALE) / 2, DEN_WALL + 0.2);
   mantelL.rotation.y = -0.12;
   world.register(mantelL, den.builtG);
@@ -395,43 +424,53 @@ export default async function make(ctx) {
   world.register(mlShadow, den.builtG);
   const heart = await makeBillboard('ui/emote_heart.png', portrait ? 0.5 : 0.52);
   world.register(heart, den.builtG);
-  // Ember stands at image u 0.40, turned toward the fire
-  // (16:9 moves her to u 0.52, at the frame's right edge, clear of the S07 caption's last frames)
-  const EM_X = paintX(den, portrait ? 0.40 : 0.52), EM_Z = -0.62;
+  const hearthPool = world.register(lightPool(3.6, 2.4, '#ff8a3a'), den.builtG);
+  hearthPool.position.set(FIRE[0] + 0.3, 0.008, -0.7);
+  // Ember watches from her own spot by the armchair, turned toward the fire. As the camera finds
+  // her she turns to chat through the wall, which is exactly where S09 (a continuous pull-back)
+  // has her: same place, same facing, same talk frame.
+  const EM_X = ember.x0, EM_Z = ember.z0;
+  const T_TURN = midFrame(E.S09 - 0.15);
   // the painted fire's own dusk glow card would wash the 3D fire out to white
   const fireGlow = den.lamps[0];
   world.track(fireGlow);
+  /** 1 while the den is S08's (3D fire, pools), falling to 0 as S09's plain den takes over. */
+  const handoff = (t) => 1 - ease.inOutSine(seg(t, E.S09 - 0.55, E.S09 - 0.05));
 
   function poseEmber(t) {
     const ch = ember.ch;
     ch.position.set(EM_X, 0.02, EM_Z);
     ember.shadow.position.set(EM_X, 0.012, EM_Z);
-    // she looks up at the drawing (a lean back, drawn up a little), then settles as the camera pans
-    const up = clamp(spring(t - E.EMBER_LOOK, 2.2, 0.62), 0, 1.15) * (1 - 0.6 * ease.inOutSine(seg(t, E.S09 - 0.7, E.S09)));
+    // she looks up at the drawing (a lean back, drawn up a little) and settles before she turns
+    const up = clamp(spring(t - E.EMBER_LOOK, 2.2, 0.62), 0, 1.15) * (1 - ease.inOutSine(seg(t, T_TURN - 0.4, T_TURN)));
     ch.rotation.z = -0.075 * up; // facing left: leaning back moves the top to the right
-    const breath = 1 + 0.013 * Math.sin(t * 2.5 + 0.4);
+    const breath = 1 + 0.013 * Math.sin(t * 2.5 + 0.4) * handoff(t);
     ch.scale.set(1, breath * (1 + 0.025 * up), 1);
-    const smile = t >= E.EMBER_SMILE && t < E.EMBER_SMILE + 0.82; // held into the pan that finds her
-    poseCharacter(ch, { pose: smile ? 'talk' : 'idle', facing: -1 });
-    const head = [EM_X - 0.1, ember.h + 0.24, EM_Z + 0.15];
+    if (t >= T_TURN) poseCharacter(ch, { pose: Math.floor(t * 6) % 2 === 0 ? 'talk' : 'idle', facing: 1 }); // S09's chatter
+    else poseCharacter(ch, { pose: t >= E.EMBER_SMILE ? 'talk' : 'idle', facing: -1 }); // the soft smile, held
+    const head = [EM_X - 0.1, ember.h + 0.14, EM_Z + 0.15];
     heart.position.set(...head); heart.userData.y0 = head[1];
-    poseEmote(heart, t - E.EMBER_HEART, { hold: 1.1, rise: 0.3, fade: 0.3 });
+    poseEmote(heart, t - E.EMBER_HEART, { hold: 0.58, rise: 0.22, fade: 0.26 }); // gone before the cut
   }
 
-  // camera: a slow push toward the drawing, then a pan right (the camera stays put) to Ember
+  // camera: a slow push toward the drawing, then a pan right (with a small truck) to Ember
   const vfov8 = portrait ? 30 : mm(85);
   const A8 = portrait ? [-2.52, 2.32, DRAW_O[2], 2.6, 3, 2] : [-2.0, 2.6, DRAW_O[2], 4.9, 4, 3];
   const A8b = portrait ? [-2.52, 2.34, DRAW_O[2], 2.46, 3, 2] : [-2.02, 2.61, DRAW_O[2], 4.62, 4, 3];
-  const PAN_TO = portrait ? [-1.56, 1.92, EM_Z] : [-1.0, 1.2, EM_Z];
-  const T_PAN = E.EMBER_HEART + 0.02;
+  const PAN_TO = portrait ? [0.36, 1.95, EM_Z] : [-0.45, 1.2, EM_Z];
+  const TRUCK = portrait ? 2.1 : 0.55;
+  // 9:16 finds her sooner (its frame starts further from her) and then holds on her
+  const T_PAN = portrait ? E.EMBER_HEART - 0.14 : E.EMBER_HEART + 0.02;
+  const T_PAN_END = portrait ? E.S09 - 0.25 : E.S09;
   function rig8(t) {
     const k = ease.inOutSine(seg(t, E.S08, T_PAN));
     const f = A8.map((v, i) => lerp(v, A8b[i], k));
     const cam = frameCam(den, f, vfov8, aspect);
-    const p = ease.inOutSine(seg(t, T_PAN, E.S09));
+    const p = ease.inOutSine(seg(t, T_PAN, T_PAN_END));
     if (p > 0) {
       const tw = toWorld(den, PAN_TO);
       cam.target = cam.target.map((v, i) => lerp(v, tw[i], p));
+      cam.pos = [cam.pos[0] + TRUCK * p, cam.pos[1], cam.pos[2]];
     }
     cam.frameW = f[3];
     return cam;
@@ -443,17 +482,19 @@ export default async function make(ctx) {
   }
 
   function poseS08(t) {
-    hearth.group.visible = true;
-    hearth.pose(t, { camera, intensity: 0.5 });
+    const h = handoff(t);
+    hearth.group.visible = h > 0.001;
+    hearth.pose(t, { camera, intensity: 0.5 * h });
     hearth.light.position.set(0, 0.35, 0.6);
     draw.group.visible = true;
-    draw.pose(t, { times: STROKE_START, dur: STROKE_DUR, holdEnd: HOLD_END, release: RELEASE, embers: 1 - 0.7 * seg(t, STROKE_START[0] - 0.3, STROKE_START[0]) * (1 - seg(t, HOLD_END, HOLD_END + 0.3)) });
+    draw.pose(t, { times: STROKE_START, dur: STROKE_DUR, holdEnd: HOLD_END, release: RELEASE, embers: h * (1 - 0.7 * seg(t, STROKE_START[0] - 0.3, STROKE_START[0]) * (1 - seg(t, HOLD_END, HOLD_END + 0.3))) });
     mantelL.visible = true; mlShadow.visible = true;
+    hearthPool.visible = h > 0.001; hearthPool.material.opacity = (0.3 + 0.06 * Math.sin(t * 9.7) * Math.sin(t * 3.3)) * h;
   }
 
   const s08 = {
     id: 'S08', start: E.S08, end: E.S09,
-    mb: (t) => blurFrames(rig8, t),
+    mb: (t) => blurFrames(rig8, t, portrait ? 1080 : 1920),
     pose(t) {
       setAspect(camera, portrait);
       const cam = rig8(t);
@@ -463,21 +504,23 @@ export default async function make(ctx) {
       poseS08(t);
       const grade = world.pose(t, { dusk: 1, lamps: 1, focus, aperture, camera, behaviours: { ember: { walkFrom: EM_X, facing: -1 } } });
       poseEmber(t);
-      qaFace('S08', t, cam, toWorld(den, [EM_X - 0.1, 1.45, EM_Z]));
-      fireGlow.material.opacity *= 0.35;
+      fireGlow.material.opacity *= lerp(1, 0.35, handoff(t));
       interiorOnly();
-      // S09 (a continuous pull-back) starts from this camera and look, so they match its grade
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: 1.04, exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: 0.24, dof: { focus, aperture, maxBlur: 16 } }) };
+      soloRoomLight(den, 10);
+      // S09 (a continuous pull-back) starts from this camera and look, so S08 eases into its
+      // grade over the pan (contrast 1.0 keeps the lifted blacks; S09 opens at 1.04)
+      const m = 1 - handoff(t);
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, contrast: lerp(1, 1.04, m), exposure: portrait ? 1.16 : 1.24, gamma: portrait ? [1, 1, 1] : [1.05, 1.05, 1.05], vignette: lerp(0.2, 0.24, m), dof: { focus, aperture, maxBlur: 16 } }) };
     },
   };
 
-  // TEMP QA: warn when a face is under the lower-centre caption
-  function qaFace(id, t, cam, p) {
-    if (portrait || t > E.S08 + 0.14 || t < E.S07 + 0.27) return;
-    camera.updateMatrixWorld();
-    const q = project(camera, p, ctx.overlay);
-    const nx = q.x / ctx.overlay.width, ny = q.y / ctx.overlay.height, r = 0.3 / cam.frameW;
-    if (nx + r > 0.19 && nx - r < 0.81 && ny + r * 1.78 > 0.77 && ny - r * 1.78 < 0.9 && q.z < 1) console.error(`QAFACE ${id} t=${t.toFixed(3)} x=${nx.toFixed(3)} y=${ny.toFixed(3)}`);
+  // Interior frames are lit painting from edge to edge and every point light is paid for on
+  // every pixel, so far rooms' lamps (out of their 10.4-unit range here) are switched off.
+  // S07 keeps only its own lamp (hard cuts both sides); S08 keeps the neighbours' too (they
+  // reach the den a little), so nothing changes when S09's pull-back takes over.
+  const roomLights = Object.values(house.rooms).filter((rm) => rm.light).map((rm) => world.track(rm.light) && rm);
+  function soloRoomLight(keep, radius = 0) {
+    for (const rm of roomLights) if (rm !== keep && Math.hypot(rm.x - keep.x, rm.y - keep.y) > radius) rm.light.visible = false;
   }
 
   /** Interiors: no sun shadows, no grass, no fireflies drifting in front of the lens. */

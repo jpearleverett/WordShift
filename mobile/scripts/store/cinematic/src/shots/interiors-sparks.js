@@ -86,7 +86,7 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
         k, f: (j + 0.5) / cells.length, target, from, c1, c2,
         flight: 0.36 + len * 0.1 + h(3) * 0.08,
         // the drawing lifts away from the top down, each spark a little on its own
-        release: (1 - clamp(target[1] / topY)) * 0.14 + h(5) * 0.1, drift: (h(6) - 0.5) * 0.5, tw: h(7) * 50,
+        release: (1 - clamp(target[1] / topY)) * 0.1 + h(5) * 0.08, drift: (h(6) - 0.5) * 0.5, tw: h(7) * 50,
       });
     });
   });
