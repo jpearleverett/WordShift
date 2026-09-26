@@ -218,7 +218,7 @@ export default async function make(ctx) {
     const push = ease.inOutSine(seg(t, E.S09 + 0.9, E.S10));
     if (!portrait) {
       const a = { pos: add(face, [0.8, 0.3, 5]), target: face, fov: mm(50) };
-      const b = { pos: [0, 11.8, 50 - 0.4 * push], target: [0, 8.8, 0], fov: mm(31) };
+      const b = { pos: [0, 8.6, 49 - 0.4 * push], target: [0, 8.9, 0], fov: mm(29) };
       return { pos: mix3(a.pos, b.pos, k), target: mix3(a.target, b.target, k), fov: lerp(a.fov, b.fov, k) };
     }
     const a = { pos: add(face, [0.5, 0.1, 6.2]), target: face, fov: mm(35) };
