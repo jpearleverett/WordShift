@@ -106,7 +106,10 @@ export function tileFace(ch, color = tileColorFor(ch), { font = 'Epunda Slab', i
  * Build a tile Group. Children: body (rounded box) and face (decal plane).
  * Group origin is the tile center; the letter faces +Z.
  */
-export function makeTile(ch, { color = tileColorFor(ch), emissive = 0 } = {}) {
+/** Base self-light on every tile face and body, so the candy colours hold in any key (spec 2.2 swatches). */
+export const TILE_EMISSIVE_BASE = 0.15;
+
+export function makeTile(ch, { color = tileColorFor(ch), emissive = TILE_EMISSIVE_BASE } = {}) {
   if (!bodyGeo) bodyGeo = new RoundedBoxGeometry(TILE_W, TILE_H, TILE_D, 10, RADIUS);
   const group = new THREE.Group();
   const bodyMat = new THREE.MeshPhysicalMaterial({
@@ -131,13 +134,14 @@ export function makeTile(ch, { color = tileColorFor(ch), emissive = 0 } = {}) {
   const lf = tileFace(ch, LOCKED);
   const lockMat = new THREE.MeshPhysicalMaterial({
     map: lf.map, normalMap: lf.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.40, clearcoat: 0.8, clearcoatRoughness: 0.18,
+    emissive: new THREE.Color('#ffffff'), emissiveMap: lf.map, emissiveIntensity: emissive,
     transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
   });
   const lockFace = new THREE.Mesh(face.geometry, lockMat);
   lockFace.position.z = TILE_D / 2 + 0.003;
   lockFace.visible = false;
   group.add(body, face, lockFace);
-  group.userData = { ch, body, face, bodyMat, faceMat, color, lockFace, lockMat };
+  group.userData = { ch, body, face, bodyMat, faceMat, color, lockFace, lockMat, glowBase: emissive };
   return group;
 }
 
@@ -175,6 +179,8 @@ export function makeSprout() {
 
 /** Set a warm self-glow on a tile (0 = none). */
 export function setTileGlow(tile, amount) {
-  tile.userData.bodyMat.emissiveIntensity = amount * 0.6;
-  tile.userData.faceMat.emissiveIntensity = amount * 0.6;
+  const u = tile.userData, base = u.glowBase ?? TILE_EMISSIVE_BASE;
+  u.bodyMat.emissiveIntensity = base + amount * 0.6;
+  u.faceMat.emissiveIntensity = base + amount * 0.6;
+  u.lockMat.emissiveIntensity = base + amount * 0.6;
 }

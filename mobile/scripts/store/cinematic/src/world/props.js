@@ -22,7 +22,7 @@ export function makeJar({ lid = '#b8483c', fill = '#c9803e', height = 0.62, radi
   const r = radius;
   prof.push(new THREE.Vector2(0.001, 0), new THREE.Vector2(r * 0.9, 0), new THREE.Vector2(r, 0.04), new THREE.Vector2(r, height * 0.78),
     new THREE.Vector2(r * 0.86, height * 0.86), new THREE.Vector2(r * 0.8, height * 0.9));
-  const glass = new THREE.Mesh(new THREE.LatheGeometry(prof, 24), new THREE.MeshPhysicalMaterial({ color: '#f4efe6', roughness: 0.08, transmission: 0, transparent: true, opacity: 0.38, clearcoat: 1, clearcoatRoughness: 0.05, depthWrite: false }));
+  const glass = new THREE.Mesh(new THREE.LatheGeometry(prof, 24), new THREE.MeshPhysicalMaterial({ color: '#f4efe6', roughness: 0.3, transmission: 0, transparent: true, opacity: 0.38, clearcoat: 1, clearcoatRoughness: 0.35, depthWrite: false }));
   const content = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.9, r * 0.9, height * 0.55, 20), new THREE.MeshStandardMaterial({ color: fill, roughness: 0.9 }));
   content.position.y = height * 0.29;
   const lidM = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.88, r * 0.88, height * 0.16, 20), new THREE.MeshStandardMaterial({ color: lid, roughness: 0.55 }));

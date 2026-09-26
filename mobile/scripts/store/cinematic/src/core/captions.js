@@ -73,7 +73,8 @@ export class Captions {
       for (const c of b.caps) {
         const st = STYLE[c.size === 'big' ? 'big' : c.voice];
         const size = Math.round(st.size[aspect] * this.px);
-        const words = c.text.split(' ').map((w) => ({ ...wordCanvas(w, st, size), text: w }));
+        // gi: the word's index across the whole caption, so a wrapped caption still reveals in reading order
+        const words = c.text.split(' ').map((w, gi) => ({ ...wordCanvas(w, st, size), text: w, gi }));
         const space = size * 0.28;
         const maxW = (aspect === '9x16' ? SAFE9.x1 - SAFE9.x0 - 2 * HALO : 1500) * this.px;
         // wrap
@@ -103,7 +104,7 @@ export class Captions {
           const cy = y - w.baselineY + w.canvas.height / 2;
           minX = Math.min(minX, x); maxX = Math.max(maxX, x + w.advance);
           x += w.advance + ln.space;
-          return { name, cx, cy, i };
+          return { name, cx, cy, i: w.gi };
         });
         y += lh(ln.size);
       }

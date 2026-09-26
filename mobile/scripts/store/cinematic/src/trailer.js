@@ -3,7 +3,8 @@
 //
 // A shot module exports `async function make(ctx)` returning one shot or an array:
 //   { id, start, end, transition?: { type: 'whip', dur, dir: [x, y] },
-//     mb?(t) -> subframes, pose(t, ctx) -> { scene, camera, look }, overlay?(t, ctx) }
+//     mb?(t) -> subframes, shutter?(t) -> seconds (default 1/60; see common.js blurFor),
+//     pose(t, ctx) -> { scene, camera, look }, overlay?(t, ctx) }
 // pose() receives trailer time, must be a pure function of it, and is called
 // after world.begin() has reset shared state (so it only sets what it uses).
 
@@ -35,7 +36,7 @@ export async function buildTrailer(ctx) {
       const layers = active.map((l) => ({
         pose: (ts) => { world.begin(); return l.shot.pose(ts, common); },
         mb: l.shot.mb ? l.shot.mb(t) : 1,
-        shutter: 1 / 60,
+        shutter: l.shot.shutter ? l.shot.shutter(t) : 1 / 60,
       }));
       const tr = active.length > 1 ? { type: active[1].transition.type, u: active[1].u, dir: active[1].transition.dir, color: active[1].transition.color } : null;
       return {

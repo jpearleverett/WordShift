@@ -17,9 +17,9 @@ export const E = {
   L_LAND: bar(1),                // 1.00, the first landing; the bed opens here
   SPROUT: bar(1, 1, 1) - 0.02,   // ~1.20
   L_LOCK: bar(1, 1, 1) + 0.08,   // ~1.30
-  T_LIFT: bar(1, 2),             // 1.44
+  T_LIFT: bar(1, 3, 1),          // ~2.10 (PAY / PLANT holds first)
   EMBER_TALK: bar(1, 2) + 0.11,  // 1.55
-  HEAR_OPEN: bar(1, 3, 1) + 0.08,// ~2.18
+  HEAR_OPEN: bar(1, 4),          // ~2.32
   T_LAND: bar(2),                // 2.76
   T_LOCK: bar(2) + 0.19,
   FLASH: [bar(2, 2), bar(2, 2, 1), bar(2, 3)], // PAY, PLAN, HEART
@@ -35,7 +35,8 @@ export const E = {
   SLOANE_POP: bar(5, 2),         // 8.50
   BUBBLE: bar(5, 3),             // 8.94
   TYPE_START: bar(5, 3) + 0.06,  // 9.00
-  TYPE_END: bar(6, 4) - 0.06,    // ~11.08
+  TYPE_CPS: 36,                  // Sloane types 36 characters a second, so Gerald lands early
+  TYPE_END: bar(5, 3) + 0.06 + 52 / 36, // ~10.44; the full line then holds ~1.1 s
   MOTH_LAND: bar(6, 4),          // 11.14
   // --- S04 montage
   S04: bar(7),                   // 11.58
@@ -96,7 +97,7 @@ export const CAPTIONS = [
   { id: 'c7', text: "Panko's spice jars keep changing places.", voice: 'tease', in: E.S07 + 0.27, out: E.S08 - 0.25, line: 0 },
   { id: 'c8', text: "The animals talk about you when you're away.", voice: 'tease', in: E.S09 + 0.7, out: E.BREATH - 0.01, line: 0 },
   { id: 'c9', text: 'All good things.', voice: 'tease', in: E.S09 + 2.4, out: E.BREATH - 0.01, line: 1 },
-  { id: 'c10', text: 'Probably.', voice: 'tease', size: 'big', in: E.PROBABLY, out: E.S10 - 0.2, line: 0 },
+  { id: 'c10', text: 'Probably.', voice: 'tease', size: 'big', in: E.PROBABLY, out: E.S10 - 0.24, line: 0 },
 ];
 
 /** Captions for the SRT (bubble and end line included). */

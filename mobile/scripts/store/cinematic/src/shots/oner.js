@@ -339,10 +339,10 @@ export default async function make(ctx) {
       return { scene: world.scene, camera, look: look(grade, 0, { msaa: t < E.S02, dof: { focus, aperture, maxBlur: t < E.CRANE ? 18 : 14 } }) };
     },
     overlay(t) {
-      // Sloane's bubble, anchored above her head, typed at 25 characters a second
+      // Sloane's bubble, anchored above her head, typed at E.TYPE_CPS characters a second
       if (t < E.BUBBLE || t > E.S04 - 0.02) return;
       const open = spring(t - E.BUBBLE, 3.5, 0.5);
-      const n = Math.floor(Math.max(0, t - E.TYPE_START) * 25);
+      const n = Math.floor(Math.max(0, t - E.TYPE_START) * E.TYPE_CPS);
       bubbleArt.draw(Math.min(n, bubbleArt.total));
       const head = add(JW, [sloane.x0, sloane.h + 0.1, sloane.z0]);
       const p = project(camera, head, ctx.overlay);

@@ -37,7 +37,7 @@ export async function makeAmberStream({ count = 40, size = 0.45, seed = 12 } = {
   const rnd = mulberry32(seed);
   const gems = [];
   for (let i = 0; i < count; i++) {
-    const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, color: new THREE.Color(1.6, 1.4, 1.1) });
+    const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
     const s = new THREE.Sprite(m);
     s.userData = { off: rnd(), jitter: [rnd() - 0.5, rnd() - 0.5, rnd() - 0.5], sz: size * (0.6 + rnd() * 0.7), spin: rnd() * 6 };
     group.add(s);

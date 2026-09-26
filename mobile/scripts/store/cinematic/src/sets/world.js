@@ -185,7 +185,7 @@ export async function buildWorld({ pxScale = 1 } = {}) {
           facing = Math.sign(b.walkTo - b.walkFrom) || facing;
           if (u >= 1 && b.endFacing) facing = b.endFacing;
         } else if (b.walkFrom !== undefined) x = b.walkFrom;
-        if (b.pose) pose = b.pose;
+        if (b.pose && pose !== 'walk') pose = b.pose;
         if (b.facing && pose !== 'walk') facing = b.facing;
         if (r.float) bob = Math.sin(t * 1.4 + r.seed) * 0.08 + 0.15;
         if (b.bob) bob += b.bob;

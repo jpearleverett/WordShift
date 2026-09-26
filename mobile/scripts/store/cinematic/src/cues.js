@@ -168,10 +168,10 @@ at('E.SLOANE_POP', E.SLOANE_POP, { synth: 'sparkle', params: { dur: 0.22, count:
 // the L drops into the hammock's sag and bounces (a soft cloth pat)
 at('E.SLOANE_POP + 0.35', E.SLOANE_POP + 0.35, { synth: 'puff', params: { dur: 0.12, cut: 700, seed: 274, pan: 0.05 }, db: -22 });
 at('E.BUBBLE', E.BUBBLE, { file: 'dialogue', db: -6, pan: 0.15 });
-// typing: one tick on every third character (25 characters a second)
+// typing: one tick on every third character (E.TYPE_CPS characters a second)
 {
   const text = 'Three moths live in my fur. I call all three Gerald.';
-  for (let c = 1; c <= text.length; c += 3) at(`E.TYPE_START + ${c}/25`, E.TYPE_START + c / 25, { file: 'ui_tick', db: -26 + (hash01(c) - 0.5) * 2, pan: 0.2 });
+  for (let c = 1; c <= text.length; c += 3) at(`E.TYPE_START + ${c}/${E.TYPE_CPS}`, E.TYPE_START + c / E.TYPE_CPS, { file: 'ui_tick', db: -26 + (hash01(c) - 0.5) * 2, pan: 0.2 });
 }
 // the three Geralds: wing-beat flutters panned with their loops (fire.js makeMoths)
 [{ sp: 0.9, ph: 0, rate: 21 }, { sp: 1.13, ph: 2.1, rate: 24 }, { sp: 1.36, ph: 4.2, rate: 19 }].forEach((m, i) => add({
