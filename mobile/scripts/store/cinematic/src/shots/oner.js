@@ -54,8 +54,8 @@ export default async function make(ctx) {
   });
   rack.group.position.set(...RACK_POS);
   world.register(rack.group);
-  // the trays self-light like the tiles (core/tiles TILE_EMISSIVE_BASE), so parchment and
-  // tile faces keep the game's relative values under the grade (spec 2.2 swatches)
+  // the trays self-light like the tiles, so parchment and tile faces keep the game's
+  // relative values under the grade (spec 2.2 swatches; see TRAY_EMISSIVE)
   for (const tr of rack.trays) tr.traverse((o) => { if (o.isMesh && o.geometry.type === 'PlaneGeometry') { o.material.emissive = new THREE.Color(TRAY_GLOW); o.material.emissiveIntensity = TRAY_EMISSIVE; } });
   const tiles = rack.set.tiles;
   const L = tiles.get('0:1').obj;
@@ -63,12 +63,13 @@ export default async function make(ctx) {
   // Tile-local self-light for the tile shots (spec 2.2 swatches under the AgX grade):
   // each face glows in its own hue with the chroma pushed (AgX pulls pastels toward
   // grey), strongest on the macro and rack shots and easing back under the boom
-  const selfTint = (hex) => {
+  const selfTint = (hex, push) => {
     const c = new THREE.Color(hex), l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-    return new THREE.Color(1 + CHROMA_PUSH * (c.r / l - 1), 1 + CHROMA_PUSH * (c.g / l - 1), 1 + CHROMA_PUSH * (c.b / l - 1));
+    return new THREE.Color(1 + push * (c.r / l - 1), 1 + push * (c.g / l - 1), 1 + push * (c.b / l - 1));
   };
   const WHITE = new THREE.Color(1, 1, 1);
-  for (const x of tiles.values()) x.obj.userData.selfTint = { face: selfTint(x.obj.userData.color.bg), lock: selfTint(LOCKED.bg) };
+  // (the locked powder blue is nearly grey, so it takes a stronger push to keep its blue)
+  for (const x of tiles.values()) x.obj.userData.selfTint = { face: selfTint(x.obj.userData.color.bg, CHROMA_PUSH), lock: selfTint(LOCKED.bg, CHROMA_PUSH * 2.5) };
   const sprout = makeSprout();
   L.add(sprout);
   const sproutLeaves = []; sprout.traverse((o) => { if (o.isMesh) sproutLeaves.push(o); });
@@ -626,9 +627,12 @@ export default async function make(ctx) {
   return shot;
 }
 
+// The tile shots' swatch tuning (spec 2.2 / 7.2 gate 5, measured with qa/swatch.mjs on
+// full-res stills at 0.5 and 2.9): exposure, the tiles' self-light and its chroma push,
+// and the trays' self-light (held under the bloom threshold, or the trays veil the tiles).
 const TILE_EXPOSURE = 1.6;
-const TILE_SELF = 0.35;
-const CHROMA_PUSH = 2.6;
+const TILE_SELF = 0.25;
+const CHROMA_PUSH = 3.0;
 const TRAY_EMISSIVE = 0.5;
 const TRAY_GLOW = '#F3E2BF';
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
