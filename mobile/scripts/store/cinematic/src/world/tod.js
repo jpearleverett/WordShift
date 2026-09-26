@@ -67,7 +67,7 @@ export function skyWipe(mixv, u, y) {
  *   `rowBlend`, and into the evening haze (up to `haze` by `hazeEnd`).
  * cast.js (the horizon decal) samples the same way.
  */
-export const SKY_EDGE = { melt: 0.12, heavy: 0.06, rowBlend: 0.3, haze: 0.3, hazeEnd: 0.5, mid: [36, 76], heavyRes: [12, 16], rowRes: 24 };
+export const SKY_EDGE = { melt: 0.12, heavy: 0.05, rowBlend: 0.45, haze: 0.2, hazeEnd: 0.6, mid: [36, 76], heavyRes: [12, 20], rowRes: 24 };
 
 /**
  * The painted sky as one backdrop plane: a single copy of the painting (a band of
@@ -112,7 +112,7 @@ export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b 
         float k = smoothstep(front - hw, front + hw, vUv.y + rp * rip);
         // ahead of the front the afternoon's lower band (its green trees and meadow) already
         // takes the evening, so no bright green stands under the pink sky
-        vec3 dim = mix(vec3(1.0), vec3(0.78, 0.62, 0.58), smoothstep(0.0, 0.55, mixv) * (1.0 - smoothstep(0.55, 0.85, vUv.y)));
+        vec3 dim = mix(vec3(1.0), vec3(0.74, 0.54, 0.48), smoothstep(0.0, 0.45, mixv) * (1.0 - smoothstep(0.55, 0.85, vUv.y)));
         vec3 soft = mix(texture2D(midA, uv).rgb * dim, texture2D(midB, uv).rgb, k);
         vec3 c;
         if (out_ > 0.0) {

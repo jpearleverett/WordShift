@@ -36,7 +36,7 @@ const EMOTE_OFFSET = { observatory: [1.6, -0.25] };
  * which carries the painting's own hues) mostly off, the painting lit through a sand tint.
  */
 const EXPOSURE_S10 = 1.16;
-const AQUARIUM_S10 = { glow: 0.12, tint: '#c9ab95', paint: 0.62, light: 0.42 };
+const AQUARIUM_S10 = { glow: 0.05, tint: '#c9ab95', paint: 0.5, light: 0.42 };
 /** S10: extra self-light on the end tiles so their faces hold the spec 2.2 swatches under the dusk key. */
 const TILE_LIFT_S10 = 0.75;
 /**
@@ -189,7 +189,7 @@ export default async function make(ctx) {
   // house, ~20 units further, goes soft.
   const L10 = portrait
     ? { end: { pos: [-6.5, GROUND_Y, 9.5], yaw: 0.3 }, signW: 4.35, signY: 5.1, signZ: -1.0, cam: { pos: [0.24, 1.6, 10.4], target: [0.14, 2.5, 0], fov: 46 } }
-    : { end: { pos: [-9.5, GROUND_Y, 13], yaw: 0.52 }, signW: 5.0, signY: 4.18, signZ: -1.0, cam: { pos: [0.1, 2.85, 9.0], target: [0, 3.05, 0], fov: mm(50) } };
+    : { end: { pos: [-11.5, GROUND_Y, 13], yaw: 0.52 }, signW: 5.0, signY: 4.18, signZ: -1.0, cam: { pos: [0.1, 2.85, 9.0], target: [0, 3.05, 0], fov: mm(50) } };
   const END = L10.end;
   const end = new THREE.Group();
   end.position.set(...END.pos); end.rotation.y = END.yaw;
@@ -204,7 +204,7 @@ export default async function make(ctx) {
   rack.trays[1].visible = false; rack.trays[2].visible = false;
   // the tray face self-lights like S01's (oner.js TRAY_EMISSIVE), so the parchment holds
   // its cream under the dusk key instead of greying to mauve
-  rack.trays[0].traverse((o) => { if (o.isMesh && o.geometry.type === 'PlaneGeometry') { o.material.emissive = new THREE.Color('#F3E2BF'); o.material.emissiveIntensity = 0.35; } });
+  rack.trays[0].traverse((o) => { if (o.isMesh && o.geometry.type === 'PlaneGeometry') { o.material.emissive = new THREE.Color('#F3E2BF'); o.material.emissiveIntensity = 0.5; } });
   end.add(rack.group);
   const letters = ['M', 'O', 'S', 'T', 'L', 'Y'];
   const endTiles = letters.map((ch) => { const tl = makeTile(ch); rack.rows[0].group.add(tl); return tl; });
@@ -389,7 +389,7 @@ export default async function make(ctx) {
     });
   }
 
-  const SKY_S10 = portrait ? [-80, 22, -170] : [-120, 20, -170];
+  const SKY_S10 = portrait ? [-80, 22, -170] : [-167, 12, -170];
   /** S09 16:9: the backdrop re-seated for the hold (scale, position); see s09.pose. */
   const SKY_S09 = { scale: 3.2, pos: [-60, -37.5, -170] };
   world.track(world.sky); // S09 (16:9) re-seats it and S10 moves the painted sun behind the sign; begin() restores it
@@ -410,28 +410,30 @@ export default async function make(ctx) {
     const dir = new THREE.Vector3(); f.camera.getWorldDirection(dir);
     const d = f.look?.dof?.focus ?? 6;
     const p = f.camera.position;
+    const hl = s08Shot.handoffLook || {};
     const h = {
       pos: [p.x, p.y, p.z], target: [p.x + dir.x * d, p.y + dir.y * d, p.z + dir.z * d], fov: f.camera.fov,
-      aperture: f.look?.dof?.aperture ?? (portrait ? 60 : 70), exposure: f.look?.exposure, contrast: f.look?.contrast,
+      aperture: f.look?.dof?.aperture ?? (portrait ? 60 : 70), maxBlur: f.look?.dof?.maxBlur ?? 10, exposure: hl.exposure ?? f.look?.exposure, contrast: hl.contrast ?? f.look?.contrast,
+      tint: hl.tint ? new THREE.Color(hl.tint) : null, // the den painting's interior tint (S08 sets it)
     };
     world.begin();
     return h;
   })();
   const s08End = () => handoff;
+  const denTint = new THREE.Color();
   /** Where the pull-back starts at t: S08's own rig while its pan is still running, else its last frame. */
   const pullFrom = (t) => (s08Rig ? s08Rig(Math.min(t, E.S09 + 0.3)) : s08End());
 
-  // The hold. 16:9 (spec 3.2, lowered so the roof fits above the captions): the whole house
-  // from ground to chimney smoke, the dusk sky beside the gable, with a perceptible 5-unit
-  // push over 28.4-33.9; the tease captions (bottom centre, baseline 918) sit on the grass
-  // below the ground-floor residents' feet. 9:16 keeps the whole house, with the ground
+  // The hold. 16:9 (spec 3.2, reframed so the roof fits above the captions): the whole house
+  // from the grass to the chimney, the painted dusk sun and mountains beside and above the
+  // gable (the backdrop re-seated, see s09.pose), and a perceptible 6-unit push over
+  // 28.35-33.92 that gathers pace (an ease-in): a quarter of it by 31.17, so the ground-floor
+  // residents stand whole above the two-line tease (bottom centre, from about y 790), then
+  // on through "Probably." into the hard cut. 9:16 keeps the whole house, with the ground
   // floor above the Shorts/Reels UI (y 1440).
   const WIDE = portrait
     ? (push) => ({ pos: [0, 13.4, 44 - 1.2 * push], target: [0, 12.1, 0], fov: mm(24) })
     : (push) => ({ pos: [0, 10.5, 59.5 - 6.0 * push], target: [0, 9.0 + 1.3 * push, 0], fov: mm(35) });
-  // 16:9: the push gathers pace (an ease-in): barely moving while the two-line tease is up
-  // (a quarter of it by 31.17, so the ground floor stays clear above the captions), then
-  // carrying on through "Probably." into the hard cut
   const pushAt = portrait ? (t) => ease.inOutSine(seg(t, E.S09 + 0.9, E.S10)) : (t) => seg(t, E.S09 + 0.9, E.S10) ** 2;
   function s09Camera(t) {
     const ember = world.residents.ember;
@@ -451,21 +453,23 @@ export default async function make(ctx) {
   const s09Blur = (t) => blurFor(travelPx((ts) => s09Camera(ts), t, portrait ? 1920 : 1080), { maxN: 32, minShutterFrac: 0.75 });
 
   // 16:9 hold checks (construction time, like the S10 feet check below): the chimney stays
-  // in frame, and the ground-floor residents' heads stay clear of the tease captions
-  // (two lines from about y 790 until 31.17, then "Probably." from about y 855).
+  // in frame (NDC y <= 0.9) at the start, at 31.17 and at the end of the push, and the
+  // ground-floor residents stay clear of the tease captions: heads above y 780 (feet above
+  // 790, the whole figure) while the two-line tease is up, heads above 855 ("Probably.").
   if (!portrait) {
     const cam = new THREE.PerspectiveCamera(30, 16 / 9, 0.05, 900);
     const yPx = (p) => { const v = new THREE.Vector3(...p).project(cam); return { ndcY: v.y, y: (1 - (v.y * 0.5 + 0.5)) * 1080 }; };
-    const heads = LAYOUT[0].map((id) => { const rm = house.rooms[id], r = world.residents[RESIDENTS[id].name]; return [rm.x + r.x0, rm.y + 0.12 + r.h, r.z0]; });
-    for (const [label, push, maxY] of [['start', 0, 780], ['31.17', pushAt(E.BREATH - 0.01), 780], ['end', 1, 855]]) {
+    const ground = LAYOUT[0].map((id) => { const rm = house.rooms[id], r = world.residents[RESIDENTS[id].name]; return { name: RESIDENTS[id].name, head: [rm.x + r.x0, rm.y + 0.12 + r.h, r.z0], feet: [rm.x + r.x0, rm.y + 0.02, r.z0] }; });
+    for (const [label, push, maxHead, maxFeet] of [['start', 0, 780, 790], ['31.17', pushAt(E.BREATH - 0.01), 780, 790], ['end', 1, 855, 972]]) {
       const c = WIDE(push);
       cam.fov = c.fov; cam.updateProjectionMatrix();
       cam.position.set(...c.pos); cam.lookAt(...c.target); cam.updateMatrixWorld();
       const ch = house.chimneyTop ? yPx([house.chimneyTop.x, house.chimneyTop.y, house.chimneyTop.z]) : null;
       if (ch && ch.ndcY > 0.9) console.warn(`[S09 16:9 CHECK FAILED] chimney top at NDC y ${ch.ndcY.toFixed(3)} (> 0.9) at push ${label}`);
-      for (const hd of heads) {
-        const y = yPx(hd).y;
-        if (y > maxY) console.warn(`[S09 16:9 CHECK FAILED] a ground-floor head top at y ${y.toFixed(0)} px (> ${maxY}) at push ${label}`);
+      for (const g of ground) {
+        const hy = yPx(g.head).y, fy = yPx(g.feet).y;
+        if (hy > maxHead) console.warn(`[S09 16:9 CHECK FAILED] ${g.name}'s head top at y ${hy.toFixed(0)} px (> ${maxHead}) at push ${label}`);
+        if (fy > maxFeet) console.warn(`[S09 16:9 CHECK FAILED] ${g.name}'s feet at y ${fy.toFixed(0)} px (> ${maxFeet}) at push ${label}`);
       }
     }
   }
@@ -527,6 +531,8 @@ export default async function make(ctx) {
       applyWalks(ch.walks);
       uprightResidents();
       for (const o of mantelProps()) o.visible = true;
+      // the den painting's interior tint (S08's) eases into the wide's dusk tint with the grade
+      if (handoff?.tint) den.mat.color.lerpColors(handoff.tint, denTint.copy(den.mat.color), cam.k);
       // staggered emote cascade: bottom row first, left to right, one per sixteenth; each
       // emote rides above its resident's head wherever the stroll has taken them
       order.forEach((room, i) => {
@@ -555,7 +561,8 @@ export default async function make(ctx) {
       const exWide = portrait ? 1.16 : 1.24;
       const ex0 = handoff?.exposure ?? exWide, ct0 = handoff?.contrast ?? grade.contrast;
       const exposure = lerp(ex0, exWide, cam.k), contrast = lerp(ct0, grade.contrast, cam.k);
-      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure, contrast, dof: { focus, aperture: cam.aperture, maxBlur: 10 } }) };
+      const maxBlur = lerp(handoff?.maxBlur ?? 10, 10, cam.k);
+      return { scene: world.scene, camera, look: look(grade, 1, { msaa: false, exposure, contrast, dof: { focus, aperture: cam.aperture, maxBlur } }) };
     },
   };
 

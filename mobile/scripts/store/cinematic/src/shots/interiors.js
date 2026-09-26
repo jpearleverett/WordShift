@@ -537,19 +537,18 @@ export default async function make(ctx) {
   }
 
   // camera: a slow push toward the drawing, then a pan right (with a small truck) onto Ember.
-  //   16:9  the fire mouth, the whole drawing and Ember three-quarter (knees up) beside it, so
-  //         her look-up and smile play in frame; the frame's left edge stays inside the room.
-  //         The pan waits until the finished drawing lets go.
-  //   9:16  the fire and the drawing, Ember wholly out of frame to the right; the pan finds her
-  //         full figure right of centre as she smiles, the heart above her.
-  const vfov8 = portrait ? 30 : mm(85);
   //   16:9  the frame's left edge on the den wall (-3.95), the drawing at about 20% x / 22% y
-  //         with ~110 px of headroom, the L on the mantel, and Ember (52%) cropped at the thigh,
-  //         so her look up (a lean back, a lift) reads with her whole torso. (Ember at 59% would
-  //         need a frame no wider than 5.3, which crops her at the neck under the drawing.)
+  //         with ~110 px of headroom, the L on the mantel, and Ember (52%) cropped at mid-torso,
+  //         so her look up (a lean back, a lift) and her smile play in frame. (Ember at 59%
+  //         would need a frame no wider than 5.3, which crops her at the neck under the
+  //         drawing.) The pan runs from the heart on, while the drawing lets go.
+  //   9:16  the fire and the drawing, Ember wholly out of frame to the right; the pan finds her
+  //         full figure a little right of centre as she smiles (the drawing just gone off the
+  //         left edge), her feet above the platform UI band, the heart above her.
+  const vfov8 = portrait ? 30 : mm(85);
   const A8 = portrait ? [-2.75, 2.32, DRAW_O[2], 2.6, 3, 2] : [-0.95, 2.29, DRAW_O[2], 6.0, 2, 1];
   const A8b = portrait ? [-2.75, 2.34, DRAW_O[2], 2.46, 3, 2] : [-0.97, 2.31, DRAW_O[2], 5.85, 2, 1];
-  const PAN_TO = portrait ? [EM_X - 0.35, 1.6, EM_Z] : [EM_X + 0.4, 1.2, EM_Z];
+  const PAN_TO = portrait ? [EM_X - 0.15, 1.2, EM_Z] : [EM_X + 0.4, 1.2, EM_Z];
   const TRUCK = portrait ? 2.1 : 0.55;
   //   16:9  the pan starts as the heart pops and runs on past the cut (T_PAN_END > E.S09): S09
   //         samples this rig (s08.rig) up to E.S09 + 0.3 and blends it into the pull-back, so

@@ -195,7 +195,7 @@ export default async function make(ctx) {
   const bubbles = Array.from({ length: 9 }, () => world.register(pixelSprite(bubbleTex, 0.24)));
   const dirtTex = dirtTexture();
   const dirt = Array.from({ length: 6 }, () => world.register(pixelSprite(dirtTex, 0.15)));
-  const moths = makeMoths({ px: 0.042, radius: 0.5 });
+  const moths = makeMoths({ px: 0.035, radius: 0.5 });
   world.register(moths.group);
 
   // the sprouted L, sitting on the cap of the chimney painted on the front gable
@@ -518,7 +518,7 @@ export default async function make(ctx) {
     kitchen: fromAim([0.2, 2.9, 15.5], [0, 2.35, 0], 38, { aperture: 8 }),
   } : {
     craneX: [-2.5, 0], craneY: [2.0, 29], craneZ: 24, lookDrop: 0.5, fov: mm(40),
-    tipPitch: 11, tipFov: mm(42), skyRise: -3.0, skyBack: 4,
+    tipPitch: 11, tipFov: mm(45), skyRise: -3.0, skyBack: 4,
     hero: fromAim([0, 6.2, 58], [0, 13.4, 0], mm(40), { aperture: 6.5 }),
     heroDrift: [0.35, 0, 0],
     kitchen: fromAim([0.5, 3.5, 14], [0, 2.3, 0], mm(50), { aperture: 8 }),

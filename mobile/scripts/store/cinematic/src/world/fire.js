@@ -100,21 +100,40 @@ export function makeFire({ px = 0.06, width = 0.9, height = 1.1, count = 90, spa
   };
 }
 
-/** Three tiny pixel moths (8x6 art px) on lissajous loops around a point. */
-export function makeMoths({ px = 0.045, radius = 0.55, colors = ['#e9d8b8', '#d8c2e6', '#c9dfc6'] } = {}) {
+/**
+ * Three tiny pastel pixel moths on lissajous loops around a point: 8x6 art px (spec 3.2)
+ * in two flap frames, wings spread and wings raised, each drawn at (1, 1) on a 10x8
+ * canvas inside a 1 px house-ink outline, with two antenna pixels. Without the outline
+ * the pale wings melted into the room behind and read as grey squares.
+ */
+const MOTH_ART = [
+  // wings spread: forewings up and out, hindwings down and out, the body between
+  ['WW....WW', 'WWW..WWW', '.WWBBWW.', '.WWBBWW.', 'WWWBBWWW', 'WW....WW'],
+  // wings raised: seen edge-on above the body
+  ['........', '.W....W.', '.WWBBWW.', '..WBBW..', '.WWBBWW.', '........'],
+];
+const MOTH_ANTENNAE = [[[3, 0], [6, 0]], [[3, 1], [6, 1]]];
+const MOTH_INK = '#3B2416';
+export function makeMoths({ px = 0.045, radius = 0.55, colors = ['#F4C7D8', '#CBE3F2', '#F6E3A2'] } = {}) {
   const group = new THREE.Group();
-  const frames = colors.map((c) => [0, 1].map((f) => {
-    const cv = document.createElement('canvas'); cv.width = 8; cv.height = 6;
+  const frames = colors.map((c) => MOTH_ART.map((art, f) => {
+    const W = 10, H = 8;
+    const cell = Array.from({ length: H }, () => Array(W).fill(''));
+    art.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.') cell[y + 1][x + 1] = ch === 'B' ? MOTH_INK : c; }));
+    const filled = (x, y) => x >= 0 && y >= 0 && x < W && y < H && art[y - 1]?.[x - 1] !== undefined && art[y - 1][x - 1] !== '.';
+    // the outline: every empty pixel that touches the moth along a side (not a corner)
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!filled(x, y) && (filled(x - 1, y) || filled(x + 1, y) || filled(x, y - 1) || filled(x, y + 1))) cell[y][x] = MOTH_INK;
+    }
+    for (const [x, y] of MOTH_ANTENNAE[f]) cell[y][x] = MOTH_INK;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const g = cv.getContext('2d');
-    g.fillStyle = '#5a4636'; g.fillRect(3, 2, 2, 3);
-    g.fillStyle = c;
-    if (f === 0) { g.fillRect(0, 0, 3, 3); g.fillRect(5, 0, 3, 3); g.fillRect(1, 3, 2, 2); g.fillRect(5, 3, 2, 2); }
-    else { g.fillRect(1, 1, 2, 2); g.fillRect(5, 1, 2, 2); g.fillRect(2, 3, 1, 2); g.fillRect(5, 3, 1, 2); }
+    cell.forEach((row, y) => row.forEach((col, x) => { if (col) { g.fillStyle = col; g.fillRect(x, y, 1, 1); } }));
     const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.colorSpace = THREE.SRGBColorSpace;
     return new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
   }));
   const moths = frames.map((fr, i) => {
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(8 * px, 6 * px), fr[0]);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(10 * px, 8 * px), fr[0]);
     group.add(mesh);
     return { mesh, fr, ph: i * 2.1, sp: 0.9 + i * 0.23 };
   });

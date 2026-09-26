@@ -290,6 +290,18 @@ export default async function make(ctx) {
     return add(p, [0, hop, 0]);
   }
 
+  // Each timber piece flies for 0.36 s and lands on its knock (eased in, so it hits hard).
+  /** Flight progress 0..1 of piece i at t. */
+  const pieceK = (i, t) => ease.inQuad(seg(t, E.KNOCKS[i] - 0.36, E.KNOCKS[i]));
+  /** Piece i's position at t, room-local (the jungle group's space). */
+  function piecePos(i, t) {
+    const f = pieceK(i, t), L = LAND[i], sd = Math.sign(L[0]);
+    if (i === 0) { const a = t - E.KNOCKS[0]; return [L[0], L[1] + (1 - f) * 2.2 + (a > 0 ? 0.06 * Math.max(0, Math.exp(-a * 16) * Math.sin(a * 38)) : 0), L[2]]; }
+    if (i <= 2) return [L[0] + sd * (1 - f) * 3.0, L[1] + (1 - f) * 2.2 + Math.sin(Math.PI * f) * 0.8, L[2] + (1 - f) * 3.5];
+    if (i === 3) return [L[0], L[1] + (1 - f) * 3.0, L[2]];
+    return [L[0] + sd * (1 - f) * 4.0, L[1] + Math.sin(Math.PI * f) * 0.8, L[2]];
+  }
+
   function poseBuild(t) {
     // before the drop the jungle is an empty frame being built; after it, the room
     if (t < E.GEMS) { house.setBuilt('jungle', false); return; }
@@ -301,41 +313,31 @@ export default async function make(ctx) {
     // the room's own (dark) returns come in under the unroll, behind the pine stand-ins
     for (const w of jungle.returns) w.visible = t >= E.DROP;
     const K = E.KNOCKS;
-    // each piece flies for 0.36 s and lands on its knock, with a squash and a rebound
-    const piece = (i) => ease.inQuad(seg(t, K[i] - 0.36, K[i]));
     const flying = (i) => t >= K[i] - 0.36;
     const squash = (i, amp = 0.22) => (t < K[i] ? 1 : 1 - amp * Math.exp(-(t - K[i]) * 16) * Math.cos((t - K[i]) * 38));
     // 0 the floor drops in and rebounds a hair
     if (t < E.DROP) {
-      const f = piece(0), a = t - K[0];
       jungle.floor.visible = flying(0);
-      jungle.floor.position.y = 0.003 + (1 - f) * 2.2 + (a > 0 ? 0.06 * Math.max(0, Math.exp(-a * 16) * Math.sin(a * 38)) : 0);
+      jungle.floor.position.y = piecePos(0, t)[1];
     }
     // 1, 2 the pine returns swing in from outside the frame (up and toward the lens),
     // arcing over and turning flush with the posts; cut away under the unroll
     standIns.forEach((w, k) => {
       const i = 1 + k, sd = k === 0 ? -1 : 1;
       if (!flying(i) || t >= E.DROP + 0.4) return;
-      const f = piece(i);
       w.visible = true;
-      w.position.set(LAND[i][0] + sd * (1 - f) * 3.0, LAND[i][1] + (1 - f) * 2.2 + Math.sin(Math.PI * f) * 0.8, LAND[i][2] + (1 - f) * 3.5);
-      w.rotation.set(0, -sd * Math.PI / 2 + sd * (1 - f) * 1.3, 0);
+      w.position.set(...piecePos(i, t));
+      w.rotation.set(0, -sd * Math.PI / 2 + sd * (1 - pieceK(i, t)) * 1.3, 0);
       w.scale.set(1, squash(i, 0.1), 1);
     });
     // 3 the ceiling beam drops from well above; 4, 5 the trims fly in from off frame with
     // an up-arc. They stay for the rest of the oner (out of frame once inside the room).
-    if (flying(3)) {
-      const f = piece(3);
-      beam.visible = true;
-      beam.position.set(LAND[3][0], LAND[3][1] + (1 - f) * 3.0, LAND[3][2]);
-      beam.scale.set(1, squash(3), 1);
-    }
+    if (flying(3)) { beam.visible = true; beam.position.set(...piecePos(3, t)); beam.scale.set(1, squash(3), 1); }
     trims.forEach((m, k) => {
-      const i = 4 + k, sd = k === 0 ? -1 : 1;
+      const i = 4 + k;
       if (!flying(i)) return;
-      const f = piece(i);
       m.visible = true;
-      m.position.set(LAND[i][0] + sd * (1 - f) * 4.0, LAND[i][1] + Math.sin(Math.PI * f) * 0.8, LAND[i][2]);
+      m.position.set(...piecePos(i, t));
       m.scale.set(squash(i), 1, 1);
     });
     // a pixel dust puff where each piece lands: stepped growth (15 fps), 0.6 -> 1.5 of its
@@ -436,7 +438,7 @@ export default async function make(ctx) {
       g.material.rotation = gp.h2 * 6 + t * 2.4 * (gp.h1 - 0.5);
       // deep amber: undo the tile shots' exposure lift (it pushed the gems past AgX's
       // shoulder into cream) and warm the sprite, so the gold keeps its hue and dark rim
-      g.material.color.setRGB(gk, gk * 0.84, gk * 0.6);
+      g.material.color.setRGB(gk, gk * 0.74, gk * 0.15);
       g.material.opacity = Math.min(1, u * 12) * (1 - seg(ride, 0.9, 1));
       if (ride > 0) { lit++; c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; }
     });
@@ -538,15 +540,18 @@ export default async function make(ctx) {
     S = { pos: [sloane.x0 - 0.66, JW[1] + 1.46, sloane.z0 + 8.0], target: [sloane.x0 - 0.76, JW[1] + 1.3, sloane.z0], fov: 40 };
     ORBIT = 5;
   }
-  // The crane is two overlapping moves. A boom and tilt up after the amber bursts
-  // (B -> C: it ramps in softly, peaks early and has a long tail, so there is no lurch
-  // and the rack is out of frame by about 5.2) rides on the long crane to the frame
-  // (C -> D). The long crane starts at rest and gathers speed all the way to the drop: it
-  // passes dead centre on the frame at exactly the drop and carries that momentum
-  // straight into the push to Sloane (D -> S), so the oner never stops or lurches between
-  // the burst and the room. Measured with travelPx every 1/30 s: peak 31 px (16:9) / 45
-  // (9:16), never below 8 px from 5.1 to 7.9, no frame above 2.5x its neighbours.
-  const BOOM = [E.GEMS + 0.15, E.GEMS + 2.3];
+  // The crane is one continuous spline through three keys, each channel (position, aim,
+  // zoom) a Hermite curve with matched velocities at the joins:
+  //   B (at rest, CRANE) -> M, the top of the boom (T_TOP): the tilt up off the rack after
+  //     the amber bursts, which has the rack (and PAY) out of frame by ~4.8, before the
+  //     amber caption comes in; M is C a fifth of the way along to D, and the curve goes
+  //     through it at speed (no stop between the boom and the long crane);
+  //   M -> D, the long crane to the frame, passing dead centre on it at exactly the drop
+  //     and still moving;
+  //   D -> S (below), the push to Sloane, which carries that momentum straight in.
+  // Measured with travelPx every 1/30 s: peak 31 px (16:9) / 53 (9:16), at least 8 px
+  // from 5.1 to 7.9 (11 in 9:16), no frame above 2.5x its neighbours.
+  const T_TOP = E.GEMS + 1.1;
   const PUSH = 1.25; // the push to Sloane after the drop
   const MACRO_D = 10.5;
   /** 1 on the macro and rack shots, easing to 0 as the boom lifts off them. */
@@ -574,31 +579,40 @@ export default async function make(ctx) {
     return { pos: add(B.pos, [0, up * 0.5, 0]), target: add(B.target, [0, up, 0]), fov: B.fov };
   }
 
-  // The velocities the move carries through the drop (world units a second): the mean of
-  // the crane's and the push's average velocities (a Catmull-Rom tangent), a little more on
-  // the aim so the frame keeps travelling into the hit. The zoom settles at the drop (it
-  // widens on the crane and narrows on the push, so any carried rate would reverse it).
-  const T1 = E.DROP - E.CRANE;
+  // The velocities at the keys (world units a second). At M: twice the harmonic mean of
+  // the neighbouring slopes, per component (0 where they disagree, so no channel ever
+  // reverses). At D: the mean of the long crane's and the push's average velocities (a
+  // Catmull-Rom tangent), a little less on position. The zoom settles at each key (it
+  // widens on the crane and narrows on the push, so a carried rate would reverse it).
+  const M = { pos: mix3(C.pos, D.pos, 0.2), target: mix3(C.target, D.target, 0.2), fov: lerp(C.fov, D.fov, 0.2) };
+  // (9:16's narrow frame must be centred on the cell by the time the blueprint lays flat,
+  // or the sheet and its PLAN hang off the right edge: its aim is most of the way over
+  // at the boom top, and eases in rather than carrying speed into the drop)
+  if (portrait) M.target[0] = lerp(C.target[0], D.target[0], 0.75);
+  const T_BOOM = T_TOP - E.CRANE, T_LONG = E.DROP - T_TOP;
+  const mono = (a, b, c, ta, tc) => b.map((_, i) => { const d0 = (b[i] - a[i]) / ta, d1 = (c[i] - b[i]) / tc; return d0 * d1 <= 0 ? 0 : (4 * d0 * d1) / (d0 + d1); });
+  const V_M_POS = mono(B.pos, M.pos, D.pos, T_BOOM, T_LONG), V_M_AIM = mono(B.target, M.target, D.target, T_BOOM, T_LONG);
+  const through = (c, d, s, k) => c.map((_, i) => k * ((d[i] - c[i]) / T_LONG + (s[i] - d[i]) / PUSH) / 2);
+  const V_POS = through(M.pos, D.pos, S.pos, 0.8), V_AIM = through(M.target, D.target, S.target, portrait ? 0.5 : 1);
   const CREEP = [0, 0, -0.35 / (E.S04 - E.DROP - PUSH)]; // the slow drift in on Sloane after the push
-  const through = (c, d, s, k) => c.map((_, i) => k * ((d[i] - c[i]) / T1 + (s[i] - d[i]) / PUSH) / 2);
-  const V_POS = through(C.pos, D.pos, S.pos, 1), V_AIM = through(C.target, D.target, S.target, 1.3);
   function onerCamera(t) {
     let r, roll = 0;
     if (t < E.L_LAND + 0.12) r = rigA(t);
     else if (t < E.CRANE) r = blend(rigA(t), B, ease.inOutSine(seg(t, E.L_LAND + 0.12, E.L_LAND + 0.8)));
     else if (t < E.DROP) {
-      const sb = seg(t, BOOM[0], BOOM[1]);
-      const e1 = 1 - Math.pow(1 - sb, 3) * (1 + 3 * sb); // speed 12 s (1 - s)^2: soft in, peak at a third, long tail
-      const s = seg(t, E.CRANE, E.DROP);
-      const w = 16 * s * s * (1 - s) * (1 - s); // the orbit and Dutch tilt: in and out at rest
-      const pos = add(hermite3(C.pos, ZERO3, D.pos, V_POS, s, T1), B.pos.map((v, i) => (1 - e1) * (v - C.pos[i])));
+      const s0 = seg(t, E.CRANE, E.DROP);
+      const w = 16 * s0 * s0 * (1 - s0) * (1 - s0); // the orbit and Dutch tilt: in and out at rest
+      let pos, target, fov;
+      if (t < T_TOP) {
+        const s = seg(t, E.CRANE, T_TOP);
+        pos = hermite3(B.pos, ZERO3, M.pos, V_M_POS, s, T_BOOM); target = hermite3(B.target, ZERO3, M.target, V_M_AIM, s, T_BOOM); fov = lerp(B.fov, M.fov, smooth(s));
+      } else {
+        const s = seg(t, T_TOP, E.DROP);
+        pos = hermite3(M.pos, V_M_POS, D.pos, V_POS, s, T_LONG); target = hermite3(M.target, V_M_AIM, D.target, V_AIM, s, T_LONG); fov = lerp(M.fov, D.fov, smooth(s));
+      }
       const orbit = THREE.MathUtils.degToRad(ORBIT * w);
       const rel = [pos[0] - D.target[0], pos[2] - D.target[2]];
-      r = {
-        pos: [D.target[0] + rel[0] * Math.cos(orbit) - rel[1] * Math.sin(orbit), pos[1], D.target[2] + rel[0] * Math.sin(orbit) + rel[1] * Math.cos(orbit)],
-        target: add(hermite3(C.target, ZERO3, D.target, V_AIM, s, T1), B.target.map((v, i) => (1 - e1) * (v - C.target[i]))),
-        fov: lerp(C.fov, D.fov, smooth(s)) + (1 - e1) * (B.fov - C.fov),
-      };
+      r = { pos: [D.target[0] + rel[0] * Math.cos(orbit) - rel[1] * Math.sin(orbit), pos[1], D.target[2] + rel[0] * Math.sin(orbit) + rel[1] * Math.cos(orbit)], target, fov };
       roll = 1.5 * w;
     } else {
       // the push through the open front to Sloane: it leaves the drop at the crane's speed
@@ -647,6 +661,8 @@ export default async function make(ctx) {
     // the hero L and the amber ride faster than the camera: blur for them too (every
     // third gem is enough to find the fastest)
     if (t > E.GEMS && t < E.SLOANE_POP + 0.4) px = Math.max(px, pointTravel(heroPos, t));
+    // and for the timber, which lands fast (it would strobe in sharp copies otherwise)
+    E.KNOCKS.forEach((k, i) => { if (t > k - 0.36 && t < k + 0.03) px = Math.max(px, pointTravel((ts) => add(JW, piecePos(i, ts)), t)); });
     if (t > E.GEMS && t < E.GEM_BURST + 0.2) {
       for (let i = 0; i < N_GEMS; i += 3) {
         if (!gemPos(i, t - 1 / 120) || !gemPos(i, t + 1 / 120)) continue;
@@ -747,7 +763,7 @@ const TILE_SELF = 0.25;
 const CHROMA_PUSH = 3.0;
 const TRAY_EMISSIVE = 0.5;
 const TRAY_GLOW = '#F3E2BF';
-const GEM_TINT = 0.65; // the gems' sprite colour under the day grade (see poseAmber)
+const GEM_TINT = 0.5; // the gems' sprite colour under the day grade (see poseAmber)
 const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };

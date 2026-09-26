@@ -3,8 +3,10 @@
 //   node scripts/store/cinematic/qa/report.mjs [--draft] [--skip=determinism,overlay,probes]
 //
 // Gates: copy/words/assets/determinism-source (qa/lint.mjs), overlay safe zones (every
-// frame, both aspects, from the overlay's inked boxes), luma from 20.4 s (YAVG >= 72 and
-// the darkest 2% >= 18, measured on the encoded MP4s), outputs (ffmpeg stream info), audio (EBU R128,
+// frame, both aspects, from the overlay's inked boxes), the 9:16 end card's sign, posts, tray
+// and tiles inside x 96-918 (every S10 frame), luma from 20.4 s (YAVG >= 72 and the darkest
+// 2% >= 18, measured on the encoded MP4s), the 16:9 S09 hold's upper corners (YAVG >= 75,
+// 28.35 to the cut), outputs (ffmpeg stream info), audio (EBU R128,
 // true peak, silences, duration) and determinism (four frames rendered by two separate
 // browser processes must match).
 
@@ -56,6 +58,25 @@ if (!skip.has('overlay')) {
       }, [TOTAL, FPS, aspect === '9x16']);
       const names = [...new Set(bad.map((b) => b.name))];
       gate(`overlay-${aspect}`, bad.length === 0, { frames: new Set(bad.map((b) => b.f)).size, items: names, first: bad.slice(0, 6) });
+      // 9:16 end card: the sign, its posts, the tray and the tiles (the 3D end card, not the
+      // overlay) stay inside the safe box's x 96-918 on every S10 frame, the impact included
+      if (aspect === '9x16') {
+        const res = await page.evaluate(([from, total, fps]) => {
+          const s10 = window.TRAILER.trailer.shots.find((s) => s.id === 'S10');
+          if (!s10 || !s10.qaBoxes) return { missing: true };
+          const out = [], worst = { x0: Infinity, x1: -Infinity };
+          for (let f = from; f < total; f++) {
+            window.TRAILER.overlayAt(f / fps); // poses the frame
+            for (const b of s10.qaBoxes()) {
+              const k = 1080 / b.frame[0], x0 = b.box[0] * k, x1 = b.box[2] * k;
+              worst.x0 = Math.min(worst.x0, x0); worst.x1 = Math.max(worst.x1, x1);
+              if (x0 < 96 || x1 > 918) out.push({ f, t: +(f / fps).toFixed(3), name: b.name, x: [Math.round(x0), Math.round(x1)] });
+            }
+          }
+          return { out, worst };
+        }, [Math.ceil(E.S10 * FPS), TOTAL, FPS]);
+        gate('endcard-safe-9x16', !res.missing && res.out.length === 0, res.missing ? { missing: 'S10 qaBoxes' } : { frames: new Set(res.out.map((b) => b.f)).size, xRange: [Math.round(res.worst.x0), Math.round(res.worst.x1)], first: res.out.slice(0, 6) });
+      }
       await page.close();
     }
   } finally { await browser.close(); server.close(); }
@@ -189,6 +210,20 @@ for (const [aspect, file] of Object.entries(MP4)) {
     frames: yavg.length, minYAVG: +Math.min(...yavg).toFixed(2), meanYAVG: +(yavg.reduce((p, c) => p + c, 0) / yavg.length).toFixed(2),
     minDark2: +Math.min(...dark).toFixed(2), belowYAVG: lowY.slice(0, 8), belowDark: lowD.slice(0, 8),
   });
+
+  // 16:9 S09 hold (28.35 to the cut): both upper corners show the painted dusk sky, never
+  // the backdrop's margin fill (the old brown "smoke"): YAVG >= 75 in each corner crop
+  if (aspect === '16x9') {
+    const T0 = 28.35, T1 = E.S10 - 0.01;
+    const corners = { upperLeft: 'crop=400:320:0:80', upperRight: 'crop=400:310:1520:40' };
+    const res = {};
+    for (const [name, crop] of Object.entries(corners)) {
+      const out = sh('ffmpeg', ['-hide_banner', '-v', 'error', '-ss', String(T0), '-t', (T1 - T0).toFixed(3), '-i', file, '-vf', `${crop},signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-`, '-f', 'null', '-']);
+      const ys = [...out.matchAll(/YAVG=([\d.]+)/g)].map((m) => Number(m[1]));
+      res[name] = { frames: ys.length, minYAVG: ys.length ? +Math.min(...ys).toFixed(2) : null, below75: ys.map((y, i) => ({ t: +(T0 + i / FPS).toFixed(2), y })).filter((x) => x.y < 75).slice(0, 6) };
+    }
+    gate('s09-corners-16x9', Object.values(res).every((r) => r.frames > 0 && r.minYAVG >= 75), res);
+  }
 }
 
 // ---- 9: audio, on the mixed score

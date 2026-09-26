@@ -86,7 +86,7 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
         flight: Math.min(0.45, 0.36 + len * 0.1 + h(3) * 0.08),
         // each spark lets go on its own, well apart from its neighbours (a loose rising cloud;
         // a row or a line that lets go together, or stays behind together, reads as a letter)
-        release: h(5) * 0.25, tw: h(7) * 50,
+        release: h(5) * 0.2, tw: h(7) * 50,
         // once free it kicks off sideways (never straight up its own wall, which would keep a
         // dotted column) and climbs at its own speed, so neighbours part at once
         drift: (h(6) < 0.5 ? -1 : 1) * (0.1 + 0.16 * h(9)), climb: 0.8 + h(8) * 1.0,
@@ -143,7 +143,7 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
       } else {
         // what is still in place dims as a whole once the drawing starts to let go, so its
         // leftover pieces of line never read as letters while the rest rises
-        a *= 1 - 0.88 * ease.inOutSine(clamp((t - o.holdEnd) / 0.15));
+        a *= 1 - 0.95 * ease.inOutSine(clamp((t - o.holdEnd) / 0.12));
       }
     }
     return { x, y, a };
