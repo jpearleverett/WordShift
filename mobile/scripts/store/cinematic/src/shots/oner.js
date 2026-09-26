@@ -515,12 +515,12 @@ export default async function make(ctx) {
     poseEmote(pop, t - E.SLOANE_POP, { hold: 0.18, rise: 0.1, fade: 0.2 });
     moths.group.visible = t >= E.SLOANE_POP;
     moths.pose(t, camera);
-    const centre = add(head, [-0.95, -0.45, 0.25]);
+    const centre = add(head, [-1.12, -0.45, 0.25]);
     moths.group.position.set(...centre);
     moths.group.children.forEach((m, i) => {
       const a = t * (1.1 + i * 0.27) + MOTH_PHASE[i];
-      // (a loop 0.7 wide: its right end stays a hand's width left of her face)
-      m.position.set(Math.sin(a) * 0.35, MOTH_BANDS[i] + Math.sin(a * 1.7 + i) * 0.05, Math.cos(a) * 0.3);
+      // (a loop 0.6 wide: its right end stays a hand's width left of her face)
+      m.position.set(Math.sin(a) * 0.3, MOTH_BANDS[i] + Math.sin(a * 1.7 + i) * 0.05, Math.cos(a) * 0.3);
       // appear out of her fur: grow from her head over the pop
       m.scale.setScalar(Math.max(0.001, spring(t - E.SLOANE_POP - 0.1 - i * 0.12, 2.6, 0.6)));
     });
