@@ -69,12 +69,12 @@ const FLY = { liftH: 0.6, arc: 0.3, zArc: 1.2, tumble: 0.25 };
  * the landing slot (the match cut); 9:16 pins the centre of the target row, since a
  * pinned slot cannot keep SUPPER and GLITTER both inside the frame at a readable size.
  * The tall frame spans almost two floors, so 9:16 sits the trays low (target row at
- * 67%, inside the 1440 px safe line) on a longer lens from a gentler height: the room
+ * 68%, inside the 1440 px safe line) on a longer lens from a gentler height: the room
  * below (Ember, Archimedes and Fennick facing the lens) stays under the frame while the
  * resident behind the rack still shows head and shoulders above it.
  */
 const RIG_WIDE = { yaw: 8, pitch: 1.5, fov: mm(65), ndc: [-0.17, -0.3], dist: 10.4, push: 0.6, anchor: 'slot' };
-const RIG_TALL = { yaw: 5, pitch: -10, fov: 28, ndc: [-0.06, -0.35], dist: 12.5, push: 0.9, anchor: 'row' };
+const RIG_TALL = { yaw: 5, pitch: -7, fov: 28, ndc: [-0.06, -0.37], dist: 12.5, push: 0.9, anchor: 'row' };
 
 function basis(yawDeg, pitchDeg) {
   const y = yawDeg * RAD, p = pitchDeg * RAD;
@@ -383,7 +383,7 @@ export default async function make(ctx) {
       afterPose(b, t, sy);
       poseLife(b, t);
       motes.uniforms.focus.value = cam.depth; motes.uniforms.aperture.value = APERTURE;
-      // warm key on the rack from the front-left (the sun's side)
+      // the white key on the rack from the front-left (the sun's side)
       key.visible = true; key.target.visible = true;
       // aimed at the rack's centre so the far end of a seven-tile row is lit as well as the slot
       const rc = [b.rm.x + b.rx, b.slotW[1], b.slotW[2]];
