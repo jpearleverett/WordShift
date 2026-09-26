@@ -115,7 +115,7 @@ export default async function make(ctx) {
   const shaft = world.register(makeShaft({ width: 1.8, height: 5.5, color: '#fff3c8', opacity: 0.16 }), jungle.group);
   const pop = await makeBillboard('ui/emote_sparkle.png', 0.9);
   world.register(pop);
-  const bubbleArt = makeBubble({ text: 'Three moths live in my fur. I call all three Gerald.', name: 'Sloane', width: Math.round((portrait ? 820 : 760) * ctx.pxScale), fontSize: Math.round((portrait ? 44 : 40) * ctx.pxScale), pixel: Math.max(2, Math.round(6 * ctx.pxScale)), tail: 'left' });
+  const bubbleArt = makeBubble({ text: 'Three moths live in my fur. I call all three Gerald.', name: 'Sloane', width: Math.round((portrait ? 760 : 760) * ctx.pxScale), fontSize: Math.round((portrait ? 44 : 40) * ctx.pxScale), pixel: Math.max(2, Math.round(6 * ctx.pxScale)), tail: 'left' });
   ctx.overlay.quad('bubble', { texture: bubbleArt.texture, width: bubbleArt.width, height: bubbleArt.height });
 
   const streamPts = [rackCentre, [-2.2, 3.8, 8.5], [0.4, 6.4, 4.2], [0, 6.6, -0.6]];
@@ -349,9 +349,12 @@ export default async function make(ctx) {
       const px = ctx.pxScale;
       let x = portrait ? ctx.overlay.width / 2 : p.x + bubbleArt.width / 2 + 30 * px;
       let y = portrait ? p.y - bubbleArt.height / 2 - 60 * px : p.y - bubbleArt.height / 2 - 20 * px;
-      if (portrait) { x = Math.min(Math.max(x, 96 * px + bubbleArt.width / 2), 918 * px - bubbleArt.width / 2); y = Math.max(y, 200 * px + bubbleArt.height / 2); }
-      else { x = Math.min(x, ctx.overlay.width - 90 * px - bubbleArt.width / 2); y = Math.max(y, 90 * px + bubbleArt.height / 2); }
-      ctx.overlay.place('bubble', { x, y, scale: 0.6 + 0.4 * open, opacity: Math.min(1, open * 1.5) * (1 - seg(t, E.S04 - 0.2, E.S04)) });
+      const sc = 0.6 + 0.4 * open;
+      // clamp with the live scale (the pop overshoots) so the bubble never leaves the safe box
+      const hw = (bubbleArt.width * sc) / 2 + 4 * px, hh = (bubbleArt.height * sc) / 2 + 4 * px;
+      if (portrait) { x = Math.min(Math.max(x, 96 * px + hw), 918 * px - hw); y = Math.max(y, 200 * px + hh); }
+      else { x = Math.min(x, ctx.overlay.width - 90 * px - hw); y = Math.max(y, 90 * px + hh); }
+      ctx.overlay.place('bubble', { x, y, scale: sc, opacity: Math.min(1, open * 1.5) * (1 - seg(t, E.S04 - 0.2, E.S04)) });
     },
   };
   return shot;
