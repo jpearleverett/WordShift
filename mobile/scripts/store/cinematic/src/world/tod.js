@@ -111,8 +111,9 @@ export async function makeSkyBackdrop({ a = 'environment/sky_afternoon.webp', b 
         float rip = 0.5 * (sin(uc * 14.45 + vUv.y * 5.1) + sin(uc * 29.5 - vUv.y * 9.3 + 2.1));
         float k = smoothstep(front - hw, front + hw, vUv.y + rp * rip);
         // ahead of the front the afternoon's lower band (its green trees and meadow) already
-        // takes the evening, so no bright green stands under the pink sky
-        vec3 dim = mix(vec3(1.0), vec3(0.74, 0.54, 0.48), smoothstep(0.0, 0.45, mixv) * (1.0 - smoothstep(0.55, 0.85, vUv.y)));
+        // takes the evening, so no bright green stands under the pink sky (a linear-light
+        // multiply: in sRGB it pulls green about 40% and red about 20% toward the dusk olive)
+        vec3 dim = mix(vec3(1.0), vec3(0.58, 0.34, 0.28), smoothstep(0.0, 0.38, mixv) * (1.0 - smoothstep(0.55, 0.85, vUv.y)));
         vec3 soft = mix(texture2D(midA, uv).rgb * dim, texture2D(midB, uv).rgb, k);
         vec3 c;
         if (out_ > 0.0) {

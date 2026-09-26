@@ -11,8 +11,8 @@
 //      the lower-centre caption never crosses her face or chest), and the shelf leaves
 //      the frame for the bed's bass-out break. When it slides back, the jars stand
 //      DILL, SAGE, MINT and the L sits at the right end. Nothing moves on camera: the
-//      swap happens only while the shelf is out of frame. Panko turns toward the
-//      shelf and a question mark pops.
+//      swap happens only while the shelf is out of frame. Panko looks up at the
+//      shelf (a hop and a lean) and a question mark pops.
 // S08: Ember's den. A 3D pixel fire in the painted fireplace and a flickering light;
 //      the sprouted L sits at the right end of the mantel. Sparks rise out of the
 //      fire and draw a plain little house in five eighth-note strokes (walls and
@@ -73,13 +73,13 @@ function spiceLabel(word, band) {
   // the lettering, drawn soft and then snapped to ink / paper per pixel
   const tc = document.createElement('canvas'); tc.width = W; tc.height = H;
   const tg = tc.getContext('2d');
-  // (26 px caps on a 32 px label: DILL SAGE MINT read at about 28 px in 16:9's payoff frame;
+  // (27 px type on a 32 px label: DILL SAGE MINT stand 28 px tall in 16:9's payoff frame;
   // squeezed a little so the words stay on the jar's front)
-  tg.font = '700 26px "Figtree"';
+  tg.font = '700 27px "Figtree"';
   tg.textAlign = 'center'; tg.textBaseline = 'alphabetic';
   const m = tg.measureText(word);
   const base = H / 2 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
-  tg.save(); tg.translate(W / 2, 0); tg.scale(0.84, 1); tg.fillStyle = '#000'; tg.fillText(word, 0, Math.round(base)); tg.restore();
+  tg.save(); tg.translate(W / 2, 0); tg.scale(0.82, 1); tg.fillStyle = '#000'; tg.fillText(word, 0, Math.round(base)); tg.restore();
   const ink = tg.getImageData(0, 0, W, H).data;
   return pixelTexture(W, H, (g) => {
     g.fillStyle = '#F3E2BF'; g.fillRect(0, 0, W, H);
@@ -212,7 +212,7 @@ export default async function make(ctx) {
   const interiorTint = new THREE.Color(INTERIOR_TINT);
   // S08: the den's painted light a touch lower, so Ember's fur stands 15+ luma off the wood
   // panelling behind her (both are the same warm orange)
-  const DEN_PAINT = 0.93;
+  const DEN_PAINT = 0.86;
 
   // ================================================================ S07 Panko's jars
   const kit = house.rooms.kitchen;
@@ -315,13 +315,13 @@ export default async function make(ctx) {
   ovenPool.position.set(paintX(kit, 0.908), 0.009, -1.0);
 
   // Panko stirs her pot, trots off for the break (the camera goes with her and down, so the
-  // shelf leaves the frame) and at the end turns back toward the shelf.
+  // shelf leaves the frame) and, as the jars come back, looks up at the shelf's right end,
+  // where the L now sits: a hop and a lean, facing right in both cuts (turn 1), the "?" above.
   //   9:16  she stirs from the pot's right and stops short of the oven: her head stays left
   //         of its flame (at 2.35+ the fire stands on her head).
-  //   16:9  she stirs from the pot's left and trots to the herbs on the left counter. At 100 mm
-  //         a frame holding the jars and her whole face is at least ~6.6 units wide, and the
-  //         flip moves her face ~1.2 units, so only a spot left of the lower-centre caption
-  //         (x 20-80%) keeps it off her face and chest while she turns under the jars' frame.
+  //   16:9  she stirs from the pot's left and trots right, to just below the shelf. The caption
+  //         is gone (c7 out E.JARS_BACK + 0.1) as the camera snaps back up to the jars, so the
+  //         payoff holds DILL SAGE MINT, the L, her whole head and the "?" with no text on her.
   const STAGE = portrait ? { from: 1.3, fromFacing: -1, to: 1.85, turn: 1 } : { from: -0.6, fromFacing: 1, to: 0.35, turn: 1 };
   const P_Z = -0.5, STRIDE = 0.72;
   const T_WALK0 = E.JARS_AWAY + 0.02, T_WALK1 = E.JARS_AWAY + 1.22;
@@ -368,8 +368,9 @@ export default async function make(ctx) {
   //   R   Panko at her stove (16:9: she enters from the frame's left edge on a curved path,
   //       above the caption; low enough that it crosses only her legs)
   //   D   down with her for the break: the shelf and its jars leave the frame
-  //   B   back up to the shelf: the jars and Panko, who turns (16:9: she at the left edge,
-  //       the jars top right, her face and the "?" left of the caption)
+  //   B   back up to the shelf: the jars and Panko, who looks up (16:9: a 0.15 s snap on the
+  //       groove's return, so the payoff then holds still: the jars and the L top right, her
+  //       head and the "?" left of centre, the caption already gone)
   const FZ = ITEM_Z;
   const F = (x, y, w, pitch = 0) => [x, y, FZ, w, 0, pitch];
   const RIG7 = portrait ? {
@@ -380,8 +381,8 @@ export default async function make(ctx) {
     D: F(2.0, 0.72, 2.2, -9), D2: F(2.03, 0.7, 2.19, -9),
     B: F(1.85, 2.5, 2.7, -1.5), B2: F(1.83, 2.49, 2.72, -1.5),
   } : {
-    // 16:9 blocks the break to the left counter: the caption (lower centre, x 20-80%) then never
-    // crosses her face or chest, and when the jars come back she turns at the frame's left edge
+    // 16:9: the lower-centre caption (x 20-80%) crosses only her legs before the break; she
+    // trots right beneath the shelf, which stays out of frame until the jars come back
     J0: F(1.36, 2.93, 4.3, 1), J1: F(1.8, 2.93, 4.3, 1),
     R1: F(1.5, 1.6, 4.8, -1), R: F(0.7, 1.3, 5.2, -2), R2: F(0.68, 1.3, 5.18, -2),
     D: F(0.2, 1.05, 5.3, -3.5), D2: F(0.18, 1.03, 5.28, -3.5),

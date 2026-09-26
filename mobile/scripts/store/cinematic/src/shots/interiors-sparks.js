@@ -141,9 +141,10 @@ export function makeStrokeSparks({ strokes = HOUSE_STROKES, scale = 1.35, cell =
         x += s.drift * kick + Math.sin(t * 5 + s.tw) * 0.035 * r;
         a *= 1 - ease.outQuad(r);
       } else {
-        // what is still in place dims as a whole once the drawing starts to let go, so its
-        // leftover pieces of line never read as letters while the rest rises
-        a *= 1 - 0.95 * ease.inOutSine(clamp((t - o.holdEnd) / 0.12));
+        // what is still in place dims as a whole as the drawing starts to let go (from a frame
+        // before the first spark leaves), so its leftover pieces of line never read as letters
+        // while the rest rises
+        a *= 1 - 0.95 * ease.inOutSine(clamp((t - o.holdEnd + 0.03) / 0.1));
       }
     }
     return { x, y, a };

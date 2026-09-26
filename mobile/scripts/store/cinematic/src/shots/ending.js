@@ -426,6 +426,7 @@ export default async function make(ctx) {
   })();
   const s08End = () => handoff;
   const denTint = new THREE.Color();
+  const SMOKE_S09 = new THREE.Color('#f2e6da');
   /** Where the pull-back starts at t: S08's own rig while its pan is still running, else its last frame. */
   const pullFrom = (t) => (s08Rig ? s08Rig(Math.min(t, E.S09 + 0.3)) : s08End());
 
@@ -560,6 +561,12 @@ export default async function make(ctx) {
         poseEmote(e, t - E.CASCADE[i], { hold: 1.3, rise: 0.35, fade: 0.4 });
       });
       world.sun.castShadow = wide;
+      // 16:9: the chimney smoke reads against the dusk sky in the hold (it is pink on pink
+      // otherwise): a little denser and a lighter, warmer grey (world.pose sets both afresh)
+      if (!portrait && world.puffs) {
+        const sm = lerp(1, 1.8, seg(cam.k, 0.5, 1));
+        for (const p of world.puffs) { p.s.material.opacity = Math.min(0.8, p.s.material.opacity * sm); p.s.material.color.lerp(SMOKE_S09, 0.6 * (sm - 1) / 0.8); }
+      }
       // the dusk horizon decal and haze from S06 (cast.js), so the far meadow runs into the painting
       if (world.duskSeam) {
         const sk = seg(cam.k, 0.5, 1);

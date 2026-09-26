@@ -205,18 +205,21 @@ export default async function make(ctx) {
   // wallpaper unrolls (the same reveal as the painting, with its bright seam), so the room's
   // own returns take over under the unroll
   const standMat = pine(roomD / 2.2, roomH / 1.1);
-  standMat.onBeforeCompile = (sh) => {
-    sh.uniforms.uReveal = jungle.reveal;
+  const wipeWith = (reveal) => (sh) => {
+    sh.uniforms.uReveal = reveal;
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vRUv;').replace('#include <uv_vertex>', '#include <uv_vertex>\nvRUv = uv;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vRUv;\nuniform float uReveal;')
       .replace('#include <dithering_fragment>', '#include <dithering_fragment>\nif (uReveal > 0.001) { float edge = 1.0 - uReveal; if (vRUv.y > edge) discard; float seam = 1.0 - smoothstep(0.0, 0.03, edge - vRUv.y); gl_FragColor.rgb += vec3(1.0, 0.92, 0.7) * seam * 1.5 * (1.0 - smoothstep(0.75, 1.0, uReveal)); }');
   };
+  standMat.onBeforeCompile = wipeWith(jungle.reveal);
   standMat.customProgramCacheKey = () => 'pine-return-reveal';
   const standIns = [-1, 1].map(() => world.register(new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), standMat), jungle.group));
-  // and a pine floor, wiped away from the back edge forward by the same unroll (a plane's uv
-  // y runs to its back edge once it lies flat), just above the room's own floor
-  const standFloorMat = standMat.clone(); standFloorMat.map = pine(roomW / 2.2, roomD / 1.1).map; standFloorMat.emissiveMap = standFloorMat.map;
-  standFloorMat.onBeforeCompile = standMat.onBeforeCompile; standFloorMat.customProgramCacheKey = standMat.customProgramCacheKey;
+  // and a pine floor, just above the room's own floor, wiped away from the back edge forward
+  // (a plane's uv y runs to its back edge once it lies flat) once the unroll is halfway down
+  // the wall, and more slowly: the wall and the floor going at once stepped the frame's luma
+  const floorWipe = { value: 0 };
+  const standFloorMat = pine(roomW / 2.2, roomD / 1.1);
+  standFloorMat.onBeforeCompile = wipeWith(floorWipe); standFloorMat.customProgramCacheKey = standMat.customProgramCacheKey;
   const standFloor = world.register(new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), standFloorMat), jungle.group);
   standFloor.rotation.x = -Math.PI / 2;
   for (const m of [beam, ...trims, ...standIns]) { m.castShadow = true; m.receiveShadow = true; }
@@ -318,7 +321,10 @@ export default async function make(ctx) {
     sloane.ch.visible = t >= E.SLOANE_POP; sloane.shadow.visible = t >= E.SLOANE_POP;
     jungle.painting.visible = t >= E.DROP;
     if (jungle.windowMesh) jungle.windowMesh.visible = t >= E.DROP;
-    jungle.reveal.value = ease.inOutSine(seg(t, E.DROP, E.DROP + 0.4));
+    // the wallpaper unrolls in 0.4 s at a near-even rate (short soft ends): it takes the bright
+    // pine and the blueprint away line by line, and an eased curve concentrated that luma
+    // change into a few frames
+    jungle.reveal.value = trapezoid(seg(t, E.DROP, E.DROP + 0.4), 0.2);
     // the room's own (dark) returns come in under the unroll, behind the pine stand-ins
     for (const w of jungle.returns) w.visible = t >= E.DROP;
     const K = E.KNOCKS;
@@ -327,7 +333,8 @@ export default async function make(ctx) {
     // 0 the pine floor drops in and rebounds a hair (the room's own floor comes in under
     // the unroll)
     jungle.floor.visible = t >= E.DROP;
-    if (flying(0) && t < E.DROP + 0.4) { standFloor.visible = true; standFloor.position.set(...piecePos(0, t)); }
+    floorWipe.value = smooth(seg(t, E.DROP + 0.2, E.DROP + 0.8));
+    if (flying(0) && t < E.DROP + 0.8) { standFloor.visible = true; standFloor.position.set(...piecePos(0, t)); }
     // 1, 2 the pine returns swing in from outside the frame (up and toward the lens),
     // arcing over and turning flush with the posts; cut away under the unroll
     standIns.forEach((w, k) => {
@@ -784,6 +791,13 @@ const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm3 = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 const ZERO3 = [0, 0, 0];
+/** 0..1 with a constant-speed middle and quadratic ramps of length a at both ends. */
+function trapezoid(s, a) {
+  const v = 1 / (1 - a);
+  if (s < a) return (v * s * s) / (2 * a);
+  if (s > 1 - a) return 1 - (v * (1 - s) * (1 - s)) / (2 * a);
+  return v * (s - a / 2);
+}
 // PLANT's landing sparkles: [x from the rack centre, margin (+1 above the tiles, -1 below),
 // size]. The x values are the gaps between PLANT's tiles (slot pitch 0.504, tiles 0.45
 // wide); the margins sit between PLANT and its neighbour rows, and the sprout's side of
