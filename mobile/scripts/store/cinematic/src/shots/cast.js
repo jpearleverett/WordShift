@@ -153,7 +153,7 @@ export default async function make(ctx) {
   const L_HIDE = DESC0 + 0.3;                    // the L on the chimney leaves as the camera comes down and back
 
   const dusk = (t) => smooth(seg(t, E.DUSK_START, E.DUSK_END));
-  // the wipe front's progress (tod.js skyWipe), through knots set below where the sun hands over
+  // the wipe front's progress (tod.js skyWipe): one eased sweep (SKY_KNOTS, below)
   const skyMix = (t) => monotone(SKY_KNOTS, t);
   const LAMP_ORDER = LAYOUT.flat();
   // each lamp pops on its sixteenth: a quick rise past full with a small overshoot that
@@ -445,7 +445,7 @@ export default async function make(ctx) {
     moths.group.visible = mk > 0.02;
     if (moths.group.visible) {
       moths.pose(t, camera);
-      const hp = inRoom('sloane', sl.ch.position.x - 0.4, sl.h * 1.08, sl.z0 + 0.15);
+      const hp = inRoom('sloane', sl.ch.position.x - 0.75, sl.h * 1.1, sl.z0 + 0.15);
       moths.group.position.set(hp[0], hp[1], hp[2]);
       moths.group.scale.setScalar(Math.max(0.001, mk));
     }

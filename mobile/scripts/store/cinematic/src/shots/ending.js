@@ -403,9 +403,10 @@ export default async function make(ctx) {
   // S08 -> S09 is one continuous move. S08 exposes its camera rig (`rig`, a pure function
   // of time) and, in 16:9, keeps panning until E.S09 + 0.3: the pull-back starts from that
   // still-decelerating pan, so the pan hands its speed to the pull-back with no stop in
-  // between. S08's final look (exposure, contrast, aperture) is sampled once, here at
-  // construction (S08 is made before this module), so every process sees the same values
-  // and the grade and depth of field ease out of S08's instead of stepping at the cut.
+  // between. S08's final look (exposure, contrast, aperture, blur cap) is sampled once, here
+  // at construction (S08 is made before this module), so every process sees the same values
+  // and the grade and depth of field ease out of S08's instead of stepping at the cut (S08
+  // itself eases the den's painted light and interior tint back to the dusk values).
   const s08Shot = (ctx.shots || []).find((s) => s.id === 'S08') || null;
   const s08Rig = s08Shot && typeof s08Shot.rig === 'function' ? s08Shot.rig : null;
   const handoff = (() => {
@@ -415,17 +416,14 @@ export default async function make(ctx) {
     const dir = new THREE.Vector3(); f.camera.getWorldDirection(dir);
     const d = f.look?.dof?.focus ?? 6;
     const p = f.camera.position;
-    const hl = s08Shot.handoffLook || {};
     const h = {
       pos: [p.x, p.y, p.z], target: [p.x + dir.x * d, p.y + dir.y * d, p.z + dir.z * d], fov: f.camera.fov,
-      aperture: f.look?.dof?.aperture ?? (portrait ? 60 : 70), maxBlur: f.look?.dof?.maxBlur ?? 10, exposure: hl.exposure ?? f.look?.exposure, contrast: hl.contrast ?? f.look?.contrast,
-      tint: hl.tint ? new THREE.Color(hl.tint) : null, // the den painting's interior tint (S08 sets it)
+      aperture: f.look?.dof?.aperture ?? (portrait ? 60 : 70), maxBlur: f.look?.dof?.maxBlur ?? 10, exposure: f.look?.exposure, contrast: f.look?.contrast,
     };
     world.begin();
     return h;
   })();
   const s08End = () => handoff;
-  const denTint = new THREE.Color();
   const SMOKE_S09 = new THREE.Color('#f2e6da');
   /** Where the pull-back starts at t: S08's own rig while its pan is still running, else its last frame. */
   const pullFrom = (t) => (s08Rig ? s08Rig(Math.min(t, E.S09 + 0.3)) : s08End());
@@ -450,23 +448,35 @@ export default async function make(ctx) {
     const a = from || (portrait ? { pos: add(face, [0.5, 0.1, 6.2]), target: face, fov: mm(35) } : { pos: add(face, [0.8, 0.3, 5]), target: face, fov: mm(50) });
     const b = WIDE(pushAt(t));
     const ap0 = handoff ? handoff.aperture : (portrait ? 60 : 70);
-    // The camera's distance to its target grows geometrically (an even rate of change of
-    // scale), its direction and target blending with k: a linear blend of the positions
-    // front-loads the move (7-8% of the frame per frame within 0.15 s of a still close-up),
-    // this starts at half that and peaks mid-move instead.
-    const target = mix3(a.target, b.target, k);
+    // The camera's distance to its target grows geometrically with k (an even rate of change
+    // of scale), and the target, the viewing direction and the lens follow the distance
+    // travelled (kt): while the camera is still close the aim stays on Ember and only swings
+    // to the house once it is far enough for the swing to be small on screen. A linear blend
+    // of the positions front-loaded the move (7-8% of the frame per frame within 0.15 s of a
+    // still close-up); this starts at about a third of that (9:16 travel 9, 30, 50 px/frame
+    // on the first three frames against 25, 78, 123) and peaks about 11% lower, mid-move.
     const da = [a.pos[0] - a.target[0], a.pos[1] - a.target[1], a.pos[2] - a.target[2]], db = [b.pos[0] - b.target[0], b.pos[1] - b.target[1], b.pos[2] - b.target[2]];
     const la = Math.hypot(...da), lb = Math.hypot(...db);
-    const dir = mix3(da.map((v) => v / la), db.map((v) => v / lb), k), dl = Math.hypot(...dir) || 1;
     const L = la * Math.pow(lb / la, k);
+    const kt = Math.abs(lb - la) > 1e-6 ? (L - la) / (lb - la) : k;
+    const target = mix3(a.target, b.target, kt);
+    const dir = mix3(da.map((v) => v / la), db.map((v) => v / lb), kt), dl = Math.hypot(...dir) || 1;
     const pos = target.map((v, i) => v + (dir[i] / dl) * L);
-    return { pos, target, fov: lerp(a.fov, b.fov, k), k, aperture: lerp(ap0, 9, k) };
+    return { pos, target, fov: lerp(a.fov, b.fov, kt), k, aperture: lerp(ap0, 9, k) };
   }
   /**
-   * Adaptive motion blur for the pull-back: up to 32 subframes, and never a shutter shorter
-   * than 0.75 of 1/60 s, so the fastest frames smear into a streak instead of stepping.
+   * Adaptive motion blur for the pull-back (common.js blurFor: up to 32 subframes, never a
+   * shutter shorter than 0.75 of 1/60 s), with the shutter opening further as the camera
+   * speeds up: from 30 px of travel per frame it widens toward 1.5/60 s (a 270-degree
+   * shutter) at 90 px and above, so neighbouring frames of the fastest stretch overlap in
+   * time and the move reads as one smear instead of strobing from frame to frame.
    */
-  const s09Blur = (t) => blurFor(travelPx((ts) => s09Camera(ts), t, portrait ? 1920 : 1080), { maxN: 32, minShutterFrac: 0.75 });
+  const s09Blur = (t) => {
+    const px = travelPx((ts) => s09Camera(ts), t, portrait ? 1920 : 1080);
+    const b = blurFor(px, { maxN: 32, minShutterFrac: 0.75 });
+    const open = 1 + 0.5 * Math.min(1, Math.max(0, (px - 30) / 60));
+    return { n: b.n, shutter: b.shutter * open };
+  };
 
   // 16:9 hold checks (construction time, like the S10 feet check below): the chimney stays
   // in frame (NDC y <= 0.9) at the start, at 31.17 and at the end of the push, and the
@@ -547,8 +557,6 @@ export default async function make(ctx) {
       applyWalks(ch.walks);
       uprightResidents();
       for (const o of mantelProps()) o.visible = true;
-      // the den painting's interior tint (S08's) eases into the wide's dusk tint with the grade
-      if (handoff?.tint) den.mat.color.lerpColors(handoff.tint, denTint.copy(den.mat.color), cam.k);
       // staggered emote cascade: bottom row first, left to right, one per sixteenth; each
       // emote rides above its resident's head wherever the stroll has taken them
       order.forEach((room, i) => {
