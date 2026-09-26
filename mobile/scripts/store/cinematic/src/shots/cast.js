@@ -368,9 +368,9 @@ export default async function make(ctx) {
   const P = portrait ? {
     craneX: [0, 0], craneY: [3.4, 31], craneZ: 21, lookDrop: 0.5, fov: 54,
     tipPitch: 10, tipFov: 40, skyRise: 6.5, skyBack: 4,
-    hero: fromAim([0, 9, 36], [0, 13, 0], 53, { aperture: 12 }),
+    hero: fromAim([0, 9, 40], [0, 13.5, 0], 53, { aperture: 7 }),
     heroDrift: [0, 0, 0],
-    kitchen: fromAim([0.2, 2.9, 15.5], [0, 2.35, 0], 42, { aperture: 8 }),
+    kitchen: fromAim([0.2, 2.9, 15.5], [0, 2.35, 0], 38, { aperture: 8 }),
   } : {
     craneX: [-2.5, 0], craneY: [2.0, 29], craneZ: 24, lookDrop: 0.5, fov: mm(40),
     tipPitch: 20, tipFov: mm(65), skyRise: 2.5, skyBack: 4,
@@ -446,7 +446,7 @@ export default async function make(ctx) {
     const lat = Math.hypot(dp[0] - along * f[0], dp[1] - along * f[1], dp[2] - along * f[2]);
     const d = Math.min(Math.max(b.focus, 6), 40);
     const px = Math.hypot(a.yaw - b.yaw, a.pitch - b.pitch) * pxPerRad + lat / d * pxPerRad + Math.abs(along) / d * 960 + Math.abs(a.fov - b.fov) / b.fov * 960;
-    return px < 3 ? 1 : px < 30 ? 3 : 5;
+    return px < 3 ? 1 : px < 30 || t < DESC0 ? 3 : 5;
   }
 
   function pose(t) {
@@ -472,7 +472,7 @@ export default async function make(ctx) {
     poseProps(t);
     return {
       scene: world.scene, camera,
-      look: look(grade, dk, { msaa: false, exposure: grade.exposure * (1 + 0.07 * dk), dof: { focus: r.focus, aperture: r.aperture, maxBlur: 14 } }),
+      look: look(grade, dk, { msaa: false, exposure: grade.exposure * (1 + 0.07 * dk + 0.08 * ease.inOutSine(seg(t, E.PUSH_KITCHEN, E.S07))), dof: { focus: r.focus, aperture: r.aperture, maxBlur: 14 } }),
     };
   }
 
