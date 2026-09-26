@@ -12,7 +12,10 @@ node scripts/store/cinematic/render.mjs 9x16 --scale=0.5 --stills=4.2          #
 node scripts/store/cinematic/render.mjs 16x9 --scale=0.5 --from=345 --to=455   # a frame range (30 fps) as a draft
 node scripts/store/cinematic/sheet.mjs 16x9 --draft --from=11.5 --to=15.2 --every=0.25   # contact sheet of draft frames
 node scripts/store/cinematic/encode.mjs 16x9 --draft                           # draft MP4 (needs every frame)
-node scripts/store/cinematic/audio/score.mjs                                   # the soundtrack
+node scripts/store/cinematic/audio/score.mjs                                   # the soundtrack -> $CINEMATIC_WORK/score.wav + out/score.m4a
+node scripts/store/cinematic/srt.mjs                                           # captions -> out/wordshift-cinematic-captions-en.srt
+node scripts/store/cinematic/qa/lint.mjs                                       # copy, words, moves, determinism, asset allowlist
+node scripts/store/cinematic/qa/report.mjs [--draft]                           # every QA gate on the encoded MP4s -> out/trailer-report.json
 ```
 `$CINEMATIC_WORK` defaults to `/tmp/wordshift-cinematic`. Chromium runs headless on
 SwiftShader (software WebGL): about 0.4-1.2 s per 1080p frame, 4x less at `--scale=0.5`.
@@ -106,6 +109,24 @@ One persistent scene, built once:
   `ctx.overlay.place(name, { x, y, scale, opacity })` in pixels (origin top-left). Sizes scale with
   `ctx.pxScale`. `common.project(camera, worldPoint, overlay)` converts a world point to overlay pixels.
 
+## Sound
+
+`src/cues.js` builds `SCORE` from `E` and `GRID` (its header documents every cue field), so a
+retimed event moves its sound with it. `audio/score.mjs` renders it: the bed is one continuous
+excerpt of `assets/music/home_phase0.mp3` (trailer T = file T + `GRID.offset`) with gain, a
+time-varying low-pass and vibrato; game sounds come only from the spec 5.3 allowlist (enforced);
+everything else is a seeded, band-limited voice in `audio/synth.mjs`. The master is limited and
+loudness-normalised in two passes (`audio/mix.mjs`) to -14 LUFS, true peak under -1 dBTP.
+`CINEMATIC_STEMS=1` also writes per-layer stems; the beat-sync report goes to `$CINEMATIC_SYNC`
+(default `/tmp/wordshift-cinematic-score/sync.txt`), which `qa/report.mjs` folds into the report.
+
+## QA
+
+`qa/lint.mjs` is fast and source-only. `qa/report.mjs` needs the encoded MP4s: it checks the
+overlay's inked pixels on every frame against the safe zones (via `TRAILER.overlayAt(t)`, which
+poses without rendering), luma from 20.4 s, the output format, loudness and cross-process
+determinism, and writes `out/trailer-report.json`.
+
 ## Hard rules (from the spec and the owner's brief)
 
 - Only these assets: residents' `idle/talk/walk` sprites (never `robed*`, never the aye-aye), the 12 room
@@ -113,4 +134,5 @@ One persistent scene, built once:
   `ui/amber.png`, `ui/emote_{heart,note,sparkle,thought,question}.png`. No story art, no pit, no night skies.
 - Nothing reads as a face, eyes or a presence. No resident looks at camera; no unison freezes; no lamp dips.
 - Every shown word is real and cheerful (verified in `mobile/src/dictionary.ts`).
-- 9:16: nothing added (captions, bubbles) outside x 96-918, y 200-1440 (at 1080x1920).
+- 9:16: nothing added (captions, bubbles) outside x 96-918, y 200-1440 (at 1080x1920); 16:9: nothing below y 972.
+- No particle, spark or drawing may pair into eyes (the blueprint's chalk and the fireflies are laid out for this).
