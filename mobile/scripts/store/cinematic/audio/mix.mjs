@@ -1,5 +1,6 @@
 // Mixing utilities for the score: decode files to float PCM, place them with
-// gain envelopes, and master with a two-pass EBU R128 loudnorm through ffmpeg.
+// gain envelopes, limit the few bed transients that would stop a linear
+// loudness pass, and master with a two-pass EBU R128 loudnorm through ffmpeg.
 
 import { Buffer } from 'node:buffer';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -43,16 +44,73 @@ export function automate(dst, gainAt) {
 
 export function peak(b) { let p = 0; for (let i = 0; i < b.L.length; i++) p = Math.max(p, Math.abs(b.L[i]), Math.abs(b.R[i])); return p; }
 
-export function writeWav(file, b, { float = true } = {}) {
+/**
+ * Inter-sample peak estimate per sample: max of |x| at the sample and at three
+ * points between it and the next, on a Catmull-Rom curve through the neighbours
+ * (close to a 4x oversampled true-peak meter for band-limited material).
+ */
+function peakTrack(b) {
+  const n = b.L.length; const p = new Float32Array(n);
+  for (const ch of [b.L, b.R]) {
+    for (let i = 0; i < n; i++) {
+      const y0 = ch[Math.max(0, i - 1)], y1 = ch[i], y2 = ch[Math.min(n - 1, i + 1)], y3 = ch[Math.min(n - 1, i + 2)];
+      let m = Math.abs(y1);
+      for (const u of [0.25, 0.5, 0.75]) {
+        const v = 0.5 * ((2 * y1) + (-y0 + y2) * u + (2 * y0 - 5 * y1 + 4 * y2 - y3) * u * u + (-y0 + 3 * y1 - 3 * y2 + y3) * u * u * u);
+        if (Math.abs(v) > m) m = Math.abs(v);
+      }
+      if (m > p[i]) p[i] = m;
+    }
+  }
+  return p;
+}
+
+/**
+ * Look-ahead peak limiter (in place). The gain reaches the needed reduction by
+ * the peak (a sliding minimum over the look-ahead, then a box smoother of the same
+ * length) and recovers with a one-pole release. Returns { maxReductionDb, samples }.
+ */
+export function limit(b, ceiling, { lookaheadMs = 5, releaseMs = 90 } = {}) {
+  const n = b.L.length; const la = Math.max(1, Math.round(lookaheadMs * SR / 1000));
+  const pk = peakTrack(b);
+  const need = new Float32Array(n);
+  let touched = 0;
+  for (let i = 0; i < n; i++) { need[i] = pk[i] > ceiling ? ceiling / pk[i] : 1; if (need[i] < 1) touched++; }
+  if (!touched) return { maxReductionDb: 0, samples: 0 };
+  // sliding minimum over [i, i + la] (monotonic deque)
+  const hmin = new Float32Array(n); const dq = new Int32Array(n); let h = 0, t = 0;
+  for (let i = n - 1; i >= 0; i--) {
+    while (t > h && need[dq[t - 1]] >= need[i]) t--;
+    dq[t++] = i;
+    while (dq[h] > i + la) h++;
+    hmin[i] = need[dq[h]];
+  }
+  // box-average over [i - la, i] keeps the curve at or below `need` at every peak
+  const g = new Float32Array(n); let acc = 0;
+  for (let i = 0; i < n; i++) { acc += hmin[i]; if (i - la - 1 >= 0) acc -= hmin[i - la - 1]; g[i] = acc / Math.min(i + 1, la + 1); }
+  const rel = 1 - Math.exp(-1 / (releaseMs * SR / 1000));
+  let cur = 1, worst = 1;
+  const regions = []; let open = null;
+  for (let i = 0; i < n; i++) {
+    cur = g[i] < cur ? g[i] : cur + (g[i] - cur) * rel;
+    if (cur > g[i]) cur = g[i];
+    if (cur < worst) worst = cur;
+    b.L[i] *= cur; b.R[i] *= cur;
+    // where it works by more than 1 dB (for the report)
+    if (cur < 0.891) { if (!open || i / SR - open.to > 0.05) { open = { from: i / SR, to: i / SR, db: 0 }; regions.push(open); } open.to = i / SR; open.db = Math.min(open.db, 20 * Math.log10(cur)); }
+  }
+  return { maxReductionDb: 20 * Math.log10(worst), samples: touched, regions };
+}
+
+export function writeWav(file, b, { float = true, bits = 16 } = {}) {
   const n = b.L.length;
-  const bytesPer = float ? 4 : 2;
+  const bytesPer = float ? 4 : bits / 8;
   const data = Buffer.alloc(n * 2 * bytesPer);
+  const q = (v, max) => Math.max(-max - 1, Math.min(max, Math.round(v * max)));
   for (let i = 0; i < n; i++) {
     if (float) { data.writeFloatLE(b.L[i], i * 8); data.writeFloatLE(b.R[i], i * 8 + 4); }
-    else {
-      data.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(b.L[i] * 32767))), i * 4);
-      data.writeInt16LE(Math.max(-32768, Math.min(32767, Math.round(b.R[i] * 32767))), i * 4 + 2);
-    }
+    else if (bits === 24) { data.writeIntLE(q(b.L[i], 8388607), i * 6, 3); data.writeIntLE(q(b.R[i], 8388607), i * 6 + 3, 3); }
+    else { data.writeInt16LE(q(b.L[i], 32767), i * 4); data.writeInt16LE(q(b.R[i], 32767), i * 4 + 2); }
   }
   const h = Buffer.alloc(44);
   h.write('RIFF', 0); h.writeUInt32LE(36 + data.length, 4); h.write('WAVE', 8); h.write('fmt ', 12);
@@ -62,7 +120,18 @@ export function writeWav(file, b, { float = true } = {}) {
   fs.writeFileSync(file, Buffer.concat([h, data]));
 }
 
-/** Two-pass linear loudnorm to I/TP/LRA. Returns the measured output stats. */
+/** EBU R128 of a file: integrated loudness, loudness range, true peak. */
+export function measure(file) {
+  const r = runStderr(['-hide_banner', '-nostats', '-i', file, '-af', 'ebur128=peak=true', '-f', 'null', '-']);
+  const num = (re) => Number((r.match(re) || []).pop()?.match(/-?[\d.]+/)[0]);
+  return { I: num(/I:\s+-?[\d.]+ LUFS/g), LRA: num(/LRA:\s+-?[\d.]+ LU/g), TP: num(/Peak:\s+-?[\d.]+ dBFS/g) };
+}
+
+/**
+ * Two-pass linear loudnorm to I/TP/LRA. Returns the measured input and output stats;
+ * `normalized.normalization_type` must read "linear" (the input's true peak leaves
+ * room for the gain). ffmpeg runs the filter at 192 kHz and resamples back to SR.
+ */
 export function loudnorm(input, output, { I = -14, TP = -1, LRA = 11 } = {}) {
   const r = runStderr(['-hide_banner', '-i', input, '-af', `loudnorm=I=${I}:TP=${TP}:LRA=${LRA}:print_format=json`, '-f', 'null', '-']);
   const m = JSON.parse(r.slice(r.lastIndexOf('{'), r.lastIndexOf('}') + 1));
@@ -72,7 +141,7 @@ export function loudnorm(input, output, { I = -14, TP = -1, LRA = 11 } = {}) {
   return { measured: m, normalized: m2 };
 }
 
-function runStderr(args) {
+export function runStderr(args) {
   const r = spawnSync(FFMPEG, args, { encoding: 'utf8', maxBuffer: 1 << 28 });
   if (r.status !== 0) throw new Error(r.stderr.slice(-2000));
   return r.stderr;
